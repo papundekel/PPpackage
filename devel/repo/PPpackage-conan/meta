@@ -1,0 +1,10 @@
+{
+    "mapping": [
+        {
+            "key": {
+                "simple": "1"
+            },
+            "value": "simple-1"
+        }
+    ]
+}

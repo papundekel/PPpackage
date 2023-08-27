@@ -4,5 +4,6 @@ devel/conan/
 devel/docker/
 devel/repo/*
 !devel/repo/PPpackage-arch/
+!devel/repo/PPpackage-conan/
 .venv/
 .vscode/
