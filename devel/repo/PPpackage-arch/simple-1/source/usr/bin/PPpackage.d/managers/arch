@@ -1,0 +1,320 @@
+#!/usr/bin/env python
+
+import sys
+import subprocess
+import json
+import re
+import os
+
+
+class ExceptionSTDERR(Exception):
+    def __init__(self, message, stderr):
+        self.message = message
+        self.stderr = stderr
+
+    def __str__(self):
+        stderr = "".join([f"\t{line}\n" for line in self.stderr.splitlines()])
+        return f"{self.message}:\n{{\n{stderr}}}"
+
+
+regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
+
+
+def subprocess_wait(process, error_message):
+    stdout, stderr = process.communicate()
+
+    if process.returncode != 0:
+        raise ExceptionSTDERR(error_message, stderr)
+
+    return stdout
+
+
+def get_cache_paths(cache_path):
+    database_path = f"{cache_path}/arch/db"
+    cache_path = f"{cache_path}/arch/cache"
+    return database_path, cache_path
+
+
+def ensure_dir_exists(path):
+    try:
+        os.makedirs(path)
+    except FileExistsError:
+        pass
+
+
+def check_general_format(input, keys_required, keys_permitted_unequired, error_message):
+    if type(input) is not dict:
+        raise Exception(error_message)
+
+    keys = input.keys()
+
+    keys_permitted = keys_required | keys_permitted_unequired
+
+    are_present_required = keys_required <= keys
+    are_present_only_permitted = keys <= keys_permitted
+
+    if not are_present_required or not are_present_only_permitted:
+        raise Exception(error_message)
+
+
+def parse_requirements(input):
+    requirements_input = json.load(input)
+
+    if type(requirements_input) is not list:
+        raise Exception("Invalid input format")
+
+    for requirement_input in requirements_input:
+        if type(requirement_input) is not str:
+            raise Exception("Invalid input format")
+
+    return set(requirements_input)
+
+
+def resolve(input, output, cache_path):
+    database_path, _ = get_cache_paths(cache_path)
+
+    requirements = parse_requirements(input)
+
+    dependencies = []
+
+    for requirement in requirements:
+        process = subprocess.Popen(
+            [
+                "pactree",
+                "--dbpath",
+                database_path,
+                "-s",
+                requirement,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+        )
+
+        stdout = subprocess_wait(process, "Error in `pactree`")
+
+        for line in stdout.splitlines():
+            match = regex_package_name.search(line)
+
+            if match is None:
+                raise Exception("Invalid pactree output")
+
+            dependency = match.group()
+            dependencies.append(dependency)
+
+    dependencies = list(set(dependencies))
+
+    process = subprocess.Popen(
+        ["pacinfo", "--dbpath", database_path, "--short", *dependencies],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="ascii",
+    )
+
+    stdout = subprocess_wait(process, "Error in `pacinfo`")
+
+    lockfile = {}
+
+    for line in stdout.splitlines():
+        if line.startswith(" "):
+            continue
+
+        split_line = line.split()
+
+        package = split_line[0].split("/")[-1]
+        version = split_line[1].rsplit("-", 1)[0]
+
+        lockfile[package] = version
+
+    json.dump(lockfile, output)
+
+
+def update_database(cache_path):
+    database_path, _ = get_cache_paths(cache_path)
+
+    ensure_dir_exists(database_path)
+
+    process = subprocess.Popen(
+        ["fakeroot", "pacman", "--dbpath", database_path, "-Sy"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="ascii",
+    )
+
+    stdout = subprocess_wait(process, "Error in `pacman -Sy`")
+
+    print(stdout, file=sys.stderr, end="")
+
+
+def parse_lockfile(input):
+    lockfile_input = json.load(input)
+
+    if type(lockfile_input) is not dict:
+        raise Exception("Invalid lockfile format")
+
+    for package, version in lockfile_input.items():
+        if type(package) is not str or type(version) is not str:
+            raise Exception("Invalid lockfile format")
+
+    return list(lockfile_input.keys())
+
+
+def fetch(input, output, cache_path):
+    database_path, cache_path = get_cache_paths(cache_path)
+
+    ensure_dir_exists(cache_path)
+
+    packages = parse_lockfile(input)
+
+    print("Downloading packages...", file=sys.stderr)
+
+    process = subprocess.Popen(
+        [
+            "fakeroot",
+            "pacman",
+            "--dbpath",
+            database_path,
+            "--cachedir",
+            cache_path,
+            "--noconfirm",
+            "-Sw",
+            *packages,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="ascii",
+    )
+
+    stdout = subprocess_wait(process, "Error in `pacman -Sw`")
+
+    for line in stdout.splitlines():
+        if (
+            "downloading..." in line
+            or line.startswith("Packages")
+            or line.startswith("Total Download Size:")
+        ):
+            print(line, file=sys.stderr)
+
+    process = subprocess.Popen(
+        [
+            "pacman",
+            "--dbpath",
+            database_path,
+            "--cachedir",
+            cache_path,
+            "--noconfirm",
+            "-Sddp",
+            *packages,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="ascii",
+    )
+
+    stdout = subprocess_wait(process, "Error in `pacman -Sddp`")
+
+    product_ids = {}
+
+    for package, line in zip(packages, stdout.splitlines()):
+        package_version_split = (
+            line.rsplit("/", 1)[-1].partition(".pkg.tar.zst")[0].rsplit("-", 2)
+        )
+
+        product_id = f"{package_version_split[-2]}-{package_version_split[-1]}"
+
+        product_ids[package] = product_id
+
+    json.dump(product_ids, output)
+
+
+class Product:
+    def __init__(self, package, version, product_id):
+        self.package = package
+        self.version = version
+        self.product_id = product_id
+
+
+def parse_products_input(input):
+    products_input = json.load(input)
+
+    if type(products_input) is not dict:
+        raise Exception("Invalid products format")
+
+    products = []
+
+    for package, version_info in products_input.items():
+        if type(version_info) is not dict:
+            raise Exception("Invalid products format")
+
+        products.append(
+            Product(
+                package=package,
+                version=version_info["version"],
+                product_id=version_info["product_id"],
+            )
+        )
+
+    return products
+
+
+def install_products(products, database_path, cache_path, install_path):
+    print("Installing packages...", file=sys.stderr)
+
+    process = subprocess.Popen(
+        [
+            "fakechroot",
+            "fakeroot",
+            "pacman",
+            "--noconfirm",
+            "--needed",
+            "--dbpath",
+            database_path,
+            "--cachedir",
+            cache_path,
+            "--root",
+            install_path,
+            "-Udd",
+            *[
+                f"{cache_path}/{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+                for product in products
+            ],
+        ],
+        env=dict(os.environ, FAKECHROOT_CMD_SUBST="/bin/ldconfig:/bin/true"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="ascii",
+    )
+
+    stdout = subprocess_wait(process, "Error in `pacman -Udd`")
+
+    for line in stdout.splitlines():
+        if "installing" in line:
+            print(line, file=sys.stderr)
+
+
+def install(input, cache_path, install_path):
+    database_path = f"{cache_path}/arch/db"
+    cache_path = f"{cache_path}/arch/cache"
+
+    ensure_dir_exists(install_path)
+
+    products = parse_products_input(input)
+
+    install_products(products, database_path, cache_path, install_path)
+
+
+try:
+    if len(sys.argv) == 3 and sys.argv[1] == "resolve":
+        resolve(sys.stdin, sys.stdout, sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "fetch":
+        fetch(sys.stdin, sys.stdout, sys.argv[2])
+    elif len(sys.argv) == 4 and sys.argv[1] == "install":
+        install(sys.stdin, sys.argv[2], sys.argv[3])
+
+    elif len(sys.argv) == 3 and sys.argv[1] == "update_db":
+        update_database(sys.argv[2])
+    else:
+        raise Exception("Unknown command")
+except Exception as e:
+    print(e, file=sys.stderr)
+    sys.exit(1)
