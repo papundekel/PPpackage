@@ -1,0 +1,7 @@
+devel/
+.vscode/
+__pycache__/
+.dockerignore
+.gitignore
+tmp/
+Dockerfile

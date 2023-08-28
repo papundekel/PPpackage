@@ -1,9 +1,5 @@
-devel/arch/
-devel/cache/
-devel/conan/
-devel/docker/
-devel/repo/*
-!devel/repo/PPpackage-arch/
-!devel/repo/PPpackage-conan/
+devel/
+__pycache__/
 .venv/
 .vscode/
+tmp/

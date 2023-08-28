@@ -1,0 +1,13 @@
+from conan import ConanFile
+
+
+class Conan(ConanFile):
+    virtualbuildenv = False
+    virtualrunenv = False
+    generators = []
+    settings = "os", "arch", "compiler", "build_type"
+
+    def requirements(self):
+        {% for leaf_index in leaf_indices %}
+        self.requires("leaf-{{leaf_index}}/1.0.0@pppackage")
+        {% endfor %}
