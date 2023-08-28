@@ -1,7 +1,4 @@
-from conan.internal.deploy import full_deploy
-
 import os
-import sys
 
 
 def deploy(graph, output_folder, **kwargs):

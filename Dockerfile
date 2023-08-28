@@ -15,3 +15,5 @@ RUN pacman --noconfirm -S cmake
 COPY ./ /workdir
 
 WORKDIR /workdir
+
+CMD ["./manager.sh", "PPpackage", "requirements.json", "generators.json", "tmp/generators", "tmp/root"]

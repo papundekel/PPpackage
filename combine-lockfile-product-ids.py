@@ -3,7 +3,6 @@
 import json
 import sys
 
-
 from PPpackage_PPpackage import merge_lockfile_product_ids
 
 

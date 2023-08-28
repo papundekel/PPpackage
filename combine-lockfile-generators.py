@@ -3,6 +3,7 @@
 import json
 import sys
 
+
 if __name__ == "__main__":
     lockfile_path = sys.argv[1]
     generators_path = sys.argv[2]
