@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 
-from PPpackage_manager import *
+from PPpackage_utils import (
+    MyException,
+    check_dict_format,
+    subprocess_wait,
+    ensure_dir_exists,
+    execute,
+    parse_lockfile_simple,
+    parse_products_simple,
+)
 
 import shutil
 import sys
@@ -222,6 +230,10 @@ def install_product(environment, product, destination_path):
     )
 
 
+def submanagers():
+    return []
+
+
 def resolve(cache_path, requirements):
     cache_path = get_cache_path(cache_path)
 
@@ -252,7 +264,7 @@ def resolve(cache_path, requirements):
 
     remove_leaves_from_cache(environment)
 
-    return lockfile
+    return [lockfile]
 
 
 def fetch(cache_path, lockfile, generators, generators_path):
@@ -314,6 +326,7 @@ def install(cache_path, products, destination_path):
 if __name__ == "__main__":
     execute(
         "conan",
+        submanagers,
         resolve,
         fetch,
         install,

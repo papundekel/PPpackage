@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 
-from PPpackage_manager import *
+from PPpackage_utils import (
+    MyException,
+    parse_cl_argument,
+    ensure_dir_exists,
+    execute,
+    subprocess_wait,
+    parse_lockfile_simple,
+    parse_products_simple,
+)
 
 import sys
 import subprocess
@@ -26,6 +34,26 @@ def parse_requirements(requirements_input):
             raise MyException("Invalid requirements format")
 
     return requirements_input
+
+
+def update_database():
+    cache_path = parse_cl_argument(2, "Missing cache path argument.")
+
+    database_path, _ = get_cache_paths(cache_path)
+
+    ensure_dir_exists(database_path)
+
+    process = subprocess.Popen(
+        ["fakeroot", "pacman", "--dbpath", database_path, "-Sy"],
+        stdout=2,
+        encoding="ascii",
+    )
+
+    subprocess_wait(process, "Error in `pacman -Sy`")
+
+
+def submanagers():
+    return []
 
 
 def resolve(cache_path, requirements):
@@ -84,21 +112,7 @@ def resolve(cache_path, requirements):
 
         lockfile[package] = version
 
-    return lockfile
-
-
-def update_database(cache_path, *args):
-    database_path, _ = get_cache_paths(cache_path)
-
-    ensure_dir_exists(database_path)
-
-    process = subprocess.Popen(
-        ["fakeroot", "pacman", "--dbpath", database_path, "-Sy"],
-        stdout=2,
-        encoding="ascii",
-    )
-
-    subprocess_wait(process, "Error in `pacman -Sy`")
+    return [lockfile]
 
 
 def fetch(cache_path, lockfile, generators, generators_path):
@@ -164,7 +178,7 @@ def install(cache_path, products, destination_path):
     ensure_dir_exists(database_path)
 
     environment = os.environ.copy()
-    environment["FAKECHROOT_CMD_SUBST"] = "/bin/ldconfig:/bin/true"
+    environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
 
     process = subprocess.Popen(
         [
@@ -196,11 +210,12 @@ def install(cache_path, products, destination_path):
 if __name__ == "__main__":
     execute(
         "arch",
+        submanagers,
         resolve,
         fetch,
         install,
         parse_requirements,
         parse_lockfile_simple,
         parse_products_simple,
-        {"update_db": update_database},
+        {"update-db": update_database},
     )

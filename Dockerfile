@@ -16,4 +16,4 @@ COPY ./ /workdir
 
 WORKDIR /workdir
 
-CMD ["./manager.sh", "PPpackage", "requirements.json", "generators.json", "tmp/generators", "tmp/root"]
+RUN chmod a+x *.py *.sh
