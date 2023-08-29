@@ -1,0 +1,12 @@
+from conan import ConanFile
+
+
+class Conan(ConanFile):
+    name = "leaf-{{index}}"
+    user = "pppackage"
+    version = "1.0.0"
+
+    def requirements(self):
+        {% for package, version in requirements.items() %}
+        self.requires("{{package}}/{{version}}")
+        {% endfor %}
