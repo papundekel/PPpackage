@@ -45,7 +45,7 @@ def update_database():
 
     process = subprocess.Popen(
         ["fakeroot", "pacman", "--dbpath", database_path, "-Sy"],
-        stdout=2,
+        stdout=sys.stderr,
         encoding="ascii",
     )
 
@@ -134,7 +134,7 @@ def fetch(cache_path, lockfile, generators, generators_path):
             "-Sw",
             *packages,
         ],
-        stdout=2,
+        stdout=sys.stderr,
         encoding="ascii",
     )
 
