@@ -5,7 +5,7 @@ from PPpackage_utils import (
     parse_cl_argument,
     ensure_dir_exists,
     execute,
-    subprocess_communicate,
+    asubprocess_communicate,
     parse_lockfile_simple,
     parse_products_simple,
 )
@@ -54,17 +54,46 @@ async def update_database():
 
     ensure_dir_exists(database_path)
 
-    process = subprocess.Popen(
-        ["fakeroot", "pacman", "--dbpath", database_path, "-Sy"],
+    process = asyncio.create_subprocess_exec(
+        "fakeroot",
+        "pacman",
+        "--dbpath",
+        database_path,
+        "-Sy",
+        stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
-        encoding="ascii",
+        stderr=None,
     )
 
-    subprocess_communicate(process, "Error in `pacman -Sy`")
+    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
 
 
 async def submanagers():
     return []
+
+
+async def resolve_requirement(database_path, requirement, dependencies):
+    process = asyncio.create_subprocess_exec(
+        "pactree",
+        "--dbpath",
+        database_path,
+        "-s",
+        requirement,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+
+    stdout = await asubprocess_communicate(await process, "Error in `pactree`.")
+
+    for line in stdout.decode("utf-8").splitlines():
+        match = regex_package_name.search(line)
+
+        if match is None:
+            raise MyException("Invalid pactree output.")
+
+        dependency = match.group()
+        dependencies.append(dependency)
 
 
 async def resolve(cache_path, requirements, options):
@@ -75,44 +104,31 @@ async def resolve(cache_path, requirements, options):
 
     dependencies = []
 
-    for requirement in requirements:
-        process = subprocess.Popen(
-            [
-                "pactree",
-                "--dbpath",
-                database_path,
-                "-s",
-                requirement,
-            ],
-            stdout=subprocess.PIPE,
-            encoding="utf-8",
-        )
-
-        stdout = subprocess_communicate(process, "Error in `pactree`.")
-
-        for line in stdout.splitlines():
-            match = regex_package_name.search(line)
-
-            if match is None:
-                raise MyException("Invalid pactree output.")
-
-            dependency = match.group()
-            dependencies.append(dependency)
+    async with asyncio.TaskGroup() as group:
+        for requirement in requirements:
+            group.create_task(
+                resolve_requirement(database_path, requirement, dependencies)
+            )
 
     # trivial resolution of same-named packages
     dependencies = list(set(dependencies))
 
-    process = subprocess.Popen(
-        ["pacinfo", "--dbpath", database_path, "--short", *dependencies],
+    process = asyncio.create_subprocess_exec(
+        "pacinfo",
+        "--dbpath",
+        database_path,
+        "--short",
+        *dependencies,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
-        encoding="ascii",
+        stderr=None,
     )
 
-    stdout = subprocess_communicate(process, "Error in `pacinfo`.")
+    stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
 
     lockfile = {}
 
-    for line in stdout.splitlines():
+    for line in stdout.decode("ascii").splitlines():
         if line.startswith(" "):
             continue
 
@@ -133,44 +149,42 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
 
     packages = list(lockfile.keys())
 
-    process = subprocess.Popen(
-        [
-            "fakeroot",
-            "pacman",
-            "--dbpath",
-            database_path,
-            "--cachedir",
-            cache_path,
-            "--noconfirm",
-            "-Sw",
-            *packages,
-        ],
+    process = asyncio.create_subprocess_exec(
+        "fakeroot",
+        "pacman",
+        "--dbpath",
+        database_path,
+        "--cachedir",
+        cache_path,
+        "--noconfirm",
+        "-Sw",
+        *packages,
+        stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
-        encoding="ascii",
+        stderr=None,
     )
 
-    subprocess_communicate(process, "Error in `pacman -Sw`.")
+    await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
 
-    process = subprocess.Popen(
-        [
-            "pacman",
-            "--dbpath",
-            database_path,
-            "--cachedir",
-            cache_path,
-            "--noconfirm",
-            "-Sddp",
-            *packages,
-        ],
+    process = asyncio.create_subprocess_exec(
+        "pacman",
+        "--dbpath",
+        database_path,
+        "--cachedir",
+        cache_path,
+        "--noconfirm",
+        "-Sddp",
+        *packages,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
-        encoding="ascii",
+        stderr=None,
     )
 
-    stdout = subprocess_communicate(process, "Error in `pacman -Sddp`")
+    stdout = await asubprocess_communicate(await process, "Error in `pacman -Sddp`")
 
     product_ids = {}
 
-    for package, line in zip(packages, stdout.splitlines()):
+    for package, line in zip(packages, stdout.decode("ascii").splitlines()):
         package_version_split = (
             line.rsplit("/", 1)[-1].partition(".pkg.tar.zst")[0].rsplit("-", 2)
         )
@@ -191,31 +205,30 @@ async def install(cache_path, products, destination_path):
     environment = os.environ.copy()
     environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
 
-    process = subprocess.Popen(
-        [
-            "fakechroot",
-            "fakeroot",
-            "pacman",
-            "--noconfirm",
-            "--needed",
-            "--dbpath",
-            database_path,
-            "--cachedir",
-            cache_path,
-            "--root",
-            destination_path,
-            "-Udd",
-            *[
-                f"{cache_path}/{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
-                for product in products
-            ],
+    process = asyncio.create_subprocess_exec(
+        "fakechroot",
+        "fakeroot",
+        "pacman",
+        "--noconfirm",
+        "--needed",
+        "--dbpath",
+        database_path,
+        "--cachedir",
+        cache_path,
+        "--root",
+        destination_path,
+        "-Udd",
+        *[
+            f"{cache_path}/{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+            for product in products
         ],
+        stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
-        encoding="ascii",
+        stderr=None,
         env=environment,
     )
 
-    subprocess_communicate(process, "Error in `pacman -Udd`")
+    await asubprocess_communicate(await process, "Error in `pacman -Udd`")
 
 
 if __name__ == "__main__":

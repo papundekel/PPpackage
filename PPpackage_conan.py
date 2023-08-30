@@ -2,7 +2,6 @@
 
 from PPpackage_utils import (
     MyException,
-    subprocess_communicate,
     asubprocess_communicate,
     check_dict_format,
     ensure_dir_exists,
@@ -185,7 +184,7 @@ async def get_lockfile(
             await process, "Error in `conan graph info`"
         )
 
-    lockfile = parse_conan_graph_resolve(graph_string)
+    lockfile = parse_conan_graph_resolve(graph_string.decode("ascii"))
 
     return lockfile
 
@@ -388,7 +387,7 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
             await process, "Error in `conan install`"
         )
 
-    graph_infos = parse_conan_graph_fetch(graph_json)
+    graph_infos = parse_conan_graph_fetch(graph_json.decode("ascii"))
 
     patch_native_generators(native_generators_path, native_generators_path_suffix)
 
