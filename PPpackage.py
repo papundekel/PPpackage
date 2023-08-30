@@ -13,6 +13,7 @@ import subprocess
 import itertools
 import json
 import sys
+import os
 
 
 def check_requirements(manager_requirements_input):
@@ -43,16 +44,22 @@ def merge_lockfiles(versions, product_ids):
     }
 
 
+def get_manager_path(managers_path, manager):
+    return os.path.join(managers_path, f"PPpackage_{manager}.py")
+
+
 def submanagers():
     return []
 
 
-def resolve(cache_path, manager_requirements):
+def resolve(managers_path, cache_path, manager_requirements):
     manager_lockfiles = {}
 
     for manager, requirements in manager_requirements.items():
+        manager_path = get_manager_path(managers_path, manager)
+
         process = subprocess.Popen(
-            [f"./PPpackage_{manager}.py", "resolve", cache_path],
+            [manager_path, "resolve", cache_path],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             encoding="ascii",
@@ -86,12 +93,16 @@ def resolve(cache_path, manager_requirements):
     return lockfile
 
 
-def fetch(cache_path, manager_lockfile_dict, generators, generators_path):
+def fetch(
+    managers_path, cache_path, manager_lockfile_dict, generators, generators_path
+):
     manager_product_ids = {}
 
     for manager, lockfile in manager_lockfile_dict.items():
+        manager_path = get_manager_path(managers_path, manager)
+
         process = subprocess.Popen(
-            [f"./PPpackage_{manager}.py", "fetch", cache_path, generators_path],
+            [manager_path, "fetch", cache_path, generators_path],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             encoding="ascii",
@@ -112,18 +123,22 @@ def fetch(cache_path, manager_lockfile_dict, generators, generators_path):
     return manager_product_ids
 
 
-def install(cache_path, manager_versions, manager_product_ids, destination_path):
+def install(
+    managers_path, cache_path, manager_versions, manager_product_ids, destination_path
+):
     for manager, versions in manager_versions.items():
-        product_ids = manager_product_ids[manager]
-
-        products = merge_lockfiles(versions, product_ids)
+        manager_path = get_manager_path(managers_path, manager)
 
         process = subprocess.Popen(
-            [f"./PPpackage_{manager}.py", "install", cache_path, destination_path],
+            [manager_path, "install", cache_path, destination_path],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             encoding="ascii",
         )
+
+        product_ids = manager_product_ids[manager]
+
+        products = merge_lockfiles(versions, product_ids)
 
         subprocess_communicate(
             process,
@@ -148,9 +163,10 @@ def parse_requirements_generators(input):
 
 if __name__ == "__main__":
     try:
-        cache_path = parse_cl_argument(1, "Missing cache path argument.")
-        generators_path = parse_cl_argument(2, "Missing generators path argument.")
-        destination_path = parse_cl_argument(3, "Missing destination path argument.")
+        managers_path = parse_cl_argument(1, "Missing managers path argument.")
+        cache_path = parse_cl_argument(2, "Missing cache path argument.")
+        generators_path = parse_cl_argument(3, "Missing generators path argument.")
+        destination_path = parse_cl_argument(4, "Missing destination path argument.")
 
         requirements_generators_input = json.load(sys.stdin)
 
@@ -158,11 +174,13 @@ if __name__ == "__main__":
             requirements_generators_input
         )
 
-        versions = resolve(cache_path, requirements)
+        versions = resolve(managers_path, cache_path, requirements)
 
-        product_ids = fetch(cache_path, versions, generators, generators_path)
+        product_ids = fetch(
+            managers_path, cache_path, versions, generators, generators_path
+        )
 
-        install(cache_path, versions, product_ids, destination_path)
+        install(managers_path, cache_path, versions, product_ids, destination_path)
     except MyException as e:
         print(f"PPpackage: {e}", file=sys.stderr)
         sys.exit(1)
