@@ -50,7 +50,7 @@ async def asubprocess_communicate(
 
     if process.returncode != 0:
         if stderr is not None:
-            raise STDERRException(error_message, stderr)
+            raise STDERRException(error_message, stderr.decode("ascii"))
         else:
             raise MyException(error_message)
 

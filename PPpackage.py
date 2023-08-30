@@ -3,6 +3,7 @@
 from PPpackage_utils import (
     MyException,
     subprocess_communicate,
+    asubprocess_communicate,
     check_dict_format,
     parse_generators,
     parse_cl_argument,
@@ -205,6 +206,37 @@ async def fetch(
     return manager_product_ids_dict
 
 
+async def install_manager(
+    managers_path,
+    cache_path,
+    manager_product_ids_dict,
+    destination_path,
+    manager,
+    versions,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "install",
+        cache_path,
+        destination_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=None,
+    )
+
+    product_ids = manager_product_ids_dict[manager]
+
+    products = merge_lockfiles(versions, product_ids)
+
+    await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s install.",
+        json.dumps(products).encode("ascii"),
+    )
+
+
 async def install(
     managers_path,
     cache_path,
@@ -212,23 +244,18 @@ async def install(
     manager_product_ids_dict,
     destination_path,
 ):
-    for manager, versions in manager_versions_dict.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "install", cache_path, destination_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            encoding="ascii",
-        )
-
-        product_ids = manager_product_ids_dict[manager]
-
-        products = merge_lockfiles(versions, product_ids)
-
-        subprocess_communicate(
-            process, f"Error in {manager}'s install.", json.dumps(products)
-        )
+    async with asyncio.TaskGroup() as group:
+        for manager, versions in manager_versions_dict.items():
+            group.create_task(
+                install_manager(
+                    managers_path,
+                    cache_path,
+                    manager_product_ids_dict,
+                    destination_path,
+                    manager,
+                    versions,
+                )
+            )
 
 
 async def main():
