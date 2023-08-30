@@ -109,40 +109,94 @@ def generator_versions(generators_path, manager_versions_dict, manager_product_i
 builtin_generators = {"versions": generator_versions}
 
 
+async def install_manager(
+    managers_path,
+    cache_path,
+    manager_product_ids_dict,
+    destination_path,
+    manager,
+    versions,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "install",
+        cache_path,
+        destination_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=None,
+    )
+
+    product_ids = manager_product_ids_dict[manager]
+
+    products = merge_lockfiles(versions, product_ids)
+
+    await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s install.",
+        json.dumps(products).encode("ascii"),
+    )
+
+
+async def resolve_manager(
+    managers_path,
+    cache_path,
+    manager,
+    requirements,
+    manager_options_dict,
+    manager_lockfiles,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "resolve",
+        cache_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+
+    options = manager_options_dict.get(manager)
+
+    lockfiles_output = await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s resolve.",
+        json.dumps(
+            {
+                "requirements": requirements,
+                "options": options,
+            }
+        ).encode("ascii"),
+    )
+
+    lockfiles = json.loads(lockfiles_output)
+
+    if type(lockfiles) is not list:
+        raise MyException("Invalid lockfile format.")
+
+    manager_lockfiles[manager] = lockfiles
+
+
 async def resolve(
     managers_path, cache_path, manager_requirements, manager_options_dict
 ):
     manager_lockfiles = {}
 
-    for manager, requirements in manager_requirements.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "resolve", cache_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            encoding="ascii",
-        )
-
-        options = manager_options_dict.get(manager)
-
-        lockfiles_output = subprocess_communicate(
-            process,
-            f"Error in {manager}'s resolve.",
-            json.dumps(
-                {
-                    "requirements": requirements,
-                    "options": options,
-                }
-            ),
-        )
-
-        lockfiles = json.loads(lockfiles_output)
-
-        if type(lockfiles) is not list:
-            raise MyException("Invalid lockfile format.")
-
-        manager_lockfiles[manager] = lockfiles
+    async with asyncio.TaskGroup() as group:
+        for manager, requirements in manager_requirements.items():
+            group.create_task(
+                resolve_manager(
+                    managers_path,
+                    cache_path,
+                    manager,
+                    requirements,
+                    manager_options_dict,
+                    manager_lockfiles,
+                )
+            )
 
     lockfiles = [
         {manager: lockfile for manager, lockfile in i}
@@ -204,37 +258,6 @@ async def fetch(
         )
 
     return manager_product_ids_dict
-
-
-async def install_manager(
-    managers_path,
-    cache_path,
-    manager_product_ids_dict,
-    destination_path,
-    manager,
-    versions,
-):
-    manager_path = get_manager_path(managers_path, manager)
-
-    process = asyncio.create_subprocess_exec(
-        manager_path,
-        "install",
-        cache_path,
-        destination_path,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=None,
-    )
-
-    product_ids = manager_product_ids_dict[manager]
-
-    products = merge_lockfiles(versions, product_ids)
-
-    await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s install.",
-        json.dumps(products).encode("ascii"),
-    )
 
 
 async def install(

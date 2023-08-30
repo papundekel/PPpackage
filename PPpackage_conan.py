@@ -19,6 +19,7 @@ import jinja2
 import contextlib
 import os
 import asyncio
+import sys
 
 
 def get_cache_path(cache_path):
@@ -403,6 +404,8 @@ async def install(cache_path, products, destination_path):
     environment = make_conan_environment(cache_path)
 
     destination_path = os.path.join(destination_path, "conan")
+
+    shutil.rmtree(destination_path)
 
     async with asyncio.TaskGroup() as group:
         for product in products:
