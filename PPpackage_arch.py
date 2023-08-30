@@ -5,7 +5,7 @@ from PPpackage_utils import (
     parse_cl_argument,
     ensure_dir_exists,
     execute,
-    subprocess_wait,
+    subprocess_communicate,
     parse_lockfile_simple,
     parse_products_simple,
 )
@@ -14,6 +14,7 @@ import sys
 import subprocess
 import re
 import os
+import asyncio
 
 
 regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
@@ -46,7 +47,7 @@ def parse_options(input):
     return None
 
 
-def update_database():
+async def update_database():
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
 
     database_path, _ = get_cache_paths(cache_path)
@@ -59,14 +60,14 @@ def update_database():
         encoding="ascii",
     )
 
-    subprocess_wait(process, "Error in `pacman -Sy`")
+    subprocess_communicate(process, "Error in `pacman -Sy`")
 
 
-def submanagers():
+async def submanagers():
     return []
 
 
-def resolve(cache_path, requirements, options):
+async def resolve(cache_path, requirements, options):
     database_path, _ = get_cache_paths(cache_path)
 
     # trivial resolution of same-named packages
@@ -87,7 +88,7 @@ def resolve(cache_path, requirements, options):
             encoding="utf-8",
         )
 
-        stdout = subprocess_wait(process, "Error in `pactree`.")
+        stdout = subprocess_communicate(process, "Error in `pactree`.")
 
         for line in stdout.splitlines():
             match = regex_package_name.search(line)
@@ -107,7 +108,7 @@ def resolve(cache_path, requirements, options):
         encoding="ascii",
     )
 
-    stdout = subprocess_wait(process, "Error in `pacinfo`.")
+    stdout = subprocess_communicate(process, "Error in `pacinfo`.")
 
     lockfile = {}
 
@@ -125,7 +126,7 @@ def resolve(cache_path, requirements, options):
     return [lockfile]
 
 
-def fetch(cache_path, lockfile, options, generators, generators_path):
+async def fetch(cache_path, lockfile, options, generators, generators_path):
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -148,7 +149,7 @@ def fetch(cache_path, lockfile, options, generators, generators_path):
         encoding="ascii",
     )
 
-    subprocess_wait(process, "Error in `pacman -Sw`.")
+    subprocess_communicate(process, "Error in `pacman -Sw`.")
 
     process = subprocess.Popen(
         [
@@ -165,7 +166,7 @@ def fetch(cache_path, lockfile, options, generators, generators_path):
         encoding="ascii",
     )
 
-    stdout = subprocess_wait(process, "Error in `pacman -Sddp`")
+    stdout = subprocess_communicate(process, "Error in `pacman -Sddp`")
 
     product_ids = {}
 
@@ -181,7 +182,7 @@ def fetch(cache_path, lockfile, options, generators, generators_path):
     return product_ids
 
 
-def install(cache_path, products, destination_path):
+async def install(cache_path, products, destination_path):
     _, cache_path = get_cache_paths(cache_path)
     database_path = f"{destination_path}/var/lib/pacman"
 
@@ -214,19 +215,21 @@ def install(cache_path, products, destination_path):
         env=environment,
     )
 
-    subprocess_wait(process, "Error in `pacman -Udd`")
+    subprocess_communicate(process, "Error in `pacman -Udd`")
 
 
 if __name__ == "__main__":
-    execute(
-        "arch",
-        submanagers,
-        resolve,
-        fetch,
-        install,
-        parse_requirements,
-        parse_options,
-        parse_lockfile_simple,
-        parse_products_simple,
-        {"update-db": update_database},
+    asyncio.run(
+        execute(
+            "arch",
+            submanagers,
+            resolve,
+            fetch,
+            install,
+            parse_requirements,
+            parse_options,
+            parse_lockfile_simple,
+            parse_products_simple,
+            {"update-db": update_database},
+        )
     )

@@ -2,8 +2,9 @@
 
 from PPpackage_utils import (
     MyException,
+    subprocess_communicate,
+    asubprocess_communicate,
     check_dict_format,
-    subprocess_wait,
     ensure_dir_exists,
     execute,
     parse_lockfile_simple,
@@ -17,6 +18,7 @@ import subprocess
 import jinja2
 import contextlib
 import os
+import asyncio
 
 
 def get_cache_path(cache_path):
@@ -144,7 +146,7 @@ def export_leaf(environment, template, index, requirement_partition):
             env=environment,
         )
 
-        subprocess_wait(process, "Error in `conan export`.")
+        subprocess_communicate(process, "Error in `conan export`.")
 
 
 def export_leaves(environment, template, requirement_partitions):
@@ -181,7 +183,7 @@ def get_lockfile(
             env=environment,
         )
 
-        graph_string = subprocess_wait(process, "Error in `conan graph info`")
+        graph_string = subprocess_communicate(process, "Error in `conan graph info`")
 
     lockfile = parse_conan_graph_resolve(graph_string)
 
@@ -196,7 +198,7 @@ def remove_leaves_from_cache(environment):
         env=environment,
     )
 
-    subprocess_wait(process, "Error in `conan remove`")
+    subprocess_communicate(process, "Error in `conan remove`")
 
 
 def patch_native_generators_paths(
@@ -232,22 +234,21 @@ def patch_native_generators(native_generators_path, native_generators_path_suffi
     )
 
 
-def install_product(environment, product, destination_path):
-    process = subprocess.Popen(
-        [
-            "conan",
-            "cache",
-            "path",
-            f"{product.package}/{product.version}:{product.product_id}",
-        ],
+async def install_product(environment, destination_path, product):
+    process = await asyncio.create_subprocess_exec(
+        "conan",
+        "cache",
+        "path",
+        f"{product.package}/{product.version}:{product.product_id}",
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
-        encoding="ascii",
+        stderr=None,
         env=environment,
     )
 
-    stdout = subprocess_wait(process, "Error in `conan cache path`")
+    stdout = await asubprocess_communicate(process, "Error in `conan cache path`")
 
-    product_path = stdout.splitlines()[0]
+    product_path = stdout.decode("ascii").splitlines()[0]
 
     shutil.copytree(
         product_path,
@@ -291,11 +292,11 @@ def parse_options(input):
     return options
 
 
-def submanagers():
+async def submanagers():
     return []
 
 
-def resolve(cache_path, requirements, options):
+async def resolve(cache_path, requirements, options):
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -326,7 +327,7 @@ def resolve(cache_path, requirements, options):
     return [lockfile]
 
 
-def fetch(cache_path, lockfile, options, generators, generators_path):
+async def fetch(cache_path, lockfile, options, generators, generators_path):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -380,7 +381,7 @@ def fetch(cache_path, lockfile, options, generators, generators_path):
             env=environment,
         )
 
-        graph_json = subprocess_wait(process, "Error in `conan install`")
+        graph_json = subprocess_communicate(process, "Error in `conan install`")
 
     graph_infos = parse_conan_graph_fetch(graph_json)
 
@@ -396,27 +397,30 @@ def fetch(cache_path, lockfile, options, generators, generators_path):
     return product_ids
 
 
-def install(cache_path, products, destination_path):
+async def install(cache_path, products, destination_path):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
 
     destination_path = os.path.join(destination_path, "conan")
 
-    for product in products:
-        install_product(environment, product, destination_path)
+    async with asyncio.TaskGroup() as group:
+        for product in products:
+            group.create_task(install_product(environment, destination_path, product))
 
 
 if __name__ == "__main__":
-    execute(
-        "conan",
-        submanagers,
-        resolve,
-        fetch,
-        install,
-        parse_requirements,
-        parse_options,
-        parse_lockfile_simple,
-        parse_products_simple,
-        {},
+    asyncio.run(
+        execute(
+            "conan",
+            submanagers,
+            resolve,
+            fetch,
+            install,
+            parse_requirements,
+            parse_options,
+            parse_lockfile_simple,
+            parse_products_simple,
+            {},
+        )
     )

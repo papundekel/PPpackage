@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import asyncio
 
 
 class SetEncoder(json.JSONEncoder):
@@ -30,7 +31,7 @@ class STDERRException(Exception):
         return f"{super().__str__()}\n{self.stderr}"
 
 
-def subprocess_communicate(process, error_message, input):
+def subprocess_communicate(process, error_message, input=None):
     stdout, stderr = process.communicate(input)
 
     if process.returncode != 0:
@@ -42,8 +43,18 @@ def subprocess_communicate(process, error_message, input):
     return stdout
 
 
-def subprocess_wait(process, error_message):
-    return subprocess_communicate(process, error_message, None)
+async def asubprocess_communicate(
+    process: asyncio.subprocess.Process, error_message, input=None
+):
+    stdout, stderr = await process.communicate(input)
+
+    if process.returncode != 0:
+        if stderr is not None:
+            raise STDERRException(error_message, stderr)
+        else:
+            raise MyException(error_message)
+
+    return stdout
 
 
 def check_dict_format(input, keys_required, keys_permitted_unequired, error_message):
@@ -175,13 +186,13 @@ def parse_cl_argument(index, error_message):
     return sys.argv[index]
 
 
-def submanagers(submanagers_handler):
-    submanagers = submanagers_handler()
+async def submanagers(submanagers_handler):
+    submanagers = await submanagers_handler()
 
     json.dump(submanagers, sys.stdout)
 
 
-def resolve(requirements_parser, options_parser, resolver):
+async def resolve(requirements_parser, options_parser, resolver):
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
 
     input = json.load(sys.stdin)
@@ -190,12 +201,12 @@ def resolve(requirements_parser, options_parser, resolver):
         requirements_parser, options_parser, input
     )
 
-    lockfiles = resolver(cache_path, requirements, options)
+    lockfiles = await resolver(cache_path, requirements, options)
 
     json.dump(lockfiles, sys.stdout)
 
 
-def fetch(lockfile_parser, options_parser, fetcher):
+async def fetch(lockfile_parser, options_parser, fetcher):
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
     generators_path = parse_cl_argument(3, "Missing generators path argument.")
 
@@ -205,12 +216,12 @@ def fetch(lockfile_parser, options_parser, fetcher):
         lockfile_parser, options_parser, input
     )
 
-    products = fetcher(cache_path, lockfile, options, generators, generators_path)
+    products = await fetcher(cache_path, lockfile, options, generators, generators_path)
 
     json.dump(products, sys.stdout)
 
 
-def install(products_parser, installer):
+async def install(products_parser, installer):
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
     destination_path = parse_cl_argument(3, "Missing destination path argument.")
 
@@ -220,10 +231,10 @@ def install(products_parser, installer):
 
     products = products_parser(input)
 
-    installer(cache_path, products, destination_path)
+    await installer(cache_path, products, destination_path)
 
 
-def execute(
+async def execute(
     manager_id,
     submanagers_handler,
     resolver,
@@ -255,7 +266,7 @@ def execute(
         if command_handler is None:
             raise MyException("Unknown command `{command}`")
 
-        command_handler()
+        await command_handler()
 
     except MyException as e:
         print(f"{manager_id}: {e}", file=sys.stderr)
