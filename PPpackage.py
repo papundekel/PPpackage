@@ -161,23 +161,66 @@ async def resolve_manager(
 
     options = manager_options_dict.get(manager)
 
+    resolve_input_json = json.dumps(
+        {
+            "requirements": requirements,
+            "options": options,
+        }
+    ).encode("ascii")
+
     lockfiles_output = await asubprocess_communicate(
         await process,
         f"Error in {manager}'s resolve.",
-        json.dumps(
-            {
-                "requirements": requirements,
-                "options": options,
-            }
-        ).encode("ascii"),
+        resolve_input_json,
     )
 
-    lockfiles = json.loads(lockfiles_output)
-
-    if type(lockfiles) is not list:
-        raise MyException("Invalid lockfile format.")
+    lockfiles = json.loads(lockfiles_output.decode("ascii"))
 
     manager_lockfiles[manager] = lockfiles
+
+
+async def fetch_manager(
+    managers_path,
+    cache_path,
+    manager,
+    versions,
+    manager_options_dict,
+    generators,
+    generators_path,
+    manager_product_ids_dict,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "fetch",
+        cache_path,
+        generators_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+
+    options = manager_options_dict.get(manager)
+
+    fetch_input_json = json.dumps(
+        {
+            "lockfile": versions,
+            "options": options,
+            "generators": generators - builtin_generators.keys(),
+        },
+        cls=SetEncoder,
+    )
+
+    product_ids_output = await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s fetch.",
+        fetch_input_json.encode("ascii"),
+    )
+
+    product_ids = json.loads(product_ids_output.decode("ascii"))
+
+    manager_product_ids_dict[manager] = product_ids
 
 
 async def resolve(
@@ -223,34 +266,20 @@ async def fetch(
 ):
     manager_product_ids_dict = {}
 
-    for manager, versions in manager_versions_dict.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "fetch", cache_path, generators_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            encoding="ascii",
-        )
-
-        options = manager_options_dict.get(manager)
-
-        product_ids_output = subprocess_communicate(
-            process,
-            f"Error in {manager}'s fetch.",
-            json.dumps(
-                {
-                    "lockfile": versions,
-                    "options": options,
-                    "generators": generators - builtin_generators.keys(),
-                },
-                cls=SetEncoder,
-            ),
-        )
-
-        product_ids = json.loads(product_ids_output)
-
-        manager_product_ids_dict[manager] = product_ids
+    async with asyncio.TaskGroup() as group:
+        for manager, versions in manager_versions_dict.items():
+            group.create_task(
+                fetch_manager(
+                    managers_path,
+                    cache_path,
+                    manager,
+                    versions,
+                    manager_options_dict,
+                    generators,
+                    generators_path,
+                    manager_product_ids_dict,
+                )
+            )
 
     for generator in generators & builtin_generators.keys():
         builtin_generators[generator](

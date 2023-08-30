@@ -405,7 +405,8 @@ async def install(cache_path, products, destination_path):
 
     destination_path = os.path.join(destination_path, "conan")
 
-    shutil.rmtree(destination_path)
+    if os.path.exists(destination_path):
+        shutil.rmtree(destination_path)
 
     async with asyncio.TaskGroup() as group:
         for product in products:
