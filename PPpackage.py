@@ -7,6 +7,7 @@ from PPpackage_utils import (
     parse_generators,
     parse_cl_argument,
     SetEncoder,
+    ensure_dir_exists,
 )
 
 import subprocess
@@ -80,6 +81,32 @@ def parse_input(input):
     return requirements, options, generators
 
 
+def generator_versions(generators_path, manager_versions_dict, manager_product_ids):
+    versions_path = os.path.join(generators_path, "versions")
+
+    for manager, versions in manager_versions_dict.items():
+        manager_path = os.path.join(versions_path, manager)
+
+        ensure_dir_exists(manager_path)
+
+        product_ids = manager_product_ids[manager]
+
+        for package, version in versions.items():
+            product_id = product_ids[package]
+
+            with open(
+                os.path.join(manager_path, f"{package}.json"), "w"
+            ) as versions_file:
+                json.dump(
+                    {"version": version, "product_id": product_id},
+                    versions_file,
+                    indent=4,
+                )
+
+
+builtin_generators = {"versions": generator_versions}
+
+
 def submanagers():
     return []
 
@@ -135,14 +162,14 @@ def resolve(managers_path, cache_path, manager_requirements, manager_options_dic
 def fetch(
     managers_path,
     cache_path,
-    manager_lockfile_dict,
+    manager_versions_dict,
     manager_options_dict,
     generators,
     generators_path,
 ):
-    manager_product_ids = {}
+    manager_product_ids_dict = {}
 
-    for manager, lockfile in manager_lockfile_dict.items():
+    for manager, versions in manager_versions_dict.items():
         manager_path = get_manager_path(managers_path, manager)
 
         process = subprocess.Popen(
@@ -158,22 +185,35 @@ def fetch(
             process,
             f"Error in {manager}'s fetch.",
             json.dumps(
-                {"lockfile": lockfile, "options": options, "generators": generators},
+                {
+                    "lockfile": versions,
+                    "options": options,
+                    "generators": generators - builtin_generators.keys(),
+                },
                 cls=SetEncoder,
             ),
         )
 
         product_ids = json.loads(product_ids_output)
 
-        manager_product_ids[manager] = product_ids
+        manager_product_ids_dict[manager] = product_ids
 
-    return manager_product_ids
+    for generator in generators & builtin_generators.keys():
+        builtin_generators[generator](
+            generators_path, manager_versions_dict, manager_product_ids_dict
+        )
+
+    return manager_product_ids_dict
 
 
 def install(
-    managers_path, cache_path, manager_versions, manager_product_ids, destination_path
+    managers_path,
+    cache_path,
+    manager_versions_dict,
+    manager_product_ids_dict,
+    destination_path,
 ):
-    for manager, versions in manager_versions.items():
+    for manager, versions in manager_versions_dict.items():
         manager_path = get_manager_path(managers_path, manager)
 
         process = subprocess.Popen(
@@ -183,7 +223,7 @@ def install(
             encoding="ascii",
         )
 
-        product_ids = manager_product_ids[manager]
+        product_ids = manager_product_ids_dict[manager]
 
         products = merge_lockfiles(versions, product_ids)
 
