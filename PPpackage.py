@@ -3,11 +3,10 @@
 from PPpackage_utils import (
     MyException,
     subprocess_communicate,
-    check_lockfile_simple,
-    check_products_simple,
     check_dict_format,
     parse_generators,
     parse_cl_argument,
+    SetEncoder,
 )
 
 import subprocess
@@ -34,42 +33,6 @@ def parse_requirements(input):
     requirements = input
 
     return requirements
-
-
-def check_lockfile(manager_lockfiles_input):
-    if type(manager_lockfiles_input) is not dict:
-        raise MyException("Invalid lockfile format.")
-
-    for manager, lockfile in manager_lockfiles_input.items():
-        if type(manager) is not str:
-            raise MyException("Invalid lockfile format.")
-
-        check_lockfile_simple(lockfile)
-
-
-def parse_lockfile(input):
-    check_lockfile(input)
-
-    lockfile = input
-
-    return lockfile
-
-
-def check_products(manager_products_input):
-    if type(manager_products_input) is not dict:
-        raise MyException("Invalid products format.")
-
-    for manager, products in manager_products_input.items():
-        if type(manager) is not str:
-            raise MyException("Invalid products format.")
-
-        check_products_simple(products)
-
-
-def parse_products(manager_products_input):
-    check_products(manager_products_input)
-
-    return manager_products_input
 
 
 def merge_lockfiles(versions, product_ids):
@@ -137,7 +100,9 @@ def fetch(cache_path, manager_lockfile_dict, generators, generators_path):
         product_ids_output = subprocess_communicate(
             process,
             f"Error in {manager}'s fetch.",
-            json.dumps({"lockfile": lockfile, "generators": generators}),
+            json.dumps(
+                {"lockfile": lockfile, "generators": generators}, cls=SetEncoder
+            ),
         )
 
         product_ids = json.loads(product_ids_output)
@@ -182,18 +147,22 @@ def parse_requirements_generators(input):
 
 
 if __name__ == "__main__":
-    cache_path = parse_cl_argument(1, "Missing cache path argument.")
-    generators_path = parse_cl_argument(2, "Missing generators path argument.")
-    destination_path = parse_cl_argument(3, "Missing destination path argument.")
+    try:
+        cache_path = parse_cl_argument(1, "Missing cache path argument.")
+        generators_path = parse_cl_argument(2, "Missing generators path argument.")
+        destination_path = parse_cl_argument(3, "Missing destination path argument.")
 
-    requirements_generators_input = json.load(sys.stdin)
+        requirements_generators_input = json.load(sys.stdin)
 
-    requirements, generators = parse_requirements_generators(
-        requirements_generators_input
-    )
+        requirements, generators = parse_requirements_generators(
+            requirements_generators_input
+        )
 
-    versions = resolve(cache_path, requirements)
+        versions = resolve(cache_path, requirements)
 
-    product_ids = fetch(cache_path, versions, generators, generators_path)
+        product_ids = fetch(cache_path, versions, generators, generators_path)
 
-    install(cache_path, versions, product_ids, destination_path)
+        install(cache_path, versions, product_ids, destination_path)
+    except MyException as e:
+        print(f"PPpackage: {e}", file=sys.stderr)
+        sys.exit(1)
