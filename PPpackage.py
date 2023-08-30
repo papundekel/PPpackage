@@ -48,11 +48,43 @@ def get_manager_path(managers_path, manager):
     return os.path.join(managers_path, f"PPpackage_{manager}.py")
 
 
+def check_options(input):
+    if type(input) is not dict:
+        raise MyException("Invalid options format.")
+
+    for options_input in input.values():
+        if type(options_input) is not dict:
+            raise MyException("Invalid options format.")
+
+
+def parse_options(input):
+    check_options(input)
+
+    options = input
+
+    return options
+
+
+def parse_input(input):
+    check_dict_format(
+        input,
+        {"requirements", "options", "generators"},
+        set(),
+        "Invalid input format.",
+    )
+
+    requirements = parse_requirements(input["requirements"])
+    options = parse_options(input["options"])
+    generators = parse_generators(input["generators"])
+
+    return requirements, options, generators
+
+
 def submanagers():
     return []
 
 
-def resolve(managers_path, cache_path, manager_requirements):
+def resolve(managers_path, cache_path, manager_requirements, manager_options_dict):
     manager_lockfiles = {}
 
     for manager, requirements in manager_requirements.items():
@@ -65,10 +97,17 @@ def resolve(managers_path, cache_path, manager_requirements):
             encoding="ascii",
         )
 
+        options = manager_options_dict.get(manager)
+
         lockfiles_output = subprocess_communicate(
             process,
             f"Error in {manager}'s resolve.",
-            json.dumps(requirements),
+            json.dumps(
+                {
+                    "requirements": requirements,
+                    "options": options,
+                }
+            ),
         )
 
         lockfiles = json.loads(lockfiles_output)
@@ -94,7 +133,12 @@ def resolve(managers_path, cache_path, manager_requirements):
 
 
 def fetch(
-    managers_path, cache_path, manager_lockfile_dict, generators, generators_path
+    managers_path,
+    cache_path,
+    manager_lockfile_dict,
+    manager_options_dict,
+    generators,
+    generators_path,
 ):
     manager_product_ids = {}
 
@@ -108,11 +152,14 @@ def fetch(
             encoding="ascii",
         )
 
+        options = manager_options_dict.get(manager)
+
         product_ids_output = subprocess_communicate(
             process,
             f"Error in {manager}'s fetch.",
             json.dumps(
-                {"lockfile": lockfile, "generators": generators}, cls=SetEncoder
+                {"lockfile": lockfile, "options": options, "generators": generators},
+                cls=SetEncoder,
             ),
         )
 
@@ -141,24 +188,8 @@ def install(
         products = merge_lockfiles(versions, product_ids)
 
         subprocess_communicate(
-            process,
-            f"Error in {manager}'s install.",
-            json.dumps(products),
+            process, f"Error in {manager}'s install.", json.dumps(products)
         )
-
-
-def parse_requirements_generators(input):
-    check_dict_format(
-        input,
-        {"requirements", "generators"},
-        set(),
-        "Invalid requirements-generators format.",
-    )
-
-    requirements = parse_requirements(input["requirements"])
-    generators = parse_generators(input["generators"])
-
-    return requirements, generators
 
 
 if __name__ == "__main__":
@@ -170,14 +201,12 @@ if __name__ == "__main__":
 
         requirements_generators_input = json.load(sys.stdin)
 
-        requirements, generators = parse_requirements_generators(
-            requirements_generators_input
-        )
+        requirements, options, generators = parse_input(requirements_generators_input)
 
-        versions = resolve(managers_path, cache_path, requirements)
+        versions = resolve(managers_path, cache_path, requirements, options)
 
         product_ids = fetch(
-            managers_path, cache_path, versions, generators, generators_path
+            managers_path, cache_path, versions, options, generators, generators_path
         )
 
         install(managers_path, cache_path, versions, product_ids, destination_path)

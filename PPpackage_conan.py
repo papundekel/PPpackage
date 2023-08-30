@@ -118,7 +118,7 @@ def create_requirement_partitions(requirements):
 
 
 @contextlib.contextmanager
-def create_and_render_temp_file(template, template_context, suffix):
+def create_and_render_temp_file(template, template_context, suffix=None):
     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix) as file:
         content = template.render(**template_context)
 
@@ -152,24 +152,36 @@ def export_leaves(environment, template, requirement_partitions):
         export_leaf(environment, template, index, requirement_partition)
 
 
-def get_lockfile(environment, conanfile_root):
-    process = subprocess.Popen(
-        [
-            "conan",
-            "graph",
-            "info",
-            "--format",
-            "json",
-            "--profile:build=profile",
-            "--profile:host=profile",
-            conanfile_root.name,
-        ],
-        stdout=subprocess.PIPE,
-        encoding="ascii",
-        env=environment,
-    )
+def get_lockfile(
+    environment, root_template, profile_template, requirement_partitions, options
+):
+    with (
+        create_and_render_temp_file(
+            root_template,
+            {"leaf_indices": range(len(requirement_partitions))},
+            ".py",
+        ) as root_file,
+        create_and_render_temp_file(
+            profile_template, {"options": options}
+        ) as profile_file,
+    ):
+        process = subprocess.Popen(
+            [
+                "conan",
+                "graph",
+                "info",
+                "--format",
+                "json",
+                f"--profile:host={profile_file.name}",
+                "--profile:build=profile",
+                root_file.name,
+            ],
+            stdout=subprocess.PIPE,
+            encoding="ascii",
+            env=environment,
+        )
 
-    graph_string = subprocess_wait(process, "Error in `conan graph info`")
+        graph_string = subprocess_wait(process, "Error in `conan graph info`")
 
     lockfile = parse_conan_graph_resolve(graph_string)
 
@@ -245,11 +257,45 @@ def install_product(environment, product, destination_path):
     )
 
 
+def generator_info(generators_path, graph_infos):
+    info_path = os.path.join(generators_path, "info")
+    ensure_dir_exists(info_path)
+
+    for package, graph_info in graph_infos.items():
+        with open(os.path.join(info_path, f"{package}.json"), "w") as file:
+            json.dump(graph_info.cpp_info, file, indent=4)
+
+
+additional_generators = {"info": generator_info}
+
+
+def check_options(input):
+    check_dict_format(input, set(), {"settings", "options"}, "Invalid input format.")
+
+    for category_input, assignments_input in input.items():
+        if type(assignments_input) is not dict:
+            raise MyException(
+                f"Invalid input format. options[{category_input}] not a dict."
+            )
+
+        for value in assignments_input.values():
+            if type(value) is not str:
+                raise MyException(f"Invalid input format. `{value}` not a string.")
+
+
+def parse_options(input):
+    check_options(input)
+
+    options = input
+
+    return options
+
+
 def submanagers():
     return []
 
 
-def resolve(cache_path, requirements):
+def resolve(cache_path, requirements, options):
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -264,37 +310,23 @@ def resolve(cache_path, requirements):
         autoescape=jinja2.select_autoescape(),
     )
 
-    template_leaf = jinja_loader.get_template("conanfile-leaf.py.jinja")
+    leaf_template = jinja_loader.get_template("conanfile-leaf.py.jinja")
 
-    export_leaves(environment, template_leaf, requirement_partitions)
+    export_leaves(environment, leaf_template, requirement_partitions)
 
-    template_root = jinja_loader.get_template("conanfile-root.py.jinja")
+    root_template = jinja_loader.get_template("conanfile-root.py.jinja")
+    profile_template = jinja_loader.get_template("profile.jinja")
 
-    with create_and_render_temp_file(
-        template_root,
-        {"leaf_indices": range(len(requirement_partitions))},
-        ".py",
-    ) as conanfile_root:
-        lockfile = get_lockfile(environment, conanfile_root)
+    lockfile = get_lockfile(
+        environment, root_template, profile_template, requirement_partitions, options
+    )
 
     remove_leaves_from_cache(environment)
 
     return [lockfile]
 
 
-def generator_info(generators_path, graph_infos):
-    info_path = os.path.join(generators_path, "info")
-    ensure_dir_exists(info_path)
-
-    for package, graph_info in graph_infos.items():
-        with open(os.path.join(info_path, f"{package}.json"), "w") as file:
-            json.dump(graph_info.cpp_info, file, indent=4)
-
-
-additional_generators = {"info": generator_info}
-
-
-def fetch(cache_path, lockfile, generators, generators_path):
+def fetch(cache_path, lockfile, options, generators, generators_path):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -304,21 +336,27 @@ def fetch(cache_path, lockfile, generators, generators_path):
         autoescape=jinja2.select_autoescape(),
     )
 
-    template = jinja_loader.get_template("conanfile-fetch.py.jinja")
+    conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
+    profile_template = jinja_loader.get_template("profile.jinja")
 
     native_generators_path_suffix = "conan"
     native_generators_path = os.path.join(
         generators_path, native_generators_path_suffix
     )
 
-    with create_and_render_temp_file(
-        template,
-        {
-            "lockfile": lockfile,
-            "generators": generators - additional_generators.keys(),
-        },
-        ".py",
-    ) as conanfile:
+    with (
+        create_and_render_temp_file(
+            conanfile_template,
+            {
+                "lockfile": lockfile,
+                "generators": generators - additional_generators.keys(),
+            },
+            ".py",
+        ) as conanfile_file,
+        create_and_render_temp_file(
+            profile_template, {"options": options}
+        ) as profile_file,
+    ):
         process = subprocess.Popen(
             [
                 "conan",
@@ -333,9 +371,9 @@ def fetch(cache_path, lockfile, generators, generators_path):
                 "missing",
                 "--format",
                 "json",
+                f"--profile:host={profile_file.name}",
                 "--profile:build=profile",
-                "--profile:host=profile",
-                conanfile.name,
+                conanfile_file.name,
             ],
             stdout=subprocess.PIPE,
             encoding="ascii",
@@ -377,6 +415,7 @@ if __name__ == "__main__":
         fetch,
         install,
         parse_requirements,
+        parse_options,
         parse_lockfile_simple,
         parse_products_simple,
         {},

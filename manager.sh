@@ -8,4 +8,4 @@ destination_path="$tmp_path/root/"
 input_path="$tmp_path/input/"
 
 ./PPpackage_arch.py update-db "$cache_path" && \
-./PPpackage.py "$managers_path" "$cache_path" "$generators_path" "$destination_path" <"$input_path/requirements-generators.json"
+./PPpackage.py "$managers_path" "$cache_path" "$generators_path" "$destination_path" <"$input_path/input.json"

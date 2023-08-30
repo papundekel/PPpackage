@@ -100,18 +100,30 @@ def parse_generators(input):
     return generators
 
 
-def parse_lockfile_generators(lockfile_parser, input):
+def parse_resolve_input(requirements_parser, options_parser, input):
+    check_dict_format(
+        input, {"requirements", "options"}, set(), "Invalid resolve input format."
+    )
+
+    requirements = requirements_parser(input["requirements"])
+    options = options_parser(input["options"])
+
+    return requirements, options
+
+
+def parse_fetch_input(lockfile_parser, options_parser, input):
     check_dict_format(
         input,
-        {"lockfile", "generators"},
+        {"lockfile", "options", "generators"},
         set(),
-        "Invalid lockfile-generators format.",
+        "Invalid fetch input format.",
     )
 
     lockfile = lockfile_parser(input["lockfile"])
+    options = options_parser(input["options"])
     generators = parse_generators(input["generators"])
 
-    return lockfile, generators
+    return lockfile, options, generators
 
 
 def check_products_simple(products_input):
@@ -169,27 +181,31 @@ def submanagers(submanagers_handler):
     json.dump(submanagers, sys.stdout)
 
 
-def resolve(requirements_parser, resolver):
+def resolve(requirements_parser, options_parser, resolver):
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
 
     input = json.load(sys.stdin)
 
-    requirements = requirements_parser(input)
+    requirements, options = parse_resolve_input(
+        requirements_parser, options_parser, input
+    )
 
-    lockfiles = resolver(cache_path, requirements)
+    lockfiles = resolver(cache_path, requirements, options)
 
     json.dump(lockfiles, sys.stdout)
 
 
-def fetch(lockfile_parser, fetcher):
+def fetch(lockfile_parser, options_parser, fetcher):
     cache_path = parse_cl_argument(2, "Missing cache path argument.")
     generators_path = parse_cl_argument(3, "Missing generators path argument.")
 
     input = json.load(sys.stdin)
 
-    lockfile, generators = parse_lockfile_generators(lockfile_parser, input)
+    lockfile, options, generators = parse_fetch_input(
+        lockfile_parser, options_parser, input
+    )
 
-    products = fetcher(cache_path, lockfile, generators, generators_path)
+    products = fetcher(cache_path, lockfile, options, generators, generators_path)
 
     json.dump(products, sys.stdout)
 
@@ -214,6 +230,7 @@ def execute(
     fetcher,
     installer,
     requirements_parser,
+    options_parser,
     lockfile_parser,
     products_parser,
     additional_commands,
@@ -226,8 +243,8 @@ def execute(
 
         required_commands = {
             "submanagers": lambda: submanagers(submanagers_handler),
-            "resolve": lambda: resolve(requirements_parser, resolver),
-            "fetch": lambda: fetch(lockfile_parser, fetcher),
+            "resolve": lambda: resolve(requirements_parser, options_parser, resolver),
+            "fetch": lambda: fetch(lockfile_parser, options_parser, fetcher),
             "install": lambda: install(products_parser, installer),
         }
 

@@ -25,15 +25,25 @@ def get_cache_paths(cache_path):
     return database_path, cache_path
 
 
-def parse_requirements(requirements_input):
-    if type(requirements_input) is not list:
+def check_requirements(input):
+    if type(input) is not list:
         raise MyException("Invalid requirements format")
 
-    for requirement_input in requirements_input:
+    for requirement_input in input:
         if type(requirement_input) is not str:
             raise MyException("Invalid requirements format")
 
-    return requirements_input
+
+def parse_requirements(input):
+    check_requirements(input)
+
+    requirements = input
+
+    return requirements
+
+
+def parse_options(input):
+    return None
 
 
 def update_database():
@@ -56,7 +66,7 @@ def submanagers():
     return []
 
 
-def resolve(cache_path, requirements):
+def resolve(cache_path, requirements, options):
     database_path, _ = get_cache_paths(cache_path)
 
     # trivial resolution of same-named packages
@@ -115,7 +125,7 @@ def resolve(cache_path, requirements):
     return [lockfile]
 
 
-def fetch(cache_path, lockfile, generators, generators_path):
+def fetch(cache_path, lockfile, options, generators, generators_path):
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -215,6 +225,7 @@ if __name__ == "__main__":
         fetch,
         install,
         parse_requirements,
+        parse_options,
         parse_lockfile_simple,
         parse_products_simple,
         {"update-db": update_database},
