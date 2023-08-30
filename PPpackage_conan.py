@@ -359,30 +359,31 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
             profile_template, {"options": options}
         ) as profile_file,
     ):
-        process = subprocess.Popen(
-            [
-                "conan",
-                "install",
-                "--output-folder",
-                os.path.normpath(
-                    native_generators_path
-                ),  # conan doesn't normalize paths here
-                "--deployer",
-                "PPpackage_conan_deployer.py",
-                "--build",
-                "missing",
-                "--format",
-                "json",
-                f"--profile:host={profile_file.name}",
-                "--profile:build=profile",
-                conanfile_file.name,
-            ],
+        process = asyncio.create_subprocess_exec(
+            "conan",
+            "install",
+            "--output-folder",
+            os.path.normpath(
+                native_generators_path
+            ),  # conan doesn't normalize paths here
+            "--deployer",
+            "PPpackage_conan_deployer.py",
+            "--build",
+            "missing",
+            "--format",
+            "json",
+            f"--profile:host={profile_file.name}",
+            "--profile:build=profile",
+            conanfile_file.name,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            encoding="ascii",
+            stderr=None,
             env=environment,
         )
 
-        graph_json = subprocess_communicate(process, "Error in `conan install`")
+        graph_json = await asubprocess_communicate(
+            await process, "Error in `conan install`"
+        )
 
     graph_infos = parse_conan_graph_fetch(graph_json)
 
