@@ -187,27 +187,37 @@ def remove_leaves_from_cache(environment):
     subprocess_wait(process, "Error in `conan remove`")
 
 
-def patch_generators_paths(generators_path, file_paths):
-    for file_path in file_paths:
-        presets_path = os.path.join(generators_path, file_path)
+def patch_native_generators_paths(
+    old_generators_path, new_generators_path, files_to_patch_paths
+):
+    for file_to_patch_path in files_to_patch_paths:
+        old_generators_path_abs = os.path.abspath(old_generators_path)
 
-        generators_path_abs = os.path.abspath(generators_path)
-
-        if os.path.exists(presets_path):
-            with open(presets_path, "r") as presets_file:
-                lines = presets_file.readlines()
+        if os.path.exists(file_to_patch_path):
+            with open(file_to_patch_path, "r") as file_to_patch:
+                lines = file_to_patch.readlines()
 
             lines = [
-                line.replace(generators_path_abs, "/PPpackage/generators")
+                line.replace(old_generators_path_abs, new_generators_path)
                 for line in lines
             ]
 
-            with open(presets_path, "w") as presets_file:
-                presets_file.writelines(lines)
+            with open(file_to_patch_path, "w") as file_to_patch:
+                file_to_patch.writelines(lines)
 
 
-def patch_generators(generators_path):
-    patch_generators_paths(generators_path, ["CMakePresets.json"])
+def patch_native_generators(native_generators_path, native_generators_path_suffix):
+    new_generators_path = os.path.join(
+        "/PPpackage/generators", native_generators_path_suffix
+    )
+    patch_native_generators_paths(
+        native_generators_path,
+        new_generators_path,
+        [
+            os.path.join(native_generators_path, file_sub_path)
+            for file_sub_path in ["CMakePresets.json"]
+        ],
+    )
 
 
 def install_product(environment, product, destination_path):
@@ -296,6 +306,11 @@ def fetch(cache_path, lockfile, generators, generators_path):
 
     template = jinja_loader.get_template("conanfile-fetch.py.jinja")
 
+    native_generators_path_suffix = "conan"
+    native_generators_path = os.path.join(
+        generators_path, native_generators_path_suffix
+    )
+
     with create_and_render_temp_file(
         template,
         {
@@ -309,7 +324,9 @@ def fetch(cache_path, lockfile, generators, generators_path):
                 "conan",
                 "install",
                 "--output-folder",
-                os.path.normpath(generators_path),  # conan doesn't normalize paths here
+                os.path.normpath(
+                    native_generators_path
+                ),  # conan doesn't normalize paths here
                 "--deployer",
                 "PPpackage_conan_deployer.py",
                 "--build",
@@ -329,7 +346,7 @@ def fetch(cache_path, lockfile, generators, generators_path):
 
     graph_infos = parse_conan_graph_fetch(graph_json)
 
-    patch_generators(generators_path)
+    patch_native_generators(native_generators_path, native_generators_path_suffix)
 
     for generator in generators & additional_generators.keys():
         additional_generators[generator](generators_path, graph_infos)
