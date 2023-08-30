@@ -15,6 +15,7 @@ import itertools
 import json
 import sys
 import os
+import asyncio
 
 
 def check_requirements(manager_requirements_input):
@@ -107,11 +108,9 @@ def generator_versions(generators_path, manager_versions_dict, manager_product_i
 builtin_generators = {"versions": generator_versions}
 
 
-def submanagers():
-    return []
-
-
-def resolve(managers_path, cache_path, manager_requirements, manager_options_dict):
+async def resolve(
+    managers_path, cache_path, manager_requirements, manager_options_dict
+):
     manager_lockfiles = {}
 
     for manager, requirements in manager_requirements.items():
@@ -159,7 +158,7 @@ def resolve(managers_path, cache_path, manager_requirements, manager_options_dic
     return lockfile
 
 
-def fetch(
+async def fetch(
     managers_path,
     cache_path,
     manager_versions_dict,
@@ -206,7 +205,7 @@ def fetch(
     return manager_product_ids_dict
 
 
-def install(
+async def install(
     managers_path,
     cache_path,
     manager_versions_dict,
@@ -232,7 +231,7 @@ def install(
         )
 
 
-if __name__ == "__main__":
+async def main():
     try:
         managers_path = parse_cl_argument(1, "Missing managers path argument.")
         cache_path = parse_cl_argument(2, "Missing cache path argument.")
@@ -243,13 +242,19 @@ if __name__ == "__main__":
 
         requirements, options, generators = parse_input(requirements_generators_input)
 
-        versions = resolve(managers_path, cache_path, requirements, options)
+        versions = await resolve(managers_path, cache_path, requirements, options)
 
-        product_ids = fetch(
+        product_ids = await fetch(
             managers_path, cache_path, versions, options, generators, generators_path
         )
 
-        install(managers_path, cache_path, versions, product_ids, destination_path)
+        await install(
+            managers_path, cache_path, versions, product_ids, destination_path
+        )
     except MyException as e:
         print(f"PPpackage: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
