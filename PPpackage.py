@@ -72,6 +72,14 @@ def parse_products(manager_products_input):
     return manager_products_input
 
 
+def merge_lockfiles(versions, product_ids):
+    return {
+        package: {"version": versions[package], "product_id": product_ids[package]}
+        for package in versions
+        if package in product_ids
+    }
+
+
 def submanagers():
     return []
 
@@ -139,8 +147,12 @@ def fetch(cache_path, manager_lockfile_dict, generators, generators_path):
     return manager_product_ids
 
 
-def install(cache_path, manager_products, destination_path):
-    for manager, products in manager_products.items():
+def install(cache_path, manager_versions, manager_product_ids, destination_path):
+    for manager, versions in manager_versions.items():
+        product_ids = manager_product_ids[manager]
+
+        products = merge_lockfiles(versions, product_ids)
+
         process = subprocess.Popen(
             [f"./PPpackage_{manager}.py", "install", cache_path, destination_path],
             stdin=subprocess.PIPE,
@@ -169,27 +181,6 @@ def parse_requirements_generators(input):
     return requirements, generators
 
 
-def merge_lockfiles(versions, product_ids):
-    output = {}
-
-    for key in versions:
-        versions_value = versions[key]
-
-        if key in product_ids:
-            product_ids_value = product_ids[key]
-
-            if type(versions_value) is dict and type(product_ids_value) is dict:
-                output[key] = merge_lockfiles(versions_value, product_ids_value)
-            elif type(versions_value) is str and type(product_ids_value) is str:
-                version = versions_value
-                product_id = product_ids_value
-                output[key] = {"version": version, "product_id": product_id}
-            else:
-                raise MyException("Invalid version or product ids lockfile format.")
-
-    return output
-
-
 if __name__ == "__main__":
     cache_path = parse_cl_argument(1, "Missing cache path argument.")
     generators_path = parse_cl_argument(2, "Missing generators path argument.")
@@ -205,6 +196,4 @@ if __name__ == "__main__":
 
     product_ids = fetch(cache_path, versions, generators, generators_path)
 
-    products = merge_lockfiles(versions, product_ids)
-
-    install(cache_path, products, destination_path)
+    install(cache_path, versions, product_ids, destination_path)
