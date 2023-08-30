@@ -131,31 +131,29 @@ def create_and_render_temp_file(template, template_context, suffix=None):
         yield file
 
 
-def export_leaf(environment, template, index, requirement_partition):
+async def export_leaf(environment, template, index, requirement_partition):
     with create_and_render_temp_file(
         template, {"index": index, "requirements": requirement_partition}, ".py"
     ) as conanfile_leaf:
-        process = subprocess.Popen(
-            [
-                "conan",
-                "export",
-                conanfile_leaf.name,
-            ],
+        process = asyncio.create_subprocess_exec(
+            "conan",
+            "export",
+            conanfile_leaf.name,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
-            encoding="ascii",
             env=environment,
         )
 
-        subprocess_communicate(process, "Error in `conan export`.")
+        await asubprocess_communicate(await process, "Error in `conan export`.")
 
 
-def export_leaves(environment, template, requirement_partitions):
+async def export_leaves(environment, template, requirement_partitions):
     for index, requirement_partition in enumerate(requirement_partitions):
-        export_leaf(environment, template, index, requirement_partition)
+        await export_leaf(environment, template, index, requirement_partition)
 
 
-def get_lockfile(
+async def get_lockfile(
     environment, root_template, profile_template, requirement_partitions, options
 ):
     with (
@@ -168,38 +166,43 @@ def get_lockfile(
             profile_template, {"options": options}
         ) as profile_file,
     ):
-        process = subprocess.Popen(
-            [
-                "conan",
-                "graph",
-                "info",
-                "--format",
-                "json",
-                f"--profile:host={profile_file.name}",
-                "--profile:build=profile",
-                root_file.name,
-            ],
+        process = asyncio.create_subprocess_exec(
+            "conan",
+            "graph",
+            "info",
+            "--format",
+            "json",
+            f"--profile:host={profile_file.name}",
+            "--profile:build=profile",
+            root_file.name,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            encoding="ascii",
+            stderr=None,
             env=environment,
         )
 
-        graph_string = subprocess_communicate(process, "Error in `conan graph info`")
+        graph_string = await asubprocess_communicate(
+            await process, "Error in `conan graph info`"
+        )
 
     lockfile = parse_conan_graph_resolve(graph_string)
 
     return lockfile
 
 
-def remove_leaves_from_cache(environment):
-    process = subprocess.Popen(
-        ["conan", "remove", "--confirm", "leaf-*/1.0.0@pppackage"],
+async def remove_leaves_from_cache(environment):
+    process = asyncio.create_subprocess_exec(
+        "conan",
+        "remove",
+        "--confirm",
+        "leaf-*/1.0.0@pppackage",
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
-        encoding="ascii",
+        stderr=None,
         env=environment,
     )
 
-    subprocess_communicate(process, "Error in `conan remove`")
+    await asubprocess_communicate(await process, "Error in `conan remove`")
 
 
 def patch_native_generators_paths(
@@ -314,16 +317,16 @@ async def resolve(cache_path, requirements, options):
 
     leaf_template = jinja_loader.get_template("conanfile-leaf.py.jinja")
 
-    export_leaves(environment, leaf_template, requirement_partitions)
+    await export_leaves(environment, leaf_template, requirement_partitions)
 
     root_template = jinja_loader.get_template("conanfile-root.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    lockfile = get_lockfile(
+    lockfile = await get_lockfile(
         environment, root_template, profile_template, requirement_partitions, options
     )
 
-    remove_leaves_from_cache(environment)
+    await remove_leaves_from_cache(environment)
 
     return [lockfile]
 
