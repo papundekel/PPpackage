@@ -3,6 +3,7 @@
 from PPpackage_utils import (
     MyException,
     subprocess_communicate,
+    asubprocess_communicate,
     check_dict_format,
     parse_generators,
     parse_cl_argument,
@@ -15,6 +16,7 @@ import itertools
 import json
 import sys
 import os
+import asyncio
 
 
 def check_requirements(manager_requirements_input):
@@ -107,42 +109,137 @@ def generator_versions(generators_path, manager_versions_dict, manager_product_i
 builtin_generators = {"versions": generator_versions}
 
 
-def submanagers():
-    return []
+async def install_manager(
+    managers_path,
+    cache_path,
+    manager_product_ids_dict,
+    destination_path,
+    manager,
+    versions,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "install",
+        cache_path,
+        destination_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=None,
+    )
+
+    product_ids = manager_product_ids_dict[manager]
+
+    products = merge_lockfiles(versions, product_ids)
+
+    await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s install.",
+        json.dumps(products).encode("ascii"),
+    )
 
 
-def resolve(managers_path, cache_path, manager_requirements, manager_options_dict):
+async def resolve_manager(
+    managers_path,
+    cache_path,
+    manager,
+    requirements,
+    manager_options_dict,
+    manager_lockfiles,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "resolve",
+        cache_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+
+    options = manager_options_dict.get(manager)
+
+    resolve_input_json = json.dumps(
+        {
+            "requirements": requirements,
+            "options": options,
+        }
+    ).encode("ascii")
+
+    lockfiles_output = await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s resolve.",
+        resolve_input_json,
+    )
+
+    lockfiles = json.loads(lockfiles_output.decode("ascii"))
+
+    manager_lockfiles[manager] = lockfiles
+
+
+async def fetch_manager(
+    managers_path,
+    cache_path,
+    manager,
+    versions,
+    manager_options_dict,
+    generators,
+    generators_path,
+    manager_product_ids_dict,
+):
+    manager_path = get_manager_path(managers_path, manager)
+
+    process = asyncio.create_subprocess_exec(
+        manager_path,
+        "fetch",
+        cache_path,
+        generators_path,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+
+    options = manager_options_dict.get(manager)
+
+    fetch_input_json = json.dumps(
+        {
+            "lockfile": versions,
+            "options": options,
+            "generators": generators - builtin_generators.keys(),
+        },
+        cls=SetEncoder,
+    )
+
+    product_ids_output = await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s fetch.",
+        fetch_input_json.encode("ascii"),
+    )
+
+    product_ids = json.loads(product_ids_output.decode("ascii"))
+
+    manager_product_ids_dict[manager] = product_ids
+
+
+async def resolve(
+    managers_path, cache_path, manager_requirements, manager_options_dict
+):
     manager_lockfiles = {}
 
-    for manager, requirements in manager_requirements.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "resolve", cache_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            encoding="ascii",
-        )
-
-        options = manager_options_dict.get(manager)
-
-        lockfiles_output = subprocess_communicate(
-            process,
-            f"Error in {manager}'s resolve.",
-            json.dumps(
-                {
-                    "requirements": requirements,
-                    "options": options,
-                }
-            ),
-        )
-
-        lockfiles = json.loads(lockfiles_output)
-
-        if type(lockfiles) is not list:
-            raise MyException("Invalid lockfile format.")
-
-        manager_lockfiles[manager] = lockfiles
+    async with asyncio.TaskGroup() as group:
+        for manager, requirements in manager_requirements.items():
+            group.create_task(
+                resolve_manager(
+                    managers_path,
+                    cache_path,
+                    manager,
+                    requirements,
+                    manager_options_dict,
+                    manager_lockfiles,
+                )
+            )
 
     lockfiles = [
         {manager: lockfile for manager, lockfile in i}
@@ -159,7 +256,7 @@ def resolve(managers_path, cache_path, manager_requirements, manager_options_dic
     return lockfile
 
 
-def fetch(
+async def fetch(
     managers_path,
     cache_path,
     manager_versions_dict,
@@ -169,34 +266,20 @@ def fetch(
 ):
     manager_product_ids_dict = {}
 
-    for manager, versions in manager_versions_dict.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "fetch", cache_path, generators_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            encoding="ascii",
-        )
-
-        options = manager_options_dict.get(manager)
-
-        product_ids_output = subprocess_communicate(
-            process,
-            f"Error in {manager}'s fetch.",
-            json.dumps(
-                {
-                    "lockfile": versions,
-                    "options": options,
-                    "generators": generators - builtin_generators.keys(),
-                },
-                cls=SetEncoder,
-            ),
-        )
-
-        product_ids = json.loads(product_ids_output)
-
-        manager_product_ids_dict[manager] = product_ids
+    async with asyncio.TaskGroup() as group:
+        for manager, versions in manager_versions_dict.items():
+            group.create_task(
+                fetch_manager(
+                    managers_path,
+                    cache_path,
+                    manager,
+                    versions,
+                    manager_options_dict,
+                    generators,
+                    generators_path,
+                    manager_product_ids_dict,
+                )
+            )
 
     for generator in generators & builtin_generators.keys():
         builtin_generators[generator](
@@ -206,33 +289,28 @@ def fetch(
     return manager_product_ids_dict
 
 
-def install(
+async def install(
     managers_path,
     cache_path,
     manager_versions_dict,
     manager_product_ids_dict,
     destination_path,
 ):
-    for manager, versions in manager_versions_dict.items():
-        manager_path = get_manager_path(managers_path, manager)
-
-        process = subprocess.Popen(
-            [manager_path, "install", cache_path, destination_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            encoding="ascii",
-        )
-
-        product_ids = manager_product_ids_dict[manager]
-
-        products = merge_lockfiles(versions, product_ids)
-
-        subprocess_communicate(
-            process, f"Error in {manager}'s install.", json.dumps(products)
-        )
+    async with asyncio.TaskGroup() as group:
+        for manager, versions in manager_versions_dict.items():
+            group.create_task(
+                install_manager(
+                    managers_path,
+                    cache_path,
+                    manager_product_ids_dict,
+                    destination_path,
+                    manager,
+                    versions,
+                )
+            )
 
 
-if __name__ == "__main__":
+async def main():
     try:
         managers_path = parse_cl_argument(1, "Missing managers path argument.")
         cache_path = parse_cl_argument(2, "Missing cache path argument.")
@@ -243,13 +321,19 @@ if __name__ == "__main__":
 
         requirements, options, generators = parse_input(requirements_generators_input)
 
-        versions = resolve(managers_path, cache_path, requirements, options)
+        versions = await resolve(managers_path, cache_path, requirements, options)
 
-        product_ids = fetch(
+        product_ids = await fetch(
             managers_path, cache_path, versions, options, generators, generators_path
         )
 
-        install(managers_path, cache_path, versions, product_ids, destination_path)
+        await install(
+            managers_path, cache_path, versions, product_ids, destination_path
+        )
     except MyException as e:
         print(f"PPpackage: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
