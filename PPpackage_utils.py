@@ -3,6 +3,13 @@ import json
 import os
 
 
+class SetEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, set):
+            return list(obj)
+        return json.JSONEncoder.default(self, obj)
+
+
 def ensure_dir_exists(path):
     try:
         os.makedirs(path)
@@ -85,7 +92,10 @@ def parse_generators(input):
         if type(generator_input) is not str:
             raise MyException("Invalid generator format: not a string.")
 
-    generators = input
+    generators = set(input)
+
+    if len(generators) != len(input):
+        raise MyException("Invalid generators format: multiple identical values.")
 
     return generators
 

@@ -11,7 +11,6 @@ from PPpackage_utils import (
 )
 
 import shutil
-import sys
 import json
 import tempfile
 import subprocess
@@ -67,27 +66,33 @@ def parse_requirements(requirements_input):
 
 
 def parse_conan_graph_nodes(graph_string):
-    return json.loads(graph_string)["graph"]["nodes"].values()
+    return [
+        node
+        for node in json.loads(graph_string)["graph"]["nodes"].values()
+        if node["ref"] != ""
+    ]
 
 
 def parse_conan_graph_resolve(graph_string):
     nodes = parse_conan_graph_nodes(graph_string)
 
     return {
-        (package_version := ref.split("/", 1))[0]: package_version[1]
+        (package_and_version := node["ref"].split("/", 1))[0]: package_and_version[1]
         for node in nodes
-        if (ref := node["ref"]) != "" and node["user"] != "pppackage"
+        if node["user"] != "pppackage"
     }
+
+
+class GraphInfo:
+    def __init__(self, node):
+        self.product_id = f"{node['package_id']}#{node['prev']}"
+        self.cpp_info = node["cpp_info"]
 
 
 def parse_conan_graph_fetch(input):
     nodes = parse_conan_graph_nodes(input)
 
-    return {
-        ref.split("/", 1)[0]: f"{node['package_id']}#{node['prev']}"
-        for node in nodes
-        if (ref := node["ref"]) != ""
-    }
+    return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes}
 
 
 def create_requirement_partitions(requirements):
@@ -267,6 +272,18 @@ def resolve(cache_path, requirements):
     return [lockfile]
 
 
+def generator_info(generators_path, graph_infos):
+    info_path = os.path.join(generators_path, "info")
+    ensure_dir_exists(info_path)
+
+    for package, graph_info in graph_infos.items():
+        with open(os.path.join(info_path, f"{package}.json"), "w") as file:
+            json.dump(graph_info.cpp_info, file, indent=4)
+
+
+additional_generators = {"info": generator_info}
+
+
 def fetch(cache_path, lockfile, generators, generators_path):
     cache_path = get_cache_path(cache_path)
 
@@ -280,7 +297,12 @@ def fetch(cache_path, lockfile, generators, generators_path):
     template = jinja_loader.get_template("conanfile-fetch.py.jinja")
 
     with create_and_render_temp_file(
-        template, {"lockfile": lockfile, "generators": generators}, ".py"
+        template,
+        {
+            "lockfile": lockfile,
+            "generators": generators - additional_generators.keys(),
+        },
+        ".py",
     ) as conanfile:
         process = subprocess.Popen(
             [
@@ -305,11 +327,18 @@ def fetch(cache_path, lockfile, generators, generators_path):
 
         graph_json = subprocess_wait(process, "Error in `conan install`")
 
-    products = parse_conan_graph_fetch(graph_json)
+    graph_infos = parse_conan_graph_fetch(graph_json)
 
     patch_generators(generators_path)
 
-    return products
+    for generator in generators & additional_generators.keys():
+        additional_generators[generator](generators_path, graph_infos)
+
+    product_ids = {
+        package: graph_info.product_id for package, graph_info in graph_infos.items()
+    }
+
+    return product_ids
 
 
 def install(cache_path, products, destination_path):
