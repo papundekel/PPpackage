@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from PPpackage_utils import (
+    Product,
     MyException,
     asubprocess_communicate,
     parse_lockfile_simple,
@@ -17,18 +18,19 @@ import re
 import os
 import asyncio
 from pathlib import Path
-
+from collections.abc import Iterable, Mapping, MutableSet, Set, MutableMapping
+from typing import Any
 
 regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
 
 
-def get_cache_paths(cache_path: Path):
+def get_cache_paths(cache_path: Path) -> tuple[Path, Path]:
     database_path = cache_path / "arch" / "db"
     cache_path = cache_path / "arch" / "cache"
     return database_path, cache_path
 
 
-def check_requirements(input):
+def check_requirements(input: Any) -> Iterable[str]:
     if type(input) is not list:
         raise MyException("Invalid requirements format")
 
@@ -36,20 +38,24 @@ def check_requirements(input):
         if type(requirement_input) is not str:
             raise MyException("Invalid requirements format")
 
+    return input
 
-def parse_requirements(input):
-    check_requirements(input)
 
-    requirements = input
+def parse_requirements(input: Any) -> Iterable[str]:
+    input_checked = check_requirements(input)
+
+    requirements = input_checked
 
     return requirements
 
 
-def parse_options(input):
+def parse_options(input: Any) -> Any:
     return None
 
 
-async def resolve_requirement(database_path: Path, requirement, dependencies):
+async def resolve_requirement(
+    database_path: Path, requirement: str, dependencies: MutableSet[str]
+) -> None:
     process = asyncio.create_subprocess_exec(
         "pactree",
         "--dbpath",
@@ -70,11 +76,11 @@ async def resolve_requirement(database_path: Path, requirement, dependencies):
             raise MyException("Invalid pactree output.")
 
         dependency = match.group()
-        dependencies.append(dependency)
+        dependencies.add(dependency)
 
 
 @app.command("update-db")
-async def update_database(cache_path: Path):
+async def update_database(cache_path: Path) -> None:
     database_path, _ = get_cache_paths(cache_path)
 
     ensure_dir_exists(database_path)
@@ -93,26 +99,25 @@ async def update_database(cache_path: Path):
     await asubprocess_communicate(await process, "Error in `pacman -Sy`")
 
 
-async def submanagers():
+async def submanagers() -> Iterable[str]:
     return []
 
 
-async def resolve(cache_path: Path, requirements, options):
+async def resolve(
+    cache_path: Path, requirements: Iterable[str], options: Any
+) -> Iterable[Mapping[str, str]]:
     database_path, _ = get_cache_paths(cache_path)
 
     # trivial resolution of same-named packages
     requirements = set(requirements)
 
-    dependencies = []
+    dependencies: MutableSet[str] = set()
 
     async with asyncio.TaskGroup() as group:
         for requirement in requirements:
             group.create_task(
                 resolve_requirement(database_path, requirement, dependencies)
             )
-
-    # trivial resolution of same-named packages
-    dependencies = list(set(dependencies))
 
     process = asyncio.create_subprocess_exec(
         "pacinfo",
@@ -143,7 +148,13 @@ async def resolve(cache_path: Path, requirements, options):
     return [lockfile]
 
 
-async def fetch(cache_path: Path, lockfile, options, generators, generators_path: Path):
+async def fetch(
+    cache_path: Path,
+    lockfile: Mapping[str, str],
+    options: Any,
+    generators: Set[str],
+    generators_path: Path,
+) -> Mapping[str, str]:
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -183,7 +194,7 @@ async def fetch(cache_path: Path, lockfile, options, generators, generators_path
 
     stdout = await asubprocess_communicate(await process, "Error in `pacman -Sddp`")
 
-    product_ids = {}
+    product_ids: MutableMapping[str, str] = {}
 
     for package, line in zip(packages, stdout.decode("ascii").splitlines()):
         package_version_split = (
@@ -197,7 +208,9 @@ async def fetch(cache_path: Path, lockfile, options, generators, generators_path
     return product_ids
 
 
-async def install(cache_path: Path, products, destination_path: Path):
+async def install(
+    cache_path: Path, products: Set[Product], destination_path: Path
+) -> None:
     _, cache_path = get_cache_paths(cache_path)
     database_path = destination_path / "var" / "lib" / "pacman"
 
