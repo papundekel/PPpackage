@@ -1,24 +1,25 @@
 import sys
 import json
-import os
 import asyncio
 import typer
 import inspect
 import functools
 from pathlib import Path
+from collections.abc import Mapping, Set, Callable, Iterable, Awaitable
+from typing import Any, Optional, TypedDict
 
 
-def ensure_dir_exists(path: Path):
+def ensure_dir_exists(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
 class AsyncTyper(typer.Typer):
     @staticmethod
-    def maybe_run_async(decorator, f):
+    def maybe_run_async(decorator: Callable[[Any], Any], f: Any) -> Any:
         if inspect.iscoroutinefunction(f):
 
             @functools.wraps(f)
-            def runner(*args, **kwargs):
+            def runner(*args: Any, **kwargs: Any) -> Any:
                 return asyncio.run(f(*args, **kwargs))
 
             decorator(runner)
@@ -26,17 +27,17 @@ class AsyncTyper(typer.Typer):
             decorator(f)
         return f
 
-    def callback(self, *args, **kwargs):
+    def callback(self, *args: Any, **kwargs: Any) -> Any:
         decorator = super().callback(*args, **kwargs)
         return functools.partial(self.maybe_run_async, decorator)
 
-    def command(self, *args, **kwargs):
+    def command(self, *args: Any, **kwargs: Any) -> Any:
         decorator = super().command(*args, **kwargs)
         return functools.partial(self.maybe_run_async, decorator)
 
 
 class SetEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, set):
             return list(obj)
         return json.JSONEncoder.default(self, obj)
@@ -47,29 +48,19 @@ class MyException(Exception):
 
 
 class STDERRException(Exception):
-    def __init__(self, message, stderr):
+    def __init__(self, message: str, stderr: str) -> None:
         super().__init__(message)
         self.stderr = stderr
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{super().__str__()}\n{self.stderr}"
 
 
-def subprocess_communicate(process, error_message, input=None):
-    stdout, stderr = process.communicate(input)
-
-    if process.returncode != 0:
-        if stderr is not None:
-            raise STDERRException(error_message, stderr)
-        else:
-            raise MyException(error_message)
-
-    return stdout
-
-
 async def asubprocess_communicate(
-    process: asyncio.subprocess.Process, error_message, input=None
-):
+    process: asyncio.subprocess.Process,
+    error_message: str,
+    input: Optional[bytes] = None,
+) -> bytes:
     stdout, stderr = await process.communicate(input)
 
     if process.returncode != 0:
@@ -81,7 +72,12 @@ async def asubprocess_communicate(
     return stdout
 
 
-def check_dict_format(input, keys_required, keys_permitted_unequired, error_message):
+def check_dict_format(
+    input: Any,
+    keys_required: Set[str],
+    keys_permitted_unequired: Set[str],
+    error_message: str,
+) -> Mapping[str, Any]:
     if type(input) is not dict:
         raise MyException(error_message)
 
@@ -95,31 +91,36 @@ def check_dict_format(input, keys_required, keys_permitted_unequired, error_mess
     if not are_present_required or not are_present_only_permitted:
         raise MyException(error_message)
 
+    return input
 
-def check_lockfile_simple(lockfile_input):
-    if type(lockfile_input) is not dict:
+
+def check_lockfile_simple(input: Any) -> Mapping[str, str]:
+    if type(input) is not dict:
         raise MyException("Invalid lockfile format: not a dict.")
 
-    for package, version in lockfile_input.items():
-        if type(package) is not str:
+    for package_input, version_input in input.items():
+        if type(package_input) is not str:
             raise MyException(
-                f"Invalid lockfile package format: `{package}` not a string."
-            )
-        if type(version) is not str:
-            raise MyException(
-                f"Invalid lockfile version format: `{version}` not a string."
+                f"Invalid lockfile package format: `{package_input}` not a string."
             )
 
+        if type(version_input) is not str:
+            raise MyException(
+                f"Invalid lockfile version format: `{version_input}` not a string."
+            )
 
-def parse_lockfile_simple(input):
-    check_lockfile_simple(input)
+    return input
 
-    lockfile = input
+
+def parse_lockfile_simple(input: Any) -> Mapping[str, str]:
+    input_checked = check_lockfile_simple(input)
+
+    lockfile = input_checked
 
     return lockfile
 
 
-def parse_generators(input):
+def parse_generators(input: Any) -> Set[str]:
     if type(input) is not list:
         raise MyException("Invalid generators format: not a list.")
 
@@ -135,37 +136,45 @@ def parse_generators(input):
     return generators
 
 
-def parse_resolve_input(requirements_parser, options_parser, input):
-    check_dict_format(
+def parse_resolve_input(
+    requirements_parser: Callable[[Any], Iterable[Any]],
+    options_parser: Callable[[Any], Any],
+    input: Any,
+) -> tuple[Iterable[Any], Any]:
+    input_checked = check_dict_format(
         input, {"requirements", "options"}, set(), "Invalid resolve input format."
     )
 
-    requirements = requirements_parser(input["requirements"])
-    options = options_parser(input["options"])
+    requirements = requirements_parser(input_checked["requirements"])
+    options = options_parser(input_checked["options"])
 
     return requirements, options
 
 
-def parse_fetch_input(lockfile_parser, options_parser, input):
-    check_dict_format(
+def parse_fetch_input(
+    lockfile_parser: Callable[[Any], Mapping[str, str]],
+    options_parser: Callable[[Any], Any],
+    input: Any,
+) -> tuple[Mapping[str, str], Any, Set[str]]:
+    input_checked = check_dict_format(
         input,
         {"lockfile", "options", "generators"},
         set(),
         "Invalid fetch input format.",
     )
 
-    lockfile = lockfile_parser(input["lockfile"])
-    options = options_parser(input["options"])
-    generators = parse_generators(input["generators"])
+    lockfile = lockfile_parser(input_checked["lockfile"])
+    options = options_parser(input_checked["options"])
+    generators = parse_generators(input_checked["generators"])
 
     return lockfile, options, generators
 
 
-def check_products_simple(products_input):
-    if type(products_input) is not dict:
+def check_products_simple(input: Any) -> Mapping[str, Mapping[str, str]]:
+    if type(input) is not dict:
         raise MyException("Invalid products format")
 
-    for package, version_info in products_input.items():
+    for package, version_info in input.items():
         if type(package) is not str:
             raise MyException("Invalid products format")
 
@@ -182,25 +191,27 @@ def check_products_simple(products_input):
         if type(product_id) is not str:
             raise MyException("Invalid products format")
 
+    return input
+
 
 class Product:
-    def __init__(self, package, version, product_id):
+    def __init__(self, package: str, version: str, product_id: str):
         self.package = package
         self.version = version
         self.product_id = product_id
 
 
-def parse_products_simple(products_input):
-    check_products_simple(products_input)
+def parse_products_simple(input: Any) -> Set[Product]:
+    input_checked = check_products_simple(input)
 
-    return [
+    return {
         Product(
             package=package,
             version=version_info["version"],
             product_id=version_info["product_id"],
         )
-        for package, version_info in products_input.items()
-    ]
+        for package, version_info in input_checked.items()
+    }
 
 
 _debug = False
@@ -210,29 +221,34 @@ app = AsyncTyper()
 
 
 @app.callback()
-def callback(debug: bool = False):
+def callback(debug: bool = False) -> None:
     global _debug
     _debug = debug
 
 
 def init(
-    submanagers_handler,
-    resolver,
-    fetcher,
-    installer,
-    requirements_parser,
-    options_parser,
-    lockfile_parser,
-    products_parser,
-):
+    submanagers_handler: Callable[[], Awaitable[Iterable[str]]],
+    resolver: Callable[
+        [Path, Iterable[Any], Any], Awaitable[Iterable[Mapping[str, str]]]
+    ],
+    fetcher: Callable[
+        [Path, Mapping[str, str], Any, Set[str], Path],
+        Awaitable[Mapping[str, str]],
+    ],
+    installer: Callable[[Path, Set[Product], Path], Awaitable[None]],
+    requirements_parser: Callable[[Any], Iterable[Any]],
+    options_parser: Callable[[Any], Any],
+    lockfile_parser: Callable[[Any], Mapping[str, str]],
+    products_parser: Callable[[Any], Set[Product]],
+) -> None:
     @app.command()
-    async def submanagers():
+    async def submanagers() -> None:
         submanagers = await submanagers_handler()
 
         json.dump(submanagers, sys.stdout)
 
     @app.command()
-    async def resolve(cache_path: Path):
+    async def resolve(cache_path: Path) -> None:
         input = json.load(sys.stdin)
 
         requirements, options = parse_resolve_input(
@@ -246,23 +262,23 @@ def init(
         json.dump(lockfiles, sys.stdout, indent=indent)
 
     @app.command()
-    async def fetch(cache_path: Path, generators_path: Path):
+    async def fetch(cache_path: Path, generators_path: Path) -> None:
         input = json.load(sys.stdin)
 
         lockfile, options, generators = parse_fetch_input(
             lockfile_parser, options_parser, input
         )
 
-        products = await fetcher(
+        product_ids = await fetcher(
             cache_path, lockfile, options, generators, generators_path
         )
 
         indent = 4 if _debug else None
 
-        json.dump(products, sys.stdout, indent=indent)
+        json.dump(product_ids, sys.stdout, indent=indent)
 
     @app.command()
-    async def install(cache_path: Path, destination_path: Path):
+    async def install(cache_path: Path, destination_path: Path) -> None:
         input = json.load(sys.stdin)
 
         ensure_dir_exists(destination_path)
@@ -272,7 +288,7 @@ def init(
         await installer(cache_path, products, destination_path)
 
 
-def run(manager_id):
+def run(manager_id: str) -> None:
     try:
         app()
     except* MyException as eg:

@@ -14,32 +14,37 @@ import subprocess
 import itertools
 import json
 import sys
-import os
 import asyncio
 from pathlib import Path
+from typing import Any
+from collections.abc import Iterable, Mapping, Sequence, MutableMapping, Callable, Set
 
 
-def check_requirements(manager_requirements_input):
-    if type(manager_requirements_input) is not dict:
+def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
+    if type(input) is not dict:
         raise MyException("Invalid requirements format.")
 
-    for manager, requirements in manager_requirements_input.items():
+    for manager, requirements in input.items():
         if type(manager) is not str:
             raise MyException("Invalid requirements format.")
 
         if type(requirements) is not list:
             raise MyException("Invalid requirements format.")
 
+    return input
 
-def parse_requirements(input):
-    check_requirements(input)
 
-    requirements = input
+def parse_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
+    input_checked = check_requirements(input)
+
+    requirements = input_checked
 
     return requirements
 
 
-def merge_lockfiles(versions, product_ids):
+def merge_lockfiles(
+    versions: Mapping[str, str], product_ids: Mapping[str, str]
+) -> Mapping[str, Mapping[str, str]]:
     return {
         package: {"version": versions[package], "product_id": product_ids[package]}
         for package in versions
@@ -47,43 +52,55 @@ def merge_lockfiles(versions, product_ids):
     }
 
 
-def get_manager_command_path(managers_path: Path, manager):
+def get_manager_command_path(managers_path: Path, manager: str) -> Path:
     return managers_path.absolute() / f"PPpackage_{manager}.py"
 
 
-def check_options(input):
+def check_options(input: Any) -> Mapping[str, Any]:
     if type(input) is not dict:
         raise MyException("Invalid options format.")
 
-    for options_input in input.values():
+    for manager_input, options_input in input.items():
+        if type(manager_input) is not str:
+            raise MyException("Invalid options format.")
+
+        # TODO: rethink
         if type(options_input) is not dict:
             raise MyException("Invalid options format.")
 
+    return input
 
-def parse_options(input):
-    check_options(input)
 
-    options = input
+def parse_options(input: Any) -> Mapping[str, Any]:
+    input_checked = check_options(input)
+
+    options = input_checked
 
     return options
 
 
-def parse_input(input):
-    check_dict_format(
+def parse_input(
+    input: Any,
+) -> tuple[Mapping[str, Iterable[Any]], Mapping[str, Any], Set[str]]:
+    input_checked = check_dict_format(
         input,
         {"requirements", "options", "generators"},
         set(),
         "Invalid input format.",
     )
 
-    requirements = parse_requirements(input["requirements"])
-    options = parse_options(input["options"])
-    generators = parse_generators(input["generators"])
+    requirements = parse_requirements(input_checked["requirements"])
+    options = parse_options(input_checked["options"])
+    generators = parse_generators(input_checked["generators"])
 
     return requirements, options, generators
 
 
-def generator_versions(generators_path, manager_versions_dict, manager_product_ids):
+def generator_versions(
+    generators_path: Path,
+    manager_versions_dict: Mapping[str, Mapping[str, str]],
+    manager_product_ids: Mapping[str, Mapping[str, str]],
+) -> None:
     versions_path = generators_path / "versions"
 
     for manager, versions in manager_versions_dict.items():
@@ -104,18 +121,23 @@ def generator_versions(generators_path, manager_versions_dict, manager_product_i
                 )
 
 
-builtin_generators = {"versions": generator_versions}
+builtin_generators: Mapping[
+    str,
+    Callable[
+        [Path, Mapping[str, Mapping[str, str]], Mapping[str, Mapping[str, str]]], None
+    ],
+] = {"versions": generator_versions}
 
 
 async def install_manager(
-    debug,
+    debug: bool,
     managers_path: Path,
     cache_path: Path,
-    manager_product_ids_dict,
+    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     destination_path: Path,
-    manager,
-    versions,
-):
+    manager: str,
+    versions: Mapping[str, str],
+) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
@@ -151,14 +173,14 @@ async def install_manager(
 
 
 async def resolve_manager(
-    debug,
+    debug: bool,
     managers_path: Path,
     cache_path: Path,
-    manager,
-    requirements,
-    manager_options_dict,
-    manager_lockfiles,
-):
+    manager: str,
+    requirements: Iterable[Any],
+    manager_options_dict: Mapping[str, Any],
+    manager_lockfiles: MutableMapping[str, Iterable[Any]],
+) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
@@ -207,16 +229,16 @@ async def resolve_manager(
 
 
 async def fetch_manager(
-    debug,
+    debug: bool,
     managers_path: Path,
     cache_path: Path,
-    manager,
-    versions,
-    manager_options_dict,
-    generators,
+    manager: str,
+    versions: Mapping[str, str],
+    manager_options_dict: Mapping[str, Any],
+    generators: Iterable[str],
     generators_path: Path,
-    manager_product_ids_dict,
-):
+    manager_product_ids_dict: MutableMapping[str, Mapping[str, str]],
+) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
@@ -268,9 +290,13 @@ async def fetch_manager(
 
 
 async def resolve(
-    debug, managers_path, cache_path, manager_requirements, manager_options_dict
-):
-    manager_lockfiles = {}
+    debug: bool,
+    managers_path: Path,
+    cache_path: Path,
+    manager_requirements: Mapping[str, Iterable[Any]],
+    manager_options_dict: Mapping[str, Any],
+) -> Mapping[str, Mapping[str, str]]:
+    manager_lockfiles: MutableMapping[str, Iterable[Mapping[str, str]]] = {}
 
     async with asyncio.TaskGroup() as group:
         for manager, requirements in manager_requirements.items():
@@ -286,7 +312,7 @@ async def resolve(
                 )
             )
 
-    lockfiles = [
+    lockfiles: Sequence[Mapping[str, Mapping[str, str]]] = [
         {manager: lockfile for manager, lockfile in i}
         for i in itertools.product(
             *[
@@ -302,15 +328,15 @@ async def resolve(
 
 
 async def fetch(
-    debug,
-    managers_path,
-    cache_path,
-    manager_versions_dict,
-    manager_options_dict,
-    generators,
-    generators_path,
-):
-    manager_product_ids_dict = {}
+    debug: bool,
+    managers_path: Path,
+    cache_path: Path,
+    manager_versions_dict: Mapping[str, Mapping[str, str]],
+    manager_options_dict: Mapping[str, Any],
+    generators: Iterable[str],
+    generators_path: Path,
+) -> Mapping[str, Mapping[str, str]]:
+    manager_product_ids_dict: MutableMapping[str, Mapping[str, str]] = {}
 
     async with asyncio.TaskGroup() as group:
         for manager, versions in manager_versions_dict.items():
@@ -337,13 +363,13 @@ async def fetch(
 
 
 async def install(
-    debug,
-    managers_path,
-    cache_path,
-    manager_versions_dict,
-    manager_product_ids_dict,
-    destination_path,
-):
+    debug: bool,
+    managers_path: Path,
+    cache_path: Path,
+    manager_versions_dict: Mapping[str, Mapping[str, str]],
+    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
+    destination_path: Path,
+) -> None:
     async with asyncio.TaskGroup() as group:
         for manager, versions in manager_versions_dict.items():
             group.create_task(
@@ -369,7 +395,7 @@ async def main(
     generators_path: Path,
     destination_path: Path,
     debug: bool = False,
-):
+) -> None:
     requirements_generators_input = json.load(sys.stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)

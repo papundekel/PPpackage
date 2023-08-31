@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from PPpackage_utils import (
+    Product,
     MyException,
     asubprocess_communicate,
     check_dict_format,
@@ -19,16 +20,31 @@ import jinja2
 import contextlib
 import os
 import asyncio
-import sys
 from pathlib import Path
+from collections.abc import (
+    Iterable,
+    Mapping,
+    Sequence,
+    MutableMapping,
+    MutableSequence,
+    Generator,
+    Callable,
+    Set,
+)
 import typing
+from typing import Any, TypedDict, Optional, NotRequired
 
 
-def get_cache_path(cache_path: Path):
+class Options(TypedDict):
+    settings: NotRequired[Mapping[str, str]]
+    options: NotRequired[Mapping[str, str]]
+
+
+def get_cache_path(cache_path: Path) -> Path:
     return cache_path / "conan"
 
 
-def make_conan_environment(cache_path: Path):
+def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
     environment = os.environ.copy()
 
     environment["CONAN_HOME"] = str(cache_path.absolute())
@@ -37,16 +53,16 @@ def make_conan_environment(cache_path: Path):
 
 
 class Requirement:
-    def __init__(self, package, version):
+    def __init__(self, package: str, version: str):
         self.package = package
         self.version = version
 
 
-def check_requirements(requirements_input):
-    if type(requirements_input) is not list:
+def check_requirements(input: Any) -> Iterable[Mapping[str, str]]:
+    if type(input) is not list:
         raise MyException("Invalid requirements format.")
 
-    for requirement_input in requirements_input:
+    for requirement_input in input:
         check_dict_format(
             requirement_input,
             {"package", "version"},
@@ -60,17 +76,29 @@ def check_requirements(requirements_input):
         if type(requirement_input["version"]) is not str:
             raise MyException("Invalid requirement format.")
 
+    return input
 
-def parse_requirements(requirements_input):
-    check_requirements(requirements_input)
+
+def parse_requirements(input: Any) -> Iterable[Requirement]:
+    input_checked = check_requirements(input)
 
     return [
         Requirement(requirement_input["package"], requirement_input["version"])
-        for requirement_input in requirements_input
+        for requirement_input in input_checked
     ]
 
 
-def parse_conan_graph_nodes(graph_string):
+class Node(TypedDict):
+    ref: str
+    package_id: str
+    prev: str
+    user: str
+    cpp_info: Mapping[str, Any]
+
+
+def parse_conan_graph_nodes(
+    graph_string: str,
+) -> Iterable[Node]:
     return [
         node
         for node in json.loads(graph_string)["graph"]["nodes"].values()
@@ -78,7 +106,7 @@ def parse_conan_graph_nodes(graph_string):
     ]
 
 
-def parse_conan_graph_resolve(graph_string):
+def parse_conan_graph_resolve(graph_string: str) -> Mapping[str, str]:
     nodes = parse_conan_graph_nodes(graph_string)
 
     return {
@@ -89,22 +117,24 @@ def parse_conan_graph_resolve(graph_string):
 
 
 class GraphInfo:
-    def __init__(self, node):
+    def __init__(self, node: Node):
         self.product_id = f"{node['package_id']}#{node['prev']}"
         self.cpp_info = node["cpp_info"]
 
 
-def parse_conan_graph_fetch(input):
+def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
     nodes = parse_conan_graph_nodes(input)
 
     return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes}
 
 
-def create_requirement_partitions(requirements):
-    requirement_partitions = []
+def create_requirement_partitions(
+    requirements: Iterable[Requirement],
+) -> Sequence[Mapping[str, str]]:
+    requirement_partitions: MutableSequence[MutableMapping[str, str]] = []
 
     for requirement in requirements:
-        partition_available = next(
+        partition_available: Optional[MutableMapping[str, str]] = next(
             (
                 partition
                 for partition in requirement_partitions
@@ -114,8 +144,8 @@ def create_requirement_partitions(requirements):
         )
 
         if partition_available is None:
-            requirement_partitions.append({})
-            partition_available = requirement_partitions[-1]
+            partition_available = typing.cast(MutableMapping[str, str], {})
+            requirement_partitions.append(partition_available)
 
         partition_available[requirement.package] = requirement.version
 
@@ -123,7 +153,11 @@ def create_requirement_partitions(requirements):
 
 
 @contextlib.contextmanager
-def create_and_render_temp_file(template, template_context, suffix=None):
+def create_and_render_temp_file(
+    template: jinja2.Template,
+    template_context: Mapping[str, Any],
+    suffix: Optional[str] = None,
+) -> Generator[tempfile._TemporaryFileWrapper, Any, Any]:
     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix) as file:
         content = template.render(**template_context)
 
@@ -133,7 +167,12 @@ def create_and_render_temp_file(template, template_context, suffix=None):
         yield file
 
 
-async def export_leaf(environment, template, index, requirement_partition):
+async def export_leaf(
+    environment: Mapping[str, str],
+    template: jinja2.Template,
+    index: int,
+    requirement_partition: Mapping[str, str],
+) -> None:
     with create_and_render_temp_file(
         template, {"index": index, "requirements": requirement_partition}, ".py"
     ) as conanfile_leaf:
@@ -150,14 +189,22 @@ async def export_leaf(environment, template, index, requirement_partition):
         await asubprocess_communicate(await process, "Error in `conan export`.")
 
 
-async def export_leaves(environment, template, requirement_partitions):
+async def export_leaves(
+    environment: Mapping[str, str],
+    template: jinja2.Template,
+    requirement_partitions: Iterable[Mapping[str, str]],
+) -> None:
     for index, requirement_partition in enumerate(requirement_partitions):
         await export_leaf(environment, template, index, requirement_partition)
 
 
 async def get_lockfile(
-    environment, root_template, profile_template, requirement_partitions, options
-):
+    environment: Mapping[str, str],
+    root_template: jinja2.Template,
+    profile_template: jinja2.Template,
+    requirement_partitions: Sequence[Mapping[str, str]],
+    options: Options,
+) -> Mapping[str, str]:
     with (
         create_and_render_temp_file(
             root_template,
@@ -192,7 +239,7 @@ async def get_lockfile(
     return lockfile
 
 
-async def remove_leaves_from_cache(environment):
+async def remove_leaves_from_cache(environment: Mapping[str, str]) -> None:
     process = asyncio.create_subprocess_exec(
         "conan",
         "remove",
@@ -210,8 +257,8 @@ async def remove_leaves_from_cache(environment):
 def patch_native_generators_paths(
     old_generators_path: Path,
     new_generators_path: Path,
-    files_to_patch_paths: typing.Iterable[Path],
-):
+    files_to_patch_paths: Iterable[Path],
+) -> None:
     old_generators_path_abs_str = str(old_generators_path.absolute())
     new_generators_path_str = str(new_generators_path)
 
@@ -231,7 +278,7 @@ def patch_native_generators_paths(
 
 def patch_native_generators(
     native_generators_path: Path, native_generators_path_suffix: Path
-):
+) -> None:
     new_generators_path = Path("/PPpackage/generators") / native_generators_path_suffix
 
     patch_native_generators_paths(
@@ -244,7 +291,9 @@ def patch_native_generators(
     )
 
 
-async def install_product(environment, destination_path, product):
+async def install_product(
+    environment: Mapping[str, str], destination_path: Path, product: Product
+) -> None:
     process = await asyncio.create_subprocess_exec(
         "conan",
         "cache",
@@ -268,7 +317,7 @@ async def install_product(environment, destination_path, product):
     )
 
 
-def generator_info(generators_path: Path, graph_infos):
+def generator_info(generators_path: Path, graph_infos: Mapping[str, GraphInfo]) -> None:
     info_path = generators_path / "info"
     ensure_dir_exists(info_path)
 
@@ -277,13 +326,20 @@ def generator_info(generators_path: Path, graph_infos):
             json.dump(graph_info.cpp_info, file, indent=4)
 
 
-additional_generators = {"info": generator_info}
+additional_generators: Mapping[str, Callable[[Path, Mapping[str, GraphInfo]], None]] = {
+    "info": generator_info
+}
 
 
-def check_options(input):
-    check_dict_format(input, set(), {"settings", "options"}, "Invalid input format.")
+def check_options(input: Any) -> Options:
+    input_checked = typing.cast(
+        Options,
+        check_dict_format(
+            input, set(), {"settings", "options"}, "Invalid input format."
+        ),
+    )
 
-    for category_input, assignments_input in input.items():
+    for category_input, assignments_input in input_checked.items():
         if type(assignments_input) is not dict:
             raise MyException(
                 f"Invalid input format. options[{category_input}] not a dict."
@@ -293,20 +349,24 @@ def check_options(input):
             if type(value) is not str:
                 raise MyException(f"Invalid input format. `{value}` not a string.")
 
+    return input_checked
 
-def parse_options(input):
-    check_options(input)
 
-    options = input
+def parse_options(input: Any) -> Options:
+    input_checked = check_options(input)
+
+    options = input_checked
 
     return options
 
 
-async def submanagers():
+async def submanagers() -> Iterable[str]:
     return []
 
 
-async def resolve(cache_path, requirements, options):
+async def resolve(
+    cache_path: Path, requirements: Iterable[Requirement], options: Options
+) -> Iterable[Mapping[str, str]]:
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -339,11 +399,11 @@ async def resolve(cache_path, requirements, options):
 
 async def fetch(
     cache_path: Path,
-    lockfile,
-    options,
-    generators,
+    lockfile: Mapping[str, str],
+    options: Options,
+    generators: Iterable[str],
     generators_path: Path,
-):
+) -> Mapping[str, str]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -410,7 +470,9 @@ async def fetch(
     return product_ids
 
 
-async def install(cache_path, products, destination_path):
+async def install(
+    cache_path: Path, products: Set[Product], destination_path: Path
+) -> None:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
