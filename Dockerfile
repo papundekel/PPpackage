@@ -12,6 +12,8 @@ RUN pacman --noconfirm -S yajl
 
 RUN pacman --noconfirm -S cmake
 
+RUN pacman --noconfirm -Syu python-typer
+
 COPY ./ /workdir
 
 WORKDIR /workdir
