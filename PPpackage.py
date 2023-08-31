@@ -7,6 +7,7 @@ from PPpackage_utils import (
     check_dict_format,
     parse_generators,
     SetEncoder,
+    ensure_dir_exists,
 )
 
 import subprocess
@@ -15,6 +16,7 @@ import json
 import sys
 import os
 import asyncio
+from pathlib import Path
 
 
 def check_requirements(manager_requirements_input):
@@ -45,8 +47,8 @@ def merge_lockfiles(versions, product_ids):
     }
 
 
-def get_manager_path(managers_path, manager):
-    return os.path.join(managers_path, f"PPpackage_{manager}.py")
+def get_manager_command_path(managers_path: Path, manager):
+    return managers_path.absolute() / f"PPpackage_{manager}.py"
 
 
 def check_options(input):
@@ -82,21 +84,19 @@ def parse_input(input):
 
 
 def generator_versions(generators_path, manager_versions_dict, manager_product_ids):
-    versions_path = os.path.join(generators_path, "versions")
+    versions_path = generators_path / "versions"
 
     for manager, versions in manager_versions_dict.items():
-        manager_path = os.path.join(versions_path, manager)
+        manager_path = versions_path / manager
 
-        os.makedirs(manager_path, exist_ok=True)
+        ensure_dir_exists(manager_path)
 
         product_ids = manager_product_ids[manager]
 
         for package, version in versions.items():
             product_id = product_ids[package]
 
-            with open(
-                os.path.join(manager_path, f"{package}.json"), "w"
-            ) as versions_file:
+            with open(manager_path / f"{package}.json", "w") as versions_file:
                 json.dump(
                     {"version": version, "product_id": product_id},
                     versions_file,
@@ -109,21 +109,21 @@ builtin_generators = {"versions": generator_versions}
 
 async def install_manager(
     debug,
-    managers_path,
-    cache_path,
+    managers_path: Path,
+    cache_path: Path,
     manager_product_ids_dict,
-    destination_path,
+    destination_path: Path,
     manager,
     versions,
 ):
-    manager_path = get_manager_path(managers_path, manager)
+    manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
-        manager_path,
+        str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "install",
-        cache_path,
-        destination_path,
+        str(cache_path),
+        str(destination_path),
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=None,
@@ -152,20 +152,20 @@ async def install_manager(
 
 async def resolve_manager(
     debug,
-    managers_path,
-    cache_path,
+    managers_path: Path,
+    cache_path: Path,
     manager,
     requirements,
     manager_options_dict,
     manager_lockfiles,
 ):
-    manager_path = get_manager_path(managers_path, manager)
+    manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
-        manager_path,
+        str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "resolve",
-        cache_path,
+        str(cache_path),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -208,23 +208,23 @@ async def resolve_manager(
 
 async def fetch_manager(
     debug,
-    managers_path,
-    cache_path,
+    managers_path: Path,
+    cache_path: Path,
     manager,
     versions,
     manager_options_dict,
     generators,
-    generators_path,
+    generators_path: Path,
     manager_product_ids_dict,
 ):
-    manager_path = get_manager_path(managers_path, manager)
+    manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = asyncio.create_subprocess_exec(
-        manager_path,
+        str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "fetch",
-        cache_path,
-        generators_path,
+        str(cache_path),
+        str(generators_path),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -364,10 +364,10 @@ app = AsyncTyper()
 
 @app.command()
 async def main(
-    managers_path: str,
-    cache_path: str,
-    generators_path: str,
-    destination_path: str,
+    managers_path: Path,
+    cache_path: Path,
+    generators_path: Path,
+    destination_path: Path,
     debug: bool = False,
 ):
     requirements_generators_input = json.load(sys.stdin)

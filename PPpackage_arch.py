@@ -8,6 +8,7 @@ from PPpackage_utils import (
     init,
     app,
     run,
+    ensure_dir_exists,
 )
 
 import sys
@@ -15,14 +16,15 @@ import subprocess
 import re
 import os
 import asyncio
+from pathlib import Path
 
 
 regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
 
 
-def get_cache_paths(cache_path):
-    database_path = f"{cache_path}/arch/db"
-    cache_path = f"{cache_path}/arch/cache"
+def get_cache_paths(cache_path: Path):
+    database_path = cache_path / "arch" / "db"
+    cache_path = cache_path / "arch" / "cache"
     return database_path, cache_path
 
 
@@ -47,11 +49,11 @@ def parse_options(input):
     return None
 
 
-async def resolve_requirement(database_path, requirement, dependencies):
+async def resolve_requirement(database_path: Path, requirement, dependencies):
     process = asyncio.create_subprocess_exec(
         "pactree",
         "--dbpath",
-        database_path,
+        str(database_path),
         "-s",
         requirement,
         stdin=subprocess.DEVNULL,
@@ -72,16 +74,16 @@ async def resolve_requirement(database_path, requirement, dependencies):
 
 
 @app.command("update-db")
-async def update_database(cache_path: str):
+async def update_database(cache_path: Path):
     database_path, _ = get_cache_paths(cache_path)
 
-    os.makedirs(database_path, exist_ok=True)
+    ensure_dir_exists(database_path)
 
     process = asyncio.create_subprocess_exec(
         "fakeroot",
         "pacman",
         "--dbpath",
-        database_path,
+        str(database_path),
         "-Sy",
         stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
@@ -95,7 +97,7 @@ async def submanagers():
     return []
 
 
-async def resolve(cache_path, requirements, options):
+async def resolve(cache_path: Path, requirements, options):
     database_path, _ = get_cache_paths(cache_path)
 
     # trivial resolution of same-named packages
@@ -115,7 +117,7 @@ async def resolve(cache_path, requirements, options):
     process = asyncio.create_subprocess_exec(
         "pacinfo",
         "--dbpath",
-        database_path,
+        str(database_path),
         "--short",
         *dependencies,
         stdin=subprocess.DEVNULL,
@@ -141,10 +143,10 @@ async def resolve(cache_path, requirements, options):
     return [lockfile]
 
 
-async def fetch(cache_path, lockfile, options, generators, generators_path):
+async def fetch(cache_path: Path, lockfile, options, generators, generators_path: Path):
     database_path, cache_path = get_cache_paths(cache_path)
 
-    os.makedirs(cache_path, exist_ok=True)
+    ensure_dir_exists(cache_path)
 
     packages = list(lockfile.keys())
 
@@ -152,9 +154,9 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
         "fakeroot",
         "pacman",
         "--dbpath",
-        database_path,
+        str(database_path),
         "--cachedir",
-        cache_path,
+        str(cache_path),
         "--noconfirm",
         "-Sw",
         *packages,
@@ -168,9 +170,9 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
     process = asyncio.create_subprocess_exec(
         "pacman",
         "--dbpath",
-        database_path,
+        str(database_path),
         "--cachedir",
-        cache_path,
+        str(cache_path),
         "--noconfirm",
         "-Sddp",
         *packages,
@@ -195,11 +197,11 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
     return product_ids
 
 
-async def install(cache_path, products, destination_path):
+async def install(cache_path: Path, products, destination_path: Path):
     _, cache_path = get_cache_paths(cache_path)
-    database_path = f"{destination_path}/var/lib/pacman"
+    database_path = destination_path / "var" / "lib" / "pacman"
 
-    os.makedirs(database_path, exist_ok=True)
+    ensure_dir_exists(database_path)
 
     environment = os.environ.copy()
     environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
@@ -211,14 +213,17 @@ async def install(cache_path, products, destination_path):
         "--noconfirm",
         "--needed",
         "--dbpath",
-        database_path,
+        str(database_path),
         "--cachedir",
-        cache_path,
+        str(cache_path),
         "--root",
-        destination_path,
+        str(destination_path),
         "-Udd",
         *[
-            f"{cache_path}/{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+            str(
+                cache_path
+                / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+            )
             for product in products
         ],
         stdin=subprocess.DEVNULL,

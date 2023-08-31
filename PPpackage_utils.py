@@ -5,6 +5,11 @@ import asyncio
 import typer
 import inspect
 import functools
+from pathlib import Path
+
+
+def ensure_dir_exists(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
 
 
 class AsyncTyper(typer.Typer):
@@ -227,7 +232,7 @@ def init(
         json.dump(submanagers, sys.stdout)
 
     @app.command()
-    async def resolve(cache_path: str):
+    async def resolve(cache_path: Path):
         input = json.load(sys.stdin)
 
         requirements, options = parse_resolve_input(
@@ -241,7 +246,7 @@ def init(
         json.dump(lockfiles, sys.stdout, indent=indent)
 
     @app.command()
-    async def fetch(cache_path: str, generators_path: str):
+    async def fetch(cache_path: Path, generators_path: Path):
         input = json.load(sys.stdin)
 
         lockfile, options, generators = parse_fetch_input(
@@ -257,10 +262,10 @@ def init(
         json.dump(products, sys.stdout, indent=indent)
 
     @app.command()
-    async def install(cache_path: str, destination_path: str):
+    async def install(cache_path: Path, destination_path: Path):
         input = json.load(sys.stdin)
 
-        os.makedirs(destination_path, exist_ok=True)
+        ensure_dir_exists(destination_path)
 
         products = products_parser(input)
 

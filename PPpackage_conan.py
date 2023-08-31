@@ -8,6 +8,7 @@ from PPpackage_utils import (
     parse_products_simple,
     init,
     run,
+    ensure_dir_exists,
 )
 
 import shutil
@@ -19,16 +20,18 @@ import contextlib
 import os
 import asyncio
 import sys
+from pathlib import Path
+import typing
 
 
-def get_cache_path(cache_path):
-    return f"{cache_path}/conan/"
+def get_cache_path(cache_path: Path):
+    return cache_path / "conan"
 
 
-def make_conan_environment(cache_path):
+def make_conan_environment(cache_path: Path):
     environment = os.environ.copy()
 
-    environment["CONAN_HOME"] = os.path.abspath(cache_path)
+    environment["CONAN_HOME"] = str(cache_path.absolute())
 
     return environment
 
@@ -205,17 +208,20 @@ async def remove_leaves_from_cache(environment):
 
 
 def patch_native_generators_paths(
-    old_generators_path, new_generators_path, files_to_patch_paths
+    old_generators_path: Path,
+    new_generators_path: Path,
+    files_to_patch_paths: typing.Iterable[Path],
 ):
-    for file_to_patch_path in files_to_patch_paths:
-        old_generators_path_abs = os.path.abspath(old_generators_path)
+    old_generators_path_abs_str = str(old_generators_path.absolute())
+    new_generators_path_str = str(new_generators_path)
 
-        if os.path.exists(file_to_patch_path):
+    for file_to_patch_path in files_to_patch_paths:
+        if file_to_patch_path.exists():
             with open(file_to_patch_path, "r") as file_to_patch:
                 lines = file_to_patch.readlines()
 
             lines = [
-                line.replace(old_generators_path_abs, new_generators_path)
+                line.replace(old_generators_path_abs_str, new_generators_path_str)
                 for line in lines
             ]
 
@@ -223,16 +229,17 @@ def patch_native_generators_paths(
                 file_to_patch.writelines(lines)
 
 
-def patch_native_generators(native_generators_path, native_generators_path_suffix):
-    new_generators_path = os.path.join(
-        "/PPpackage/generators", native_generators_path_suffix
-    )
+def patch_native_generators(
+    native_generators_path: Path, native_generators_path_suffix: Path
+):
+    new_generators_path = Path("/PPpackage/generators") / native_generators_path_suffix
+
     patch_native_generators_paths(
         native_generators_path,
         new_generators_path,
         [
-            os.path.join(native_generators_path, file_sub_path)
-            for file_sub_path in ["CMakePresets.json"]
+            native_generators_path / file_sub_path
+            for file_sub_path in [Path("CMakePresets.json")]
         ],
     )
 
@@ -255,18 +262,18 @@ async def install_product(environment, destination_path, product):
 
     shutil.copytree(
         product_path,
-        os.path.join(destination_path, product.package),
+        destination_path / product.package,
         symlinks=True,
         dirs_exist_ok=True,
     )
 
 
-def generator_info(generators_path, graph_infos):
-    info_path = os.path.join(generators_path, "info")
-    os.makedirs(info_path, exist_ok=True)
+def generator_info(generators_path: Path, graph_infos):
+    info_path = generators_path / "info"
+    ensure_dir_exists(info_path)
 
     for package, graph_info in graph_infos.items():
-        with open(os.path.join(info_path, f"{package}.json"), "w") as file:
+        with open(info_path / f"{package}.json", "w") as file:
             json.dump(graph_info.cpp_info, file, indent=4)
 
 
@@ -302,7 +309,7 @@ async def submanagers():
 async def resolve(cache_path, requirements, options):
     cache_path = get_cache_path(cache_path)
 
-    os.makedirs(cache_path, exist_ok=True)
+    ensure_dir_exists(cache_path)
 
     # CONAN_HOME must be an absolute path
     environment = make_conan_environment(cache_path)
@@ -330,7 +337,13 @@ async def resolve(cache_path, requirements, options):
     return [lockfile]
 
 
-async def fetch(cache_path, lockfile, options, generators, generators_path):
+async def fetch(
+    cache_path: Path,
+    lockfile,
+    options,
+    generators,
+    generators_path: Path,
+):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -343,10 +356,8 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
     conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    native_generators_path_suffix = "conan"
-    native_generators_path = os.path.join(
-        generators_path, native_generators_path_suffix
-    )
+    native_generators_path_suffix = Path("conan")
+    native_generators_path = generators_path / native_generators_path_suffix
 
     with (
         create_and_render_temp_file(
@@ -365,9 +376,7 @@ async def fetch(cache_path, lockfile, options, generators, generators_path):
             "conan",
             "install",
             "--output-folder",
-            os.path.normpath(
-                native_generators_path
-            ),  # conan doesn't normalize paths here
+            str(native_generators_path),
             "--deployer",
             "PPpackage_conan_deployer.py",
             "--build",
@@ -406,9 +415,9 @@ async def install(cache_path, products, destination_path):
 
     environment = make_conan_environment(cache_path)
 
-    destination_path = os.path.join(destination_path, "conan")
+    destination_path = destination_path / "conan"
 
-    if os.path.exists(destination_path):
+    if destination_path.exists():
         shutil.rmtree(destination_path)
 
     async with asyncio.TaskGroup() as group:
