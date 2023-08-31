@@ -72,7 +72,7 @@ async def resolve_requirement(database_path, requirement, dependencies):
         dependencies.append(dependency)
 
 
-@app.command("update-database")
+@app.command("update-db")
 async def update_database(cache_path: str):
     database_path, _ = get_cache_paths(cache_path)
 
