@@ -205,7 +205,16 @@ def parse_products_simple(products_input):
     ]
 
 
+_debug = False
+
+
 app = AsyncTyper()
+
+
+@app.callback()
+def callback(debug: bool = False):
+    global _debug
+    _debug = debug
 
 
 def init(
@@ -234,7 +243,9 @@ def init(
 
         lockfiles = await resolver(cache_path, requirements, options)
 
-        json.dump(lockfiles, sys.stdout)
+        indent = 4 if _debug else None
+
+        json.dump(lockfiles, sys.stdout, indent=indent)
 
     @app.command()
     async def fetch(cache_path: str, generators_path: str):
@@ -248,7 +259,9 @@ def init(
             cache_path, lockfile, options, generators, generators_path
         )
 
-        json.dump(products, sys.stdout)
+        indent = 4 if _debug else None
+
+        json.dump(products, sys.stdout, indent=indent)
 
     @app.command()
     async def install(cache_path: str, destination_path: str):

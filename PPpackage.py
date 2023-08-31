@@ -121,6 +121,7 @@ async def install_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "install",
         cache_path,
         destination_path,
@@ -163,6 +164,7 @@ async def resolve_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "resolve",
         cache_path,
         stdin=subprocess.PIPE,
@@ -172,11 +174,14 @@ async def resolve_manager(
 
     options = manager_options_dict.get(manager)
 
+    indent = 4 if debug else None
+
     resolve_input_json = json.dumps(
         {
             "requirements": requirements,
             "options": options,
-        }
+        },
+        indent=indent,
     )
 
     if debug:
@@ -217,6 +222,7 @@ async def fetch_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "fetch",
         cache_path,
         generators_path,
@@ -227,6 +233,8 @@ async def fetch_manager(
 
     options = manager_options_dict.get(manager)
 
+    indent = 4 if debug else None
+
     fetch_input_json = json.dumps(
         {
             "lockfile": versions,
@@ -234,6 +242,7 @@ async def fetch_manager(
             "generators": generators - builtin_generators.keys(),
         },
         cls=SetEncoder,
+        indent=indent,
     )
 
     if debug:
@@ -252,7 +261,7 @@ async def fetch_manager(
 
     if debug:
         print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=sys.stderr)
-        print(fetch_input_json, file=sys.stderr)
+        print(product_ids_json, file=sys.stderr)
 
     product_ids = json.loads(product_ids_json)
 
