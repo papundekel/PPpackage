@@ -109,6 +109,7 @@ builtin_generators = {"versions": generator_versions}
 
 
 async def install_manager(
+    debug,
     managers_path,
     cache_path,
     manager_product_ids_dict,
@@ -120,6 +121,7 @@ async def install_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "install",
         cache_path,
         destination_path,
@@ -132,14 +134,25 @@ async def install_manager(
 
     products = merge_lockfiles(versions, product_ids)
 
+    indent = 4 if debug else None
+
+    products_json = json.dumps(products, indent=indent)
+
+    if debug:
+        print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
+        print(products_json, file=sys.stderr)
+
+    products_json_bytes = products_json.encode("ascii")
+
     await asubprocess_communicate(
         await process,
         f"Error in {manager}'s install.",
-        json.dumps(products).encode("ascii"),
+        products_json_bytes,
     )
 
 
 async def resolve_manager(
+    debug,
     managers_path,
     cache_path,
     manager,
@@ -151,6 +164,7 @@ async def resolve_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "resolve",
         cache_path,
         stdin=subprocess.PIPE,
@@ -160,25 +174,41 @@ async def resolve_manager(
 
     options = manager_options_dict.get(manager)
 
+    indent = 4 if debug else None
+
     resolve_input_json = json.dumps(
         {
             "requirements": requirements,
             "options": options,
-        }
-    ).encode("ascii")
-
-    lockfiles_output = await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s resolve.",
-        resolve_input_json,
+        },
+        indent=indent,
     )
 
-    lockfiles = json.loads(lockfiles_output.decode("ascii"))
+    if debug:
+        print(f"DEBUG PPpackage: sending to {manager}'s resolve:", file=sys.stderr)
+        print(resolve_input_json, file=sys.stderr)
+
+    resolve_input_json_bytes = resolve_input_json.encode("ascii")
+
+    lockfiles_json_bytes = await asubprocess_communicate(
+        await process,
+        f"Error in {manager}'s resolve.",
+        resolve_input_json_bytes,
+    )
+
+    lockfiles_json = lockfiles_json_bytes.decode("ascii")
+
+    if debug:
+        print(f"DEBUG PPpackage: received from {manager}' resolve:", file=sys.stderr)
+        print(lockfiles_json, file=sys.stderr)
+
+    lockfiles = json.loads(lockfiles_json)
 
     manager_lockfiles[manager] = lockfiles
 
 
 async def fetch_manager(
+    debug,
     managers_path,
     cache_path,
     manager,
@@ -192,6 +222,7 @@ async def fetch_manager(
 
     process = asyncio.create_subprocess_exec(
         manager_path,
+        "--debug" if debug else "--no-debug",
         "fetch",
         cache_path,
         generators_path,
@@ -202,6 +233,8 @@ async def fetch_manager(
 
     options = manager_options_dict.get(manager)
 
+    indent = 4 if debug else None
+
     fetch_input_json = json.dumps(
         {
             "lockfile": versions,
@@ -209,21 +242,34 @@ async def fetch_manager(
             "generators": generators - builtin_generators.keys(),
         },
         cls=SetEncoder,
+        indent=indent,
     )
 
-    product_ids_output = await asubprocess_communicate(
+    if debug:
+        print(f"DEBUG PPpackage: sending to {manager}'s fetch:", file=sys.stderr)
+        print(fetch_input_json, file=sys.stderr)
+
+    fetch_input_json_bytes = fetch_input_json.encode("ascii")
+
+    product_ids_json_bytes = await asubprocess_communicate(
         await process,
         f"Error in {manager}'s fetch.",
-        fetch_input_json.encode("ascii"),
+        fetch_input_json_bytes,
     )
 
-    product_ids = json.loads(product_ids_output.decode("ascii"))
+    product_ids_json = product_ids_json_bytes.decode("ascii")
+
+    if debug:
+        print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=sys.stderr)
+        print(product_ids_json, file=sys.stderr)
+
+    product_ids = json.loads(product_ids_json)
 
     manager_product_ids_dict[manager] = product_ids
 
 
 async def resolve(
-    managers_path, cache_path, manager_requirements, manager_options_dict
+    debug, managers_path, cache_path, manager_requirements, manager_options_dict
 ):
     manager_lockfiles = {}
 
@@ -231,6 +277,7 @@ async def resolve(
         for manager, requirements in manager_requirements.items():
             group.create_task(
                 resolve_manager(
+                    debug,
                     managers_path,
                     cache_path,
                     manager,
@@ -256,6 +303,7 @@ async def resolve(
 
 
 async def fetch(
+    debug,
     managers_path,
     cache_path,
     manager_versions_dict,
@@ -269,6 +317,7 @@ async def fetch(
         for manager, versions in manager_versions_dict.items():
             group.create_task(
                 fetch_manager(
+                    debug,
                     managers_path,
                     cache_path,
                     manager,
@@ -289,6 +338,7 @@ async def fetch(
 
 
 async def install(
+    debug,
     managers_path,
     cache_path,
     manager_versions_dict,
@@ -299,6 +349,7 @@ async def install(
         for manager, versions in manager_versions_dict.items():
             group.create_task(
                 install_manager(
+                    debug,
                     managers_path,
                     cache_path,
                     manager_product_ids_dict,
@@ -318,18 +369,21 @@ async def main(
     cache_path: str,
     generators_path: str,
     destination_path: str,
+    debug: bool = False,
 ):
     requirements_generators_input = json.load(sys.stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)
 
-    versions = await resolve(managers_path, cache_path, requirements, options)
+    versions = await resolve(debug, managers_path, cache_path, requirements, options)
 
     product_ids = await fetch(
-        managers_path, cache_path, versions, options, generators, generators_path
+        debug, managers_path, cache_path, versions, options, generators, generators_path
     )
 
-    await install(managers_path, cache_path, versions, product_ids, destination_path)
+    await install(
+        debug, managers_path, cache_path, versions, product_ids, destination_path
+    )
 
 
 if __name__ == "__main__":
