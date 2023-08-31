@@ -37,13 +37,6 @@ class SetEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def ensure_dir_exists(path):
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-        pass
-
-
 class MyException(Exception):
     pass
 
@@ -267,7 +260,7 @@ def init(
     async def install(cache_path: str, destination_path: str):
         input = json.load(sys.stdin)
 
-        ensure_dir_exists(destination_path)
+        os.makedirs(destination_path, exist_ok=True)
 
         products = products_parser(input)
 

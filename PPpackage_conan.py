@@ -4,11 +4,9 @@ from PPpackage_utils import (
     MyException,
     asubprocess_communicate,
     check_dict_format,
-    ensure_dir_exists,
     parse_lockfile_simple,
     parse_products_simple,
     init,
-    app,
     run,
 )
 
@@ -265,7 +263,7 @@ async def install_product(environment, destination_path, product):
 
 def generator_info(generators_path, graph_infos):
     info_path = os.path.join(generators_path, "info")
-    ensure_dir_exists(info_path)
+    os.makedirs(info_path, exist_ok=True)
 
     for package, graph_info in graph_infos.items():
         with open(os.path.join(info_path, f"{package}.json"), "w") as file:
@@ -304,7 +302,7 @@ async def submanagers():
 async def resolve(cache_path, requirements, options):
     cache_path = get_cache_path(cache_path)
 
-    ensure_dir_exists(cache_path)
+    os.makedirs(cache_path, exist_ok=True)
 
     # CONAN_HOME must be an absolute path
     environment = make_conan_environment(cache_path)

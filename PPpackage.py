@@ -7,7 +7,6 @@ from PPpackage_utils import (
     check_dict_format,
     parse_generators,
     SetEncoder,
-    ensure_dir_exists,
 )
 
 import subprocess
@@ -88,7 +87,7 @@ def generator_versions(generators_path, manager_versions_dict, manager_product_i
     for manager, versions in manager_versions_dict.items():
         manager_path = os.path.join(versions_path, manager)
 
-        ensure_dir_exists(manager_path)
+        os.makedirs(manager_path, exist_ok=True)
 
         product_ids = manager_product_ids[manager]
 

@@ -2,7 +2,6 @@
 
 from PPpackage_utils import (
     MyException,
-    ensure_dir_exists,
     asubprocess_communicate,
     parse_lockfile_simple,
     parse_products_simple,
@@ -76,7 +75,7 @@ async def resolve_requirement(database_path, requirement, dependencies):
 async def update_database(cache_path: str):
     database_path, _ = get_cache_paths(cache_path)
 
-    ensure_dir_exists(database_path)
+    os.makedirs(database_path, exist_ok=True)
 
     process = asyncio.create_subprocess_exec(
         "fakeroot",
@@ -145,7 +144,7 @@ async def resolve(cache_path, requirements, options):
 async def fetch(cache_path, lockfile, options, generators, generators_path):
     database_path, cache_path = get_cache_paths(cache_path)
 
-    ensure_dir_exists(cache_path)
+    os.makedirs(cache_path, exist_ok=True)
 
     packages = list(lockfile.keys())
 
@@ -200,7 +199,7 @@ async def install(cache_path, products, destination_path):
     _, cache_path = get_cache_paths(cache_path)
     database_path = f"{destination_path}/var/lib/pacman"
 
-    ensure_dir_exists(database_path)
+    os.makedirs(database_path, exist_ok=True)
 
     environment = os.environ.copy()
     environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
