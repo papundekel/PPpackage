@@ -5,9 +5,11 @@ from PPpackage_utils import (
     asubprocess_communicate,
     check_dict_format,
     ensure_dir_exists,
-    execute,
     parse_lockfile_simple,
     parse_products_simple,
+    init,
+    app,
+    run,
 )
 
 import shutil
@@ -417,17 +419,14 @@ async def install(cache_path, products, destination_path):
 
 
 if __name__ == "__main__":
-    asyncio.run(
-        execute(
-            "conan",
-            submanagers,
-            resolve,
-            fetch,
-            install,
-            parse_requirements,
-            parse_options,
-            parse_lockfile_simple,
-            parse_products_simple,
-            {},
-        )
+    init(
+        submanagers,
+        resolve,
+        fetch,
+        install,
+        parse_requirements,
+        parse_options,
+        parse_lockfile_simple,
+        parse_products_simple,
     )
+    run("conan")
