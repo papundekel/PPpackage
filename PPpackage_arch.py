@@ -2,12 +2,13 @@
 
 from PPpackage_utils import (
     MyException,
-    parse_cl_argument,
     ensure_dir_exists,
-    execute,
     asubprocess_communicate,
     parse_lockfile_simple,
     parse_products_simple,
+    init,
+    app,
+    run,
 )
 
 import sys
@@ -47,31 +48,6 @@ def parse_options(input):
     return None
 
 
-async def update_database():
-    cache_path = parse_cl_argument(2, "Missing cache path argument.")
-
-    database_path, _ = get_cache_paths(cache_path)
-
-    ensure_dir_exists(database_path)
-
-    process = asyncio.create_subprocess_exec(
-        "fakeroot",
-        "pacman",
-        "--dbpath",
-        database_path,
-        "-Sy",
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-    )
-
-    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
-
-
-async def submanagers():
-    return []
-
-
 async def resolve_requirement(database_path, requirement, dependencies):
     process = asyncio.create_subprocess_exec(
         "pactree",
@@ -94,6 +70,30 @@ async def resolve_requirement(database_path, requirement, dependencies):
 
         dependency = match.group()
         dependencies.append(dependency)
+
+
+@app.command("update-database")
+async def update_database(cache_path: str):
+    database_path, _ = get_cache_paths(cache_path)
+
+    ensure_dir_exists(database_path)
+
+    process = asyncio.create_subprocess_exec(
+        "fakeroot",
+        "pacman",
+        "--dbpath",
+        database_path,
+        "-Sy",
+        stdin=subprocess.DEVNULL,
+        stdout=sys.stderr,
+        stderr=None,
+    )
+
+    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
+
+
+async def submanagers():
+    return []
 
 
 async def resolve(cache_path, requirements, options):
@@ -232,17 +232,14 @@ async def install(cache_path, products, destination_path):
 
 
 if __name__ == "__main__":
-    asyncio.run(
-        execute(
-            "arch",
-            submanagers,
-            resolve,
-            fetch,
-            install,
-            parse_requirements,
-            parse_options,
-            parse_lockfile_simple,
-            parse_products_simple,
-            {"update-db": update_database},
-        )
+    init(
+        submanagers,
+        resolve,
+        fetch,
+        install,
+        parse_requirements,
+        parse_options,
+        parse_lockfile_simple,
+        parse_products_simple,
     )
+    run("arch")

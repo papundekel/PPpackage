@@ -2,11 +2,10 @@
 
 from PPpackage_utils import (
     MyException,
-    subprocess_communicate,
+    AsyncTyper,
     asubprocess_communicate,
     check_dict_format,
     parse_generators,
-    parse_cl_argument,
     SetEncoder,
     ensure_dir_exists,
 )
@@ -310,30 +309,33 @@ async def install(
             )
 
 
-async def main():
-    try:
-        managers_path = parse_cl_argument(1, "Missing managers path argument.")
-        cache_path = parse_cl_argument(2, "Missing cache path argument.")
-        generators_path = parse_cl_argument(3, "Missing generators path argument.")
-        destination_path = parse_cl_argument(4, "Missing destination path argument.")
+app = AsyncTyper()
 
-        requirements_generators_input = json.load(sys.stdin)
 
-        requirements, options, generators = parse_input(requirements_generators_input)
+@app.command()
+async def main(
+    managers_path: str,
+    cache_path: str,
+    generators_path: str,
+    destination_path: str,
+):
+    requirements_generators_input = json.load(sys.stdin)
 
-        versions = await resolve(managers_path, cache_path, requirements, options)
+    requirements, options, generators = parse_input(requirements_generators_input)
 
-        product_ids = await fetch(
-            managers_path, cache_path, versions, options, generators, generators_path
-        )
+    versions = await resolve(managers_path, cache_path, requirements, options)
 
-        await install(
-            managers_path, cache_path, versions, product_ids, destination_path
-        )
-    except MyException as e:
-        print(f"PPpackage: {e}", file=sys.stderr)
-        sys.exit(1)
+    product_ids = await fetch(
+        managers_path, cache_path, versions, options, generators, generators_path
+    )
+
+    await install(managers_path, cache_path, versions, product_ids, destination_path)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        app()
+    except* MyException as eg:
+        for e in eg.exceptions:
+            print(f"PPpackage: {e}", file=sys.stderr)
+        sys.exit(1)

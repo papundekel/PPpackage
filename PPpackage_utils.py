@@ -2,6 +2,32 @@ import sys
 import json
 import os
 import asyncio
+import typer
+import inspect
+import functools
+
+
+class AsyncTyper(typer.Typer):
+    @staticmethod
+    def maybe_run_async(decorator, f):
+        if inspect.iscoroutinefunction(f):
+
+            @functools.wraps(f)
+            def runner(*args, **kwargs):
+                return asyncio.run(f(*args, **kwargs))
+
+            decorator(runner)
+        else:
+            decorator(f)
+        return f
+
+    def callback(self, *args, **kwargs):
+        decorator = super().callback(*args, **kwargs)
+        return functools.partial(self.maybe_run_async, decorator)
+
+    def command(self, *args, **kwargs):
+        decorator = super().command(*args, **kwargs)
+        return functools.partial(self.maybe_run_async, decorator)
 
 
 class SetEncoder(json.JSONEncoder):
@@ -179,63 +205,10 @@ def parse_products_simple(products_input):
     ]
 
 
-def parse_cl_argument(index, error_message):
-    if not len(sys.argv) > index:
-        raise MyException(error_message)
-
-    return sys.argv[index]
+app = AsyncTyper()
 
 
-async def submanagers(submanagers_handler):
-    submanagers = await submanagers_handler()
-
-    json.dump(submanagers, sys.stdout)
-
-
-async def resolve(requirements_parser, options_parser, resolver):
-    cache_path = parse_cl_argument(2, "Missing cache path argument.")
-
-    input = json.load(sys.stdin)
-
-    requirements, options = parse_resolve_input(
-        requirements_parser, options_parser, input
-    )
-
-    lockfiles = await resolver(cache_path, requirements, options)
-
-    json.dump(lockfiles, sys.stdout)
-
-
-async def fetch(lockfile_parser, options_parser, fetcher):
-    cache_path = parse_cl_argument(2, "Missing cache path argument.")
-    generators_path = parse_cl_argument(3, "Missing generators path argument.")
-
-    input = json.load(sys.stdin)
-
-    lockfile, options, generators = parse_fetch_input(
-        lockfile_parser, options_parser, input
-    )
-
-    products = await fetcher(cache_path, lockfile, options, generators, generators_path)
-
-    json.dump(products, sys.stdout)
-
-
-async def install(products_parser, installer):
-    cache_path = parse_cl_argument(2, "Missing cache path argument.")
-    destination_path = parse_cl_argument(3, "Missing destination path argument.")
-
-    input = json.load(sys.stdin)
-
-    ensure_dir_exists(destination_path)
-
-    products = products_parser(input)
-
-    await installer(cache_path, products, destination_path)
-
-
-async def execute(
-    manager_id,
+def init(
     submanagers_handler,
     resolver,
     fetcher,
@@ -244,30 +217,54 @@ async def execute(
     options_parser,
     lockfile_parser,
     products_parser,
-    additional_commands,
 ):
+    @app.command()
+    async def submanagers():
+        submanagers = await submanagers_handler()
+
+        json.dump(submanagers, sys.stdout)
+
+    @app.command()
+    async def resolve(cache_path: str):
+        input = json.load(sys.stdin)
+
+        requirements, options = parse_resolve_input(
+            requirements_parser, options_parser, input
+        )
+
+        lockfiles = await resolver(cache_path, requirements, options)
+
+        json.dump(lockfiles, sys.stdout)
+
+    @app.command()
+    async def fetch(cache_path: str, generators_path: str):
+        input = json.load(sys.stdin)
+
+        lockfile, options, generators = parse_fetch_input(
+            lockfile_parser, options_parser, input
+        )
+
+        products = await fetcher(
+            cache_path, lockfile, options, generators, generators_path
+        )
+
+        json.dump(products, sys.stdout)
+
+    @app.command()
+    async def install(cache_path: str, destination_path: str):
+        input = json.load(sys.stdin)
+
+        ensure_dir_exists(destination_path)
+
+        products = products_parser(input)
+
+        await installer(cache_path, products, destination_path)
+
+
+def run(manager_id):
     try:
-        if not len(sys.argv) > 1:
-            raise MyException("Missing command argument.")
-
-        command = sys.argv[1]
-
-        required_commands = {
-            "submanagers": lambda: submanagers(submanagers_handler),
-            "resolve": lambda: resolve(requirements_parser, options_parser, resolver),
-            "fetch": lambda: fetch(lockfile_parser, options_parser, fetcher),
-            "install": lambda: install(products_parser, installer),
-        }
-
-        commands = additional_commands | required_commands
-
-        command_handler = commands.get(command)
-
-        if command_handler is None:
-            raise MyException("Unknown command `{command}`")
-
-        await command_handler()
-
-    except MyException as e:
-        print(f"{manager_id}: {e}", file=sys.stderr)
+        app()
+    except* MyException as eg:
+        for e in eg.exceptions:
+            print(f"{manager_id}: {e}", file=sys.stderr)
         sys.exit(1)
