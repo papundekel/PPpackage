@@ -17,4 +17,4 @@ docker run \
     --mount type=bind,source="$(pwd)/$1/cache,destination"="/workdir/tmp/cache" \
     --mount type=bind,source="$(pwd)/$1/generators,destination"="/workdir/tmp/generators" \
     --mount type=bind,source="$(pwd)/$1/root,destination"="/workdir/tmp/root" \
-    fackop/pppackage ./manager.sh tmp/
+    fackop/pppackage:alpm ./manager.sh tmp/

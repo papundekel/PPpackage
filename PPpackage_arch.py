@@ -217,10 +217,10 @@ async def install(
     ensure_dir_exists(database_path)
 
     environment = os.environ.copy()
-    environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
+    environment["LD_LIBRARY_PATH"] = "/usr/share/libalpm-pp/usr/lib/"
+    environment["LD_PRELOAD"] = "fakealpm/build/fakealpm.so"
 
     process = asyncio.create_subprocess_exec(
-        "fakechroot",
         "fakeroot",
         "pacman",
         "--noconfirm",

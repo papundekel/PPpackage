@@ -1,0 +1,50 @@
+pkgname=libalpm-pp
+pkgver=6.0.2
+pkgrel=1
+pkgdesc="A libalpm fork."
+arch=('x86_64')
+license=('GPL')
+depends=(pacman=$pkgver)
+makedepends=('meson')
+options=('strip')
+validpgpkeys=('6645B0A8C7005E78DB1D7864F99FFE0FEAE999BD'  # Allan McRae <allan@archlinux.org>
+              'B8151B117037781095514CA7BBDFFC92306B1121') # Andrew Gregory (pacman) <andrew@archlinux.org>
+source=(https://sources.archlinux.org/other/pacman/pacman-$pkgver.tar.xz{,.sig}
+        alpm.h.patch
+        util.c.patch)
+sha256sums=('7d8e3e8c5121aec0965df71f59bedf46052c6cf14f96365c4411ec3de0a4c1a5'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+prepare() {
+  cd "pacman-${pkgver}"
+  # we backport way too often in pacman
+  # lets at least make it more convenient
+  local src
+  for src in "${source[@]}"; do
+    src="${src%%::*}"
+    src="${src##*/}"
+    [[ $src = *.patch ]] || continue
+    msg2 "Applying patch $src..."
+    patch -Np1 < "../$src"
+  done
+}
+
+build() {
+  cd "pacman-$pkgver"
+
+  meson --prefix=/usr \
+        --buildtype=plain \
+        -Dscriptlet-shell=/usr/bin/bash \
+        -Dldconfig=/usr/bin/ldconfig \
+        build
+
+  meson compile -C build
+}
+
+package() {
+  cd "pacman-$pkgver"
+
+  DESTDIR="$pkgdir/usr/share/libalpm-pp" meson install -C build
+}
