@@ -20,7 +20,7 @@ WORKDIR /workdir
 
 COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp 
 
-RUN cd libalpm-pp/ && sudo --user ab makepkg --skippgpcheck --install --noconfirm
+RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
 COPY ./fakealpm/ /workdir/fakealpm
 

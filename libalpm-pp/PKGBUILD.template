@@ -1,5 +1,5 @@
 pkgname=libalpm-pp
-pkgver=6.0.2
+pkgver=PKGVER
 pkgrel=1
 pkgdesc="A libalpm fork."
 arch=('x86_64')
