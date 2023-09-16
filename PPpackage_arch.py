@@ -60,7 +60,7 @@ async def resolve_requirement(
         "pactree",
         "--dbpath",
         str(database_path),
-        "-s",
+        "--sync",
         requirement,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -90,13 +90,14 @@ async def update_database(cache_path: Path) -> None:
         "pacman",
         "--dbpath",
         str(database_path),
-        "-Sy",
+        "--sync",
+        "--refresh",
         stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
         stderr=None,
     )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
+    await asubprocess_communicate(await process, "Error in `pacman --sync --refresh`")
 
 
 async def submanagers() -> Iterable[str]:
@@ -169,14 +170,17 @@ async def fetch(
         "--cachedir",
         str(cache_path),
         "--noconfirm",
-        "-Sw",
+        "--sync",
+        "--downloadonly",
         *packages,
         stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
         stderr=None,
     )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
+    await asubprocess_communicate(
+        await process, "Error in `pacman --sync --downloadonly`."
+    )
 
     process = asyncio.create_subprocess_exec(
         "pacman",
@@ -185,14 +189,19 @@ async def fetch(
         "--cachedir",
         str(cache_path),
         "--noconfirm",
-        "-Sddp",
+        "--sync",
+        "--nodeps",
+        "--nodeps",
+        "--print",
         *packages,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=None,
     )
 
-    stdout = await asubprocess_communicate(await process, "Error in `pacman -Sddp`")
+    stdout = await asubprocess_communicate(
+        await process, "Error in `pacman --sync --print`"
+    )
 
     product_ids: MutableMapping[str, str] = {}
 
@@ -231,7 +240,9 @@ async def install(
         str(cache_path),
         "--root",
         str(destination_path),
-        "-Udd",
+        "--upgrade",
+        "--nodeps",
+        "--nodeps",
         *[
             str(
                 cache_path
@@ -245,7 +256,7 @@ async def install(
         env=environment,
     )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Udd`")
+    await asubprocess_communicate(await process, "Error in `pacman --upgrade`")
 
 
 if __name__ == "__main__":
