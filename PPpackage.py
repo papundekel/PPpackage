@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import asyncio
+import io
 import itertools
 import json
 import os
@@ -142,6 +143,26 @@ def TemporaryPipe():
         yield path
 
 
+def read_string(input: io.TextIOBase) -> str | None:
+    length = int(input.readline().strip())
+
+    if length < 0:
+        return None
+
+    string = input.read(length)
+    return string
+
+
+def read_strings(input: io.TextIOBase) -> Iterable[str]:
+    while True:
+        string = read_string(input)
+
+        if string is None:
+            break
+
+        yield string
+
+
 async def install_manager(
     debug: bool,
     managers_path: Path,
@@ -193,19 +214,47 @@ async def install_manager(
         process.stdin.close()
         await process.stdin.wait_closed()
 
-        with open(pipe_from_sub_path, "r") as pipe_from_sub:
-            with open(pipe_to_sub_path, "w") as pipe_to_sub:
-                for token in pipe_from_sub:
-                    token = token.rstrip("\n")
+        with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
+            with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
+                while True:
+                    header = pipe_from_sub.readline().strip()
 
-                    if token == "":
+                    if header == "END":
                         break
+                    elif header == "COMMAND":
+                        command = read_string(pipe_from_sub)
+                        args = list(read_strings(pipe_from_sub))
+                        print(
+                            f"{manager} requested hook `{command} {args}`.",
+                            file=sys.stderr,
+                        )
 
-                    command = token
+                        with TemporaryPipe() as pipe_hook_path:
+                            pipe_hook_path_str = str(pipe_hook_path)
 
-                    print(f"{manager} requested command `{command}`.", file=sys.stderr)
+                            pipe_to_sub.write(f"{len(pipe_hook_path_str)}\n")
+                            pipe_to_sub.write(pipe_hook_path_str)
 
-                    pipe_to_sub.write("\n")
+                            pipe_to_sub.flush()
+
+                            with open(
+                                pipe_hook_path, "r", encoding="ascii"
+                            ) as pipe_hook:
+                                process_creation = asyncio.create_subprocess_exec(
+                                    "cat",
+                                    "-",
+                                    stdin=pipe_hook,
+                                    stderr=None,
+                                    stdout=sys.stderr,
+                                )
+
+                                await asubprocess_communicate(
+                                    await process_creation, "Error in `cat -`.", None
+                                )
+                    else:
+                        raise MyException(
+                            f"Invalid hook header from {manager} `{header}`."
+                        )
 
         await asubprocess_communicate(
             process,

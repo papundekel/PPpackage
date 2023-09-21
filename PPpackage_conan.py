@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import typing
 from collections.abc import (
@@ -28,6 +29,7 @@ from PPpackage_utils import (
     Product,
     asubprocess_communicate,
     check_dict_format,
+    communicate_from_sub,
     ensure_dir_exists,
     init,
     parse_lockfile_simple,
@@ -491,9 +493,8 @@ async def install(
         for product in products:
             group.create_task(install_product(environment, destination_path, product))
 
-    with open(pipe_from_sub_path, "w") as pipe_from_sub:
-        with open(pipe_to_sub_path, "r") as pipe_to_sub:
-            pipe_from_sub.write("\n")
+    with communicate_from_sub(pipe_from_sub_path), open(pipe_to_sub_path, "r"):
+        pass
 
 
 if __name__ == "__main__":

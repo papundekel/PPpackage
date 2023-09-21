@@ -14,6 +14,7 @@ from PPpackage_utils import (
     Product,
     app,
     asubprocess_communicate,
+    communicate_from_sub,
     ensure_dir_exists,
     fakeroot,
     init,
@@ -222,7 +223,7 @@ async def install(
     ensure_dir_exists(database_path)
 
     async with fakeroot() as fakeroot_environment:
-        with open(pipe_from_sub_path, "w") as pipe_from_sub:
+        with communicate_from_sub(pipe_from_sub_path):
             environment = os.environ.copy()
 
             environment.update(fakeroot_environment)
@@ -263,8 +264,6 @@ async def install(
             await asubprocess_communicate(
                 await process_creation, "Error in `pacman -Udd`"
             )
-
-            pipe_from_sub.write("\n")
 
 
 if __name__ == "__main__":

@@ -1,37 +1,79 @@
 #include "alpm.h"
 
+#include <charconv>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
+#include <linux/limits.h>
+#include <string>
+#include <string_view>
 #include <unistd.h>
 
-static int pipe_from_sub;
-static int pipe_to_sub;
+static FILE *pipe_from_sub;
+static FILE *pipe_to_sub;
 
 __attribute__((constructor)) static void pipes_ctr() {
   const auto pipe_from_sub_path = std::getenv("PP_PIPE_FROM_SUB_PATH");
   const auto pipe_to_sub_path = std::getenv("PP_PIPE_TO_SUB_PATH");
 
-  pipe_from_sub = open(pipe_from_sub_path, O_WRONLY);
-  pipe_to_sub = open(pipe_to_sub_path, O_RDONLY | O_NONBLOCK);
+  pipe_from_sub = std::fopen(pipe_from_sub_path, "w");
+  pipe_to_sub = std::fopen(pipe_to_sub_path, "r");
 }
 
 __attribute__((destructor)) static void pipes_dtr() {
-  close(pipe_from_sub);
-  close(pipe_to_sub);
+  std::fclose(pipe_from_sub);
+  std::fclose(pipe_to_sub);
+}
+
+void write_string(const char *str) {
+  std::fprintf(pipe_from_sub, "%zu\n%s", std::strlen(str), str);
+}
+
+std::string read_string() {
+  unsigned long length;
+  std::fscanf(pipe_to_sub, "%zu\n", &length);
+
+  std::string str(length, '\0');
+  std::fread(str.data(), 1, length, pipe_to_sub);
+
+  return str;
 }
 
 extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
                                 char *const argv[], _alpm_cb_io stdin_cb,
                                 void *stdin_ctx) {
-  dprintf(pipe_from_sub, "%s\n", command);
-  fsync(pipe_from_sub);
+  std::fprintf(pipe_from_sub, "COMMAND\n");
 
-  char dev_null[1];
+  write_string(command);
 
-  read(pipe_to_sub, dev_null, 1);
+  for (const auto *arg = argv; *arg != nullptr; ++arg) {
+    write_string(*arg);
+  }
+  std::fprintf(pipe_from_sub, "-1\n");
+
+  std::fflush(pipe_from_sub);
+
+  const auto pipe_hook_path = read_string();
+
+  const auto pipe_hook = std::fopen(pipe_hook_path.c_str(), "w");
+
+  if (stdin_cb != nullptr) {
+    char buffer[PIPE_BUF];
+    while (true) {
+      const auto read = stdin_cb(buffer, sizeof(buffer), stdin_ctx);
+
+      if (read == 0)
+        break;
+
+      std::fwrite(buffer, 1, read, pipe_hook);
+    }
+  }
+
+  std::fclose(pipe_hook);
 
   return 0;
 }

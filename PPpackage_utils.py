@@ -288,6 +288,13 @@ async def fakeroot() -> AsyncIterator[Mapping[str, str]]:
             os.kill(pid, signal.SIGTERM)
 
 
+@contextmanager
+def communicate_from_sub(pipe_from_sub_path):
+    with open(pipe_from_sub_path, "w") as pipe_from_sub:
+        yield pipe_from_sub
+        pipe_from_sub.write("END\n")
+
+
 _debug = False
 
 
