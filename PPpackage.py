@@ -1,23 +1,26 @@
 #!/usr/bin/env python
 
-from PPpackage_utils import (
-    MyException,
-    AsyncTyper,
-    asubprocess_communicate,
-    check_dict_format,
-    parse_generators,
-    SetEncoder,
-    ensure_dir_exists,
-)
-
-import subprocess
+import asyncio
 import itertools
 import json
+import os
+import subprocess
 import sys
-import asyncio
+import tempfile
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence, Set
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable, Mapping, Sequence, MutableMapping, Callable, Set
+
+from PPpackage_utils import (
+    AsyncTyper,
+    MyException,
+    SetEncoder,
+    asubprocess_communicate,
+    check_dict_format,
+    ensure_dir_exists,
+    parse_generators,
+)
 
 
 def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
@@ -129,6 +132,16 @@ builtin_generators: Mapping[
 ] = {"versions": generator_versions}
 
 
+@contextmanager
+def TemporaryPipe():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "pipe"
+
+        os.mkfifo(path)
+
+        yield path
+
+
 async def install_manager(
     debug: bool,
     managers_path: Path,
@@ -140,36 +153,65 @@ async def install_manager(
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
-    process = asyncio.create_subprocess_exec(
-        str(manager_command_path),
-        "--debug" if debug else "--no-debug",
-        "install",
-        str(cache_path),
-        str(destination_path),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=None,
-    )
+    with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
+        if debug:
+            print(
+                f"DEBUG PPpackage: {manager} pipe_from_sub_path: {pipe_from_sub_path}, pipe_to_sub_path: {pipe_to_sub_path}",
+                file=sys.stderr,
+            )
 
-    product_ids = manager_product_ids_dict[manager]
+        process_creation = asyncio.create_subprocess_exec(
+            str(manager_command_path),
+            "--debug" if debug else "--no-debug",
+            "install",
+            str(cache_path),
+            str(destination_path),
+            str(pipe_from_sub_path),
+            str(pipe_to_sub_path),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
+        )
 
-    products = merge_lockfiles(versions, product_ids)
+        product_ids = manager_product_ids_dict[manager]
 
-    indent = 4 if debug else None
+        products = merge_lockfiles(versions, product_ids)
 
-    products_json = json.dumps(products, indent=indent)
+        indent = 4 if debug else None
 
-    if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
-        print(products_json, file=sys.stderr)
+        products_json = json.dumps(products, indent=indent)
 
-    products_json_bytes = products_json.encode("ascii")
+        if debug:
+            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
+            print(products_json, file=sys.stderr)
 
-    await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s install.",
-        products_json_bytes,
-    )
+        products_json_bytes = products_json.encode("ascii")
+
+        process = await process_creation
+
+        process.stdin.write(products_json_bytes)
+        process.stdin.close()
+        await process.stdin.wait_closed()
+
+        with open(pipe_from_sub_path, "r") as pipe_from_sub:
+            with open(pipe_to_sub_path, "w") as pipe_to_sub:
+                for token in pipe_from_sub:
+                    token = token.rstrip("\n")
+
+                    if token == "":
+                        break
+
+                    command = token
+
+                    print(f"{manager} requested command `{command}`.", file=sys.stderr)
+
+                    pipe_to_sub.write("\n")
+
+        await asubprocess_communicate(
+            process,
+            f"Error in {manager}'s install.",
+            None,
+        )
 
 
 async def resolve_manager(
@@ -370,19 +412,16 @@ async def install(
     manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     destination_path: Path,
 ) -> None:
-    async with asyncio.TaskGroup() as group:
-        for manager, versions in manager_versions_dict.items():
-            group.create_task(
-                install_manager(
-                    debug,
-                    managers_path,
-                    cache_path,
-                    manager_product_ids_dict,
-                    destination_path,
-                    manager,
-                    versions,
-                )
-            )
+    for manager, versions in manager_versions_dict.items():
+        await install_manager(
+            debug,
+            managers_path,
+            cache_path,
+            manager_product_ids_dict,
+            destination_path,
+            manager,
+            versions,
+        )
 
 
 app = AsyncTyper()

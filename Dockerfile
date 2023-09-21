@@ -22,10 +22,11 @@ COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp
 
 RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
-COPY ./fakealpm/ /workdir/fakealpm
+COPY fakealpm/ /workdir/fakealpm
+COPY --chmod=a+x ./build_fakealpm.sh /workdir/
 
-RUN cd fakealpm && gcc -shared -fPIC -o build/fakealpm.so -I /usr/share/libalpm-pp/usr/include/ fakealpm.c
+RUN ./build_fakealpm.sh
 
-COPY ./*.jinja ./profile /workdir/
+COPY *.jinja profile /workdir/
 
-COPY --chmod=a+x ./*.py ./*.sh /workdir/
+COPY --chmod=a+x *.py run.sh manager.sh /workdir/

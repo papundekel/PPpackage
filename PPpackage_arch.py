@@ -1,25 +1,26 @@
 #!/usr/bin/env python
 
+import asyncio
+import os
+import re
+import subprocess
+import sys
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSet, Set
+from pathlib import Path
+from typing import Any
+
 from PPpackage_utils import (
-    Product,
     MyException,
+    Product,
+    app,
     asubprocess_communicate,
+    ensure_dir_exists,
+    fakeroot,
+    init,
     parse_lockfile_simple,
     parse_products_simple,
-    init,
-    app,
     run,
-    ensure_dir_exists,
 )
-
-import sys
-import subprocess
-import re
-import os
-import asyncio
-from pathlib import Path
-from collections.abc import Iterable, Mapping, MutableSet, Set, MutableMapping
-from typing import Any
 
 regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
 
@@ -209,43 +210,61 @@ async def fetch(
 
 
 async def install(
-    cache_path: Path, products: Set[Product], destination_path: Path
+    cache_path: Path,
+    products: Set[Product],
+    destination_path: Path,
+    pipe_from_sub_path: Path,
+    pipe_to_sub_path: Path,
 ) -> None:
     _, cache_path = get_cache_paths(cache_path)
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
 
-    environment = os.environ.copy()
-    environment["LD_LIBRARY_PATH"] = "/usr/share/libalpm-pp/usr/lib/"
-    environment["LD_PRELOAD"] = "fakealpm/build/fakealpm.so"
+    async with fakeroot() as fakeroot_environment:
+        with open(pipe_from_sub_path, "w") as pipe_from_sub:
+            environment = os.environ.copy()
 
-    process = asyncio.create_subprocess_exec(
-        "fakeroot",
-        "pacman",
-        "--noconfirm",
-        "--needed",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--root",
-        str(destination_path),
-        "-Udd",
-        *[
-            str(
-                cache_path
-                / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+            environment.update(fakeroot_environment)
+
+            environment["LD_LIBRARY_PATH"] = (
+                environment["LD_LIBRARY_PATH"] + ":/usr/share/libalpm-pp/usr/lib/"
             )
-            for product in products
-        ],
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-        env=environment,
-    )
+            environment["LD_PRELOAD"] = (
+                environment["LD_PRELOAD"] + ":fakealpm/build/fakealpm.so"
+            )
+            environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
+            environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
 
-    await asubprocess_communicate(await process, "Error in `pacman -Udd`")
+            process_creation = asyncio.create_subprocess_exec(
+                "pacman",
+                "--noconfirm",
+                "--needed",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--root",
+                str(destination_path),
+                "-Udd",
+                *[
+                    str(
+                        cache_path
+                        / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+                    )
+                    for product in products
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=sys.stderr,
+                stderr=None,
+                env=environment,
+            )
+
+            await asubprocess_communicate(
+                await process_creation, "Error in `pacman -Udd`"
+            )
+
+            pipe_from_sub.write("\n")
 
 
 if __name__ == "__main__":

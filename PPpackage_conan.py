@@ -1,38 +1,39 @@
 #!/usr/bin/env python
 
-from PPpackage_utils import (
-    Product,
-    MyException,
-    asubprocess_communicate,
-    check_dict_format,
-    parse_lockfile_simple,
-    parse_products_simple,
-    init,
-    run,
-    ensure_dir_exists,
-)
-
-import shutil
-import json
-import tempfile
-import subprocess
-import jinja2
-import contextlib
-import os
 import asyncio
-from pathlib import Path
+import contextlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+import typing
 from collections.abc import (
+    Callable,
+    Generator,
     Iterable,
     Mapping,
-    Sequence,
     MutableMapping,
     MutableSequence,
-    Generator,
-    Callable,
+    Sequence,
     Set,
 )
-import typing
-from typing import Any, TypedDict, Optional, NotRequired
+from pathlib import Path
+from typing import Any, NotRequired, Optional, TypedDict
+
+import jinja2
+
+from PPpackage_utils import (
+    MyException,
+    Product,
+    asubprocess_communicate,
+    check_dict_format,
+    ensure_dir_exists,
+    init,
+    parse_lockfile_simple,
+    parse_products_simple,
+    run,
+)
 
 
 class Options(TypedDict):
@@ -471,7 +472,11 @@ async def fetch(
 
 
 async def install(
-    cache_path: Path, products: Set[Product], destination_path: Path
+    cache_path: Path,
+    products: Set[Product],
+    destination_path: Path,
+    pipe_from_sub_path: Path,
+    pipe_to_sub_path: Path,
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -485,6 +490,10 @@ async def install(
     async with asyncio.TaskGroup() as group:
         for product in products:
             group.create_task(install_product(environment, destination_path, product))
+
+    with open(pipe_from_sub_path, "w") as pipe_from_sub:
+        with open(pipe_to_sub_path, "r") as pipe_to_sub:
+            pipe_from_sub.write("\n")
 
 
 if __name__ == "__main__":
