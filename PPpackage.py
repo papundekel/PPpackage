@@ -134,13 +134,21 @@ builtin_generators: Mapping[
 
 
 @contextmanager
+def TemporaryDirectory():
+    with tempfile.TemporaryDirectory() as dir_path_string:
+        dir_path = Path(dir_path_string)
+
+        yield dir_path
+
+
+@contextmanager
 def TemporaryPipe():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = Path(tmpdir) / "pipe"
+    with TemporaryDirectory() as dir_path:
+        pipe_path = dir_path / "pipe"
 
-        os.mkfifo(path)
+        os.mkfifo(pipe_path)
 
-        yield path
+        yield pipe_path
 
 
 def read_string(input: io.TextIOBase) -> str | None:
@@ -163,6 +171,19 @@ def read_strings(input: io.TextIOBase) -> Iterable[str]:
         yield string
 
 
+@contextmanager
+def edit_json_file(path: Path, debug: bool) -> Any:
+    with path.open("r+") as file:
+        data = json.load(file)
+
+        yield data
+
+        file.seek(0)
+        file.truncate()
+
+        json.dump(data, file, indent=4 if debug else None)
+
+
 async def install_manager(
     debug: bool,
     managers_path: Path,
@@ -171,6 +192,7 @@ async def install_manager(
     destination_path: Path,
     manager: str,
     versions: Mapping[str, str],
+    bundle_dir_path: Path,
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
@@ -240,16 +262,24 @@ async def install_manager(
                             with open(
                                 pipe_hook_path, "r", encoding="ascii"
                             ) as pipe_hook:
+                                with edit_json_file(
+                                    bundle_dir_path / "config.json", debug
+                                ) as config:
+                                    config["process"]["args"] = [command, *args[1:]]
+
                                 process_creation = asyncio.create_subprocess_exec(
-                                    "cat",
-                                    "-",
+                                    "runc",
+                                    "run",
+                                    "--bundle",
+                                    str(bundle_dir_path),
+                                    "PPpackage-container",
                                     stdin=pipe_hook,
                                     stderr=None,
                                     stdout=sys.stderr,
                                 )
 
                                 await asubprocess_communicate(
-                                    await process_creation, "Error in `cat -`.", None
+                                    await process_creation, "Error in `runc run`.", None
                                 )
                     else:
                         raise MyException(
@@ -461,16 +491,40 @@ async def install(
     manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     destination_path: Path,
 ) -> None:
-    for manager, versions in manager_versions_dict.items():
-        await install_manager(
-            debug,
-            managers_path,
-            cache_path,
-            manager_product_ids_dict,
-            destination_path,
-            manager,
-            versions,
+    with TemporaryDirectory() as bundle_dir_path:
+        (bundle_dir_path / "rootfs").mkdir()
+
+        process_creation = asyncio.create_subprocess_exec(
+            "runc",
+            "spec",
+            "--rootless",
+            "--bundle",
+            str(bundle_dir_path),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
         )
+
+        await asubprocess_communicate(
+            await process_creation, "Error in `runc spec`.", None
+        )
+
+        with edit_json_file(bundle_dir_path / "config.json", debug) as config:
+            config["process"]["terminal"] = False
+            config["root"]["path"] = str(destination_path.absolute())
+            config["root"]["readonly"] = False
+
+        for manager, versions in manager_versions_dict.items():
+            await install_manager(
+                debug,
+                managers_path,
+                cache_path,
+                manager_product_ids_dict,
+                destination_path,
+                manager,
+                versions,
+                bundle_dir_path,
+            )
 
 
 app = AsyncTyper()
