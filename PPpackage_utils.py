@@ -1,12 +1,14 @@
 import asyncio
 import functools
 import inspect
+import io
 import json
 import os
 import signal
 import subprocess
 import sys
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Set
+import tempfile
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
@@ -16,6 +18,14 @@ import typer
 
 def ensure_dir_exists(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
+
+
+@contextmanager
+def TemporaryDirectory():
+    with tempfile.TemporaryDirectory() as dir_path_string:
+        dir_path = Path(dir_path_string)
+
+        yield dir_path
 
 
 class AsyncTyper(typer.Typer):
@@ -256,7 +266,7 @@ async def get_fakeroot_info():
 
 
 @asynccontextmanager
-async def fakeroot() -> AsyncIterator[Mapping[str, str]]:
+async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     pid = None
     try:
         fakeroot_info_task = get_fakeroot_info()
@@ -278,11 +288,13 @@ async def fakeroot() -> AsyncIterator[Mapping[str, str]]:
 
         fakeroot_info = await fakeroot_info_task
 
-        yield {
-            "FAKEROOTKEY": key,
-            "LD_LIBRARY_PATH": fakeroot_info.ld_library_path,
-            "LD_PRELOAD": fakeroot_info.ld_preload,
-        }
+        environment = os.environ.copy()
+
+        environment["FAKEROOTKEY"] = key
+        environment["LD_LIBRARY_PATH"] = fakeroot_info.ld_library_path
+        environment["LD_PRELOAD"] = fakeroot_info.ld_preload
+
+        yield environment
     finally:
         if pid is not None:
             os.kill(pid, signal.SIGTERM)
@@ -291,8 +303,48 @@ async def fakeroot() -> AsyncIterator[Mapping[str, str]]:
 @contextmanager
 def communicate_from_sub(pipe_from_sub_path):
     with open(pipe_from_sub_path, "w") as pipe_from_sub:
-        yield pipe_from_sub
-        pipe_from_sub.write("END\n")
+        try:
+            yield pipe_from_sub
+        finally:
+            pipe_from_sub.write("END\n")
+
+
+def hook_read_int(input: io.TextIOBase) -> int:
+    return int(input.readline().strip())
+
+
+def hook_read_string_maybe(input: io.TextIOBase) -> str | None:
+    length = hook_read_int(input)
+
+    if length < 0:
+        return None
+
+    string = input.read(length)
+
+    return string
+
+
+def hook_read_string(input: io.TextIOBase) -> str:
+    length = hook_read_int(input)
+
+    string = input.read(length)
+
+    return string
+
+
+def hook_read_strings(input: io.TextIOBase) -> Iterable[str]:
+    while True:
+        string = hook_read_string_maybe(input)
+
+        if string is None:
+            break
+
+        yield string
+
+
+def hook_write_string(output: io.TextIOBase, string: str) -> None:
+    output.write(f"{len(string)}\n")
+    output.write(string)
 
 
 _debug = False

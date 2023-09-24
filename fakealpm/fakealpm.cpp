@@ -33,9 +33,17 @@ void write_string(const char *str) {
   std::fprintf(pipe_from_sub, "%zu\n%s", std::strlen(str), str);
 }
 
+auto read_int() {
+  char buffer[64] = {0};
+  std::fgets(buffer, sizeof(buffer), pipe_to_sub);
+
+  int value;
+  std::from_chars(buffer, buffer + sizeof(buffer), value, 10);
+  return value;
+}
+
 std::string read_string() {
-  unsigned long length;
-  std::fscanf(pipe_to_sub, "%zu\n", &length);
+  const auto length = read_int();
 
   std::string str(length, '\0');
   std::fread(str.data(), 1, length, pipe_to_sub);
@@ -54,7 +62,6 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
     write_string(*arg);
   }
   std::fprintf(pipe_from_sub, "-1\n");
-
   std::fflush(pipe_from_sub);
 
   const auto pipe_hook_path = read_string();
@@ -75,5 +82,7 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
 
   std::fclose(pipe_hook);
 
-  return 0;
+  const auto return_value = read_int();
+
+  return return_value;
 }

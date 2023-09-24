@@ -17,6 +17,9 @@ from PPpackage_utils import (
     communicate_from_sub,
     ensure_dir_exists,
     fakeroot,
+    hook_read_int,
+    hook_read_string,
+    hook_write_string,
     init,
     parse_lockfile_simple,
     parse_products_simple,
@@ -210,6 +213,24 @@ async def fetch(
     return product_ids
 
 
+def hook_command(pipe_from_sub, command, *args):
+    pipe_from_sub.write("COMMAND\n")
+    hook_write_string(pipe_from_sub, command)
+    for arg in args:
+        hook_write_string(pipe_from_sub, arg)
+    pipe_from_sub.write("-1\n")
+    pipe_from_sub.flush()
+
+    pipe_hook_path = hook_read_string(pipe_from_sub)
+
+    with open(pipe_hook_path, "w"):
+        pass
+
+    return_value = hook_read_int(pipe_from_sub)
+
+    return return_value
+
+
 async def install(
     cache_path: Path,
     products: Set[Product],
@@ -221,19 +242,15 @@ async def install(
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
+    ensure_dir_exists(destination_path / "etc")
 
-    async with fakeroot() as fakeroot_environment:
-        with communicate_from_sub(pipe_from_sub_path):
-            environment = os.environ.copy()
+    with (destination_path / "etc" / "machine-id").open("w+") as machine_id_file:
+        machine_id_file.write("0" * 32 + "\n")
 
-            environment.update(fakeroot_environment)
-
-            environment["LD_LIBRARY_PATH"] = (
-                environment["LD_LIBRARY_PATH"] + ":/usr/share/libalpm-pp/usr/lib/"
-            )
-            environment["LD_PRELOAD"] = (
-                environment["LD_PRELOAD"] + ":fakealpm/build/fakealpm.so"
-            )
+    with communicate_from_sub(pipe_from_sub_path):
+        async with fakeroot() as environment:
+            environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
+            environment["LD_PRELOAD"] += ":fakealpm/build/fakealpm.so"
             environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
             environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
 

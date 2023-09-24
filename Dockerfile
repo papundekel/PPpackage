@@ -16,6 +16,8 @@ RUN pacman --noconfirm -Syu python-typer
 
 RUN pacman --noconfirm -Syu meson
 
+RUN pacman --noconfirm -Syu runc
+
 WORKDIR /workdir
 
 COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp 

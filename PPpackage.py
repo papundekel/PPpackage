@@ -17,9 +17,13 @@ from PPpackage_utils import (
     AsyncTyper,
     MyException,
     SetEncoder,
+    TemporaryDirectory,
     asubprocess_communicate,
     check_dict_format,
     ensure_dir_exists,
+    hook_read_string,
+    hook_read_strings,
+    hook_write_string,
     parse_generators,
 )
 
@@ -117,7 +121,7 @@ def generator_versions(
         for package, version in versions.items():
             product_id = product_ids[package]
 
-            with open(manager_path / f"{package}.json", "w") as versions_file:
+            with (manager_path / f"{package}.json").open("w") as versions_file:
                 json.dump(
                     {"version": version, "product_id": product_id},
                     versions_file,
@@ -134,14 +138,6 @@ builtin_generators: Mapping[
 
 
 @contextmanager
-def TemporaryDirectory():
-    with tempfile.TemporaryDirectory() as dir_path_string:
-        dir_path = Path(dir_path_string)
-
-        yield dir_path
-
-
-@contextmanager
 def TemporaryPipe():
     with TemporaryDirectory() as dir_path:
         pipe_path = dir_path / "pipe"
@@ -151,37 +147,18 @@ def TemporaryPipe():
         yield pipe_path
 
 
-def read_string(input: io.TextIOBase) -> str | None:
-    length = int(input.readline().strip())
-
-    if length < 0:
-        return None
-
-    string = input.read(length)
-    return string
-
-
-def read_strings(input: io.TextIOBase) -> Iterable[str]:
-    while True:
-        string = read_string(input)
-
-        if string is None:
-            break
-
-        yield string
-
-
 @contextmanager
 def edit_json_file(path: Path, debug: bool) -> Any:
     with path.open("r+") as file:
         data = json.load(file)
 
-        yield data
+        try:
+            yield data
+        finally:
+            file.seek(0)
+            file.truncate()
 
-        file.seek(0)
-        file.truncate()
-
-        json.dump(data, file, indent=4 if debug else None)
+            json.dump(data, file, indent=4 if debug else None)
 
 
 async def install_manager(
@@ -244,19 +221,16 @@ async def install_manager(
                     if header == "END":
                         break
                     elif header == "COMMAND":
-                        command = read_string(pipe_from_sub)
-                        args = list(read_strings(pipe_from_sub))
-                        print(
-                            f"{manager} requested hook `{command} {args}`.",
-                            file=sys.stderr,
-                        )
+                        command = hook_read_string(pipe_from_sub)
+                        args = list(hook_read_strings(pipe_from_sub))
+                        if debug:
+                            print(
+                                f"DEBUG PPpackage: {manager} requested hook `{command} {args}`.",
+                                file=sys.stderr,
+                            )
 
                         with TemporaryPipe() as pipe_hook_path:
-                            pipe_hook_path_str = str(pipe_hook_path)
-
-                            pipe_to_sub.write(f"{len(pipe_hook_path_str)}\n")
-                            pipe_to_sub.write(pipe_hook_path_str)
-
+                            hook_write_string(pipe_to_sub, str(pipe_hook_path))
                             pipe_to_sub.flush()
 
                             with open(
@@ -278,9 +252,11 @@ async def install_manager(
                                     stdout=sys.stderr,
                                 )
 
-                                await asubprocess_communicate(
-                                    await process_creation, "Error in `runc run`.", None
-                                )
+                                process = await process_creation
+                                await process.communicate(None)
+
+                                pipe_to_sub.write(f"{process.returncode}\n")
+                                pipe_to_sub.flush()
                     else:
                         raise MyException(
                             f"Invalid hook header from {manager} `{header}`."
