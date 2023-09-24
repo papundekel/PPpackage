@@ -1,0 +1,14 @@
+--- pacman-6.0.2/lib/libalpm/alpm.h	2022-10-03 04:52:04.000000000 +0200
++++ alpm.h	2023-09-10 17:03:29.084738884 +0200
+@@ -2884,6 +2884,11 @@
+  * */
+ int alpm_capabilities(void);
+ 
++typedef ssize_t (*_alpm_cb_io)(void *buf, ssize_t len, void *ctx);
++
++int _alpm_run_chroot(alpm_handle_t *handle, const char *cmd, char *const argv[],
++                     _alpm_cb_io in_cb, void *in_ctx);
++
+ /* End of libalpm_misc */
+ /** @} */
+ 

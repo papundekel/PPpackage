@@ -1,23 +1,31 @@
 #!/usr/bin/env python
 
-from PPpackage_utils import (
-    MyException,
-    AsyncTyper,
-    asubprocess_communicate,
-    check_dict_format,
-    parse_generators,
-    SetEncoder,
-    ensure_dir_exists,
-)
-
-import subprocess
+import asyncio
+import io
 import itertools
 import json
+import os
+import subprocess
 import sys
-import asyncio
+import tempfile
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence, Set
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable, Mapping, Sequence, MutableMapping, Callable, Set
+
+from PPpackage_utils import (
+    AsyncTyper,
+    MyException,
+    SetEncoder,
+    TemporaryDirectory,
+    asubprocess_communicate,
+    check_dict_format,
+    ensure_dir_exists,
+    hook_read_string,
+    hook_read_strings,
+    hook_write_string,
+    parse_generators,
+)
 
 
 def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
@@ -113,7 +121,7 @@ def generator_versions(
         for package, version in versions.items():
             product_id = product_ids[package]
 
-            with open(manager_path / f"{package}.json", "w") as versions_file:
+            with (manager_path / f"{package}.json").open("w") as versions_file:
                 json.dump(
                     {"version": version, "product_id": product_id},
                     versions_file,
@@ -129,6 +137,30 @@ builtin_generators: Mapping[
 ] = {"versions": generator_versions}
 
 
+@contextmanager
+def TemporaryPipe():
+    with TemporaryDirectory() as dir_path:
+        pipe_path = dir_path / "pipe"
+
+        os.mkfifo(pipe_path)
+
+        yield pipe_path
+
+
+@contextmanager
+def edit_json_file(path: Path, debug: bool) -> Any:
+    with path.open("r+") as file:
+        data = json.load(file)
+
+        try:
+            yield data
+        finally:
+            file.seek(0)
+            file.truncate()
+
+            json.dump(data, file, indent=4 if debug else None)
+
+
 async def install_manager(
     debug: bool,
     managers_path: Path,
@@ -137,39 +169,104 @@ async def install_manager(
     destination_path: Path,
     manager: str,
     versions: Mapping[str, str],
+    bundle_dir_path: Path,
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
-    process = asyncio.create_subprocess_exec(
-        str(manager_command_path),
-        "--debug" if debug else "--no-debug",
-        "install",
-        str(cache_path),
-        str(destination_path),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=None,
-    )
+    with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
+        if debug:
+            print(
+                f"DEBUG PPpackage: {manager} pipe_from_sub_path: {pipe_from_sub_path}, pipe_to_sub_path: {pipe_to_sub_path}",
+                file=sys.stderr,
+            )
 
-    product_ids = manager_product_ids_dict[manager]
+        process_creation = asyncio.create_subprocess_exec(
+            str(manager_command_path),
+            "--debug" if debug else "--no-debug",
+            "install",
+            str(cache_path),
+            str(destination_path),
+            str(pipe_from_sub_path),
+            str(pipe_to_sub_path),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
+        )
 
-    products = merge_lockfiles(versions, product_ids)
+        product_ids = manager_product_ids_dict[manager]
 
-    indent = 4 if debug else None
+        products = merge_lockfiles(versions, product_ids)
 
-    products_json = json.dumps(products, indent=indent)
+        indent = 4 if debug else None
 
-    if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
-        print(products_json, file=sys.stderr)
+        products_json = json.dumps(products, indent=indent)
 
-    products_json_bytes = products_json.encode("ascii")
+        if debug:
+            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
+            print(products_json, file=sys.stderr)
 
-    await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s install.",
-        products_json_bytes,
-    )
+        products_json_bytes = products_json.encode("ascii")
+
+        process = await process_creation
+
+        process.stdin.write(products_json_bytes)
+        process.stdin.close()
+        await process.stdin.wait_closed()
+
+        with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
+            with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
+                while True:
+                    header = pipe_from_sub.readline().strip()
+
+                    if header == "END":
+                        break
+                    elif header == "COMMAND":
+                        command = hook_read_string(pipe_from_sub)
+                        args = list(hook_read_strings(pipe_from_sub))
+                        if debug:
+                            print(
+                                f"DEBUG PPpackage: {manager} requested hook `{command} {args}`.",
+                                file=sys.stderr,
+                            )
+
+                        with TemporaryPipe() as pipe_hook_path:
+                            hook_write_string(pipe_to_sub, str(pipe_hook_path))
+                            pipe_to_sub.flush()
+
+                            with open(
+                                pipe_hook_path, "r", encoding="ascii"
+                            ) as pipe_hook:
+                                with edit_json_file(
+                                    bundle_dir_path / "config.json", debug
+                                ) as config:
+                                    config["process"]["args"] = [command, *args[1:]]
+
+                                process_creation = asyncio.create_subprocess_exec(
+                                    "runc",
+                                    "run",
+                                    "--bundle",
+                                    str(bundle_dir_path),
+                                    "PPpackage-container",
+                                    stdin=pipe_hook,
+                                    stderr=None,
+                                    stdout=sys.stderr,
+                                )
+
+                                process = await process_creation
+                                await process.communicate(None)
+
+                                pipe_to_sub.write(f"{process.returncode}\n")
+                                pipe_to_sub.flush()
+                    else:
+                        raise MyException(
+                            f"Invalid hook header from {manager} `{header}`."
+                        )
+
+        await asubprocess_communicate(
+            process,
+            f"Error in {manager}'s install.",
+            None,
+        )
 
 
 async def resolve_manager(
@@ -370,18 +467,39 @@ async def install(
     manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     destination_path: Path,
 ) -> None:
-    async with asyncio.TaskGroup() as group:
+    with TemporaryDirectory() as bundle_dir_path:
+        (bundle_dir_path / "rootfs").mkdir()
+
+        process_creation = asyncio.create_subprocess_exec(
+            "runc",
+            "spec",
+            "--rootless",
+            "--bundle",
+            str(bundle_dir_path),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
+        )
+
+        await asubprocess_communicate(
+            await process_creation, "Error in `runc spec`.", None
+        )
+
+        with edit_json_file(bundle_dir_path / "config.json", debug) as config:
+            config["process"]["terminal"] = False
+            config["root"]["path"] = str(destination_path.absolute())
+            config["root"]["readonly"] = False
+
         for manager, versions in manager_versions_dict.items():
-            group.create_task(
-                install_manager(
-                    debug,
-                    managers_path,
-                    cache_path,
-                    manager_product_ids_dict,
-                    destination_path,
-                    manager,
-                    versions,
-                )
+            await install_manager(
+                debug,
+                managers_path,
+                cache_path,
+                manager_product_ids_dict,
+                destination_path,
+                manager,
+                versions,
+                bundle_dir_path,
             )
 
 

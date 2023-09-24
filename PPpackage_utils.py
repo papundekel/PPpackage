@@ -1,16 +1,31 @@
-import sys
-import json
 import asyncio
-import typer
-import inspect
 import functools
+import inspect
+import io
+import json
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Set
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
-from collections.abc import Mapping, Set, Callable, Iterable, Awaitable
-from typing import Any, Optional, TypedDict
+from typing import Any, AsyncIterator, Optional
+
+import typer
 
 
 def ensure_dir_exists(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
+
+
+@contextmanager
+def TemporaryDirectory():
+    with tempfile.TemporaryDirectory() as dir_path_string:
+        dir_path = Path(dir_path_string)
+
+        yield dir_path
 
 
 class AsyncTyper(typer.Typer):
@@ -214,6 +229,124 @@ def parse_products_simple(input: Any) -> Set[Product]:
     }
 
 
+class FakerootInfo:
+    def __init__(self, ld_library_path, ld_preload):
+        self.ld_library_path = ld_library_path
+        self.ld_preload = ld_preload
+
+
+_fakeroot_info = None
+
+
+async def get_fakeroot_info():
+    global _fakeroot_info
+
+    if _fakeroot_info is None:
+        process_creation = asyncio.create_subprocess_exec(
+            "fakeroot",
+            "printenv",
+            "LD_LIBRARY_PATH",
+            "LD_PRELOAD",
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=None,
+        )
+
+        fakeroot_stdout = await asubprocess_communicate(
+            await process_creation, "Error in `fakeroot`."
+        )
+
+        ld_library_path, ld_preload = tuple(
+            [line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()]
+        )
+
+        _fakeroot_info = FakerootInfo(ld_library_path, ld_preload)
+
+    return _fakeroot_info
+
+
+@asynccontextmanager
+async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
+    pid = None
+    try:
+        fakeroot_info_task = get_fakeroot_info()
+
+        process_creation = asyncio.create_subprocess_exec(
+            "faked",
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=None,
+        )
+
+        faked_stdout = await asubprocess_communicate(
+            await process_creation, "Error in `faked`."
+        )
+
+        key, pid_string = tuple(faked_stdout.decode("ascii").strip().split(":"))
+
+        pid = int(pid_string)
+
+        fakeroot_info = await fakeroot_info_task
+
+        environment = os.environ.copy()
+
+        environment["FAKEROOTKEY"] = key
+        environment["LD_LIBRARY_PATH"] = fakeroot_info.ld_library_path
+        environment["LD_PRELOAD"] = fakeroot_info.ld_preload
+
+        yield environment
+    finally:
+        if pid is not None:
+            os.kill(pid, signal.SIGTERM)
+
+
+@contextmanager
+def communicate_from_sub(pipe_from_sub_path):
+    with open(pipe_from_sub_path, "w") as pipe_from_sub:
+        try:
+            yield pipe_from_sub
+        finally:
+            pipe_from_sub.write("END\n")
+
+
+def hook_read_int(input: io.TextIOBase) -> int:
+    return int(input.readline().strip())
+
+
+def hook_read_string_maybe(input: io.TextIOBase) -> str | None:
+    length = hook_read_int(input)
+
+    if length < 0:
+        return None
+
+    string = input.read(length)
+
+    return string
+
+
+def hook_read_string(input: io.TextIOBase) -> str:
+    length = hook_read_int(input)
+
+    string = input.read(length)
+
+    return string
+
+
+def hook_read_strings(input: io.TextIOBase) -> Iterable[str]:
+    while True:
+        string = hook_read_string_maybe(input)
+
+        if string is None:
+            break
+
+        yield string
+
+
+def hook_write_string(output: io.TextIOBase, string: str) -> None:
+    output.write(f"{len(string)}\n")
+    output.write(string)
+
+
 _debug = False
 
 
@@ -235,7 +368,7 @@ def init(
         [Path, Mapping[str, str], Any, Set[str], Path],
         Awaitable[Mapping[str, str]],
     ],
-    installer: Callable[[Path, Set[Product], Path], Awaitable[None]],
+    installer: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
     requirements_parser: Callable[[Any], Iterable[Any]],
     options_parser: Callable[[Any], Any],
     lockfile_parser: Callable[[Any], Mapping[str, str]],
@@ -278,14 +411,21 @@ def init(
         json.dump(product_ids, sys.stdout, indent=indent)
 
     @app.command()
-    async def install(cache_path: Path, destination_path: Path) -> None:
+    async def install(
+        cache_path: Path,
+        destination_path: Path,
+        pipe_from_sub_path: Path,
+        pipe_to_sub_path: Path,
+    ) -> None:
         input = json.load(sys.stdin)
 
         ensure_dir_exists(destination_path)
 
         products = products_parser(input)
 
-        await installer(cache_path, products, destination_path)
+        await installer(
+            cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
+        )
 
 
 def run(manager_id: str) -> None:

@@ -1,25 +1,30 @@
 #!/usr/bin/env python
 
+import asyncio
+import os
+import re
+import subprocess
+import sys
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSet, Set
+from pathlib import Path
+from typing import Any
+
 from PPpackage_utils import (
-    Product,
     MyException,
+    Product,
+    app,
     asubprocess_communicate,
+    communicate_from_sub,
+    ensure_dir_exists,
+    fakeroot,
+    hook_read_int,
+    hook_read_string,
+    hook_write_string,
+    init,
     parse_lockfile_simple,
     parse_products_simple,
-    init,
-    app,
     run,
-    ensure_dir_exists,
 )
-
-import sys
-import subprocess
-import re
-import os
-import asyncio
-from pathlib import Path
-from collections.abc import Iterable, Mapping, MutableSet, Set, MutableMapping
-from typing import Any
 
 regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
 
@@ -208,44 +213,74 @@ async def fetch(
     return product_ids
 
 
+def hook_command(pipe_from_sub, command, *args):
+    pipe_from_sub.write("COMMAND\n")
+    hook_write_string(pipe_from_sub, command)
+    for arg in args:
+        hook_write_string(pipe_from_sub, arg)
+    pipe_from_sub.write("-1\n")
+    pipe_from_sub.flush()
+
+    pipe_hook_path = hook_read_string(pipe_from_sub)
+
+    with open(pipe_hook_path, "w"):
+        pass
+
+    return_value = hook_read_int(pipe_from_sub)
+
+    return return_value
+
+
 async def install(
-    cache_path: Path, products: Set[Product], destination_path: Path
+    cache_path: Path,
+    products: Set[Product],
+    destination_path: Path,
+    pipe_from_sub_path: Path,
+    pipe_to_sub_path: Path,
 ) -> None:
     _, cache_path = get_cache_paths(cache_path)
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
+    ensure_dir_exists(destination_path / "etc")
 
-    environment = os.environ.copy()
-    environment["FAKECHROOT_CMD_SUBST"] = "/usr/bin/ldconfig=/usr/bin/true"
+    with (destination_path / "etc" / "machine-id").open("w+") as machine_id_file:
+        machine_id_file.write("0" * 32 + "\n")
 
-    process = asyncio.create_subprocess_exec(
-        "fakechroot",
-        "fakeroot",
-        "pacman",
-        "--noconfirm",
-        "--needed",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--root",
-        str(destination_path),
-        "-Udd",
-        *[
-            str(
-                cache_path
-                / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+    with communicate_from_sub(pipe_from_sub_path):
+        async with fakeroot() as environment:
+            environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
+            environment["LD_PRELOAD"] += ":fakealpm/build/fakealpm.so"
+            environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
+            environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
+
+            process_creation = asyncio.create_subprocess_exec(
+                "pacman",
+                "--noconfirm",
+                "--needed",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--root",
+                str(destination_path),
+                "-Udd",
+                *[
+                    str(
+                        cache_path
+                        / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+                    )
+                    for product in products
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=sys.stderr,
+                stderr=None,
+                env=environment,
             )
-            for product in products
-        ],
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-        env=environment,
-    )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Udd`")
+            await asubprocess_communicate(
+                await process_creation, "Error in `pacman -Udd`"
+            )
 
 
 if __name__ == "__main__":
