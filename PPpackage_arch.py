@@ -90,19 +90,20 @@ async def update_database(cache_path: Path) -> None:
 
     ensure_dir_exists(database_path)
 
-    process = asyncio.create_subprocess_exec(
-        "fakeroot",
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "--sync",
-        "--refresh",
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-    )
+    async with fakeroot() as environment:
+        process = asyncio.create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--sync",
+            "--refresh",
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stderr,
+            stderr=None,
+            env=environment,
+        )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
+        await asubprocess_communicate(await process, "Error in `pacman -Sy`")
 
 
 async def submanagers() -> Iterable[str]:
@@ -167,23 +168,24 @@ async def fetch(
 
     packages = list(lockfile.keys())
 
-    process = asyncio.create_subprocess_exec(
-        "fakeroot",
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--noconfirm",
-        "--sync",
-        "--downloadonly",
-        *packages,
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-    )
+    async with fakeroot() as environment:
+        process = asyncio.create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--cachedir",
+            str(cache_path),
+            "--noconfirm",
+            "--sync",
+            "--downloadonly",
+            *packages,
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stderr,
+            stderr=None,
+            env=environment,
+        )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
+        await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
 
     process = asyncio.create_subprocess_exec(
         "pacman",
