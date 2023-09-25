@@ -247,10 +247,6 @@ async def install(
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
-    ensure_dir_exists(destination_path / "etc")
-
-    with (destination_path / "etc" / "machine-id").open("w+") as machine_id_file:
-        machine_id_file.write("0" * 32 + "\n")
 
     with communicate_from_sub(pipe_from_sub_path):
         async with fakeroot() as environment:
