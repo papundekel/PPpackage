@@ -243,7 +243,6 @@ async def install(
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
-    ensure_dir_exists(destination_path / "etc")
 
     with communicate_from_sub(pipe_from_sub_path):
         async with fakeroot() as environment:
