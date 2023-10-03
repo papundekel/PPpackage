@@ -1,16 +1,22 @@
 #!/usr/bin/env python
 
-import asyncio
-import io
 import itertools
 import json
-import os
-import subprocess
-import sys
-import tempfile
+import random
+from asyncio import (
+    StreamReader,
+    StreamWriter,
+    TaskGroup,
+    create_subprocess_exec,
+    open_unix_connection,
+)
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence, Set
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
+from io import TextIOWrapper
+from os import mkfifo
 from pathlib import Path
+from sys import stderr, stdin
 from typing import Any
 
 from PPpackage_utils import (
@@ -21,10 +27,16 @@ from PPpackage_utils import (
     asubprocess_communicate,
     check_dict_format,
     ensure_dir_exists,
-    hook_read_string,
-    hook_read_strings,
-    hook_write_string,
     parse_generators,
+    pipe_read_line,
+    pipe_read_string,
+    pipe_read_strings,
+    pipe_write_int,
+    pipe_write_string,
+    stream_read_int,
+    stream_write_line,
+    stream_write_string,
+    stream_write_strings,
 )
 
 
@@ -138,38 +150,55 @@ builtin_generators: Mapping[
 
 
 @contextmanager
-def TemporaryPipe():
-    with TemporaryDirectory() as dir_path:
+def TemporaryPipe(dir=None):
+    with TemporaryDirectory(dir) as dir_path:
         pipe_path = dir_path / "pipe"
 
-        os.mkfifo(pipe_path)
+        mkfifo(pipe_path)
 
         yield pipe_path
 
 
-@contextmanager
-def edit_json_file(path: Path, debug: bool) -> Any:
-    with path.open("r+") as file:
-        data = json.load(file)
+async def install_manager_command(
+    pipe_to_sub: TextIOWrapper,
+    pipe_from_sub: TextIOWrapper,
+    daemon_reader: StreamReader,
+    daemon_writer: StreamWriter,
+    daemon_workdir_path: Path,
+    destination_relative_path: Path,
+):
+    stream_write_line(daemon_writer, "COMMAND")
+    stream_write_string(daemon_writer, str(destination_relative_path))
+    stream_write_string(daemon_writer, pipe_read_string(pipe_from_sub))
+    stream_write_strings(daemon_writer, pipe_read_strings(pipe_from_sub))
 
-        try:
-            yield data
-        finally:
-            file.seek(0)
-            file.truncate()
+    with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
+        pipe_write_string(pipe_to_sub, str(pipe_hook_path))
+        pipe_to_sub.flush()
 
-            json.dump(data, file, indent=4 if debug else None)
+        stream_write_string(
+            daemon_writer, str(pipe_hook_path.relative_to(daemon_workdir_path))
+        )
+
+        await daemon_writer.drain()
+
+        return_value = await stream_read_int(daemon_reader)
+
+        pipe_write_int(pipe_to_sub, return_value)
+        pipe_to_sub.flush()
 
 
 async def install_manager(
     debug: bool,
     managers_path: Path,
-    cache_path: Path,
-    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
-    destination_path: Path,
     manager: str,
+    cache_path: Path,
+    daemon_reader: StreamReader,
+    daemon_writer: StreamWriter,
+    daemon_workdir_path: Path,
+    destination_relative_path: Path,
+    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     versions: Mapping[str, str],
-    bundle_dir_path: Path,
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
@@ -177,19 +206,19 @@ async def install_manager(
         if debug:
             print(
                 f"DEBUG PPpackage: {manager} pipe_from_sub_path: {pipe_from_sub_path}, pipe_to_sub_path: {pipe_to_sub_path}",
-                file=sys.stderr,
+                file=stderr,
             )
 
-        process_creation = asyncio.create_subprocess_exec(
+        process_creation = create_subprocess_exec(
             str(manager_command_path),
             "--debug" if debug else "--no-debug",
             "install",
             str(cache_path),
-            str(destination_path),
+            str(daemon_workdir_path / destination_relative_path),
             str(pipe_from_sub_path),
             str(pipe_to_sub_path),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
+            stdin=PIPE,
+            stdout=DEVNULL,
             stderr=None,
         )
 
@@ -202,12 +231,15 @@ async def install_manager(
         products_json = json.dumps(products, indent=indent)
 
         if debug:
-            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=sys.stderr)
-            print(products_json, file=sys.stderr)
+            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=stderr)
+            print(products_json, file=stderr)
 
         products_json_bytes = products_json.encode("ascii")
 
         process = await process_creation
+
+        if process.stdin is None:
+            raise MyException(f"Error in {manager}'s install.")
 
         process.stdin.write(products_json_bytes)
         process.stdin.close()
@@ -216,47 +248,19 @@ async def install_manager(
         with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
             with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
                 while True:
-                    header = pipe_from_sub.readline().strip()
+                    header = pipe_read_line(pipe_from_sub)
 
                     if header == "END":
                         break
                     elif header == "COMMAND":
-                        command = hook_read_string(pipe_from_sub)
-                        args = list(hook_read_strings(pipe_from_sub))
-                        if debug:
-                            print(
-                                f"DEBUG PPpackage: {manager} requested hook `{command} {args}`.",
-                                file=sys.stderr,
-                            )
-
-                        with TemporaryPipe() as pipe_hook_path:
-                            hook_write_string(pipe_to_sub, str(pipe_hook_path))
-                            pipe_to_sub.flush()
-
-                            with open(
-                                pipe_hook_path, "r", encoding="ascii"
-                            ) as pipe_hook:
-                                with edit_json_file(
-                                    bundle_dir_path / "config.json", debug
-                                ) as config:
-                                    config["process"]["args"] = [command, *args[1:]]
-
-                                process_creation = asyncio.create_subprocess_exec(
-                                    "runc",
-                                    "run",
-                                    "--bundle",
-                                    str(bundle_dir_path),
-                                    "PPpackage-container",
-                                    stdin=pipe_hook,
-                                    stderr=None,
-                                    stdout=sys.stderr,
-                                )
-
-                                process = await process_creation
-                                await process.communicate(None)
-
-                                pipe_to_sub.write(f"{process.returncode}\n")
-                                pipe_to_sub.flush()
+                        await install_manager_command(
+                            pipe_to_sub,
+                            pipe_from_sub,
+                            daemon_reader,
+                            daemon_writer,
+                            daemon_workdir_path,
+                            destination_relative_path,
+                        )
                     else:
                         raise MyException(
                             f"Invalid hook header from {manager} `{header}`."
@@ -280,13 +284,13 @@ async def resolve_manager(
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "resolve",
         str(cache_path),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
+        stdin=PIPE,
+        stdout=PIPE,
         stderr=None,
     )
 
@@ -303,8 +307,8 @@ async def resolve_manager(
     )
 
     if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s resolve:", file=sys.stderr)
-        print(resolve_input_json, file=sys.stderr)
+        print(f"DEBUG PPpackage: sending to {manager}'s resolve:", file=stderr)
+        print(resolve_input_json, file=stderr)
 
     resolve_input_json_bytes = resolve_input_json.encode("ascii")
 
@@ -317,8 +321,8 @@ async def resolve_manager(
     lockfiles_json = lockfiles_json_bytes.decode("ascii")
 
     if debug:
-        print(f"DEBUG PPpackage: received from {manager}' resolve:", file=sys.stderr)
-        print(lockfiles_json, file=sys.stderr)
+        print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
+        print(lockfiles_json, file=stderr)
 
     lockfiles = json.loads(lockfiles_json)
 
@@ -338,14 +342,14 @@ async def fetch_manager(
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "fetch",
         str(cache_path),
         str(generators_path),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
+        stdin=PIPE,
+        stdout=PIPE,
         stderr=None,
     )
 
@@ -364,8 +368,8 @@ async def fetch_manager(
     )
 
     if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s fetch:", file=sys.stderr)
-        print(fetch_input_json, file=sys.stderr)
+        print(f"DEBUG PPpackage: sending to {manager}'s fetch:", file=stderr)
+        print(fetch_input_json, file=stderr)
 
     fetch_input_json_bytes = fetch_input_json.encode("ascii")
 
@@ -378,8 +382,8 @@ async def fetch_manager(
     product_ids_json = product_ids_json_bytes.decode("ascii")
 
     if debug:
-        print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=sys.stderr)
-        print(product_ids_json, file=sys.stderr)
+        print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=stderr)
+        print(product_ids_json, file=stderr)
 
     product_ids = json.loads(product_ids_json)
 
@@ -395,7 +399,7 @@ async def resolve(
 ) -> Mapping[str, Mapping[str, str]]:
     manager_lockfiles: MutableMapping[str, Iterable[Mapping[str, str]]] = {}
 
-    async with asyncio.TaskGroup() as group:
+    async with TaskGroup() as group:
         for manager, requirements in manager_requirements.items():
             group.create_task(
                 resolve_manager(
@@ -435,7 +439,7 @@ async def fetch(
 ) -> Mapping[str, Mapping[str, str]]:
     manager_product_ids_dict: MutableMapping[str, Mapping[str, str]] = {}
 
-    async with asyncio.TaskGroup() as group:
+    async with TaskGroup() as group:
         for manager, versions in manager_versions_dict.items():
             group.create_task(
                 fetch_manager(
@@ -459,47 +463,80 @@ async def fetch(
     return manager_product_ids_dict
 
 
+def generate_machine_id(machine_id_path: Path):
+    if machine_id_path.exists():
+        return
+
+    machine_id_path.parent.mkdir(exist_ok=True, parents=True)
+
+    with machine_id_path.open("w") as machine_id_file:
+        machine_id_file.write(
+            "".join(random.choices([str(digit) for digit in range(10)], k=32)) + "\n"
+        )
+
+
+def read_machine_id(machine_id_path: Path) -> str:
+    with machine_id_path.open("r") as machine_id_file:
+        machine_id = machine_id_file.readline().strip()
+
+        return machine_id
+
+
+@asynccontextmanager
+async def communicate_with_daemon(
+    daemon_path: Path,
+):
+    (
+        daemon_reader,
+        daemon_writer,
+    ) = await open_unix_connection(daemon_path)
+
+    try:
+        yield daemon_reader, daemon_writer
+    finally:
+        stream_write_line(daemon_writer, "END")
+        await daemon_writer.drain()
+        daemon_writer.close()
+        await daemon_writer.wait_closed()
+
+
+machine_id_relative_path = Path("etc") / "machine-id"
+
+
 async def install(
     debug: bool,
     managers_path: Path,
     cache_path: Path,
+    daemon_socket_path: Path,
+    daemon_workdir_path: Path,
+    destination_relative_path: Path,
     manager_versions_dict: Mapping[str, Mapping[str, str]],
     manager_product_ids_dict: Mapping[str, Mapping[str, str]],
-    destination_path: Path,
 ) -> None:
-    with TemporaryDirectory() as bundle_dir_path:
-        (bundle_dir_path / "rootfs").mkdir()
+    generate_machine_id(
+        daemon_workdir_path / destination_relative_path / machine_id_relative_path
+    )
 
-        process_creation = asyncio.create_subprocess_exec(
-            "runc",
-            "spec",
-            "--rootless",
-            "--bundle",
-            str(bundle_dir_path),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=None,
-        )
+    machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-        await asubprocess_communicate(
-            await process_creation, "Error in `runc spec`.", None
-        )
-
-        with edit_json_file(bundle_dir_path / "config.json", debug) as config:
-            config["process"]["terminal"] = False
-            config["root"]["path"] = str(destination_path.absolute())
-            config["root"]["readonly"] = False
+    async with communicate_with_daemon(daemon_socket_path) as (
+        daemon_reader,
+        daemon_writer,
+    ):
+        stream_write_string(daemon_writer, machine_id)
 
         for manager, versions in manager_versions_dict.items():
             await install_manager(
                 debug,
                 managers_path,
-                cache_path,
-                manager_product_ids_dict,
-                destination_path,
                 manager,
+                cache_path,
+                daemon_reader,
+                daemon_writer,
+                daemon_workdir_path,
+                destination_relative_path,
+                manager_product_ids_dict,
                 versions,
-                bundle_dir_path,
             )
 
 
@@ -511,10 +548,12 @@ async def main(
     managers_path: Path,
     cache_path: Path,
     generators_path: Path,
-    destination_path: Path,
+    daemon_socket_path: Path,
+    daemon_workdir_path: Path,
+    destination_relative_path: Path,
     debug: bool = False,
 ) -> None:
-    requirements_generators_input = json.load(sys.stdin)
+    requirements_generators_input = json.load(stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)
 
@@ -525,7 +564,14 @@ async def main(
     )
 
     await install(
-        debug, managers_path, cache_path, versions, product_ids, destination_path
+        debug,
+        managers_path,
+        cache_path,
+        daemon_socket_path,
+        daemon_workdir_path,
+        destination_relative_path,
+        versions,
+        product_ids,
     )
 
 
@@ -534,5 +580,5 @@ if __name__ == "__main__":
         app()
     except* MyException as eg:
         for e in eg.exceptions:
-            print(f"PPpackage: {e}", file=sys.stderr)
-        sys.exit(1)
+            print(f"PPpackage: {e}", file=stderr)
+        exit(1)

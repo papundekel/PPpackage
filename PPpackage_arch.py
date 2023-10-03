@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import random
 import re
 import subprocess
 import sys
@@ -17,12 +18,12 @@ from PPpackage_utils import (
     communicate_from_sub,
     ensure_dir_exists,
     fakeroot,
-    hook_read_int,
-    hook_read_string,
-    hook_write_string,
     init,
     parse_lockfile_simple,
     parse_products_simple,
+    pipe_read_int,
+    pipe_read_string,
+    pipe_write_string,
     run,
 )
 
@@ -222,18 +223,18 @@ async def fetch(
 
 def hook_command(pipe_from_sub, command, *args):
     pipe_from_sub.write("COMMAND\n")
-    hook_write_string(pipe_from_sub, command)
+    pipe_write_string(pipe_from_sub, command)
     for arg in args:
-        hook_write_string(pipe_from_sub, arg)
+        pipe_write_string(pipe_from_sub, arg)
     pipe_from_sub.write("-1\n")
     pipe_from_sub.flush()
 
-    pipe_hook_path = hook_read_string(pipe_from_sub)
+    pipe_hook_path = pipe_read_string(pipe_from_sub)
 
     with open(pipe_hook_path, "w"):
         pass
 
-    return_value = hook_read_int(pipe_from_sub)
+    return_value = pipe_read_int(pipe_from_sub)
 
     return return_value
 
@@ -257,7 +258,7 @@ async def install(
             environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
             environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
 
-            process_creation = asyncio.create_subprocess_exec(
+            process = await asyncio.create_subprocess_exec(
                 "pacman",
                 "--noconfirm",
                 "--needed",
@@ -283,9 +284,7 @@ async def install(
                 env=environment,
             )
 
-            await asubprocess_communicate(
-                await process_creation, "Error in `pacman -Udd`"
-            )
+            await asubprocess_communicate(process, "Error in `pacman -Udd`")
 
 
 if __name__ == "__main__":

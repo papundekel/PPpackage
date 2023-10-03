@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+from asyncio import StreamReader, StreamWriter
 from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
@@ -21,8 +22,8 @@ def ensure_dir_exists(path: Path) -> None:
 
 
 @contextmanager
-def TemporaryDirectory():
-    with tempfile.TemporaryDirectory() as dir_path_string:
+def TemporaryDirectory(dir=None):
+    with tempfile.TemporaryDirectory(dir=dir) as dir_path_string:
         dir_path = Path(dir_path_string)
 
         yield dir_path
@@ -309,12 +310,16 @@ def communicate_from_sub(pipe_from_sub_path):
             pipe_from_sub.write("END\n")
 
 
-def hook_read_int(input: io.TextIOBase) -> int:
-    return int(input.readline().strip())
+def pipe_read_line(input: io.TextIOBase) -> str:
+    return input.readline().strip()
 
 
-def hook_read_string_maybe(input: io.TextIOBase) -> str | None:
-    length = hook_read_int(input)
+def pipe_read_int(input: io.TextIOBase) -> int:
+    return int(pipe_read_line(input))
+
+
+def pipe_read_string_maybe(input: io.TextIOBase) -> str | None:
+    length = pipe_read_int(input)
 
     if length < 0:
         return None
@@ -324,17 +329,17 @@ def hook_read_string_maybe(input: io.TextIOBase) -> str | None:
     return string
 
 
-def hook_read_string(input: io.TextIOBase) -> str:
-    length = hook_read_int(input)
+def pipe_read_string(input: io.TextIOBase) -> str:
+    length = pipe_read_int(input)
 
     string = input.read(length)
 
     return string
 
 
-def hook_read_strings(input: io.TextIOBase) -> Iterable[str]:
+def pipe_read_strings(input: io.TextIOBase) -> Iterable[str]:
     while True:
-        string = hook_read_string_maybe(input)
+        string = pipe_read_string_maybe(input)
 
         if string is None:
             break
@@ -342,9 +347,77 @@ def hook_read_strings(input: io.TextIOBase) -> Iterable[str]:
         yield string
 
 
-def hook_write_string(output: io.TextIOBase, string: str) -> None:
-    output.write(f"{len(string)}\n")
+def pipe_write_int(output: io.TextIOBase, integer: int) -> None:
+    output.write(f"{integer}\n")
+
+
+def pipe_write_string(output: io.TextIOBase, string: str) -> None:
+    pipe_write_int(output, len(string))
     output.write(string)
+
+
+async def stream_read_line(reader: StreamReader) -> str:
+    return (await reader.readline()).decode("ascii").strip()
+
+
+async def stream_read_int(reader: StreamReader) -> int:
+    return int(await stream_read_line(reader))
+
+
+def stream_write_line(writer: StreamWriter, line: str):
+    writer.write(f"{line}\n".encode("ascii"))
+
+
+def stream_write_int(writer: StreamWriter, integer: int):
+    stream_write_line(writer, str(integer))
+
+
+async def stream_read_string_n(reader: StreamReader, length: int) -> str:
+    return (await reader.read(length)).decode("ascii")
+
+
+async def stream_read_string(reader: StreamReader) -> str:
+    length = await stream_read_int(reader)
+    return await stream_read_string_n(reader, length)
+
+
+async def stream_read_string_maybe(reader: StreamReader) -> str | None:
+    length = await stream_read_int(reader)
+
+    if length < 0:
+        return None
+
+    return await stream_read_string_n(reader, length)
+
+
+async def stream_read_strings(reader: StreamReader):
+    while True:
+        string = await stream_read_string_maybe(reader)
+
+        if string is None:
+            break
+
+        yield string
+
+
+async def stream_read_relative_path(reader: StreamReader) -> Path:
+    path = Path(await stream_read_string(reader))
+
+    if path.is_absolute():
+        raise ValueError(f"Expected relative path, got {path}.")
+
+    return path
+
+
+def stream_write_string(writer: StreamWriter, string: str):
+    stream_write_int(writer, len(string))
+    writer.write(string.encode("ascii"))
+
+
+def stream_write_strings(writer: StreamWriter, strings):
+    for string in strings:
+        stream_write_string(writer, string)
+    stream_write_int(writer, -1)
 
 
 _debug = False
