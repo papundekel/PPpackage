@@ -66,7 +66,7 @@ async def resolve_requirement(
         "pactree",
         "--dbpath",
         str(database_path),
-        "-s",
+        "--sync",
         requirement,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -91,18 +91,20 @@ async def update_database(cache_path: Path) -> None:
 
     ensure_dir_exists(database_path)
 
-    process = asyncio.create_subprocess_exec(
-        "fakeroot",
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "-Sy",
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-    )
+    async with fakeroot() as environment:
+        process = asyncio.create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--sync",
+            "--refresh",
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stderr,
+            stderr=None,
+            env=environment,
+        )
 
-    await asubprocess_communicate(await process, "Error in `pacman -Sy`")
+        await asubprocess_communicate(await process, "Error in `pacman -Sy`")
 
 
 async def submanagers() -> Iterable[str]:
@@ -167,31 +169,36 @@ async def fetch(
 
     packages = list(lockfile.keys())
 
+    async with fakeroot() as environment:
+        process = asyncio.create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--cachedir",
+            str(cache_path),
+            "--noconfirm",
+            "--sync",
+            "--downloadonly",
+            *packages,
+            stdin=subprocess.DEVNULL,
+            stdout=sys.stderr,
+            stderr=None,
+            env=environment,
+        )
+
+        await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
+
     process = asyncio.create_subprocess_exec(
-        "fakeroot",
         "pacman",
         "--dbpath",
         str(database_path),
         "--cachedir",
         str(cache_path),
         "--noconfirm",
-        "-Sw",
-        *packages,
-        stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=None,
-    )
-
-    await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
-
-    process = asyncio.create_subprocess_exec(
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--noconfirm",
-        "-Sddp",
+        "--sync",
+        "--nodeps",
+        "--nodeps",
+        "--print",
         *packages,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -243,7 +250,6 @@ async def install(
     database_path = destination_path / "var" / "lib" / "pacman"
 
     ensure_dir_exists(database_path)
-    ensure_dir_exists(destination_path / "etc")
 
     with communicate_from_sub(pipe_from_sub_path):
         async with fakeroot() as environment:
@@ -262,7 +268,9 @@ async def install(
                 str(cache_path),
                 "--root",
                 str(destination_path),
-                "-Udd",
+                "--upgrade",
+                "--nodeps",
+                "--nodeps",
                 *[
                     str(
                         cache_path
