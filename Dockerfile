@@ -4,7 +4,7 @@ RUN mkdir -p /workdir
 
 RUN pacman --noconfirm -Syu pacutils pacman-contrib python
 
-RUN aur-install bindfs conan
+RUN aur-install conan
 
 RUN pacman --noconfirm -S fakeroot fakechroot
 
@@ -31,4 +31,6 @@ RUN ./build_fakealpm.sh
 
 COPY *.jinja profile /workdir/
 
-COPY --chmod=a+x *.py run.sh manager.sh /workdir/
+COPY --chmod=a+x *.py manager.sh /workdir/
+
+RUN systemd-machine-id-setup
