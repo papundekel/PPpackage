@@ -14,6 +14,4 @@ jobs:
         packages: runc
     - name: Test runc
       run: |
-        runc spec --rootless --bundle ./
-        mkdir rootfs
-        runc run --bundle ./ container
+        runc run --bundle tmp/input/ container
