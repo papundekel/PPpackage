@@ -12,3 +12,8 @@ jobs:
       with:
         version: 1
         packages: runc
+    - name: Test runc
+      run: |
+        runc spec --rootless --bundle ./
+        mkdir rootfs
+        runc run --bundle ./ container
