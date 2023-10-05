@@ -1,0 +1,16 @@
+name: Test
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Try run.sh
+      run: |
+        ./run.sh tmp/ <tmp/input/input-basic-noconan.json
+    - name: See if ldconfig ran
+      run: |
+        ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache

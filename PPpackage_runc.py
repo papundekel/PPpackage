@@ -4,9 +4,8 @@ import json
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
-from collections.abc import Iterable
 from contextlib import contextmanager
-from functools import partial
+from os import getgid, getuid
 from pathlib import Path
 from subprocess import DEVNULL
 from sys import stderr
@@ -17,6 +16,7 @@ from lockfile import AlreadyLocked
 from typer import Exit, Typer
 
 from PPpackage_utils import (
+    TemporaryDirectory,
     asubprocess_communicate,
     stream_read_line,
     stream_read_relative_path,
@@ -28,7 +28,7 @@ from PPpackage_utils import (
 
 
 @contextmanager
-def edit_json_file(path: Path, debug: bool):
+def edit_json_file(debug: bool, path: Path):
     with path.open("r+") as file:
         data = json.load(file)
 
@@ -41,23 +41,27 @@ def edit_json_file(path: Path, debug: bool):
             json.dump(data, file, indent=4 if debug else None)
 
 
-def edit_config(bundle_path: Path, debug: bool):
-    return edit_json_file(bundle_path / "config.json", debug)
+config_relative_path = Path("config.json")
+
+
+def edit_config(debug: bool, bundle_path: Path):
+    return edit_json_file(debug, bundle_path / config_relative_path)
 
 
 async def handle_command(
     debug: bool,
-    container_path: Path,
-    bundle_path: Path,
     reader: StreamReader,
     writer: StreamWriter,
+    container_path: Path,
+    bundle_path: Path,
+    root_path: Path,
 ) -> None:
     image_path = container_path / await stream_read_relative_path(reader)
 
     command = await stream_read_string(reader)
     args = [arg async for arg in stream_read_strings(reader)]
 
-    with edit_config(bundle_path, debug) as config:
+    with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
@@ -66,6 +70,8 @@ async def handle_command(
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
             "runc",
+            "--root",
+            root_path,
             "run",
             "--bundle",
             str(bundle_path),
@@ -80,16 +86,22 @@ async def handle_command(
     stream_write_int(writer, return_code)
 
 
-def handle_init(container_path: Path, reader: StreamReader, writer: StreamWriter):
-    stream_write_string(writer, str(container_path.absolute()))
+def handle_init(
+    reader: StreamReader,
+    writer: StreamWriter,
+    containers_path: Path,
+    container_path: Path,
+):
+    stream_write_string(writer, str(container_path.relative_to(containers_path)))
 
 
 async def handle_connection(
     debug: bool,
-    containers_path: Path,
-    bundle_path: Path,
     reader: StreamReader,
     writer: StreamWriter,
+    containers_path: Path,
+    bundle_path: Path,
+    root_path: Path,
 ):
     container_id = await stream_read_string(reader)
 
@@ -103,9 +115,16 @@ async def handle_connection(
         if request == "END":
             break
         elif request == "INIT":
-            handle_init(container_path, reader, writer)
+            handle_init(
+                reader,
+                writer,
+                containers_path,
+                container_path,
+            )
         elif request == "COMMAND":
-            await handle_command(debug, container_path, bundle_path, reader, writer)
+            await handle_command(
+                debug, reader, writer, container_path, bundle_path, root_path
+            )
 
         await writer.drain()
 
@@ -116,7 +135,7 @@ async def handle_connection(
 async def create_config(debug: bool, bundle_path: Path):
     bundle_path.mkdir(exist_ok=True)
 
-    if (bundle_path / "config.json").exists():
+    if (bundle_path / config_relative_path).exists():
         return
 
     process_creation = create_subprocess_exec(
@@ -132,17 +151,26 @@ async def create_config(debug: bool, bundle_path: Path):
 
     await asubprocess_communicate(await process_creation, "Error in `runc spec`.", None)
 
-    with edit_config(bundle_path, debug) as config:
+    with edit_config(debug, bundle_path) as config:
         config["process"]["terminal"] = False
         config["root"]["readonly"] = False
+        config["linux"]["uidMappings"][0]["hostID"] = getuid()
+        config["linux"]["gidMappings"][0]["hostID"] = getgid()
 
 
 async def run_server(
-    debug: bool, containers_path: Path, bundle_path: Path, socket_path: Path
+    debug: bool,
+    containers_path: Path,
+    bundle_path: Path,
+    socket_path: Path,
+    root_path: Path,
 ):
     try:
         async with await start_unix_server(
-            partial(handle_connection, debug, containers_path, bundle_path), socket_path
+            lambda reader, writer: handle_connection(
+                debug, reader, writer, containers_path, bundle_path, root_path
+            ),
+            socket_path,
         ) as server:
             await server.start_serving()
             await get_running_loop().create_future()
@@ -150,15 +178,14 @@ async def run_server(
         socket_path.unlink()
 
 
-async def daemon(debug: bool, daemon_path: Path):
-    containers_path = daemon_path / "containers"
-    bundle_path = daemon_path / "bundle"
-    socket_path = daemon_path / "PPpackage-runc.sock"
+async def daemon(
+    debug: bool, socket_path: Path, containers_path: Path, bundle_path: Path
+):
+    with TemporaryDirectory() as root_path:
+        containers_path.mkdir(exist_ok=True)
+        await create_config(debug, bundle_path)
 
-    containers_path.mkdir(exist_ok=True)
-    await create_config(debug, bundle_path)
-
-    await run_server(debug, containers_path, bundle_path, socket_path)
+        await run_server(debug, containers_path, bundle_path, socket_path, root_path)
 
 
 app = Typer()
@@ -167,12 +194,19 @@ app = Typer()
 @app.command()
 def main(daemon_path: Path, debug: bool = False):
     daemon_path = daemon_path.absolute()
-    pidfile_path = daemon_path / "PPpackage-runc.pid"
+
+    run_path = daemon_path / "run"
+    socket_path = run_path / "PPpackage-runc.sock"
+    pidfile_path = run_path / "PPpackage-runc.pid"
+
+    containers_path = daemon_path / "containers"
+
+    bundle_path = daemon_path / "bundle"
 
     pidfile = PIDLockFile(pidfile_path)
     try:
         with DaemonContext(pidfile=pidfile, stderr=stderr):
-            asyncio_run(daemon(debug, daemon_path))
+            asyncio_run(daemon(debug, socket_path, containers_path, bundle_path))
     except AlreadyLocked:
         print(f"Daemon already running. PID file: {pidfile_path}", file=stderr)
         raise Exit(1)
