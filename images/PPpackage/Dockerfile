@@ -26,4 +26,4 @@ COPY --chmod=a+x ./build_fakealpm.sh /workdir/
 RUN ./build_fakealpm.sh
 
 COPY profile.jinja conanfile-fetch.py.jinja conanfile-leaf.py.jinja conanfile-root.py.jinja profile /workdir/
-COPY --chmod=a+x PPpackage_utils.py PPpackage.py PPpackage_arch.py PPpackage_conan.py PPpackage_conan_deployer.py manager.sh /workdir/
+COPY --chmod=a+x PPpackage_utils.py PPpackage.py PPpackage_sub.py PPpackage_arch.py PPpackage_conan.py PPpackage_conan_deployer.py manager.sh /workdir/

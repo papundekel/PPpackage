@@ -13,12 +13,14 @@ from asyncio import (
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence, Set
 from contextlib import asynccontextmanager, contextmanager
+from functools import partial
 from io import TextIOWrapper
 from os import mkfifo
 from pathlib import Path
 from sys import stderr, stdin
 from typing import Any
 
+import PPpackage_sub
 from PPpackage_utils import (
     AsyncTyper,
     MyException,
@@ -188,17 +190,17 @@ async def install_manager_command(
         pipe_to_sub.flush()
 
 
-async def install_manager(
+async def install_external_manager(
     debug: bool,
-    managers_path: Path,
     manager: str,
+    managers_path: Path,
     cache_path: Path,
     daemon_reader: StreamReader,
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
     versions: Mapping[str, str],
+    product_ids: Mapping[str, str],
 ) -> None:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
@@ -221,8 +223,6 @@ async def install_manager(
             stdout=DEVNULL,
             stderr=None,
         )
-
-        product_ids = manager_product_ids_dict[manager]
 
         products = merge_lockfiles(versions, product_ids)
 
@@ -273,18 +273,53 @@ async def install_manager(
         )
 
 
-async def resolve_manager(
+async def install_manager(
     debug: bool,
+    manager: str,
     managers_path: Path,
     cache_path: Path,
-    manager: str,
-    requirements: Iterable[Any],
-    manager_options_dict: Mapping[str, Any],
-    manager_lockfiles: MutableMapping[str, Iterable[Any]],
+    daemon_reader: StreamReader,
+    daemon_writer: StreamWriter,
+    daemon_workdir_path: Path,
+    destination_relative_path: Path,
+    versions: Mapping[str, str],
+    product_ids: Mapping[str, str],
 ) -> None:
+    if manager == "PP":
+        installer = partial(
+            PPpackage_sub.install,
+            destination_path=daemon_workdir_path / destination_relative_path,
+        )
+    else:
+        installer = partial(
+            install_external_manager,
+            manager=manager,
+            managers_path=managers_path,
+            daemon_reader=daemon_reader,
+            daemon_writer=daemon_writer,
+            daemon_workdir_path=daemon_workdir_path,
+            destination_relative_path=destination_relative_path,
+        )
+
+    await installer(
+        debug=debug,
+        cache_path=cache_path,
+        versions=versions,
+        product_ids=product_ids,
+    )
+
+
+async def resolve_external_manager(
+    debug: bool,
+    manager: str,
+    managers_path: Path,
+    cache_path: Path,
+    requirements: Iterable[Any],
+    options: Mapping[str, Any] | None,
+) -> Iterable[Any]:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         str(manager_command_path),
         "--debug" if debug else "--no-debug",
         "resolve",
@@ -293,8 +328,6 @@ async def resolve_manager(
         stdout=PIPE,
         stderr=None,
     )
-
-    options = manager_options_dict.get(manager)
 
     indent = 4 if debug else None
 
@@ -313,7 +346,7 @@ async def resolve_manager(
     resolve_input_json_bytes = resolve_input_json.encode("ascii")
 
     lockfiles_json_bytes = await asubprocess_communicate(
-        await process,
+        process,
         f"Error in {manager}'s resolve.",
         resolve_input_json_bytes,
     )
@@ -326,20 +359,42 @@ async def resolve_manager(
 
     lockfiles = json.loads(lockfiles_json)
 
+    return lockfiles
+
+
+async def resolve_manager(
+    debug: bool,
+    manager: str,
+    managers_path: Path,
+    cache_path: Path,
+    requirements: Iterable[Any],
+    options: Mapping[str, Any] | None,
+    manager_lockfiles: MutableMapping[str, Iterable[Any]],
+) -> None:
+    if manager == "PP":
+        resolver = PPpackage_sub.resolve
+    else:
+        resolver = partial(
+            resolve_external_manager, manager=manager, managers_path=managers_path
+        )
+
+    lockfiles = await resolver(
+        debug=debug, cache_path=cache_path, requirements=requirements, options=options
+    )
+
     manager_lockfiles[manager] = lockfiles
 
 
-async def fetch_manager(
+async def fetch_external_manager(
     debug: bool,
+    manager: str,
     managers_path: Path,
     cache_path: Path,
-    manager: str,
     versions: Mapping[str, str],
-    manager_options_dict: Mapping[str, Any],
+    options: Mapping[str, Any] | None,
     generators: Iterable[str],
     generators_path: Path,
-    manager_product_ids_dict: MutableMapping[str, Mapping[str, str]],
-) -> None:
+) -> Mapping[str, str]:
     manager_command_path = get_manager_command_path(managers_path, manager)
 
     process = create_subprocess_exec(
@@ -352,8 +407,6 @@ async def fetch_manager(
         stdout=PIPE,
         stderr=None,
     )
-
-    options = manager_options_dict.get(manager)
 
     indent = 4 if debug else None
 
@@ -387,6 +440,36 @@ async def fetch_manager(
 
     product_ids = json.loads(product_ids_json)
 
+    return product_ids
+
+
+async def fetch_manager(
+    debug: bool,
+    manager: str,
+    managers_path: Path,
+    cache_path: Path,
+    versions: Mapping[str, str],
+    options: Mapping[str, Any] | None,
+    generators: Iterable[str],
+    generators_path: Path,
+    manager_product_ids_dict: MutableMapping[str, Mapping[str, str]],
+) -> None:
+    if manager == "PP":
+        fetcher = PPpackage_sub.fetch
+    else:
+        fetcher = partial(
+            fetch_external_manager, manager=manager, managers_path=managers_path
+        )
+
+    product_ids = await fetcher(
+        debug=debug,
+        cache_path=cache_path,
+        versions=versions,
+        options=options,
+        generators=generators,
+        generators_path=generators_path,
+    )
+
     manager_product_ids_dict[manager] = product_ids
 
 
@@ -401,14 +484,16 @@ async def resolve(
 
     async with TaskGroup() as group:
         for manager, requirements in manager_requirements.items():
+            options = manager_options_dict.get(manager)
+
             group.create_task(
                 resolve_manager(
                     debug,
+                    manager,
                     managers_path,
                     cache_path,
-                    manager,
                     requirements,
-                    manager_options_dict,
+                    options,
                     manager_lockfiles,
                 )
             )
@@ -441,14 +526,16 @@ async def fetch(
 
     async with TaskGroup() as group:
         for manager, versions in manager_versions_dict.items():
+            options = manager_options_dict.get(manager)
+
             group.create_task(
                 fetch_manager(
                     debug,
+                    manager,
                     managers_path,
                     cache_path,
-                    manager,
                     versions,
-                    manager_options_dict,
+                    options,
                     generators,
                     generators_path,
                     manager_product_ids_dict,
@@ -526,17 +613,19 @@ async def install(
         stream_write_string(daemon_writer, machine_id)
 
         for manager, versions in manager_versions_dict.items():
+            product_ids = manager_product_ids_dict[manager]
+
             await install_manager(
                 debug,
-                managers_path,
                 manager,
+                managers_path,
                 cache_path,
                 daemon_reader,
                 daemon_writer,
                 daemon_workdir_path,
                 destination_relative_path,
-                manager_product_ids_dict,
                 versions,
+                product_ids,
             )
 
 
