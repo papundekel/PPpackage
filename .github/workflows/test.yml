@@ -9,6 +9,28 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3.0.0
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push fackop/pppackage
+      uses: docker/build-push-action@v5.0.0
+      with:
+        context: ${{ github.workspace }}
+        file: ${{ github.workspace }}/images/PPpackage/Dockerfile
+        push: true
+        tags: fackop/pppackage
+
+    - name: Build and push fackop/pppackage-runc
+      uses: docker/build-push-action@v5.0.0
+      with:
+        context: ${{ github.workspace }}
+        file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
+        push: true
+        tags: fackop/pppackage-runc
+
     - name: Restore cache
       id: cache-restore
       uses: actions/cache/restore@v3
