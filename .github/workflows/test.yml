@@ -14,4 +14,4 @@ jobs:
         packages: runc
     - name: Test runc
       run: |
-        runc run --bundle tmp/input/ container
+        sudo runc run --bundle tmp/input/ container
