@@ -58,6 +58,9 @@ async def handle_command(
     bundle_path: Path,
     root_path: Path,
 ) -> None:
+    if not container_path.exists():
+        return
+
     image_path = container_path / await stream_read_relative_path(reader)
 
     command = await stream_read_string(reader)
@@ -88,7 +91,7 @@ async def handle_command(
     stream_write_int(writer, return_code)
 
 
-def handle_init(
+async def handle_init(
     reader: StreamReader,
     writer: StreamWriter,
     containers_path: Path,
@@ -108,34 +111,21 @@ async def handle_connection(
     root_path: Path,
 ):
     container_id = await stream_read_string(reader)
-
     container_path = containers_path / container_id
-    container_path_exists = container_path.exists()
 
-    print(f"{container_path} {container_path_exists}", file=stderr)
+    while True:
+        request = await stream_read_line(reader)
 
-    stream_write_line(writer, "SUCCESS" if container_path_exists else "FAILURE")
-    await writer.drain()
+        if request == "END":
+            break
+        elif request == "INIT":
+            await handle_init(reader, writer, containers_path, container_path)
+        elif request == "COMMAND":
+            await handle_command(
+                debug, reader, writer, container_path, bundle_path, root_path
+            )
 
-    if container_path_exists:
-        while True:
-            request = await stream_read_line(reader)
-
-            if request == "END":
-                break
-            elif request == "INIT":
-                handle_init(
-                    reader,
-                    writer,
-                    containers_path,
-                    container_path,
-                )
-            elif request == "COMMAND":
-                await handle_command(
-                    debug, reader, writer, container_path, bundle_path, root_path
-                )
-
-            await writer.drain()
+        await writer.drain()
 
     writer.close()
     await writer.wait_closed()
