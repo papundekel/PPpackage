@@ -8,9 +8,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    
+    - name: Restore cache
+      id: cache-restore
+      uses: actions/cache/restore@v3
+      with:
+        path: ${{ github.workspace }}/tmp/cache
+        key: cache
+
     - name: Try run.sh
-      run: |
-        ./run.sh tmp/ <tmp/input/input-basic-noconan.json
+      run: ./run.sh tmp/ <tmp/input/input-basic.json
+
+    - name: Save cache
+      uses: actions/cache/save@v3
+      with:
+        path: ${{ github.workspace }}/tmp/cache
+        key: ${{ steps.cache-restore.outputs.cache-primary-key }}
+
     - name: See if ldconfig ran
-      run: |
-        ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
+      run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
