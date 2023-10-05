@@ -11,3 +11,6 @@ jobs:
     - name: Try run.sh
       run: |
         ./run.sh tmp/ <tmp/input/input-basic-noconan.json
+    - name: See if ldconfig ran
+      run: |
+        ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/
