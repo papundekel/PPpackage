@@ -12,7 +12,12 @@ jobs:
       with:
         version: 1
         packages: runc skopeo umoci
-    - name: Test runc
+    - name: Fetch image
       run: |
         skopeo copy docker://archlinux:latest oci:archlinux:latest
+    - name: Unpack image
+      run: |
         umoci unpack --rootless --image archlinux archlinux-bundle
+    - name: Run image
+      run: |
+        runc run --bundle archlinux-bundle container
