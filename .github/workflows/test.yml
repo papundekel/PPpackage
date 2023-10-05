@@ -29,6 +29,9 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    - name: Set up buildx
+      uses: docker/setup-buildx-action@v3.0.0
+
     - name: Build and push fackop/pppackage
       uses: docker/build-push-action@v5.0.0
       with:
