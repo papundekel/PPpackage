@@ -7,6 +7,7 @@ from asyncio import start_unix_server
 from contextlib import contextmanager
 from os import getgid, getuid
 from pathlib import Path
+from re import S
 from subprocess import DEVNULL
 from sys import stderr
 
@@ -23,6 +24,7 @@ from PPpackage_utils import (
     stream_read_string,
     stream_read_strings,
     stream_write_int,
+    stream_write_line,
     stream_write_string,
 )
 
@@ -56,6 +58,9 @@ async def handle_command(
     bundle_path: Path,
     root_path: Path,
 ) -> None:
+    if not container_path.exists():
+        return
+
     image_path = container_path / await stream_read_relative_path(reader)
 
     command = await stream_read_string(reader)
@@ -86,12 +91,14 @@ async def handle_command(
     stream_write_int(writer, return_code)
 
 
-def handle_init(
+async def handle_init(
     reader: StreamReader,
     writer: StreamWriter,
     containers_path: Path,
     container_path: Path,
 ):
+    container_path.mkdir(exist_ok=True)
+
     stream_write_string(writer, str(container_path.relative_to(containers_path)))
 
 
@@ -104,10 +111,7 @@ async def handle_connection(
     root_path: Path,
 ):
     container_id = await stream_read_string(reader)
-
     container_path = containers_path / container_id
-
-    container_path.mkdir(exist_ok=True)
 
     while True:
         request = await stream_read_line(reader)
@@ -115,12 +119,7 @@ async def handle_connection(
         if request == "END":
             break
         elif request == "INIT":
-            handle_init(
-                reader,
-                writer,
-                containers_path,
-                container_path,
-            )
+            await handle_init(reader, writer, containers_path, container_path)
         elif request == "COMMAND":
             await handle_command(
                 debug, reader, writer, container_path, bundle_path, root_path
@@ -133,8 +132,6 @@ async def handle_connection(
 
 
 async def create_config(debug: bool, bundle_path: Path):
-    bundle_path.mkdir(exist_ok=True)
-
     if (bundle_path / config_relative_path).exists():
         return
 
@@ -163,29 +160,30 @@ async def run_server(
     containers_path: Path,
     bundle_path: Path,
     socket_path: Path,
-    root_path: Path,
 ):
-    try:
-        async with await start_unix_server(
-            lambda reader, writer: handle_connection(
-                debug, reader, writer, containers_path, bundle_path, root_path
-            ),
-            socket_path,
-        ) as server:
-            await server.start_serving()
-            await get_running_loop().create_future()
-    finally:
-        socket_path.unlink()
+    with TemporaryDirectory() as root_path:
+        try:
+            async with await start_unix_server(
+                lambda reader, writer: handle_connection(
+                    debug, reader, writer, containers_path, bundle_path, root_path
+                ),
+                socket_path,
+            ) as server:
+                await server.start_serving()
+                await get_running_loop().create_future()
+        finally:
+            socket_path.unlink()
 
 
 async def daemon(
     debug: bool, socket_path: Path, containers_path: Path, bundle_path: Path
 ):
-    with TemporaryDirectory() as root_path:
-        containers_path.mkdir(exist_ok=True)
-        await create_config(debug, bundle_path)
+    containers_path.mkdir(exist_ok=True)
+    bundle_path.mkdir(exist_ok=True)
 
-        await run_server(debug, containers_path, bundle_path, socket_path, root_path)
+    await create_config(debug, bundle_path)
+
+    await run_server(debug, containers_path, bundle_path, socket_path)
 
 
 app = Typer()
