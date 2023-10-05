@@ -9,21 +9,56 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Restore cache
-      id: cache-restore
-      uses: actions/cache/restore@v3
+    - name: Package cache
+      uses: actions/cache@v3.3.2
       with:
         path: ${{ github.workspace }}/tmp/cache
-        key: cache
+        key: package-cache-${{ github.sha }}
+        restore-keys: package-cache-
+
+    - name: Docker cache
+      uses: actions/cache@v3.3.2
+      with:
+        path: /tmp/docker-cache
+        key: docker-cache-${{ github.sha }}
+        restore-keys: docker-cache-
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3.0.0
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Set up buildx
+      uses: docker/setup-buildx-action@v3.0.0
+
+    - name: Build and push fackop/pppackage
+      uses: docker/build-push-action@v5.0.0
+      with:
+        context: ${{ github.workspace }}
+        file: ${{ github.workspace }}/images/PPpackage/Dockerfile
+        push: true
+        tags: fackop/pppackage
+        cache-from: type=local,src=/tmp/docker-cache
+        cache-to: type=local,dest=/tmp/docker-cache-new
+
+    - name: Build and push fackop/pppackage-runc
+      uses: docker/build-push-action@v5.0.0
+      with:
+        context: ${{ github.workspace }}
+        file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
+        push: true
+        tags: fackop/pppackage-runc
+        cache-from: type=local,src=/tmp/docker-cache
+        cache-to: type=local,dest=/tmp/docker-cache-new
 
     - name: Try run.sh
       run: ./run.sh tmp/ <tmp/input/input-basic.json
 
-    - name: Save cache
-      uses: actions/cache/save@v3
-      with:
-        path: ${{ github.workspace }}/tmp/cache
-        key: ${{ steps.cache-restore.outputs.cache-primary-key }}
-
     - name: See if ldconfig ran
       run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
+
+    - name: Move cache (hack)
+      run: |
+        rm -rf /tmp/docker-cache
+        mv /tmp/docker-cache-new /tmp/docker-cache
