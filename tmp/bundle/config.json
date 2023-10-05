@@ -128,20 +128,6 @@
         }
     ],
     "linux": {
-        "uidMappings": [
-            {
-                "containerID": 0,
-                "hostID": 1000,
-                "size": 1
-            }
-        ],
-        "gidMappings": [
-            {
-                "containerID": 0,
-                "hostID": 1000,
-                "size": 1
-            }
-        ],
         "namespaces": [
             {
                 "type": "pid"
@@ -157,9 +143,6 @@
             },
             {
                 "type": "cgroup"
-            },
-            {
-                "type": "user"
             }
         ],
         "maskedPaths": [
