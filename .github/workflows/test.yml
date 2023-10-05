@@ -13,7 +13,7 @@ jobs:
       id: cache-restore
       uses: actions/cache/restore@v3
       with:
-        path: tmp/cache
+        path: ${{ github.workspace }}/tmp/cache
         key: cache
 
     - name: Try run.sh
@@ -22,7 +22,7 @@ jobs:
     - name: Save cache
       uses: actions/cache/save@v3
       with:
-        path: tmp/cache
+        path: ${{ github.workspace }}/tmp/cache
         key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
     - name: See if ldconfig ran
