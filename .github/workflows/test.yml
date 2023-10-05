@@ -22,3 +22,6 @@ jobs:
     - name: Run image
       run: |
         runc run --bundle tmp/bundle/ container
+    - name: Test uid
+      run: |
+        id -u
