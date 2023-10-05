@@ -23,7 +23,6 @@ jobs:
       run: |
         id
         id runner
-        id docker
         cat /etc/passwd
     - name: Test owner
       run: |
