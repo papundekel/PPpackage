@@ -14,4 +14,5 @@ jobs:
         packages: runc
     - name: Test runc
       run: |
-        docker run fackop/runc runc
+        skopeo copy docker://archlinux:latest oci:archlinux:latest
+        umoci unpack --rootless --image archlinux archlinux-bundle
