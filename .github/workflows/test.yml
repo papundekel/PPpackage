@@ -21,7 +21,10 @@ jobs:
         mv archlinux-bundle/rootfs tmp/bundle/rootfs
     - name: Test uid
       run: |
-        id -u
+        id
+        id runner
+        id docker
+        cat /etc/passwd
     - name: Test owner
       run: |
         ls -l tmp/bundle
