@@ -25,3 +25,7 @@ jobs:
     - name: Test uid
       run: |
         id -u
+    - name: Test owner
+      run: |
+        ls -l tmp/bundle
+        ls -l tmp/bundle/rootfs
