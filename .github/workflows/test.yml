@@ -14,4 +14,4 @@ jobs:
         packages: runc skopeo umoci
     - name: Try run.sh
       run: |
-        ./run.sh tmp/
+        ./run.sh tmp/ <tmp/input/input-basic.json
