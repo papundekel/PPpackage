@@ -17,7 +17,7 @@ jobs:
         key: cache
 
     - name: Try run.sh
-      run: ./run.sh tmp/ <tmp/input/input-basic-noconan.json
+      run: ./run.sh tmp/ <tmp/input/input-basic.json
 
     - name: Save cache
       uses: actions/cache/save@v3
