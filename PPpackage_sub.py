@@ -1,9 +1,6 @@
-from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
-
-from PPpackage_utils import ensure_dir_exists
 
 
 async def resolve(
@@ -39,7 +36,7 @@ async def install(
 ) -> None:
     products_path = destination_path / "PP"
 
-    ensure_dir_exists(products_path)
+    products_path.mkdir(exist_ok=True)
 
     for name, version in versions.items():
         product_id = product_ids[name]

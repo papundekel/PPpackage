@@ -36,6 +36,7 @@ from PPpackage_utils import (
     pipe_write_int,
     pipe_write_string,
     stream_read_int,
+    stream_read_line,
     stream_write_line,
     stream_write_string,
     stream_write_strings,
@@ -611,6 +612,12 @@ async def install(
         daemon_writer,
     ):
         stream_write_string(daemon_writer, machine_id)
+        await daemon_writer.drain()
+
+        response = await stream_read_line(daemon_reader)
+
+        if response != "SUCCESS":
+            raise MyException(f"ID `{machine_id}` not registered in the daemon.")
 
         for manager, versions in manager_versions_dict.items():
             product_ids = manager_product_ids_dict[manager]
