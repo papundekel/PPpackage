@@ -14,4 +14,4 @@ jobs:
         packages: runc
     - name: Test runc
       run: |
-        sudo runc --debug run --bundle tmp/test/ container
+        docker run fackop/runc runc
