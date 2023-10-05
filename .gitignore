@@ -5,3 +5,5 @@ __pycache__/
 tmp/*
 !tmp/input/
 build/
+!tmp/bundle/
+

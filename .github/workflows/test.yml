@@ -18,6 +18,7 @@ jobs:
     - name: Unpack image
       run: |
         umoci unpack --rootless --image archlinux archlinux-bundle
+        mv archlinux-bundle/rootfs tmp/bundle/rootfs
     - name: Run image
       run: |
-        runc run --bundle archlinux-bundle container
+        runc run --bundle tmp/bundle/ container
