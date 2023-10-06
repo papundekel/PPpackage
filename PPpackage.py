@@ -643,6 +643,8 @@ async def main(
     destination_relative_path: Path,
     debug: bool = False,
 ) -> None:
+    print("*MESSAGE*", file=stderr)
+
     requirements_generators_input = json.load(stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)
