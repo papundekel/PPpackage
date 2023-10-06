@@ -13,15 +13,8 @@ jobs:
       uses: actions/cache@v3.3.2
       with:
         path: ${{ github.workspace }}/tmp/cache
-        key: package-cache-${{ github.sha }}
-        restore-keys: package-cache-
-
-    - name: Docker cache
-      uses: actions/cache@v3.3.2
-      with:
-        path: /tmp/docker-cache
-        key: docker-cache-${{ github.sha }}
-        restore-keys: docker-cache-
+        key: package-cache
+        # restore-keys: package-cache-
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3.0.0
@@ -37,28 +30,25 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage/Dockerfile
-        push: true
-        tags: fackop/pppackage
-        cache-from: type=local,src=/tmp/docker-cache
-        cache-to: type=local,dest=/tmp/docker-cache-new
+        push: ${{ github.ref_name == 'main' }}
+        tags: fackop/pppackage:latest
+        outputs: type=docker
+        cache-from: type=registry,ref=fackop/pppackage:buildcache
+        cache-to: type=registry,ref=fackop/pppackage:buildcache,mode=max
 
     - name: Build and push fackop/pppackage-runc
       uses: docker/build-push-action@v5.0.0
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
-        push: true
-        tags: fackop/pppackage-runc
-        cache-from: type=local,src=/tmp/docker-cache
-        cache-to: type=local,dest=/tmp/docker-cache-new
+        push: ${{ github.ref_name == 'main' }}
+        tags: fackop/pppackage-runc:latest
+        outputs: type=docker
+        cache-from: type=registry,ref=fackop/pppackage-runc:buildcache
+        cache-to: type=registry,ref=fackop/pppackage-runc:buildcache,mode=max
 
     - name: Try run.sh
       run: ./run.sh tmp/ <tmp/input/input-basic.json
 
     - name: See if ldconfig ran
       run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
-
-    - name: Move cache (hack)
-      run: |
-        rm -rf /tmp/docker-cache
-        mv /tmp/docker-cache-new /tmp/docker-cache
