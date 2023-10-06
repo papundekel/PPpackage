@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import Any
 
 
+async def update_database(debug: bool, cache_path: Path) -> None:
+    pass
+
+
 async def resolve(
     debug: bool,
     cache_path: Path,

@@ -38,6 +38,10 @@ from PPpackage_utils import (
 )
 
 
+async def update_database(cache_path: Path) -> None:
+    pass
+
+
 class Options(TypedDict):
     settings: NotRequired[Mapping[str, str]]
     options: NotRequired[Mapping[str, str]]
@@ -499,6 +503,7 @@ async def install(
 
 if __name__ == "__main__":
     init(
+        update_database,
         submanagers,
         resolve,
         fetch,
