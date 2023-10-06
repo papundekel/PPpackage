@@ -13,8 +13,8 @@ jobs:
       uses: actions/cache@v3.3.2
       with:
         path: ${{ github.workspace }}/tmp/cache
-        key: package-cache-${{ github.sha }}
-        restore-keys: package-cache-
+        key: package-cache
+        # restore-keys: package-cache-
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3.0.0
