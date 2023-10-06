@@ -1,38 +1,33 @@
-#!/usr/bin/env python
-
-import json
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
 from contextlib import contextmanager
+from json import dump as json_dump
+from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
-from re import S
 from subprocess import DEVNULL
 from sys import stderr
 
 from daemon import DaemonContext
 from daemon.pidfile import PIDLockFile
 from lockfile import AlreadyLocked
-from typer import Exit, Typer
-
-from PPpackage_utils import (
-    TemporaryDirectory,
-    asubprocess_communicate,
+from PPpackage_utils.io import (
     stream_read_line,
     stream_read_relative_path,
     stream_read_string,
     stream_read_strings,
     stream_write_int,
-    stream_write_line,
     stream_write_string,
 )
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from typer import Exit, Typer
 
 
 @contextmanager
 def edit_json_file(debug: bool, path: Path):
     with path.open("r+") as file:
-        data = json.load(file)
+        data = json_load(file)
 
         try:
             yield data
@@ -40,7 +35,7 @@ def edit_json_file(debug: bool, path: Path):
             file.seek(0)
             file.truncate()
 
-            json.dump(data, file, indent=4 if debug else None)
+            json_dump(data, file, indent=4 if debug else None)
 
 
 config_relative_path = Path("config.json")
@@ -190,7 +185,7 @@ app = Typer()
 
 
 @app.command()
-def main(daemon_path: Path, debug: bool = False):
+def main_command(daemon_path: Path, debug: bool = False):
     daemon_path = daemon_path.absolute()
 
     run_path = daemon_path / "run"
@@ -210,5 +205,5 @@ def main(daemon_path: Path, debug: bool = False):
         raise Exit(1)
 
 
-if __name__ == "__main__":
+def main():
     app()

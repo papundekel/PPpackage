@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-
-import itertools
-import json
-import random
 from asyncio import (
     StreamReader,
     StreamWriter,
@@ -15,24 +10,19 @@ from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequenc
 from contextlib import asynccontextmanager, contextmanager
 from functools import partial
 from io import TextIOWrapper
+from itertools import product as itertools_product
+from json import dump as json_dump
+from json import dumps as json_dumps
+from json import load as json_load
+from json import loads as json_loads
 from os import mkfifo
 from pathlib import Path
+from random import choices as random_choices
 from sys import stderr, stdin
 from typing import Any
 
-from typer import Option as TyperOption
-from typing_extensions import Annotated
-
-import PPpackage_sub
-from PPpackage_utils import (
-    AsyncTyper,
-    MyException,
-    SetEncoder,
-    TemporaryDirectory,
-    asubprocess_communicate,
-    check_dict_format,
-    ensure_dir_exists,
-    parse_generators,
+from PPpackage_utils.app import AsyncTyper
+from PPpackage_utils.io import (
     pipe_read_line,
     pipe_read_string,
     pipe_read_strings,
@@ -43,15 +33,27 @@ from PPpackage_utils import (
     stream_write_string,
     stream_write_strings,
 )
+from PPpackage_utils.utils import (
+    MyException,
+    SetEncoder,
+    TemporaryDirectory,
+    asubprocess_communicate,
+    check_dict_format,
+    ensure_dir_exists,
+    parse_generators,
+)
+from typer import Option as TyperOption
+from typing_extensions import Annotated
+
+from .sub import fetch as PP_fetch
+from .sub import install as PP_install
+from .sub import resolve as PP_resolve
+from .sub import update_database as PP_update_database
 
 
-async def update_database_external_manager(
-    debug: bool, managers_path: Path, manager: str, cache_path: Path
-):
-    manager_command_path = get_manager_command_path(managers_path, manager)
-
+async def update_database_external_manager(debug: bool, manager: str, cache_path: Path):
     process = await create_subprocess_exec(
-        str(manager_command_path),
+        f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "update-database",
         str(cache_path),
@@ -66,29 +68,22 @@ async def update_database_external_manager(
     )
 
 
-async def update_database_manager(
-    debug: bool, managers_path: Path, manager: str, cache_path: Path
-):
+async def update_database_manager(debug: bool, manager: str, cache_path: Path):
     if manager == "PP":
-        updater = PPpackage_sub.update_database
+        updater = PP_update_database
     else:
         updater = partial(
             update_database_external_manager,
             manager=manager,
-            managers_path=managers_path,
         )
 
     await updater(debug=debug, cache_path=cache_path)
 
 
-async def update_database(
-    debug: bool, managers_path: Path, managers: Iterable[str], cache_path: Path
-):
+async def update_database(debug: bool, managers: Iterable[str], cache_path: Path):
     async with TaskGroup() as group:
         for manager in managers:
-            group.create_task(
-                update_database_manager(debug, managers_path, manager, cache_path)
-            )
+            group.create_task(update_database_manager(debug, manager, cache_path))
 
 
 def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
@@ -121,10 +116,6 @@ def merge_lockfiles(
         for package in versions
         if package in product_ids
     }
-
-
-def get_manager_command_path(managers_path: Path, manager: str) -> Path:
-    return managers_path.absolute() / f"PPpackage_{manager}.py"
 
 
 def check_options(input: Any) -> Mapping[str, Any]:
@@ -185,7 +176,7 @@ def generator_versions(
             product_id = product_ids[package]
 
             with (manager_path / f"{package}.json").open("w") as versions_file:
-                json.dump(
+                json_dump(
                     {"version": version, "product_id": product_id},
                     versions_file,
                     indent=4,
@@ -242,7 +233,6 @@ async def install_manager_command(
 async def install_external_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     daemon_reader: StreamReader,
     daemon_writer: StreamWriter,
@@ -251,8 +241,6 @@ async def install_external_manager(
     versions: Mapping[str, str],
     product_ids: Mapping[str, str],
 ) -> None:
-    manager_command_path = get_manager_command_path(managers_path, manager)
-
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
         if debug:
             print(
@@ -261,7 +249,7 @@ async def install_external_manager(
             )
 
         process_creation = create_subprocess_exec(
-            str(manager_command_path),
+            f"PPpackage-{manager}",
             "--debug" if debug else "--no-debug",
             "install",
             str(cache_path),
@@ -277,7 +265,7 @@ async def install_external_manager(
 
         indent = 4 if debug else None
 
-        products_json = json.dumps(products, indent=indent)
+        products_json = json_dumps(products, indent=indent)
 
         if debug:
             print(f"DEBUG PPpackage: sending to {manager}'s install:", file=stderr)
@@ -325,7 +313,6 @@ async def install_external_manager(
 async def install_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     daemon_reader: StreamReader,
     daemon_writer: StreamWriter,
@@ -336,14 +323,13 @@ async def install_manager(
 ) -> None:
     if manager == "PP":
         installer = partial(
-            PPpackage_sub.install,
+            PP_install,
             destination_path=daemon_workdir_path / destination_relative_path,
         )
     else:
         installer = partial(
             install_external_manager,
             manager=manager,
-            managers_path=managers_path,
             daemon_reader=daemon_reader,
             daemon_writer=daemon_writer,
             daemon_workdir_path=daemon_workdir_path,
@@ -361,15 +347,12 @@ async def install_manager(
 async def resolve_external_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     requirements: Iterable[Any],
     options: Mapping[str, Any] | None,
 ) -> Iterable[Any]:
-    manager_command_path = get_manager_command_path(managers_path, manager)
-
     process = await create_subprocess_exec(
-        str(manager_command_path),
+        f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "resolve",
         str(cache_path),
@@ -380,7 +363,7 @@ async def resolve_external_manager(
 
     indent = 4 if debug else None
 
-    resolve_input_json = json.dumps(
+    resolve_input_json = json_dumps(
         {
             "requirements": requirements,
             "options": options,
@@ -406,7 +389,7 @@ async def resolve_external_manager(
         print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
         print(lockfiles_json, file=stderr)
 
-    lockfiles = json.loads(lockfiles_json)
+    lockfiles = json_loads(lockfiles_json)
 
     return lockfiles
 
@@ -414,18 +397,15 @@ async def resolve_external_manager(
 async def resolve_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     requirements: Iterable[Any],
     options: Mapping[str, Any] | None,
     manager_lockfiles: MutableMapping[str, Iterable[Any]],
 ) -> None:
     if manager == "PP":
-        resolver = PPpackage_sub.resolve
+        resolver = PP_resolve
     else:
-        resolver = partial(
-            resolve_external_manager, manager=manager, managers_path=managers_path
-        )
+        resolver = partial(resolve_external_manager, manager=manager)
 
     lockfiles = await resolver(
         debug=debug, cache_path=cache_path, requirements=requirements, options=options
@@ -437,17 +417,14 @@ async def resolve_manager(
 async def fetch_external_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     versions: Mapping[str, str],
     options: Mapping[str, Any] | None,
     generators: Iterable[str],
     generators_path: Path,
 ) -> Mapping[str, str]:
-    manager_command_path = get_manager_command_path(managers_path, manager)
-
     process = create_subprocess_exec(
-        str(manager_command_path),
+        f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "fetch",
         str(cache_path),
@@ -459,7 +436,7 @@ async def fetch_external_manager(
 
     indent = 4 if debug else None
 
-    fetch_input_json = json.dumps(
+    fetch_input_json = json_dumps(
         {
             "lockfile": versions,
             "options": options,
@@ -487,7 +464,7 @@ async def fetch_external_manager(
         print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=stderr)
         print(product_ids_json, file=stderr)
 
-    product_ids = json.loads(product_ids_json)
+    product_ids = json_loads(product_ids_json)
 
     return product_ids
 
@@ -495,7 +472,6 @@ async def fetch_external_manager(
 async def fetch_manager(
     debug: bool,
     manager: str,
-    managers_path: Path,
     cache_path: Path,
     versions: Mapping[str, str],
     options: Mapping[str, Any] | None,
@@ -504,11 +480,9 @@ async def fetch_manager(
     manager_product_ids_dict: MutableMapping[str, Mapping[str, str]],
 ) -> None:
     if manager == "PP":
-        fetcher = PPpackage_sub.fetch
+        fetcher = PP_fetch
     else:
-        fetcher = partial(
-            fetch_external_manager, manager=manager, managers_path=managers_path
-        )
+        fetcher = partial(fetch_external_manager, manager=manager)
 
     product_ids = await fetcher(
         debug=debug,
@@ -524,7 +498,6 @@ async def fetch_manager(
 
 async def resolve(
     debug: bool,
-    managers_path: Path,
     cache_path: Path,
     manager_requirements: Mapping[str, Iterable[Any]],
     manager_options_dict: Mapping[str, Any],
@@ -539,7 +512,6 @@ async def resolve(
                 resolve_manager(
                     debug,
                     manager,
-                    managers_path,
                     cache_path,
                     requirements,
                     options,
@@ -549,7 +521,7 @@ async def resolve(
 
     lockfiles: Sequence[Mapping[str, Mapping[str, str]]] = [
         {manager: lockfile for manager, lockfile in i}
-        for i in itertools.product(
+        for i in itertools_product(
             *[
                 [(manager, lockfile) for lockfile in lockfiles]
                 for manager, lockfiles in manager_lockfiles.items()
@@ -564,7 +536,6 @@ async def resolve(
 
 async def fetch(
     debug: bool,
-    managers_path: Path,
     cache_path: Path,
     manager_versions_dict: Mapping[str, Mapping[str, str]],
     manager_options_dict: Mapping[str, Any],
@@ -581,7 +552,6 @@ async def fetch(
                 fetch_manager(
                     debug,
                     manager,
-                    managers_path,
                     cache_path,
                     versions,
                     options,
@@ -607,7 +577,7 @@ def generate_machine_id(machine_id_path: Path):
 
     with machine_id_path.open("w") as machine_id_file:
         machine_id_file.write(
-            "".join(random.choices([str(digit) for digit in range(10)], k=32)) + "\n"
+            "".join(random_choices([str(digit) for digit in range(10)], k=32)) + "\n"
         )
 
 
@@ -641,7 +611,6 @@ machine_id_relative_path = Path("etc") / "machine-id"
 
 async def install(
     debug: bool,
-    managers_path: Path,
     cache_path: Path,
     daemon_socket_path: Path,
     daemon_workdir_path: Path,
@@ -667,7 +636,6 @@ async def install(
             await install_manager(
                 debug,
                 manager,
-                managers_path,
                 cache_path,
                 daemon_reader,
                 daemon_writer,
@@ -682,8 +650,7 @@ app = AsyncTyper()
 
 
 @app.command()
-async def main(
-    managers_path: Path,
+async def main_command(
     cache_path: Path,
     generators_path: Path,
     daemon_socket_path: Path,
@@ -692,23 +659,22 @@ async def main(
     do_update_database: Annotated[bool, TyperOption("--update-database")] = False,
     debug: bool = False,
 ) -> None:
-    requirements_generators_input = json.load(stdin)
+    requirements_generators_input = json_load(stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)
 
     if do_update_database:
         managers = requirements.keys()
-        await update_database(debug, managers_path, managers, cache_path)
+        await update_database(debug, managers, cache_path)
 
-    versions = await resolve(debug, managers_path, cache_path, requirements, options)
+    versions = await resolve(debug, cache_path, requirements, options)
 
     product_ids = await fetch(
-        debug, managers_path, cache_path, versions, options, generators, generators_path
+        debug, cache_path, versions, options, generators, generators_path
     )
 
     await install(
         debug,
-        managers_path,
         cache_path,
         daemon_socket_path,
         daemon_workdir_path,
@@ -718,7 +684,7 @@ async def main(
     )
 
 
-if __name__ == "__main__":
+def main():
     try:
         app()
     except* MyException as eg:

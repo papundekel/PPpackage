@@ -5,3 +5,4 @@ __pycache__/
 tmp/*
 !tmp/input/
 build/
+*.egg-info/

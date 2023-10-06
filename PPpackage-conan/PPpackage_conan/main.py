@@ -1,14 +1,5 @@
-#!/usr/bin/env python
-
-import asyncio
-import contextlib
-import json
-import os
-import shutil
-import subprocess
-import sys
-import tempfile
-import typing
+from asyncio import TaskGroup, create_subprocess_exec
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import (
     Callable,
     Generator,
@@ -19,23 +10,47 @@ from collections.abc import (
     Sequence,
     Set,
 )
+from contextlib import contextmanager
+from json import dump as json_dump
+from json import loads as json_loads
+from os import environ
 from pathlib import Path
+from shutil import copytree, rmtree
+from sys import stderr
+from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, NotRequired, Optional, TypedDict
+from typing import cast as typing_cast
 
-import jinja2
-
-from PPpackage_utils import (
+from jinja2 import Environment as Jinja2Environment
+from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
+from jinja2 import Template as Jinja2Template
+from jinja2 import select_autoescape as jinja2_select_autoescape
+from PPpackage_utils.app import init, run
+from PPpackage_utils.utils import (
     MyException,
     Product,
     asubprocess_communicate,
     check_dict_format,
     communicate_from_sub,
     ensure_dir_exists,
-    init,
     parse_lockfile_simple,
     parse_products_simple,
-    run,
 )
+
+
+def get_path(module) -> Path:
+    return Path(module.__file__)
+
+
+def get_package_paths():
+    import PPpackage_conan
+
+    from . import deployer
+
+    data_path = get_path(PPpackage_conan).parent / "data"
+    deployer_path = get_path(deployer)
+
+    return data_path, deployer_path
 
 
 async def update_database(cache_path: Path) -> None:
@@ -52,7 +67,7 @@ def get_cache_path(cache_path: Path) -> Path:
 
 
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
-    environment = os.environ.copy()
+    environment = environ.copy()
 
     environment["CONAN_HOME"] = str(cache_path.absolute())
 
@@ -108,7 +123,7 @@ def parse_conan_graph_nodes(
 ) -> Iterable[Node]:
     return [
         node
-        for node in json.loads(graph_string)["graph"]["nodes"].values()
+        for node in json_loads(graph_string)["graph"]["nodes"].values()
         if node["ref"] != ""
     ]
 
@@ -151,7 +166,7 @@ def create_requirement_partitions(
         )
 
         if partition_available is None:
-            partition_available = typing.cast(MutableMapping[str, str], {})
+            partition_available = typing_cast(MutableMapping[str, str], {})
             requirement_partitions.append(partition_available)
 
         partition_available[requirement.package] = requirement.version
@@ -159,13 +174,13 @@ def create_requirement_partitions(
     return requirement_partitions
 
 
-@contextlib.contextmanager
+@contextmanager
 def create_and_render_temp_file(
-    template: jinja2.Template,
+    template: Jinja2Template,
     template_context: Mapping[str, Any],
     suffix: Optional[str] = None,
-) -> Generator[tempfile._TemporaryFileWrapper, Any, Any]:
-    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix) as file:
+) -> Generator[_TemporaryFileWrapper, Any, Any]:
+    with NamedTemporaryFile(mode="w", suffix=suffix) as file:
         content = template.render(**template_context)
 
         file.write(content)
@@ -176,20 +191,20 @@ def create_and_render_temp_file(
 
 async def export_leaf(
     environment: Mapping[str, str],
-    template: jinja2.Template,
+    template: Jinja2Template,
     index: int,
     requirement_partition: Mapping[str, str],
 ) -> None:
     with create_and_render_temp_file(
         template, {"index": index, "requirements": requirement_partition}, ".py"
     ) as conanfile_leaf:
-        process = asyncio.create_subprocess_exec(
+        process = create_subprocess_exec(
             "conan",
             "export",
             conanfile_leaf.name,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stdin=DEVNULL,
+            stdout=DEVNULL,
+            stderr=PIPE,
             env=environment,
         )
 
@@ -198,7 +213,7 @@ async def export_leaf(
 
 async def export_leaves(
     environment: Mapping[str, str],
-    template: jinja2.Template,
+    template: Jinja2Template,
     requirement_partitions: Iterable[Mapping[str, str]],
 ) -> None:
     for index, requirement_partition in enumerate(requirement_partitions):
@@ -207,8 +222,9 @@ async def export_leaves(
 
 async def get_lockfile(
     environment: Mapping[str, str],
-    root_template: jinja2.Template,
-    profile_template: jinja2.Template,
+    root_template: Jinja2Template,
+    profile_template: Jinja2Template,
+    build_profile_path: Path,
     requirement_partitions: Sequence[Mapping[str, str]],
     options: Options,
 ) -> Mapping[str, str]:
@@ -220,19 +236,21 @@ async def get_lockfile(
         ) as root_file,
         create_and_render_temp_file(
             profile_template, {"options": options}
-        ) as profile_file,
+        ) as host_profile_file,
     ):
-        process = asyncio.create_subprocess_exec(
+        host_profile_path = Path(host_profile_file.name)
+
+        process = create_subprocess_exec(
             "conan",
             "graph",
             "info",
             "--format",
             "json",
-            f"--profile:host={profile_file.name}",
-            "--profile:build=profile",
+            f"--profile:host={host_profile_path}",
+            f"--profile:build={build_profile_path}",
             root_file.name,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
+            stdin=DEVNULL,
+            stdout=PIPE,
             stderr=None,
             env=environment,
         )
@@ -247,13 +265,13 @@ async def get_lockfile(
 
 
 async def remove_leaves_from_cache(environment: Mapping[str, str]) -> None:
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         "conan",
         "remove",
         "--confirm",
         "leaf-*/1.0.0@pppackage",
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
+        stdin=DEVNULL,
+        stdout=DEVNULL,
         stderr=None,
         env=environment,
     )
@@ -301,13 +319,13 @@ def patch_native_generators(
 async def install_product(
     environment: Mapping[str, str], destination_path: Path, product: Product
 ) -> None:
-    process = await asyncio.create_subprocess_exec(
+    process = await create_subprocess_exec(
         "conan",
         "cache",
         "path",
         f"{product.package}/{product.version}:{product.product_id}",
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
+        stdin=DEVNULL,
+        stdout=PIPE,
         stderr=None,
         env=environment,
     )
@@ -316,7 +334,7 @@ async def install_product(
 
     product_path = stdout.decode("ascii").splitlines()[0]
 
-    shutil.copytree(
+    copytree(
         product_path,
         destination_path / product.package,
         symlinks=True,
@@ -330,7 +348,7 @@ def generator_info(generators_path: Path, graph_infos: Mapping[str, GraphInfo]) 
 
     for package, graph_info in graph_infos.items():
         with open(info_path / f"{package}.json", "w") as file:
-            json.dump(graph_info.cpp_info, file, indent=4)
+            json_dump(graph_info.cpp_info, file, indent=4)
 
 
 additional_generators: Mapping[str, Callable[[Path, Mapping[str, GraphInfo]], None]] = {
@@ -339,7 +357,7 @@ additional_generators: Mapping[str, Callable[[Path, Mapping[str, GraphInfo]], No
 
 
 def check_options(input: Any) -> Options:
-    input_checked = typing.cast(
+    input_checked = typing_cast(
         Options,
         check_dict_format(
             input, set(), {"settings", "options"}, "Invalid input format."
@@ -372,7 +390,10 @@ async def submanagers() -> Iterable[str]:
 
 
 async def resolve(
-    cache_path: Path, requirements: Iterable[Requirement], options: Options
+    templates_path: Path,
+    cache_path: Path,
+    requirements: Iterable[Requirement],
+    options: Options,
 ) -> Iterable[Mapping[str, str]]:
     cache_path = get_cache_path(cache_path)
 
@@ -383,20 +404,26 @@ async def resolve(
 
     requirement_partitions = create_requirement_partitions(requirements)
 
-    jinja_loader = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(""),
-        autoescape=jinja2.select_autoescape(),
+    jinja_loader = Jinja2Environment(
+        loader=Jinja2FileSystemLoader(templates_path),
+        autoescape=jinja2_select_autoescape(),
     )
 
     leaf_template = jinja_loader.get_template("conanfile-leaf.py.jinja")
-
-    await export_leaves(environment, leaf_template, requirement_partitions)
-
     root_template = jinja_loader.get_template("conanfile-root.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
+    await export_leaves(environment, leaf_template, requirement_partitions)
+
+    build_profile_path = templates_path / "profile"
+
     lockfile = await get_lockfile(
-        environment, root_template, profile_template, requirement_partitions, options
+        environment,
+        root_template,
+        profile_template,
+        build_profile_path,
+        requirement_partitions,
+        options,
     )
 
     await remove_leaves_from_cache(environment)
@@ -405,6 +432,8 @@ async def resolve(
 
 
 async def fetch(
+    templates_path: Path,
+    deployer_path: Path,
     cache_path: Path,
     lockfile: Mapping[str, str],
     options: Options,
@@ -415,9 +444,9 @@ async def fetch(
 
     environment = make_conan_environment(cache_path)
 
-    jinja_loader = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(""),
-        autoescape=jinja2.select_autoescape(),
+    jinja_loader = Jinja2Environment(
+        loader=Jinja2FileSystemLoader(templates_path),
+        autoescape=jinja2_select_autoescape(),
     )
 
     conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
@@ -437,24 +466,27 @@ async def fetch(
         ) as conanfile_file,
         create_and_render_temp_file(
             profile_template, {"options": options}
-        ) as profile_file,
+        ) as host_profile_file,
     ):
-        process = asyncio.create_subprocess_exec(
+        host_profile_path = Path(host_profile_file.name)
+        build_profile_path = templates_path / "profile"
+
+        process = create_subprocess_exec(
             "conan",
             "install",
             "--output-folder",
             str(native_generators_path),
             "--deployer",
-            "PPpackage_conan_deployer.py",
+            deployer_path,
             "--build",
             "missing",
             "--format",
             "json",
-            f"--profile:host={profile_file.name}",
-            "--profile:build=profile",
+            f"--profile:host={host_profile_path}",
+            f"--profile:build={build_profile_path}",
             conanfile_file.name,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
+            stdin=DEVNULL,
+            stdout=PIPE,
             stderr=None,
             env=environment,
         )
@@ -491,9 +523,9 @@ async def install(
     destination_path = destination_path / "conan"
 
     if destination_path.exists():
-        shutil.rmtree(destination_path)
+        rmtree(destination_path)
 
-    async with asyncio.TaskGroup() as group:
+    async with TaskGroup() as group:
         for product in products:
             group.create_task(install_product(environment, destination_path, product))
 
@@ -501,12 +533,24 @@ async def install(
         pass
 
 
-if __name__ == "__main__":
+def main():
+    data_path, deployer_path = get_package_paths()
+
     init(
         update_database,
         submanagers,
-        resolve,
-        fetch,
+        lambda cache_path, requirements, options: resolve(
+            data_path, cache_path, requirements, options
+        ),
+        lambda cache_path, lockfile, options, generators, generators_path: fetch(
+            data_path,
+            deployer_path,
+            cache_path,
+            lockfile,
+            options,
+            generators,
+            generators_path,
+        ),
         install,
         parse_requirements,
         parse_options,
