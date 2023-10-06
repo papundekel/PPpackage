@@ -9,12 +9,9 @@ RUN systemd-machine-id-setup
 
 RUN pacman --noconfirm -S pacutils
 RUN pacman --noconfirm -S pacman-contrib
-RUN pacman --noconfirm -S python
 RUN pacman --noconfirm -S fakeroot
-RUN pacman --noconfirm -S fakechroot
-RUN pacman --noconfirm -S yajl
+RUN pacman --noconfirm -S python
 RUN pacman --noconfirm -S cmake
-RUN pacman --noconfirm -S python-typer
 RUN pacman --noconfirm -S meson
 RUN aur-install conan
 
@@ -22,8 +19,20 @@ COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp
 RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
 COPY fakealpm/ /workdir/fakealpm
-COPY --chmod=a+x ./build_fakealpm.sh /workdir/
-RUN ./build_fakealpm.sh
+RUN cd fakealpm/ && ./build.sh
 
-COPY profile.jinja conanfile-fetch.py.jinja conanfile-leaf.py.jinja conanfile-root.py.jinja profile /workdir/
-COPY --chmod=a+x PPpackage_utils.py PPpackage.py PPpackage_sub.py PPpackage_arch.py PPpackage_conan.py PPpackage_conan_deployer.py manager.sh /workdir/
+ENV VIRTUAL_ENV=/workdir/.venv/
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY PPpackage-utils/ /workdir/packages/PPpackage-utils/
+RUN pip install packages/PPpackage-utils/
+
+COPY PPpackage-conan/ /workdir/packages/PPpackage-conan/
+RUN pip install packages/PPpackage-conan/
+
+COPY PPpackage-arch/ /workdir/packages/PPpackage-arch/
+RUN pip install packages/PPpackage-arch/
+
+COPY PPpackage/ /workdir/packages/PPpackage/
+RUN pip install packages/PPpackage/

@@ -1,10 +1,10 @@
-devel/
 .vscode/
 __pycache__/
 .dockerignore
 .gitignore
 tmp/
 Dockerfile
-fakealpm/build/
 .git/
 .github/
+**/*.egg-info/
+**/build/

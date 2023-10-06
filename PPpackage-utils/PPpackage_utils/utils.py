@@ -1,20 +1,14 @@
-import asyncio
-import functools
-import inspect
-import io
-import json
-import os
-import signal
-import subprocess
-import sys
-import tempfile
-from asyncio import StreamReader, StreamWriter
-from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Set
+from asyncio import create_subprocess_exec
+from asyncio.subprocess import Process
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager, contextmanager
+from json import JSONEncoder
+from os import environ, kill
 from pathlib import Path
+from signal import SIGTERM
+from subprocess import DEVNULL, PIPE
+from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
 from typing import Any, AsyncIterator, Optional
-
-import typer
 
 
 def ensure_dir_exists(path: Path) -> None:
@@ -23,40 +17,17 @@ def ensure_dir_exists(path: Path) -> None:
 
 @contextmanager
 def TemporaryDirectory(dir=None):
-    with tempfile.TemporaryDirectory(dir=dir) as dir_path_string:
+    with TempfileTemporaryDirectory(dir=dir) as dir_path_string:
         dir_path = Path(dir_path_string)
 
         yield dir_path
 
 
-class AsyncTyper(typer.Typer):
-    @staticmethod
-    def maybe_run_async(decorator: Callable[[Any], Any], f: Any) -> Any:
-        if inspect.iscoroutinefunction(f):
-
-            @functools.wraps(f)
-            def runner(*args: Any, **kwargs: Any) -> Any:
-                return asyncio.run(f(*args, **kwargs))
-
-            decorator(runner)
-        else:
-            decorator(f)
-        return f
-
-    def callback(self, *args: Any, **kwargs: Any) -> Any:
-        decorator = super().callback(*args, **kwargs)
-        return functools.partial(self.maybe_run_async, decorator)
-
-    def command(self, *args: Any, **kwargs: Any) -> Any:
-        decorator = super().command(*args, **kwargs)
-        return functools.partial(self.maybe_run_async, decorator)
-
-
-class SetEncoder(json.JSONEncoder):
+class SetEncoder(JSONEncoder):
     def default(self, obj: Any) -> Any:
         if isinstance(obj, set):
             return list(obj)
-        return json.JSONEncoder.default(self, obj)
+        return JSONEncoder.default(self, obj)
 
 
 class MyException(Exception):
@@ -73,7 +44,7 @@ class STDERRException(Exception):
 
 
 async def asubprocess_communicate(
-    process: asyncio.subprocess.Process,
+    process: Process,
     error_message: str,
     input: Optional[bytes] = None,
 ) -> bytes:
@@ -243,13 +214,13 @@ async def get_fakeroot_info():
     global _fakeroot_info
 
     if _fakeroot_info is None:
-        process_creation = asyncio.create_subprocess_exec(
+        process_creation = create_subprocess_exec(
             "fakeroot",
             "printenv",
             "LD_LIBRARY_PATH",
             "LD_PRELOAD",
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
+            stdin=DEVNULL,
+            stdout=PIPE,
             stderr=None,
         )
 
@@ -272,10 +243,10 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     try:
         fakeroot_info_task = get_fakeroot_info()
 
-        process_creation = asyncio.create_subprocess_exec(
+        process_creation = create_subprocess_exec(
             "faked",
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
+            stdin=DEVNULL,
+            stdout=PIPE,
             stderr=None,
         )
 
@@ -289,7 +260,7 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
 
         fakeroot_info = await fakeroot_info_task
 
-        environment = os.environ.copy()
+        environment = environ.copy()
 
         environment["FAKEROOTKEY"] = key
         environment["LD_LIBRARY_PATH"] = fakeroot_info.ld_library_path
@@ -298,7 +269,7 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
         yield environment
     finally:
         if pid is not None:
-            os.kill(pid, signal.SIGTERM)
+            kill(pid, SIGTERM)
 
 
 @contextmanager
@@ -308,208 +279,3 @@ def communicate_from_sub(pipe_from_sub_path):
             yield pipe_from_sub
         finally:
             pipe_from_sub.write("END\n")
-
-
-def pipe_read_line(input: io.TextIOBase) -> str:
-    return input.readline().strip()
-
-
-def pipe_read_int(input: io.TextIOBase) -> int:
-    return int(pipe_read_line(input))
-
-
-def pipe_read_string_maybe(input: io.TextIOBase) -> str | None:
-    length = pipe_read_int(input)
-
-    if length < 0:
-        return None
-
-    string = input.read(length)
-
-    return string
-
-
-def pipe_read_string(input: io.TextIOBase) -> str:
-    length = pipe_read_int(input)
-
-    string = input.read(length)
-
-    return string
-
-
-def pipe_read_strings(input: io.TextIOBase) -> Iterable[str]:
-    while True:
-        string = pipe_read_string_maybe(input)
-
-        if string is None:
-            break
-
-        yield string
-
-
-def pipe_write_int(output: io.TextIOBase, integer: int) -> None:
-    output.write(f"{integer}\n")
-
-
-def pipe_write_string(output: io.TextIOBase, string: str) -> None:
-    pipe_write_int(output, len(string))
-    output.write(string)
-
-
-async def stream_read_line(reader: StreamReader) -> str:
-    return (await reader.readline()).decode("ascii").strip()
-
-
-async def stream_read_int(reader: StreamReader) -> int:
-    return int(await stream_read_line(reader))
-
-
-def stream_write_line(writer: StreamWriter, line: str):
-    writer.write(f"{line}\n".encode("ascii"))
-
-
-def stream_write_int(writer: StreamWriter, integer: int):
-    stream_write_line(writer, str(integer))
-
-
-async def stream_read_string_n(reader: StreamReader, length: int) -> str:
-    return (await reader.read(length)).decode("ascii")
-
-
-async def stream_read_string(reader: StreamReader) -> str:
-    length = await stream_read_int(reader)
-    return await stream_read_string_n(reader, length)
-
-
-async def stream_read_string_maybe(reader: StreamReader) -> str | None:
-    length = await stream_read_int(reader)
-
-    if length < 0:
-        return None
-
-    return await stream_read_string_n(reader, length)
-
-
-async def stream_read_strings(reader: StreamReader):
-    while True:
-        string = await stream_read_string_maybe(reader)
-
-        if string is None:
-            break
-
-        yield string
-
-
-async def stream_read_relative_path(reader: StreamReader) -> Path:
-    path = Path(await stream_read_string(reader))
-
-    if path.is_absolute():
-        raise ValueError(f"Expected relative path, got {path}.")
-
-    return path
-
-
-def stream_write_string(writer: StreamWriter, string: str):
-    stream_write_int(writer, len(string))
-    writer.write(string.encode("ascii"))
-
-
-def stream_write_strings(writer: StreamWriter, strings):
-    for string in strings:
-        stream_write_string(writer, string)
-    stream_write_int(writer, -1)
-
-
-_debug = False
-
-
-app = AsyncTyper()
-
-
-@app.callback()
-def callback(debug: bool = False) -> None:
-    global _debug
-    _debug = debug
-
-
-def init(
-    database_updater: Callable[[Path], Awaitable[None]],
-    submanagers_handler: Callable[[], Awaitable[Iterable[str]]],
-    resolver: Callable[
-        [Path, Iterable[Any], Any], Awaitable[Iterable[Mapping[str, str]]]
-    ],
-    fetcher: Callable[
-        [Path, Mapping[str, str], Any, Set[str], Path],
-        Awaitable[Mapping[str, str]],
-    ],
-    installer: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
-    requirements_parser: Callable[[Any], Iterable[Any]],
-    options_parser: Callable[[Any], Any],
-    lockfile_parser: Callable[[Any], Mapping[str, str]],
-    products_parser: Callable[[Any], Set[Product]],
-) -> None:
-    @app.command("update-database")
-    async def update_database(cache_path: Path) -> None:
-        await database_updater(cache_path)
-
-    @app.command()
-    async def submanagers() -> None:
-        submanagers = await submanagers_handler()
-
-        json.dump(submanagers, sys.stdout)
-
-    @app.command()
-    async def resolve(cache_path: Path) -> None:
-        input = json.load(sys.stdin)
-
-        requirements, options = parse_resolve_input(
-            requirements_parser, options_parser, input
-        )
-
-        lockfiles = await resolver(cache_path, requirements, options)
-
-        indent = 4 if _debug else None
-
-        json.dump(lockfiles, sys.stdout, indent=indent)
-
-    @app.command()
-    async def fetch(cache_path: Path, generators_path: Path) -> None:
-        input = json.load(sys.stdin)
-
-        lockfile, options, generators = parse_fetch_input(
-            lockfile_parser, options_parser, input
-        )
-
-        product_ids = await fetcher(
-            cache_path, lockfile, options, generators, generators_path
-        )
-
-        indent = 4 if _debug else None
-
-        json.dump(product_ids, sys.stdout, indent=indent)
-
-    @app.command()
-    async def install(
-        cache_path: Path,
-        destination_path: Path,
-        pipe_from_sub_path: Path,
-        pipe_to_sub_path: Path,
-    ) -> None:
-        input = json.load(sys.stdin)
-
-        ensure_dir_exists(destination_path)
-
-        products = products_parser(input)
-
-        await installer(
-            cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
-        )
-
-
-def run(manager_id: str) -> None:
-    try:
-        app()
-    except* MyException as eg:
-        for e in eg.exceptions:
-            print(f"{manager_id}: {e}", file=sys.stderr)
-        sys.exit(1)

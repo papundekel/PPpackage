@@ -1,33 +1,25 @@
-#!/usr/bin/env python
-
-import asyncio
-import os
-import random
-import re
-import subprocess
-import sys
+from asyncio import TaskGroup, create_subprocess_exec
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSet, Set
 from pathlib import Path
+from re import compile as re_compile
+from sys import stderr
 from typing import Any
 
-from PPpackage_utils import (
+from PPpackage_utils.app import init, run
+from PPpackage_utils.io import pipe_read_int, pipe_read_string, pipe_write_string
+from PPpackage_utils.utils import (
     MyException,
     Product,
-    app,
     asubprocess_communicate,
     communicate_from_sub,
     ensure_dir_exists,
     fakeroot,
-    init,
     parse_lockfile_simple,
     parse_products_simple,
-    pipe_read_int,
-    pipe_read_string,
-    pipe_write_string,
-    run,
 )
 
-regex_package_name = re.compile(r"[a-zA-Z0-9\-@._+]+")
+regex_package_name = re_compile(r"[a-zA-Z0-9\-@._+]+")
 
 
 def get_cache_paths(cache_path: Path) -> tuple[Path, Path]:
@@ -62,14 +54,14 @@ def parse_options(input: Any) -> Any:
 async def resolve_requirement(
     database_path: Path, requirement: str, dependencies: MutableSet[str]
 ) -> None:
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         "pactree",
         "--dbpath",
         str(database_path),
         "--sync",
         requirement,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
+        stdin=DEVNULL,
+        stdout=PIPE,
         stderr=None,
     )
 
@@ -91,14 +83,14 @@ async def update_database(cache_path: Path) -> None:
     ensure_dir_exists(database_path)
 
     async with fakeroot() as environment:
-        process = asyncio.create_subprocess_exec(
+        process = create_subprocess_exec(
             "pacman",
             "--dbpath",
             str(database_path),
             "--sync",
             "--refresh",
-            stdin=subprocess.DEVNULL,
-            stdout=sys.stderr,
+            stdin=DEVNULL,
+            stdout=stderr,
             stderr=None,
             env=environment,
         )
@@ -120,20 +112,20 @@ async def resolve(
 
     dependencies: MutableSet[str] = set()
 
-    async with asyncio.TaskGroup() as group:
+    async with TaskGroup() as group:
         for requirement in requirements:
             group.create_task(
                 resolve_requirement(database_path, requirement, dependencies)
             )
 
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         "pacinfo",
         "--dbpath",
         str(database_path),
         "--short",
         *dependencies,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
+        stdin=DEVNULL,
+        stdout=PIPE,
         stderr=None,
     )
 
@@ -169,7 +161,7 @@ async def fetch(
     packages = list(lockfile.keys())
 
     async with fakeroot() as environment:
-        process = asyncio.create_subprocess_exec(
+        process = create_subprocess_exec(
             "pacman",
             "--dbpath",
             str(database_path),
@@ -179,15 +171,15 @@ async def fetch(
             "--sync",
             "--downloadonly",
             *packages,
-            stdin=subprocess.DEVNULL,
-            stdout=sys.stderr,
+            stdin=DEVNULL,
+            stdout=stderr,
             stderr=None,
             env=environment,
         )
 
         await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
 
-    process = asyncio.create_subprocess_exec(
+    process = create_subprocess_exec(
         "pacman",
         "--dbpath",
         str(database_path),
@@ -199,8 +191,8 @@ async def fetch(
         "--nodeps",
         "--print",
         *packages,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
+        stdin=DEVNULL,
+        stdout=PIPE,
         stderr=None,
     )
 
@@ -257,7 +249,7 @@ async def install(
             environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
             environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
 
-            process = await asyncio.create_subprocess_exec(
+            process = await create_subprocess_exec(
                 "pacman",
                 "--noconfirm",
                 "--needed",
@@ -277,8 +269,8 @@ async def install(
                     )
                     for product in products
                 ],
-                stdin=subprocess.DEVNULL,
-                stdout=sys.stderr,
+                stdin=DEVNULL,
+                stdout=stderr,
                 stderr=None,
                 env=environment,
             )
@@ -286,7 +278,7 @@ async def install(
             await asubprocess_communicate(process, "Error in `pacman -Udd`")
 
 
-if __name__ == "__main__":
+def main():
     init(
         update_database,
         submanagers,
