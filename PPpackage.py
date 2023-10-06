@@ -20,6 +20,9 @@ from pathlib import Path
 from sys import stderr, stdin
 from typing import Any
 
+from typer import Option as TyperOption
+from typing_extensions import Annotated
+
 import PPpackage_sub
 from PPpackage_utils import (
     AsyncTyper,
@@ -36,11 +39,56 @@ from PPpackage_utils import (
     pipe_write_int,
     pipe_write_string,
     stream_read_int,
-    stream_read_line,
     stream_write_line,
     stream_write_string,
     stream_write_strings,
 )
+
+
+async def update_database_external_manager(
+    debug: bool, managers_path: Path, manager: str, cache_path: Path
+):
+    manager_command_path = get_manager_command_path(managers_path, manager)
+
+    process = await create_subprocess_exec(
+        str(manager_command_path),
+        "--debug" if debug else "--no-debug",
+        "update-database",
+        str(cache_path),
+        stdin=DEVNULL,
+        stdout=DEVNULL,
+        stderr=None,
+    )
+
+    await asubprocess_communicate(
+        process,
+        f"Error in {manager}'s update-database.",
+    )
+
+
+async def update_database_manager(
+    debug: bool, managers_path: Path, manager: str, cache_path: Path
+):
+    if manager == "PP":
+        updater = PPpackage_sub.update_database
+    else:
+        updater = partial(
+            update_database_external_manager,
+            manager=manager,
+            managers_path=managers_path,
+        )
+
+    await updater(debug=debug, cache_path=cache_path)
+
+
+async def update_database(
+    debug: bool, managers_path: Path, managers: Iterable[str], cache_path: Path
+):
+    async with TaskGroup() as group:
+        for manager in managers:
+            group.create_task(
+                update_database_manager(debug, managers_path, manager, cache_path)
+            )
 
 
 def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
@@ -641,11 +689,16 @@ async def main(
     daemon_socket_path: Path,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
+    do_update_database: Annotated[bool, TyperOption("--update-database")] = False,
     debug: bool = False,
 ) -> None:
     requirements_generators_input = json.load(stdin)
 
     requirements, options, generators = parse_input(requirements_generators_input)
+
+    if do_update_database:
+        managers = requirements.keys()
+        await update_database(debug, managers_path, managers, cache_path)
 
     versions = await resolve(debug, managers_path, cache_path, requirements, options)
 

@@ -85,7 +85,6 @@ async def resolve_requirement(
         dependencies.add(dependency)
 
 
-@app.command("update-db")
 async def update_database(cache_path: Path) -> None:
     database_path, _ = get_cache_paths(cache_path)
 
@@ -289,6 +288,7 @@ async def install(
 
 if __name__ == "__main__":
     init(
+        update_database,
         submanagers,
         resolve,
         fetch,

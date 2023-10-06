@@ -10,5 +10,4 @@ managers_path="./"
 cache_path="$tmp_path/cache/"
 generators_path="$tmp_path/generators/"
 
-./PPpackage_arch.py update-db "$cache_path" && \
-./PPpackage.py "$managers_path" "$cache_path" "$generators_path" "$daemon_socket_path" "$daemon_workdir_path" "$destination_relative_path" $debug
+./PPpackage.py "$managers_path" "$cache_path" "$generators_path" "$daemon_socket_path" "$daemon_workdir_path" "$destination_relative_path" --update-database $debug

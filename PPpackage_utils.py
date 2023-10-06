@@ -433,6 +433,7 @@ def callback(debug: bool = False) -> None:
 
 
 def init(
+    database_updater: Callable[[Path], Awaitable[None]],
     submanagers_handler: Callable[[], Awaitable[Iterable[str]]],
     resolver: Callable[
         [Path, Iterable[Any], Any], Awaitable[Iterable[Mapping[str, str]]]
@@ -447,6 +448,10 @@ def init(
     lockfile_parser: Callable[[Any], Mapping[str, str]],
     products_parser: Callable[[Any], Set[Product]],
 ) -> None:
+    @app.command("update-database")
+    async def update_database(cache_path: Path) -> None:
+        await database_updater(cache_path)
+
     @app.command()
     async def submanagers() -> None:
         submanagers = await submanagers_handler()
