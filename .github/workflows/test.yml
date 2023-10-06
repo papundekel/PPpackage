@@ -16,13 +16,6 @@ jobs:
         key: package-cache-${{ github.sha }}
         restore-keys: package-cache-
 
-    - name: Docker cache
-      uses: actions/cache@v3.3.2
-      with:
-        path: /tmp/docker-cache
-        key: docker-cache-${{ github.sha }}
-        restore-keys: docker-cache-
-
     - name: Log in to Docker Hub
       uses: docker/login-action@v3.0.0
       with:
@@ -39,8 +32,8 @@ jobs:
         file: ${{ github.workspace }}/images/PPpackage/Dockerfile
         push: true
         tags: fackop/pppackage
-        cache-from: type=local,src=/tmp/docker-cache
-        cache-to: type=local,dest=/tmp/docker-cache-new
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Build and push fackop/pppackage-runc
       uses: docker/build-push-action@v5.0.0
@@ -49,16 +42,11 @@ jobs:
         file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
         push: true
         tags: fackop/pppackage-runc
-        cache-from: type=local,src=/tmp/docker-cache
-        cache-to: type=local,dest=/tmp/docker-cache-new
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Try run.sh
       run: ./run.sh tmp/ <tmp/input/input-basic.json
 
     - name: See if ldconfig ran
       run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
-
-    - name: Move cache (hack)
-      run: |
-        rm -rf /tmp/docker-cache
-        mv /tmp/docker-cache-new /tmp/docker-cache
