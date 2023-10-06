@@ -30,7 +30,7 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -40,7 +40,7 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage-runc
         cache-from: type=gha
         cache-to: type=gha,mode=max
