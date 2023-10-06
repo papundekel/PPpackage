@@ -30,7 +30,7 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage:latest
         outputs: type=image
         cache-from: type=registry,ref=fackop/pppackage:buildcache
@@ -41,7 +41,7 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage-runc:latest
         outputs: type=image
         cache-from: type=registry,ref=fackop/pppackage-runc:buildcache
