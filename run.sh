@@ -20,7 +20,6 @@ machine_id_length=$(printf "$machine_id" | wc --bytes) && \
 \
 docker run \
     --privileged \
-    --init \
     --detach \
     --user "$(id -u):$(id -g)" \
     --name fackop-pppackage-runc \
