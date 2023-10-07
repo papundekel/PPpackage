@@ -55,7 +55,6 @@ def callback(debug: bool = False) -> None:
 
 def init(
     database_updater: Callable[[Path], Awaitable[None]],
-    submanagers_handler: Callable[[], Awaitable[Iterable[str]]],
     resolver: Callable[
         [Path, Iterable[Any], Any], Awaitable[Iterable[Mapping[str, str]]]
     ],
@@ -72,12 +71,6 @@ def init(
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
         await database_updater(cache_path)
-
-    @__app.command()
-    async def submanagers() -> None:
-        submanagers = await submanagers_handler()
-
-        json_dump(submanagers, stdout)
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:

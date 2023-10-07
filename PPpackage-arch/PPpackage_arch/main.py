@@ -98,10 +98,6 @@ async def update_database(cache_path: Path) -> None:
         await asubprocess_communicate(await process, "Error in `pacman -Sy`")
 
 
-async def submanagers() -> Iterable[str]:
-    return []
-
-
 async def resolve(
     cache_path: Path, requirements: Iterable[str], options: Any
 ) -> Iterable[Mapping[str, str]]:
@@ -281,7 +277,6 @@ async def install(
 def main():
     app = init(
         update_database,
-        submanagers,
         resolve,
         fetch,
         install,

@@ -384,10 +384,6 @@ def parse_options(input: Any) -> Options:
     return options
 
 
-async def submanagers() -> Iterable[str]:
-    return []
-
-
 async def resolve(
     templates_path: Path,
     cache_path: Path,
@@ -537,7 +533,6 @@ def main():
 
     app = init(
         update_database,
-        submanagers,
         lambda cache_path, requirements, options: resolve(
             data_path, cache_path, requirements, options
         ),
