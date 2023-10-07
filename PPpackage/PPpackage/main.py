@@ -1,8 +1,8 @@
-from json import load as json_load
 from pathlib import Path
 from sys import stdin
 
 from PPpackage_utils.app import AsyncTyper, run
+from PPpackage_utils.utils import json_load
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 

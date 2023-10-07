@@ -1,12 +1,12 @@
 from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
-from json import loads as json_loads
 from os import environ
 from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, NotRequired, Optional, TypedDict
 
 from jinja2 import Template as Jinja2Template
+from PPpackage_utils.utils import json_loads
 
 
 class Options(TypedDict):

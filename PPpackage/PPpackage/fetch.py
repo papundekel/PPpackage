@@ -2,13 +2,11 @@ from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import Iterable, Mapping
 from functools import partial
-from json import dumps as json_dumps
-from json import loads as json_loads
 from pathlib import Path
 from sys import stderr
 from typing import Any
 
-from PPpackage_utils.utils import SetEncoder, asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
 
 from .generators import builtin as builtin_generators
 from .sub import fetch as PP_fetch
@@ -42,7 +40,6 @@ async def fetch_external_manager(
             "options": options,
             "generators": generators - builtin_generators.keys(),
         },
-        cls=SetEncoder,
         indent=indent,
     )
 

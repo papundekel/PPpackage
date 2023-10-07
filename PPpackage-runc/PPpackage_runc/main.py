@@ -7,7 +7,6 @@ from asyncio import (
     start_unix_server,
 )
 from contextlib import contextmanager
-from json import dump as json_dump
 from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
@@ -23,7 +22,7 @@ from PPpackage_utils.io import (
     stream_write_int,
     stream_write_string,
 )
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate, json_dump
 
 
 @contextmanager

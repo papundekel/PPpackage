@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from functools import partial
 from io import TextIOWrapper
-from json import dumps as json_dumps
 from pathlib import Path
 from random import choices as random_choices
 from sys import stderr
@@ -25,7 +24,12 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
+from PPpackage_utils.utils import (
+    MyException,
+    TemporaryPipe,
+    asubprocess_communicate,
+    json_dumps,
+)
 
 from .sub import install as PP_install
 

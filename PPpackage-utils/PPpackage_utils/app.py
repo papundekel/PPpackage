@@ -2,8 +2,6 @@ from asyncio import run as asyncio_run
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
-from json import dump as json_dump
-from json import load as json_load
 from pathlib import Path
 from sys import exit, stderr, stdin, stdout
 from typing import Any
@@ -14,6 +12,8 @@ from .utils import (
     MyException,
     Product,
     ensure_dir_exists,
+    json_dump,
+    json_load,
     parse_fetch_input,
     parse_resolve_input,
 )

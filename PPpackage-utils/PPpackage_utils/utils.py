@@ -3,12 +3,18 @@ from asyncio.subprocess import Process
 from collections.abc import Callable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager, contextmanager
 from json import JSONEncoder
+from json import dump as json_dump_base
+from json import dumps as json_dumps_base
+from json import load as json_load_base
+from json import loads as json_loads_base
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
 from typing import Any, AsyncIterator, Optional
+
+from frozendict import frozendict
 
 
 def ensure_dir_exists(path: Path) -> None:
@@ -21,13 +27,6 @@ def TemporaryDirectory(dir=None):
         dir_path = Path(dir_path_string)
 
         yield dir_path
-
-
-class SetEncoder(JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, set):
-            return list(obj)
-        return JSONEncoder.default(self, obj)
 
 
 class MyException(Exception):
@@ -65,7 +64,7 @@ def check_dict_format(
     keys_permitted_unequired: Set[str],
     error_message: str,
 ) -> Mapping[str, Any]:
-    if type(input) is not dict:
+    if type(input) is not frozendict:
         raise MyException(error_message)
 
     keys = input.keys()
@@ -82,7 +81,7 @@ def check_dict_format(
 
 
 def check_lockfile(input: Any) -> Mapping[str, str]:
-    if type(input) is not dict:
+    if type(input) is not frozendict:
         raise MyException("Invalid lockfile format: not a dict.")
 
     for package_input, version_input in input.items():
@@ -158,7 +157,7 @@ def parse_fetch_input(
 
 
 def check_products_simple(input: Any) -> Mapping[str, Mapping[str, str]]:
-    if type(input) is not dict:
+    if type(input) is not frozendict:
         raise MyException("Invalid products format")
 
     for package, version_info in input.items():
@@ -297,3 +296,30 @@ def noop(*args, **kwargs):
 
 async def anoop(*args, **kwargs):
     pass
+
+
+def json_hook(d: dict[str, Any]) -> Mapping[str, Any]:
+    return frozendict(d)
+
+
+def json_loads(input: str) -> Any:
+    return json_loads_base(input, object_hook=json_hook)
+
+
+def json_load(fp) -> Any:
+    return json_load_base(fp, object_hook=json_hook)
+
+
+class SetEncoder(JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, set):
+            return list(obj)
+        return JSONEncoder.default(self, obj)
+
+
+def json_dump(obj, fp, **kwargs) -> None:
+    json_dump_base(obj, fp, cls=SetEncoder, **kwargs)
+
+
+def json_dumps(obj, **kwargs) -> str:
+    return json_dumps_base(obj, cls=SetEncoder, **kwargs)

@@ -1,8 +1,7 @@
 from collections.abc import Callable, Mapping
-from json import dump as json_dump
 from pathlib import Path
 
-from PPpackage_utils.utils import ensure_dir_exists
+from PPpackage_utils.utils import ensure_dir_exists, json_dump
 
 from .utils import GraphInfo
 

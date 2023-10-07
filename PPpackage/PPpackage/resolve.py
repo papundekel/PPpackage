@@ -3,13 +3,11 @@ from asyncio.subprocess import PIPE
 from collections.abc import Iterable, Mapping
 from functools import partial
 from itertools import product as itertools_product
-from json import dumps as json_dumps
-from json import loads as json_loads
 from pathlib import Path
 from sys import stderr
 from typing import Any
 
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
 
 from .sub import resolve as PP_resolve
 

@@ -2,6 +2,7 @@ from collections.abc import Iterable, Mapping, Set
 from typing import Any
 from typing import cast as typing_cast
 
+from frozendict import frozendict
 from PPpackage_utils.utils import MyException, check_dict_format
 
 from .utils import Options, Requirement
@@ -46,7 +47,7 @@ def check_options(input: Any) -> Options:
     )
 
     for category_input, assignments_input in input_checked.items():
-        if type(assignments_input) is not dict:
+        if type(assignments_input) is not frozendict:
             raise MyException(
                 f"Invalid input format. options[{category_input}] not a dict."
             )

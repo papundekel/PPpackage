@@ -1,11 +1,12 @@
 from collections.abc import Iterable, Mapping, Set
 from typing import Any
 
+from frozendict import frozendict
 from PPpackage_utils.utils import MyException, check_dict_format, parse_generators
 
 
 def check_meta_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
-    if type(input) is not dict:
+    if type(input) is not frozendict:
         raise MyException("Invalid requirements format.")
 
     for manager, requirements in input.items():
@@ -30,7 +31,7 @@ def parse_meta_requirements(input: Any) -> Mapping[str, Set[Any]]:
 
 
 def check_meta_options(meta_options: Any) -> Mapping[str, Mapping[str, Any]]:
-    if type(meta_options) is not dict:
+    if type(meta_options) is not frozendict:
         raise MyException("Invalid meta options format.")
 
     for manager, options in meta_options.items():
@@ -38,7 +39,7 @@ def check_meta_options(meta_options: Any) -> Mapping[str, Mapping[str, Any]]:
             raise MyException("Invalid options format.")
 
         # TODO: rethink
-        if type(options) is not dict:
+        if type(options) is not frozendict:
             raise MyException("Invalid options format.")
 
     return meta_options
