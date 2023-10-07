@@ -16,7 +16,6 @@ from json import loads as json_loads
 from os import environ
 from pathlib import Path
 from shutil import copytree, rmtree
-from sys import stderr
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, NotRequired, Optional, TypedDict
 from typing import cast as typing_cast
@@ -536,7 +535,7 @@ async def install(
 def main():
     data_path, deployer_path = get_package_paths()
 
-    init(
+    app = init(
         update_database,
         submanagers,
         lambda cache_path, requirements, options: resolve(
@@ -557,4 +556,4 @@ def main():
         parse_lockfile_simple,
         parse_products_simple,
     )
-    run("conan")
+    run(app, "conan")

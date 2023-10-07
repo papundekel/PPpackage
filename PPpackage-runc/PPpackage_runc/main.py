@@ -1,17 +1,22 @@
-from asyncio import StreamReader, StreamWriter, create_subprocess_exec, get_running_loop
-from asyncio import run as asyncio_run
-from asyncio import start_unix_server
+from asyncio import (
+    CancelledError,
+    StreamReader,
+    StreamWriter,
+    create_subprocess_exec,
+    get_running_loop,
+    start_unix_server,
+)
+from asyncore import loop
 from contextlib import contextmanager
 from json import dump as json_dump
 from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
+from signal import SIGTERM
 from subprocess import DEVNULL
 from sys import stderr
 
-from daemon import DaemonContext
-from daemon.pidfile import PIDLockFile
-from lockfile import AlreadyLocked
+from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (
     stream_read_line,
     stream_read_relative_path,
@@ -21,7 +26,6 @@ from PPpackage_utils.io import (
     stream_write_string,
 )
 from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
-from typer import Exit, Typer
 
 
 @contextmanager
@@ -155,55 +159,52 @@ async def run_server(
     containers_path: Path,
     bundle_path: Path,
     socket_path: Path,
+    root_path: Path,
 ):
-    with TemporaryDirectory() as root_path:
-        try:
-            async with await start_unix_server(
-                lambda reader, writer: handle_connection(
-                    debug, reader, writer, containers_path, bundle_path, root_path
-                ),
-                socket_path,
-            ) as server:
-                await server.start_serving()
-                await get_running_loop().create_future()
-        finally:
-            socket_path.unlink()
+    try:
+        async with await start_unix_server(
+            lambda reader, writer: handle_connection(
+                debug, reader, writer, containers_path, bundle_path, root_path
+            ),
+            socket_path,
+        ) as server:
+            await server.start_serving()
+
+            loop = get_running_loop()
+
+            future = loop.create_future()
+
+            loop.add_signal_handler(SIGTERM, lambda: future.cancel())
+
+            await future
+    except CancelledError:
+        pass
+    finally:
+        socket_path.unlink()
 
 
-async def daemon(
-    debug: bool, socket_path: Path, containers_path: Path, bundle_path: Path
-):
-    containers_path.mkdir(exist_ok=True)
-    bundle_path.mkdir(exist_ok=True)
-
-    await create_config(debug, bundle_path)
-
-    await run_server(debug, containers_path, bundle_path, socket_path)
-
-
-app = Typer()
+app = AsyncTyper()
 
 
 @app.command()
-def main_command(daemon_path: Path, debug: bool = False):
+async def main_command(daemon_path: Path, debug: bool = False):
     daemon_path = daemon_path.absolute()
 
     run_path = daemon_path / "run"
     socket_path = run_path / "PPpackage-runc.sock"
-    pidfile_path = run_path / "PPpackage-runc.pid"
 
     containers_path = daemon_path / "containers"
 
     bundle_path = daemon_path / "bundle"
 
-    pidfile = PIDLockFile(pidfile_path)
-    try:
-        with DaemonContext(pidfile=pidfile, stderr=stderr):
-            asyncio_run(daemon(debug, socket_path, containers_path, bundle_path))
-    except AlreadyLocked:
-        print(f"Daemon already running. PID file: {pidfile_path}", file=stderr)
-        raise Exit(1)
+    containers_path.mkdir(exist_ok=True)
+    bundle_path.mkdir(exist_ok=True)
+
+    await create_config(debug, bundle_path)
+
+    with TemporaryDirectory() as root_path:
+        await run_server(debug, containers_path, bundle_path, socket_path, root_path)
 
 
 def main():
-    app()
+    run(app, "PPpackage-runc")

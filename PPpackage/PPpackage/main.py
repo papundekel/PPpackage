@@ -21,7 +21,7 @@ from random import choices as random_choices
 from sys import stderr, stdin
 from typing import Any
 
-from PPpackage_utils.app import AsyncTyper
+from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (
     pipe_read_line,
     pipe_read_string,
@@ -685,9 +685,4 @@ async def main_command(
 
 
 def main():
-    try:
-        app()
-    except* MyException as eg:
-        for e in eg.exceptions:
-            print(f"PPpackage: {e}", file=stderr)
-        exit(1)
+    run(app, "PPpackage")
