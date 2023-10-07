@@ -21,10 +21,11 @@ def check_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
 def parse_requirements(input: Any) -> Mapping[str, Set[Any]]:
     input_checked = check_requirements(input)
 
-    requirements = input_checked
+    manager_requirements = input_checked
 
     return {
-        manager: set(requirements) for manager, requirements in requirements.items()
+        manager: set(requirements)
+        for manager, requirements in manager_requirements.items()
     }
 
 

@@ -81,7 +81,7 @@ def check_dict_format(
     return input
 
 
-def check_lockfile_simple(input: Any) -> Mapping[str, str]:
+def check_lockfile(input: Any) -> Mapping[str, str]:
     if type(input) is not dict:
         raise MyException("Invalid lockfile format: not a dict.")
 
@@ -99,8 +99,8 @@ def check_lockfile_simple(input: Any) -> Mapping[str, str]:
     return input
 
 
-def parse_lockfile_simple(input: Any) -> Mapping[str, str]:
-    input_checked = check_lockfile_simple(input)
+def parse_lockfile(input: Any) -> Mapping[str, str]:
+    input_checked = check_lockfile(input)
 
     lockfile = input_checked
 
@@ -188,7 +188,7 @@ class Product:
         self.product_id = product_id
 
 
-def parse_products_simple(input: Any) -> Set[Product]:
+def parse_products(input: Any) -> Set[Product]:
     input_checked = check_products_simple(input)
 
     return {
