@@ -1,9 +1,9 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
-from collections.abc import Callable, Iterable, Mapping, MutableMapping, Set
+from collections.abc import Callable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager, contextmanager
 from json import JSONEncoder
-from os import environ, kill
+from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
@@ -124,10 +124,10 @@ def parse_generators(input: Any) -> Set[str]:
 
 
 def parse_resolve_input(
-    requirements_parser: Callable[[Any], Iterable[Any]],
+    requirements_parser: Callable[[Any], Set[Any]],
     options_parser: Callable[[Any], Any],
     input: Any,
-) -> tuple[Iterable[Any], Any]:
+) -> tuple[Set[Any], Any]:
     input_checked = check_dict_format(
         input, {"requirements", "options"}, set(), "Invalid resolve input format."
     )
@@ -279,3 +279,21 @@ def communicate_from_sub(pipe_from_sub_path):
             yield pipe_from_sub
         finally:
             pipe_from_sub.write("END\n")
+
+
+@contextmanager
+def TemporaryPipe(dir=None):
+    with TemporaryDirectory(dir) as dir_path:
+        pipe_path = dir_path / "pipe"
+
+        mkfifo(pipe_path)
+
+        yield pipe_path
+
+
+def noop(*args, **kwargs):
+    pass
+
+
+async def anoop(*args, **kwargs):
+    pass

@@ -6,7 +6,6 @@ from asyncio import (
     get_running_loop,
     start_unix_server,
 )
-from asyncore import loop
 from contextlib import contextmanager
 from json import dump as json_dump
 from json import load as json_load
@@ -14,7 +13,6 @@ from os import getgid, getuid
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL
-from sys import stderr
 
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (

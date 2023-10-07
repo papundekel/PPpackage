@@ -55,15 +55,13 @@ def callback(debug: bool = False) -> None:
 
 def init(
     database_updater: Callable[[Path], Awaitable[None]],
-    resolver: Callable[
-        [Path, Iterable[Any], Any], Awaitable[Iterable[Mapping[str, str]]]
-    ],
+    resolver: Callable[[Path, Set[Any], Any], Awaitable[Iterable[Mapping[str, str]]]],
     fetcher: Callable[
         [Path, Mapping[str, str], Any, Set[str], Path],
         Awaitable[Mapping[str, str]],
     ],
     installer: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
-    requirements_parser: Callable[[Any], Iterable[Any]],
+    requirements_parser: Callable[[Any], Set[Any]],
     options_parser: Callable[[Any], Any],
     lockfile_parser: Callable[[Any], Mapping[str, str]],
     products_parser: Callable[[Any], Set[Product]],
