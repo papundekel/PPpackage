@@ -98,35 +98,33 @@ async def fetch_manager(
 async def fetch(
     debug: bool,
     cache_path: Path,
-    manager_versions_dict: Mapping[str, Mapping[str, str]],
-    manager_options_dict: Mapping[str, Any],
+    meta_versions: Mapping[str, Mapping[str, str]],
+    meta_options: Mapping[str, Any],
     generators: Iterable[str],
     generators_path: Path,
 ) -> Mapping[str, Mapping[str, str]]:
     async with TaskGroup() as group:
-        manager_product_ids_tasks = {
+        meta_product_ids_tasks = {
             manager: group.create_task(
                 fetch_manager(
                     debug,
                     manager,
                     cache_path,
                     versions,
-                    manager_options_dict.get(manager),
+                    meta_options.get(manager),
                     generators,
                     generators_path,
                 )
             )
-            for manager, versions in manager_versions_dict.items()
+            for manager, versions in meta_versions.items()
         }
 
-    mananager_product_ids = {
+    meta_product_ids = {
         manager: product_ids_task.result()
-        for manager, product_ids_task in manager_product_ids_tasks.items()
+        for manager, product_ids_task in meta_product_ids_tasks.items()
     }
 
     for generator in generators & builtin_generators.keys():
-        builtin_generators[generator](
-            generators_path, manager_versions_dict, mananager_product_ids
-        )
+        builtin_generators[generator](generators_path, meta_versions, meta_product_ids)
 
-    return mananager_product_ids
+    return meta_product_ids

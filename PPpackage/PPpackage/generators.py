@@ -7,17 +7,17 @@ from PPpackage_utils.utils import ensure_dir_exists
 
 def versions(
     generators_path: Path,
-    manager_versions_dict: Mapping[str, Mapping[str, str]],
-    manager_product_ids: Mapping[str, Mapping[str, str]],
+    meta_versions: Mapping[str, Mapping[str, str]],
+    meta_product_ids: Mapping[str, Mapping[str, str]],
 ) -> None:
     versions_path = generators_path / "versions"
 
-    for manager, versions in manager_versions_dict.items():
+    for manager, versions in meta_versions.items():
         manager_path = versions_path / manager
 
         ensure_dir_exists(manager_path)
 
-        product_ids = manager_product_ids[manager]
+        product_ids = meta_product_ids[manager]
 
         for package, version in versions.items():
             product_id = product_ids[package]

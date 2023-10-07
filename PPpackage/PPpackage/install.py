@@ -228,8 +228,8 @@ async def install(
     daemon_socket_path: Path,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    manager_versions_dict: Mapping[str, Mapping[str, str]],
-    manager_product_ids_dict: Mapping[str, Mapping[str, str]],
+    meta_versions: Mapping[str, Mapping[str, str]],
+    meta_product_ids: Mapping[str, Mapping[str, str]],
 ) -> None:
     generate_machine_id(
         daemon_workdir_path / destination_relative_path / machine_id_relative_path
@@ -243,8 +243,8 @@ async def install(
     ):
         stream_write_string(daemon_writer, machine_id)
 
-        for manager, versions in manager_versions_dict.items():
-            product_ids = manager_product_ids_dict[manager]
+        for manager, versions in meta_versions.items():
+            product_ids = meta_product_ids[manager]
 
             await install_manager(
                 debug,

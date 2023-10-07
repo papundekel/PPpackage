@@ -86,34 +86,34 @@ async def resolve_manager(
 async def resolve(
     debug: bool,
     cache_path: Path,
-    manager_requirements: Mapping[str, Iterable[Any]],
-    manager_options_dict: Mapping[str, Any],
+    meta_requirements: Mapping[str, Iterable[Any]],
+    meta_options: Mapping[str, Any],
 ) -> Mapping[str, Mapping[str, str]]:
     async with TaskGroup() as group:
-        manager_lockfiles_tasks = {
+        meta_lockfiles_tasks = {
             manager: group.create_task(
                 resolve_manager(
                     debug,
                     manager,
                     cache_path,
                     requirements,
-                    manager_options_dict.get(manager),
+                    meta_options.get(manager),
                 )
             )
-            for manager, requirements in manager_requirements.items()
+            for manager, requirements in meta_requirements.items()
         }
 
-    lockfiles = [
+    meta_lockfiles = [
         {manager: lockfile for manager, lockfile in i}
         for i in itertools_product(
             *[
                 [(manager, lockfile) for lockfile in lockfiles_task.result()]
-                for manager, lockfiles_task in manager_lockfiles_tasks.items()
+                for manager, lockfiles_task in meta_lockfiles_tasks.items()
             ]
         )
     ]
 
     # here is where the model is chosen
-    lockfile = lockfiles[0]
+    meta_lockfile = meta_lockfiles[0]
 
-    return lockfile
+    return meta_lockfile
