@@ -279,7 +279,7 @@ async def install(
 
 
 def main():
-    init(
+    app = init(
         update_database,
         submanagers,
         resolve,
@@ -290,4 +290,4 @@ def main():
         parse_lockfile_simple,
         parse_products_simple,
     )
-    run("arch")
+    run(app, "arch")

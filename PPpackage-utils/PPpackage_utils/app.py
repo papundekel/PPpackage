@@ -42,15 +42,15 @@ class AsyncTyper(Typer):
         return partial(self.maybe_run_async, decorator)
 
 
-_debug = False
+__debug = False
 
-app = AsyncTyper()
+__app = AsyncTyper()
 
 
-@app.callback()
+@__app.callback()
 def callback(debug: bool = False) -> None:
-    global _debug
-    _debug = debug
+    global __debug
+    __debug = debug
 
 
 def init(
@@ -68,18 +68,18 @@ def init(
     options_parser: Callable[[Any], Any],
     lockfile_parser: Callable[[Any], Mapping[str, str]],
     products_parser: Callable[[Any], Set[Product]],
-) -> None:
-    @app.command("update-database")
+) -> Typer:
+    @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
         await database_updater(cache_path)
 
-    @app.command()
+    @__app.command()
     async def submanagers() -> None:
         submanagers = await submanagers_handler()
 
         json_dump(submanagers, stdout)
 
-    @app.command()
+    @__app.command()
     async def resolve(cache_path: Path) -> None:
         input = json_load(stdin)
 
@@ -89,11 +89,11 @@ def init(
 
         lockfiles = await resolver(cache_path, requirements, options)
 
-        indent = 4 if _debug else None
+        indent = 4 if __debug else None
 
         json_dump(lockfiles, stdout, indent=indent)
 
-    @app.command()
+    @__app.command()
     async def fetch(cache_path: Path, generators_path: Path) -> None:
         input = json_load(stdin)
 
@@ -105,11 +105,11 @@ def init(
             cache_path, lockfile, options, generators, generators_path
         )
 
-        indent = 4 if _debug else None
+        indent = 4 if __debug else None
 
         json_dump(product_ids, stdout, indent=indent)
 
-    @app.command()
+    @__app.command()
     async def install(
         cache_path: Path,
         destination_path: Path,
@@ -126,11 +126,13 @@ def init(
             cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
         )
 
+    return __app
 
-def run(manager_id: str) -> None:
+
+def run(app: Typer, program_name: str) -> None:
     try:
         app()
     except* MyException as eg:
         for e in eg.exceptions:
-            print(f"{manager_id}: {e}", file=stderr)
+            print(f"{program_name}: {e}", file=stderr)
         exit(1)
