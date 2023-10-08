@@ -18,18 +18,14 @@ runc_path="$tmp_path/PPpackage-runc"
 
 mkdir -p "$cache_path" "$generators_path" "$runc_path/run" "$runc_path/containers" && \
 \
-machine_id="$(./run-$mode-machine-id.sh)" && \
+machine_id="$(./"run-$mode-machine-id.sh")" && \
 machine_id_length="$(printf "$machine_id" | wc --bytes)" && \
 \
-runc_id="$(./run-$mode-runc.sh "$runc_path" "$debug")" && \
+runc_id="$(./"run-$mode-runc.sh" "$runc_path" "$debug")" && \
 \
 sleep 1 && \
 \
-echo "$cache_path" "$generators_path" "$machine_id_length" "$machine_id" "$runc_id" && \
-\
 container_relative_path="$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$tmp/PPpackage-runc/run/PPpackage-runc.sock" | tail --lines 1)" && \
-\
-echo "$container_relative_path" && \
 \
 ./"run-$mode-PPpackage.sh" "$cache_path" "$generators_path" "$runc_path" "$container_relative_path" "$debug" && \
 \
