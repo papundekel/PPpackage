@@ -1,4 +1,4 @@
-FROM greyltc/archlinux-aur:paru
+FROM greyltc/archlinux-aur:paru-20231001.0.289
 
 RUN mkdir -p /workdir
 WORKDIR /workdir
