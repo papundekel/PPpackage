@@ -12,7 +12,9 @@ from os import getgid, getuid
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL
+from sys import stderr
 
+from pid import PidFile, PidFileAlreadyLockedError
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (
     stream_read_line,
@@ -22,12 +24,8 @@ from PPpackage_utils.io import (
     stream_write_int,
     stream_write_string,
 )
-from PPpackage_utils.utils import (
-    MyException,
-    TemporaryDirectory,
-    asubprocess_communicate,
-    json_dump,
-)
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate, json_dump
+from typer import Exit
 
 
 @contextmanager
@@ -58,7 +56,7 @@ async def handle_command(
     container_path: Path,
     bundle_path: Path,
     root_path: Path,
-) -> None:
+) -> bool:
     if not container_path.exists():
         return False
 
@@ -210,19 +208,26 @@ async def main_command(daemon_path: Path, debug: bool = False):
     daemon_path = daemon_path.absolute()
 
     run_path = daemon_path / "run"
+
     socket_path = run_path / "PPpackage-runc.sock"
 
     containers_path = daemon_path / "containers"
-
     bundle_path = daemon_path / "bundle"
 
-    containers_path.mkdir(exist_ok=True)
-    bundle_path.mkdir(exist_ok=True)
+    try:
+        with PidFile("PPpackage-runc", piddir=run_path):
+            containers_path.mkdir(exist_ok=True)
+            bundle_path.mkdir(exist_ok=True)
 
-    await create_config(debug, bundle_path)
+            await create_config(debug, bundle_path)
 
-    with TemporaryDirectory() as root_path:
-        await run_server(debug, containers_path, bundle_path, socket_path, root_path)
+            with TemporaryDirectory() as root_path:
+                await run_server(
+                    debug, containers_path, bundle_path, socket_path, root_path
+                )
+    except PidFileAlreadyLockedError:
+        print("PPpackage-runc is already running.", file=stderr)
+        raise Exit(1)
 
 
 def main():
