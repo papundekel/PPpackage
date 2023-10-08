@@ -1,6 +1,9 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 from typing import Any
+
+from frozendict import frozendict
+from PPpackage_utils.parse import Lockfile
 
 
 async def update_database(debug: bool, cache_path: Path) -> None:
@@ -10,12 +13,12 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements: Iterable[Any],
+    requirements: Set[Any],
     options: Mapping[str, Any] | None,
-) -> Iterable[Any]:
-    lockfile = {name: "1.0.0" for name in set(requirements)}
+) -> tuple[Set[Lockfile], Mapping[str, Any]]:
+    lockfile = frozendict({name: "1.0.0" for name in set(requirements)})
 
-    return [lockfile]
+    return {lockfile}, {"arch": {"ninja"}}
 
 
 async def fetch(

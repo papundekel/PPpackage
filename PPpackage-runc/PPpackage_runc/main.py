@@ -6,15 +6,12 @@ from asyncio import (
     get_running_loop,
     start_unix_server,
 )
-from asyncore import loop
 from contextlib import contextmanager
-from json import dump as json_dump
 from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL
-from sys import stderr
 
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (
@@ -25,7 +22,12 @@ from PPpackage_utils.io import (
     stream_write_int,
     stream_write_string,
 )
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from PPpackage_utils.utils import (
+    MyException,
+    TemporaryDirectory,
+    asubprocess_communicate,
+    json_dump,
+)
 
 
 @contextmanager
@@ -58,18 +60,22 @@ async def handle_command(
     root_path: Path,
 ) -> None:
     if not container_path.exists():
-        return
+        return False
 
-    image_path = container_path / await stream_read_relative_path(reader)
+    image_path = container_path / await stream_read_relative_path(
+        debug, "PPpackage-runc", reader
+    )
 
-    command = await stream_read_string(reader)
-    args = [arg async for arg in stream_read_strings(reader)]
+    command = await stream_read_string(debug, "PPpackage-runc", reader)
+    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runc", reader)]
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
-    pipe_path = container_path / await stream_read_relative_path(reader)
+    pipe_path = container_path / await stream_read_relative_path(
+        debug, "PPpackage-runc", reader
+    )
 
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
@@ -87,10 +93,13 @@ async def handle_command(
 
         return_code = await process.wait()
 
-    stream_write_int(writer, return_code)
+    stream_write_int(debug, "PPpackage-runc", writer, return_code)
+
+    return True
 
 
 async def handle_init(
+    debug,
     reader: StreamReader,
     writer: StreamWriter,
     containers_path: Path,
@@ -98,7 +107,12 @@ async def handle_init(
 ):
     container_path.mkdir(exist_ok=True)
 
-    stream_write_string(writer, str(container_path.relative_to(containers_path)))
+    stream_write_string(
+        debug,
+        "PPpackage-runc",
+        writer,
+        str(container_path.relative_to(containers_path)),
+    )
 
 
 async def handle_connection(
@@ -109,20 +123,25 @@ async def handle_connection(
     bundle_path: Path,
     root_path: Path,
 ):
-    container_id = await stream_read_string(reader)
+    container_id = await stream_read_string(debug, "PPpackage-runc", reader)
     container_path = containers_path / container_id
 
     while True:
-        request = await stream_read_line(reader)
+        request = await stream_read_line(debug, "PPpackage-runc", reader)
+
+        if reader.at_eof():
+            break
 
         if request == "END":
             break
         elif request == "INIT":
-            await handle_init(reader, writer, containers_path, container_path)
+            await handle_init(debug, reader, writer, containers_path, container_path)
         elif request == "COMMAND":
-            await handle_command(
+            result = await handle_command(
                 debug, reader, writer, container_path, bundle_path, root_path
             )
+            if not result:
+                break
 
         await writer.drain()
 

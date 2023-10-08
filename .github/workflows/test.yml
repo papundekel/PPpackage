@@ -14,7 +14,6 @@ jobs:
       with:
         path: ${{ github.workspace }}/tmp/cache
         key: package-cache
-        # restore-keys: package-cache-
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3.0.0
@@ -48,7 +47,7 @@ jobs:
         cache-to: type=registry,ref=fackop/pppackage-runc:buildcache,mode=max
 
     - name: Try run.sh
-      run: ./run.sh tmp/ <tmp/input/input-basic.json
+      run: ./run.sh docker tmp/ --debug <tmp/input/input-basic.json
 
     - name: See if ldconfig ran
       run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
