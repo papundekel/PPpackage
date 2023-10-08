@@ -1,9 +1,12 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Generator, Iterable, Mapping, Set
+from collections.abc import Generator, Mapping, Set
 from pathlib import Path
 from re import compile as re_compile
+from typing import Any
 
+from frozendict import frozendict
+from PPpackage_utils.parse import Lockfile
 from PPpackage_utils.utils import MyException, asubprocess_communicate
 
 from .utils import get_cache_paths
@@ -42,7 +45,7 @@ def resolve_requirement_parse(stdout: bytes) -> Generator[str, None, None]:
 
 async def resolve(
     cache_path: Path, requirements: Set[str], options: None
-) -> Iterable[Mapping[str, str]]:
+) -> tuple[Set[Lockfile], Mapping[str, None]]:
     database_path, _ = get_cache_paths(cache_path)
 
     async with TaskGroup() as group:
@@ -70,10 +73,14 @@ async def resolve(
 
     stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
 
-    lockfile = {
-        (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]
-        for line in stdout.decode("ascii").splitlines()
-        if not line.startswith(" ")
-    }
+    lockfile = frozendict(
+        {
+            (split_line := line.split())[0]
+            .split("/")[-1]: split_line[1]
+            .rsplit("-", 1)[0]
+            for line in stdout.decode("ascii").splitlines()
+            if not line.startswith(" ")
+        }
+    )
 
-    return [lockfile]
+    return {lockfile}, {}

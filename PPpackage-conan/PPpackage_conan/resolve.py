@@ -1,14 +1,23 @@
-from asyncio import create_subprocess_exec
+from asyncio import Lock, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+    Set,
+)
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from typing import cast as typing_cast
 
+from frozendict import frozendict
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
+from PPpackage_utils.parse import Lockfile
 from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists
 
 from .utils import (
@@ -91,14 +100,18 @@ def create_requirement_partitions(
     return requirement_partitions
 
 
-def parse_conan_graph_resolve(graph_string: str) -> Mapping[str, str]:
+def parse_conan_graph_resolve(graph_string: str) -> Lockfile:
     nodes = parse_conan_graph_nodes(graph_string)
 
-    return {
-        (package_and_version := node["ref"].split("/", 1))[0]: package_and_version[1]
-        for node in nodes
-        if node["user"] != "pppackage"
-    }
+    return frozendict(
+        {
+            (package_and_version := node["ref"].split("/", 1))[0]: package_and_version[
+                1
+            ]
+            for node in nodes
+            if node["user"] != "pppackage"
+        }
+    )
 
 
 async def get_lockfile(
@@ -108,7 +121,7 @@ async def get_lockfile(
     build_profile_path: Path,
     requirement_partitions: Sequence[Mapping[str, str]],
     options: Options,
-) -> Mapping[str, str]:
+) -> Lockfile:
     with (
         create_and_render_temp_file(
             root_template,
@@ -150,7 +163,7 @@ async def resolve(
     cache_path: Path,
     requirements: Iterable[Requirement],
     options: Options,
-) -> Iterable[Mapping[str, str]]:
+) -> tuple[Set[Lockfile], Mapping[str, Any]]:
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -184,4 +197,4 @@ async def resolve(
 
     await remove_leaves_from_cache(environment)
 
-    return [lockfile]
+    return {lockfile}, {}

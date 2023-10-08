@@ -3,17 +3,18 @@ from typing import Any
 from typing import cast as typing_cast
 
 from frozendict import frozendict
-from PPpackage_utils.utils import MyException, check_dict_format
+from PPpackage_utils.utils import MyException, json_check_format
 
 from .utils import Options, Requirement
 
 
-def check_requirements(input: Any) -> Iterable[Mapping[str, str]]:
+def check_requirements(debug: bool, input: Any) -> Iterable[Mapping[str, str]]:
     if type(input) is not list:
         raise MyException("Invalid requirements format.")
 
     for requirement_input in input:
-        check_dict_format(
+        json_check_format(
+            debug,
             requirement_input,
             {"package", "version"},
             set(),
@@ -29,8 +30,8 @@ def check_requirements(input: Any) -> Iterable[Mapping[str, str]]:
     return input
 
 
-def parse_requirements(input: Any) -> Set[Requirement]:
-    input_checked = check_requirements(input)
+def parse_requirements(debug: bool, input: Any) -> Set[Requirement]:
+    input_checked = check_requirements(debug, input)
 
     return {
         Requirement(requirement_input["package"], requirement_input["version"])
@@ -38,11 +39,11 @@ def parse_requirements(input: Any) -> Set[Requirement]:
     }
 
 
-def check_options(input: Any) -> Options:
+def check_options(debug: bool, input: Any) -> Options:
     input_checked = typing_cast(
         Options,
-        check_dict_format(
-            input, set(), {"settings", "options"}, "Invalid input format."
+        json_check_format(
+            debug, input, set(), {"settings", "options"}, "Invalid input format."
         ),
     )
 
@@ -59,8 +60,8 @@ def check_options(input: Any) -> Options:
     return input_checked
 
 
-def parse_options(input: Any) -> Options:
-    input_checked = check_options(input)
+def parse_options(debug: bool, input: Any) -> Options:
+    input_checked = check_options(debug, input)
 
     options = input_checked
 

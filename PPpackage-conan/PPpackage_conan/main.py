@@ -1,5 +1,6 @@
 from PPpackage_utils.app import init, run
-from PPpackage_utils.utils import anoop, parse_lockfile, parse_products
+from PPpackage_utils.parse import parse_lockfile
+from PPpackage_utils.utils import anoop, parse_products
 
 from .fetch import fetch
 from .install import install

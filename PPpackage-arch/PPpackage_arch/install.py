@@ -16,24 +16,6 @@ from PPpackage_utils.utils import (
 from .utils import get_cache_paths
 
 
-def hook_command(pipe_from_sub, command, *args):
-    pipe_from_sub.write("COMMAND\n")
-    pipe_write_string(pipe_from_sub, command)
-    for arg in args:
-        pipe_write_string(pipe_from_sub, arg)
-    pipe_from_sub.write("-1\n")
-    pipe_from_sub.flush()
-
-    pipe_hook_path = pipe_read_string(pipe_from_sub)
-
-    with open(pipe_hook_path, "w"):
-        pass
-
-    return_value = pipe_read_int(pipe_from_sub)
-
-    return return_value
-
-
 async def install(
     cache_path: Path,
     products: Set[Product],

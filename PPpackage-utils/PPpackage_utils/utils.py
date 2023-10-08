@@ -11,6 +11,7 @@ from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
+from sys import stderr
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
 from typing import Any, AsyncIterator, Optional
 
@@ -58,7 +59,8 @@ async def asubprocess_communicate(
     return stdout
 
 
-def check_dict_format(
+def json_check_format(
+    debug: bool,
     input: Any,
     keys_required: Set[str],
     keys_permitted_unequired: Set[str],
@@ -75,35 +77,12 @@ def check_dict_format(
     are_present_only_permitted = keys <= keys_permitted
 
     if not are_present_required or not are_present_only_permitted:
+        if debug:
+            print(input, file=stderr)
+
         raise MyException(error_message)
 
     return input
-
-
-def check_lockfile(input: Any) -> Mapping[str, str]:
-    if type(input) is not frozendict:
-        raise MyException("Invalid lockfile format: not a dict.")
-
-    for package_input, version_input in input.items():
-        if type(package_input) is not str:
-            raise MyException(
-                f"Invalid lockfile package format: `{package_input}` not a string."
-            )
-
-        if type(version_input) is not str:
-            raise MyException(
-                f"Invalid lockfile version format: `{version_input}` not a string."
-            )
-
-    return input
-
-
-def parse_lockfile(input: Any) -> Mapping[str, str]:
-    input_checked = check_lockfile(input)
-
-    lockfile = input_checked
-
-    return lockfile
 
 
 def parse_generators(input: Any) -> Set[str]:
@@ -123,40 +102,47 @@ def parse_generators(input: Any) -> Set[str]:
 
 
 def parse_resolve_input(
-    requirements_parser: Callable[[Any], Set[Any]],
-    options_parser: Callable[[Any], Any],
+    debug: bool,
+    requirements_parser: Callable[[bool, Any], Set[Any]],
+    options_parser: Callable[[bool, Any], Any],
     input: Any,
 ) -> tuple[Set[Any], Any]:
-    input_checked = check_dict_format(
-        input, {"requirements", "options"}, set(), "Invalid resolve input format."
+    input_checked = json_check_format(
+        debug,
+        input,
+        {"requirements", "options"},
+        set(),
+        "Invalid resolve input format.",
     )
 
-    requirements = requirements_parser(input_checked["requirements"])
-    options = options_parser(input_checked["options"])
+    requirements = requirements_parser(debug, input_checked["requirements"])
+    options = options_parser(debug, input_checked["options"])
 
     return requirements, options
 
 
 def parse_fetch_input(
-    lockfile_parser: Callable[[Any], Mapping[str, str]],
-    options_parser: Callable[[Any], Any],
+    debug: bool,
+    lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
+    options_parser: Callable[[bool, Any], Any],
     input: Any,
 ) -> tuple[Mapping[str, str], Any, Set[str]]:
-    input_checked = check_dict_format(
+    input_checked = json_check_format(
+        debug,
         input,
         {"lockfile", "options", "generators"},
         set(),
         "Invalid fetch input format.",
     )
 
-    lockfile = lockfile_parser(input_checked["lockfile"])
-    options = options_parser(input_checked["options"])
+    lockfile = lockfile_parser(debug, input_checked["lockfile"])
+    options = options_parser(debug, input_checked["options"])
     generators = parse_generators(input_checked["generators"])
 
     return lockfile, options, generators
 
 
-def check_products_simple(input: Any) -> Mapping[str, Mapping[str, str]]:
+def check_products_simple(debug: bool, input: Any) -> Mapping[str, Mapping[str, str]]:
     if type(input) is not frozendict:
         raise MyException("Invalid products format")
 
@@ -164,8 +150,12 @@ def check_products_simple(input: Any) -> Mapping[str, Mapping[str, str]]:
         if type(package) is not str:
             raise MyException("Invalid products format")
 
-        check_dict_format(
-            version_info, {"version", "product_id"}, set(), "Invalid products format"
+        json_check_format(
+            debug,
+            version_info,
+            {"version", "product_id"},
+            set(),
+            "Invalid products format",
         )
 
         version = version_info["version"]
@@ -187,8 +177,8 @@ class Product:
         self.product_id = product_id
 
 
-def parse_products(input: Any) -> Set[Product]:
-    input_checked = check_products_simple(input)
+def parse_products(debug: bool, input: Any) -> Set[Product]:
+    input_checked = check_products_simple(debug, input)
 
     return {
         Product(

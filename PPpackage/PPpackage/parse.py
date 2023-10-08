@@ -1,70 +1,107 @@
 from collections.abc import Iterable, Mapping, Set
+from sys import stderr
+from tabnanny import check
 from typing import Any
 
 from frozendict import frozendict
-from PPpackage_utils.utils import MyException, check_dict_format, parse_generators
+from PPpackage_utils.parse import Lockfile, parse_lockfile
+from PPpackage_utils.utils import MyException, json_check_format, parse_generators
 
 
-def check_meta_requirements(input: Any) -> Mapping[str, Iterable[Any]]:
-    if type(input) is not frozendict:
-        raise MyException("Invalid requirements format.")
+def check_meta_requirements(debug: bool, meta_requirements_json: Any) -> None:
+    if type(meta_requirements_json) is not frozendict:
+        raise MyException("Invalid requirements format. Should be a dictionary.")
 
-    for manager, requirements in input.items():
-        if type(manager) is not str:
-            raise MyException("Invalid requirements format.")
+    for requirements_json in meta_requirements_json.values():
+        if type(requirements_json) is not list:
+            if debug:
+                print(
+                    f"Got {requirements_json}.",
+                    file=stderr,
+                )
+            raise MyException(
+                "Invalid meta requirements format. Manager requirements should be a list."
+            )
 
-        if type(requirements) is not list:
-            raise MyException("Invalid requirements format.")
 
-    return input
+def parse_meta_requirements(
+    debug: bool, meta_requirements_json: Any
+) -> Mapping[str, Set[Any]]:
+    check_meta_requirements(debug, meta_requirements_json)
 
-
-def parse_meta_requirements(input: Any) -> Mapping[str, Set[Any]]:
-    input_checked = check_meta_requirements(input)
-
-    meta_requirements = input_checked
-
-    return {
+    meta_requirements = {
         manager: set(requirements)
-        for manager, requirements in meta_requirements.items()
+        for manager, requirements in meta_requirements_json.items()
     }
 
+    return meta_requirements
 
-def check_meta_options(meta_options: Any) -> Mapping[str, Mapping[str, Any]]:
-    if type(meta_options) is not frozendict:
+
+def check_meta_options(meta_options_json: Any) -> None:
+    if type(meta_options_json) is not frozendict:
         raise MyException("Invalid meta options format.")
 
-    for manager, options in meta_options.items():
-        if type(manager) is not str:
+    for options_json in meta_options_json.values():
+        # TODO: rethink
+        if type(options_json) is not frozendict:
             raise MyException("Invalid options format.")
 
-        # TODO: rethink
-        if type(options) is not frozendict:
-            raise MyException("Invalid options format.")
+
+def parse_meta_options(meta_options_json: Any) -> Mapping[str, Mapping[str, Any]]:
+    check_meta_options(meta_options_json)
+
+    meta_options = meta_options_json
 
     return meta_options
 
 
-def parse_meta_options(input: Any) -> Mapping[str, Mapping[str, Any]]:
-    input_checked = check_meta_options(input)
-
-    options = input_checked
-
-    return options
-
-
 def parse_input(
-    input: Any,
-) -> tuple[Mapping[str, Iterable[Any]], Mapping[str, Any], Set[str]]:
-    input_checked = check_dict_format(
-        input,
+    debug: bool,
+    input_json: Any,
+) -> tuple[Mapping[str, Set[Any]], Mapping[str, Any], Set[str]]:
+    json_check_format(
+        debug,
+        input_json,
         {"requirements", "options", "generators"},
         set(),
-        "Invalid input format.",
+        "Invalid input format. Should be a JSON object with keys 'requirements', 'options' and 'generators'.",
     )
 
-    meta_requirements = parse_meta_requirements(input_checked["requirements"])
-    meta_options = parse_meta_options(input_checked["options"])
-    generators = parse_generators(input_checked["generators"])
+    meta_requirements = parse_meta_requirements(debug, input_json["requirements"])
+    meta_options = parse_meta_options(input_json["options"])
+    generators = parse_generators(input_json["generators"])
 
     return meta_requirements, meta_options, generators
+
+
+def check_lockfile_choices(lockfiles_json: Any):
+    if type(lockfiles_json) is not list:
+        raise MyException("Invalid lockfiles format.")
+
+
+def parse_lockfile_choices(debug: bool, lockfiles_json: Any):
+    check_lockfile_choices(lockfiles_json)
+
+    lockfiles = {
+        parse_lockfile(debug, lockfile_json) for lockfile_json in lockfiles_json
+    }
+
+    return lockfiles
+
+
+def parse_resolve_response(
+    debug: bool,
+    response_json: Any,
+) -> tuple[Set[Lockfile], Mapping[str, Set[Any]]]:
+    json_check_format(
+        debug,
+        response_json,
+        {"lockfiles", "requirements"},
+        set(),
+        "Invalid input format. Should be a JSON object with keys 'lockfiles' and 'requirements'.",
+    )
+
+    lockfile_choices = parse_lockfile_choices(debug, response_json["lockfiles"])
+    new_requirements = parse_meta_requirements(debug, response_json["requirements"])
+
+    return lockfile_choices, new_requirements

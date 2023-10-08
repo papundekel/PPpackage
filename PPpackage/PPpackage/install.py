@@ -44,6 +44,7 @@ def merge_lockfiles(
 
 
 async def install_manager_command(
+    debug: bool,
     pipe_to_sub: TextIOWrapper,
     pipe_from_sub: TextIOWrapper,
     daemon_reader: StreamReader,
@@ -51,24 +52,33 @@ async def install_manager_command(
     daemon_workdir_path: Path,
     destination_relative_path: Path,
 ):
-    stream_write_line(daemon_writer, "COMMAND")
-    stream_write_string(daemon_writer, str(destination_relative_path))
-    stream_write_string(daemon_writer, pipe_read_string(pipe_from_sub))
-    stream_write_strings(daemon_writer, pipe_read_strings(pipe_from_sub))
+    stream_write_line(debug, "PPpackage", daemon_writer, "COMMAND")
+    stream_write_string(
+        debug, "PPpackage", daemon_writer, str(destination_relative_path)
+    )
+
+    command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
+    stream_write_string(debug, "PPpackage", daemon_writer, command)
+
+    args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
+    stream_write_strings(debug, "PPpackage", daemon_writer, args)
 
     with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
-        pipe_write_string(pipe_to_sub, str(pipe_hook_path))
+        pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
         pipe_to_sub.flush()
 
         stream_write_string(
-            daemon_writer, str(pipe_hook_path.relative_to(daemon_workdir_path))
+            debug,
+            "PPpackage",
+            daemon_writer,
+            str(pipe_hook_path.relative_to(daemon_workdir_path)),
         )
 
         await daemon_writer.drain()
 
-        return_value = await stream_read_int(daemon_reader)
+        return_value = await stream_read_int(debug, "PPpackage", daemon_reader)
 
-        pipe_write_int(pipe_to_sub, return_value)
+        pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()
 
 
@@ -124,15 +134,19 @@ async def install_external_manager(
         process.stdin.close()
         await process.stdin.wait_closed()
 
+        if debug:
+            print(f"DEBUG PPpackage: closed sub's stdin", file=stderr)
+
         with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
             with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
                 while True:
-                    header = pipe_read_line(pipe_from_sub)
+                    header = pipe_read_line(debug, "PPpackage", pipe_from_sub)
 
                     if header == "END":
                         break
                     elif header == "COMMAND":
                         await install_manager_command(
+                            debug,
                             pipe_to_sub,
                             pipe_from_sub,
                             daemon_reader,
@@ -207,6 +221,7 @@ def read_machine_id(machine_id_path: Path) -> str:
 
 @asynccontextmanager
 async def communicate_with_daemon(
+    debug: bool,
     daemon_path: Path,
 ):
     (
@@ -217,7 +232,7 @@ async def communicate_with_daemon(
     try:
         yield daemon_reader, daemon_writer
     finally:
-        stream_write_line(daemon_writer, "END")
+        stream_write_line(debug, "PPpackage", daemon_writer, "END")
         await daemon_writer.drain()
         daemon_writer.close()
         await daemon_writer.wait_closed()
@@ -241,11 +256,11 @@ async def install(
 
     machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-    async with communicate_with_daemon(daemon_socket_path) as (
+    async with communicate_with_daemon(debug, daemon_socket_path) as (
         daemon_reader,
         daemon_writer,
     ):
-        stream_write_string(daemon_writer, machine_id)
+        stream_write_string(debug, "PPpackage", daemon_writer, machine_id)
 
         for manager, versions in meta_versions.items():
             product_ids = meta_product_ids[manager]

@@ -15,7 +15,7 @@ def check_requirements(input: Any) -> list[str]:
     return input
 
 
-def parse_requirements(input: Any) -> Set[str]:
+def parse_requirements(debug: bool, input: Any) -> Set[str]:
     input_checked = check_requirements(input)
 
     requirements = input_checked
