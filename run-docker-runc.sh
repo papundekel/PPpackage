@@ -9,6 +9,6 @@ docker run \
     --name "$name" \
     --mount type=bind,source="$runc_path/run",destination="/workdir/PPpackage-runc/run" \
     --mount type=bind,source="$runc_path/containers",destination="/workdir/PPpackage-runc/containers" \
-    fackop/pppackage-runc PPpackage-runc PPpackage-runc/ $debug
+    fackop/pppackage-runc PPpackage-runc PPpackage-runc/ $debug > /dev/null
 
 echo "$name"
