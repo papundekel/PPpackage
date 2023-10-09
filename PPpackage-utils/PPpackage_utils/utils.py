@@ -1,19 +1,29 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
-from collections.abc import Callable, Mapping, MutableMapping, Set
+from collections import namedtuple
+from collections.abc import (
+    AsyncIterator,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Set,
+)
 from contextlib import asynccontextmanager, contextmanager
+from email.policy import default
 from json import JSONEncoder
 from json import dump as json_dump_base
 from json import dumps as json_dumps_base
 from json import load as json_load_base
 from json import loads as json_loads_base
+from numbers import Number
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from sys import stderr
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Any, AsyncIterator, Optional
+from typing import Any, Optional
 
 from frozendict import frozendict
 
@@ -78,9 +88,11 @@ def json_check_format(
 
     if not are_present_required or not are_present_only_permitted:
         if debug:
-            print(input, file=stderr)
+            print(f"json_check_format: {input}", file=stderr)
 
-        raise MyException(error_message)
+        raise MyException(
+            f"{error_message} Should be a JSON object with keys {keys_required} required and {keys_permitted_unequired} optional."
+        )
 
     return input
 
@@ -300,16 +312,40 @@ def json_load(fp) -> Any:
     return json_load_base(fp, object_hook=json_hook)
 
 
-class SetEncoder(JSONEncoder):
+def isinstance_namedtuple(obj) -> bool:
+    return (
+        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
+    )
+
+
+class CustomEncoder(JSONEncoder):
     def default(self, obj: Any) -> Any:
-        if isinstance(obj, set):
-            return list(obj)
-        return JSONEncoder.default(self, obj)
+        if isinstance(obj, str):
+            return obj
+        elif isinstance(obj, bool):
+            return obj
+        elif obj is None:
+            return obj
+        elif isinstance(obj, int):
+            return obj
+        elif isinstance(obj, float):
+            return obj
+        elif isinstance_namedtuple(obj):
+            return self.default(obj._asdict())
+        elif isinstance(obj, Mapping):
+            return {self.default(k): self.default(v) for k, v in obj.items()}
+        elif isinstance(obj, Iterable):
+            return [self.default(o) for o in obj]
+
+        super().default(obj)
 
 
 def json_dump(obj, fp, **kwargs) -> None:
-    json_dump_base(obj, fp, cls=SetEncoder, **kwargs)
+    json_dump_base(obj, fp, cls=CustomEncoder, **kwargs)
 
 
 def json_dumps(obj, **kwargs) -> str:
-    return json_dumps_base(obj, cls=SetEncoder, **kwargs)
+    return json_dumps_base(obj, cls=CustomEncoder, **kwargs)
+
+
+Resolution = namedtuple("Resolution", ["lockfile", "requirements"])

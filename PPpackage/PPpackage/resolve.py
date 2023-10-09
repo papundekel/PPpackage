@@ -1,5 +1,5 @@
 from ast import parse
-from asyncio import TaskGroup, create_subprocess_exec, taskgroups
+from asyncio import Lock, TaskGroup, create_subprocess_exec, taskgroups
 from asyncio.subprocess import PIPE
 from collections.abc import Iterable, Mapping, Set
 from functools import partial, reduce
@@ -8,17 +8,19 @@ from itertools import chain as itertools_chain
 from itertools import product as itertools_product
 from pathlib import Path
 from sys import stderr
-from typing import Any
+from typing import Any, Tuple
 
 from PPpackage_utils.parse import Lockfile
 from PPpackage_utils.utils import (
     MyException,
+    Resolution,
     asubprocess_communicate,
+    frozendict,
     json_dumps,
     json_loads,
 )
 
-from .parse import parse_resolve_response
+from .parse import parse_resolutions
 from .sub import resolve as PP_resolve
 
 
@@ -28,7 +30,7 @@ async def resolve_external_manager(
     cache_path: Path,
     requirements: Set[Any],
     options: Mapping[str, Any] | None,
-) -> tuple[Set[Lockfile], Mapping[str, Set[Any]]]:
+) -> Set[Resolution]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -55,23 +57,21 @@ async def resolve_external_manager(
 
     resolve_input_json_bytes = resolve_input_json.encode("ascii")
 
-    response_bytes = await asubprocess_communicate(
+    resolutions_bytes = await asubprocess_communicate(
         process,
         f"Error in {manager}'s resolve.",
         resolve_input_json_bytes,
     )
 
-    response_string = response_bytes.decode("ascii")
+    resolutions_string = resolutions_bytes.decode("ascii")
 
     if debug:
         print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
-        print(response_string, file=stderr)
+        print(resolutions_string, file=stderr)
 
-    lockfile_choices, new_requirements = parse_resolve_response(
-        debug, json_loads(response_string)
-    )
+    resolutions = parse_resolutions(debug, json_loads(resolutions_string))
 
-    return lockfile_choices, new_requirements
+    return resolutions
 
 
 async def resolve_manager(
@@ -80,45 +80,36 @@ async def resolve_manager(
     cache_path: Path,
     requirements: Set[Any],
     options: Mapping[str, Any] | None,
-) -> tuple[Set[Lockfile], Mapping[str, Set[Any]]]:
+) -> Set[Resolution]:
     if manager == "PP":
         resolver = PP_resolve
     else:
         resolver = partial(resolve_external_manager, manager=manager)
 
-    lockfile_choices, new_requirements = await resolver(
+    resolutions = await resolver(
         debug=debug, cache_path=cache_path, requirements=requirements, options=options
     )
 
-    return lockfile_choices, new_requirements
+    return resolutions
 
 
 def merge_meta_requirements(a, b):
     return {
-        manager: a.get(manager, set()) | b.get(manager, set())
+        manager: a.get(manager, frozenset()) | b.get(manager, frozenset())
         for manager in a.keys() | b.keys()
     }
 
 
-async def resolve(
+async def resolve_iteration(
     debug: bool,
-    iteration_limit: int,
     cache_path: Path,
-    meta_requirements: Mapping[str, Set[Any]],
+    meta_requirements_list: Iterable[Mapping[str, Set[Any]]],
     meta_options: Mapping[str, Any],
-) -> Mapping[str, Mapping[str, str]]:
-    iterations_done = 0
+) -> Tuple[Set[Mapping[str, Lockfile]], Set[Mapping[str, Set[Any]]]]:
+    lockfiles = set()
+    requirements = set()
 
-    while True:
-        if iterations_done >= iteration_limit:
-            raise MyException("Resolve iteration limit reached.")
-
-        if debug:
-            print(
-                f"DEBUG PPpackage: resolve iteration with requirements: {meta_requirements}",
-                file=stderr,
-            )
-
+    for meta_requirements in meta_requirements_list:
         async with TaskGroup() as group:
             meta_tasks = {
                 manager: group.create_task(
@@ -135,38 +126,80 @@ async def resolve(
 
         meta_results = {manager: task.result() for manager, task in meta_tasks.items()}
 
-        meta_new_meta_requirements = [
-            new_meta_requirements
-            for _, (_, new_meta_requirements) in meta_results.items()
+        manager_resolutions = [
+            {manager: resolution for manager, resolution in i}
+            for i in itertools_product(
+                *[
+                    [(manager, resolution) for resolution in resolutions]
+                    for manager, resolutions in meta_results.items()
+                ]
+            )
         ]
 
-        merged_meta_requirements = reduce(
-            merge_meta_requirements, meta_new_meta_requirements, meta_requirements
+        for manager_resolution in manager_resolutions:
+            meta_lockfile = {
+                manager: resolution.lockfile
+                for manager, resolution in manager_resolution.items()
+            }
+
+            new_meta_requirements = {
+                manager: resolution.requirements
+                for manager, resolution in manager_resolution.items()
+            }
+
+            merged_meta_requirements = reduce(
+                merge_meta_requirements,
+                new_meta_requirements.values(),
+                meta_requirements,
+            )
+
+            if merged_meta_requirements == meta_requirements:
+                lockfiles.add(frozendict(meta_lockfile))
+            else:
+                requirements.add(frozendict(merged_meta_requirements))
+
+    return lockfiles, requirements
+
+
+async def resolve(
+    debug: bool,
+    iteration_limit: int,
+    cache_path: Path,
+    meta_requirements: Mapping[str, Set[Any]],
+    meta_options: Mapping[str, Any],
+) -> Mapping[str, Lockfile]:
+    iterations_done = 0
+
+    meta_requirements_list = [meta_requirements]
+    choices_of_meta_lockfiles = set()
+
+    while len(meta_requirements_list) != 0:
+        if iterations_done >= iteration_limit:
+            raise MyException("Resolve iteration limit reached.")
+
+        if debug:
+            print(
+                f"DEBUG PPpackage: resolve iteration with requirements: {json_dumps(meta_requirements_list)}",
+                file=stderr,
+            )
+
+        lockfiles, meta_requirements_list = await resolve_iteration(
+            debug, cache_path, meta_requirements_list, meta_options
         )
 
-        meta_lockfile_choices = {
-            manager: lockfile_choices
-            for manager, (lockfile_choices, _) in meta_results.items()
-        }
-
-        if merged_meta_requirements == meta_requirements:
-            break
-
-        meta_requirements = merged_meta_requirements
+        choices_of_meta_lockfiles.update(lockfiles)
 
         iterations_done += 1
 
-    choices_of_meta_lockfiles = [
-        {manager: lockfile for manager, lockfile in i}
-        for i in itertools_product(
-            *[
-                [(manager, lockfile) for lockfile in lockfile_choices]
-                for manager, lockfile_choices in meta_lockfile_choices.items()
-            ]
+    if debug:
+        print(
+            f"DEBUG PPpackage: resolve choices of meta lockfiles:",
+            file=stderr,
         )
-    ]
+        for meta_lockfile in choices_of_meta_lockfiles:
+            print(f"DEBUG PPpackage: {json_dumps(meta_lockfile)}", file=stderr)
 
     # here is where the model is chosen
-    meta_lockfile = choices_of_meta_lockfiles[0]
+    meta_lockfile = next(x for x in choices_of_meta_lockfiles)
 
     return meta_lockfile

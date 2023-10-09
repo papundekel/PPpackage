@@ -1,7 +1,6 @@
 from typing import Any
 
-from frozendict import frozendict
-from PPpackage_utils.utils import MyException
+from PPpackage_utils.utils import MyException, frozendict
 
 Lockfile = frozendict[str, str]
 

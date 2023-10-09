@@ -12,8 +12,10 @@ from typer import Typer
 from .utils import (
     MyException,
     Product,
+    Resolution,
     ensure_dir_exists,
     json_dump,
+    json_dumps,
     json_load,
     parse_fetch_input,
     parse_resolve_input,
@@ -56,9 +58,7 @@ def callback(debug: bool = False) -> None:
 
 def init(
     database_updater: Callable[[Path], Awaitable[None]],
-    resolver: Callable[
-        [Path, Set[Any], Any], Awaitable[tuple[Set[Lockfile], Mapping[str, Any]]]
-    ],
+    resolver: Callable[[Path, Set[Any], Any], Awaitable[Set[Resolution]]],
     fetcher: Callable[
         [Path, Mapping[str, str], Any, Set[str], Path],
         Awaitable[Mapping[str, str]],
@@ -81,17 +81,17 @@ def init(
             __debug, requirements_parser, options_parser, input
         )
 
-        lockfile_choices, new_requirements = await resolver(
-            cache_path, requirements, options
-        )
+        resolutions = await resolver(cache_path, requirements, options)
+
+        if __debug:
+            print(
+                f"DEBUG: PPpackage-utils: resolver returned {json_dumps(resolutions)}",
+                file=stderr,
+            )
 
         indent = 4 if __debug else None
 
-        json_dump(
-            {"lockfiles": lockfile_choices, "requirements": new_requirements},
-            stdout,
-            indent=indent,
-        )
+        json_dump(resolutions, stdout, indent=indent)
 
     @__app.command()
     async def fetch(cache_path: Path, generators_path: Path) -> None:

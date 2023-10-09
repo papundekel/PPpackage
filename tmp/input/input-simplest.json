@@ -1,0 +1,11 @@
+{
+    "requirements": {
+        "arch": [
+            "iana-etc"
+        ]
+    },
+    "options": {},
+    "generators": [
+        "versions"
+    ]
+}
