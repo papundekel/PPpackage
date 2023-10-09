@@ -27,6 +27,6 @@ sleep 1 && \
 \
 container_relative_path="$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$tmp/PPpackage-runc/run/PPpackage-runc.sock" | tail --lines 1)" && \
 \
-./"run-$mode-PPpackage.sh" "$cache_path" "$generators_path" "$runc_path" "$container_relative_path" "$debug" && \
-\
+./"run-$mode-PPpackage.sh" "$cache_path" "$generators_path" "$runc_path" "$container_relative_path" "$debug"
+
 ./"run-$mode-stop.sh" "$runc_id"
