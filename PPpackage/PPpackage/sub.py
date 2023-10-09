@@ -2,8 +2,7 @@ from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 from typing import Any
 
-from frozendict import frozendict
-from PPpackage_utils.parse import Lockfile
+from PPpackage_utils.utils import Resolution, frozendict
 
 
 async def update_database(debug: bool, cache_path: Path) -> None:
@@ -15,10 +14,11 @@ async def resolve(
     cache_path: Path,
     requirements: Set[Any],
     options: Mapping[str, Any] | None,
-) -> tuple[Set[Lockfile], Mapping[str, Any]]:
+) -> Set[Resolution]:
     lockfile = frozendict({name: "1.0.0" for name in set(requirements)})
+    new_requirements = frozendict({"arch": frozenset(["iana-etc"])})
 
-    return {lockfile}, {"arch": {"ninja"}}
+    return frozenset([Resolution(lockfile, new_requirements)])
 
 
 async def fetch(

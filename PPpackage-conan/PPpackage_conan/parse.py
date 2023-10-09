@@ -2,8 +2,7 @@ from collections.abc import Iterable, Mapping, Set
 from typing import Any
 from typing import cast as typing_cast
 
-from frozendict import frozendict
-from PPpackage_utils.utils import MyException, json_check_format
+from PPpackage_utils.utils import MyException, frozendict, json_check_format
 
 from .utils import Options, Requirement
 

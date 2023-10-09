@@ -12,13 +12,17 @@ from pathlib import Path
 from typing import Any, Optional
 from typing import cast as typing_cast
 
-from frozendict import frozendict
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Lockfile
-from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists
+from PPpackage_utils.utils import (
+    Resolution,
+    asubprocess_communicate,
+    ensure_dir_exists,
+    frozendict,
+)
 
 from .utils import (
     Options,
@@ -163,7 +167,7 @@ async def resolve(
     cache_path: Path,
     requirements: Iterable[Requirement],
     options: Options,
-) -> tuple[Set[Lockfile], Mapping[str, Any]]:
+) -> Set[Resolution]:
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -197,4 +201,4 @@ async def resolve(
 
     await remove_leaves_from_cache(environment)
 
-    return {lockfile}, {}
+    return frozenset([Resolution(lockfile, frozendict())])

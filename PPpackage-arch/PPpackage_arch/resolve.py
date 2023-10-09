@@ -1,13 +1,15 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Generator, Mapping, Set
+from collections.abc import Generator, Set
 from pathlib import Path
 from re import compile as re_compile
-from typing import Any
 
-from frozendict import frozendict
-from PPpackage_utils.parse import Lockfile
-from PPpackage_utils.utils import MyException, asubprocess_communicate
+from PPpackage_utils.utils import (
+    MyException,
+    Resolution,
+    asubprocess_communicate,
+    frozendict,
+)
 
 from .utils import get_cache_paths
 
@@ -45,7 +47,7 @@ def resolve_requirement_parse(stdout: bytes) -> Generator[str, None, None]:
 
 async def resolve(
     cache_path: Path, requirements: Set[str], options: None
-) -> tuple[Set[Lockfile], Mapping[str, None]]:
+) -> Set[Resolution]:
     database_path, _ = get_cache_paths(cache_path)
 
     async with TaskGroup() as group:
@@ -83,4 +85,4 @@ async def resolve(
         }
     )
 
-    return {lockfile}, {}
+    return frozenset([Resolution(lockfile, frozendict())])

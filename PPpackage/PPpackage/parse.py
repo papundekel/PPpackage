@@ -1,27 +1,40 @@
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Mapping, Set
 from sys import stderr
-from tabnanny import check
 from typing import Any
 
-from frozendict import frozendict
-from PPpackage_utils.parse import Lockfile, parse_lockfile
-from PPpackage_utils.utils import MyException, json_check_format, parse_generators
+from PPpackage_utils.parse import parse_lockfile
+from PPpackage_utils.utils import (
+    MyException,
+    Resolution,
+    frozendict,
+    json_check_format,
+    parse_generators,
+)
+
+
+def check_requirements(debug: bool, requirements_json: Any) -> None:
+    if type(requirements_json) is not list:
+        if debug:
+            print(
+                f"Got {requirements_json}.",
+                file=stderr,
+            )
+        raise MyException(
+            "Invalid meta requirements format. Manager requirements should be a list."
+        )
+
+
+def parse_requirements(debug: bool, requirements_json: Any) -> Set[Any]:
+    check_requirements(debug, requirements_json)
+
+    requirements = frozenset(requirements_json)
+
+    return requirements
 
 
 def check_meta_requirements(debug: bool, meta_requirements_json: Any) -> None:
     if type(meta_requirements_json) is not frozendict:
         raise MyException("Invalid requirements format. Should be a dictionary.")
-
-    for requirements_json in meta_requirements_json.values():
-        if type(requirements_json) is not list:
-            if debug:
-                print(
-                    f"Got {requirements_json}.",
-                    file=stderr,
-                )
-            raise MyException(
-                "Invalid meta requirements format. Manager requirements should be a list."
-            )
 
 
 def parse_meta_requirements(
@@ -29,10 +42,12 @@ def parse_meta_requirements(
 ) -> Mapping[str, Set[Any]]:
     check_meta_requirements(debug, meta_requirements_json)
 
-    meta_requirements = {
-        manager: set(requirements)
-        for manager, requirements in meta_requirements_json.items()
-    }
+    meta_requirements = frozendict(
+        {
+            manager: parse_requirements(debug, requirements)
+            for manager, requirements in meta_requirements_json.items()
+        }
+    )
 
     return meta_requirements
 
@@ -64,7 +79,7 @@ def parse_input(
         input_json,
         {"requirements", "options", "generators"},
         set(),
-        "Invalid input format. Should be a JSON object with keys 'requirements', 'options' and 'generators'.",
+        "Invalid input format.",
     )
 
     meta_requirements = parse_meta_requirements(debug, input_json["requirements"])
@@ -74,34 +89,47 @@ def parse_input(
     return meta_requirements, meta_options, generators
 
 
-def check_lockfile_choices(lockfiles_json: Any):
-    if type(lockfiles_json) is not list:
-        raise MyException("Invalid lockfiles format.")
-
-
-def parse_lockfile_choices(debug: bool, lockfiles_json: Any):
-    check_lockfile_choices(lockfiles_json)
-
-    lockfiles = {
-        parse_lockfile(debug, lockfile_json) for lockfile_json in lockfiles_json
-    }
-
-    return lockfiles
-
-
-def parse_resolve_response(
+def check_resolution(
     debug: bool,
-    response_json: Any,
-) -> tuple[Set[Lockfile], Mapping[str, Set[Any]]]:
+    resolution_json: Any,
+) -> None:
     json_check_format(
         debug,
-        response_json,
-        {"lockfiles", "requirements"},
+        resolution_json,
+        {"lockfile", "requirements"},
         set(),
-        "Invalid input format. Should be a JSON object with keys 'lockfiles' and 'requirements'.",
+        "Invalid resolution format.",
     )
 
-    lockfile_choices = parse_lockfile_choices(debug, response_json["lockfiles"])
-    new_requirements = parse_meta_requirements(debug, response_json["requirements"])
 
-    return lockfile_choices, new_requirements
+def check_resolutions(
+    debug: bool,
+    resolutions_json: Any,
+) -> None:
+    if type(resolutions_json) is not list:
+        raise MyException("Invalid resolutions format.")
+
+
+def parse_resolution(
+    debug: bool,
+    resolution_json: Any,
+) -> Resolution:
+    check_resolution(debug, resolution_json)
+
+    lockfile = parse_lockfile(debug, resolution_json["lockfile"])
+    requirements = parse_meta_requirements(debug, resolution_json["requirements"])
+
+    return Resolution(lockfile, requirements)
+
+
+def parse_resolutions(
+    debug: bool,
+    resolutions_json: Any,
+) -> Set[Resolution]:
+    check_resolutions(debug, resolutions_json)
+
+    resolutions = frozenset(
+        parse_resolution(debug, resolution_json) for resolution_json in resolutions_json
+    )
+
+    return resolutions
