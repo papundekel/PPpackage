@@ -6,7 +6,7 @@ from pathlib import Path
 from sys import exit, stderr, stdin, stdout
 from typing import Any
 
-from PPpackage_utils.parse import Lockfile
+from PPpackage_utils.parse import parse_fetch_input, parse_resolve_input
 from typer import Typer
 
 from .utils import (
@@ -17,8 +17,6 @@ from .utils import (
     json_dump,
     json_dumps,
     json_load,
-    parse_fetch_input,
-    parse_resolve_input,
 )
 
 
