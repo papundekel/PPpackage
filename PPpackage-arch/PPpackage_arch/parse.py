@@ -1,23 +1,23 @@
-from collections.abc import Set
+from collections.abc import Iterable, Set
 from typing import Any
 
 from PPpackage_utils.utils import MyException
 
 
-def check_requirements(input: Any) -> list[str]:
-    if type(input) is not list:
+def check_requirements(requirements_json: Any) -> Iterable[str]:
+    if type(requirements_json) is not list:
         raise MyException("Invalid requirements format")
 
-    for requirement_input in input:
-        if type(requirement_input) is not str:
+    for requirement_json in requirements_json:
+        if type(requirement_json) is not str:
             raise MyException("Invalid requirements format")
 
-    return input
+    return requirements_json
 
 
-def parse_requirements(debug: bool, input: Any) -> Set[str]:
-    input_checked = check_requirements(input)
+def parse_requirements(debug: bool, requirements_json: Any) -> Set[str]:
+    requirements_checked = check_requirements(requirements_json)
 
-    requirements = input_checked
+    requirements = set(requirements_checked)
 
-    return set(requirements)
+    return requirements

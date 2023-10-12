@@ -1,43 +1,21 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
 from collections import namedtuple
-from collections.abc import (
-    AsyncIterator,
-    Callable,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    Set,
-)
+from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
-from email.policy import default
 from json import JSONEncoder
 from json import dump as json_dump_base
 from json import dumps as json_dumps_base
 from json import load as json_load_base
 from json import loads as json_loads_base
-from numbers import Number
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
-from sys import stderr
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
 from typing import Any, Optional
 
 from frozendict import frozendict
-
-
-def ensure_dir_exists(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-@contextmanager
-def TemporaryDirectory(dir=None):
-    with TempfileTemporaryDirectory(dir=dir) as dir_path_string:
-        dir_path = Path(dir_path_string)
-
-        yield dir_path
 
 
 class MyException(Exception):
@@ -51,6 +29,28 @@ class STDERRException(Exception):
 
     def __str__(self) -> str:
         return f"{super().__str__()}\n{self.stderr}"
+
+
+Lockfile = frozendict[str, str]
+
+
+class Product:
+    def __init__(self, package: str, version: str, product_id: str):
+        self.package = package
+        self.version = version
+        self.product_id = product_id
+
+
+def ensure_dir_exists(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+@contextmanager
+def TemporaryDirectory(dir=None):
+    with TempfileTemporaryDirectory(dir=dir) as dir_path_string:
+        dir_path = Path(dir_path_string)
+
+        yield dir_path
 
 
 async def asubprocess_communicate(
@@ -67,139 +67,6 @@ async def asubprocess_communicate(
             raise MyException(error_message)
 
     return stdout
-
-
-def json_check_format(
-    debug: bool,
-    input: Any,
-    keys_required: Set[str],
-    keys_permitted_unequired: Set[str],
-    error_message: str,
-) -> Mapping[str, Any]:
-    if type(input) is not frozendict:
-        raise MyException(error_message)
-
-    keys = input.keys()
-
-    keys_permitted = keys_required | keys_permitted_unequired
-
-    are_present_required = keys_required <= keys
-    are_present_only_permitted = keys <= keys_permitted
-
-    if not are_present_required or not are_present_only_permitted:
-        if debug:
-            print(f"json_check_format: {input}", file=stderr)
-
-        raise MyException(
-            f"{error_message} Should be a JSON object with keys {keys_required} required and {keys_permitted_unequired} optional."
-        )
-
-    return input
-
-
-def parse_generators(input: Any) -> Set[str]:
-    if type(input) is not list:
-        raise MyException("Invalid generators format: not a list.")
-
-    for generator_input in input:
-        if type(generator_input) is not str:
-            raise MyException("Invalid generator format: not a string.")
-
-    generators = set(input)
-
-    if len(generators) != len(input):
-        raise MyException("Invalid generators format: multiple identical values.")
-
-    return generators
-
-
-def parse_resolve_input(
-    debug: bool,
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
-    input: Any,
-) -> tuple[Set[Any], Any]:
-    input_checked = json_check_format(
-        debug,
-        input,
-        {"requirements", "options"},
-        set(),
-        "Invalid resolve input format.",
-    )
-
-    requirements = requirements_parser(debug, input_checked["requirements"])
-    options = options_parser(debug, input_checked["options"])
-
-    return requirements, options
-
-
-def parse_fetch_input(
-    debug: bool,
-    lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
-    options_parser: Callable[[bool, Any], Any],
-    input: Any,
-) -> tuple[Mapping[str, str], Any, Set[str]]:
-    input_checked = json_check_format(
-        debug,
-        input,
-        {"lockfile", "options", "generators"},
-        set(),
-        "Invalid fetch input format.",
-    )
-
-    lockfile = lockfile_parser(debug, input_checked["lockfile"])
-    options = options_parser(debug, input_checked["options"])
-    generators = parse_generators(input_checked["generators"])
-
-    return lockfile, options, generators
-
-
-def check_products_simple(debug: bool, input: Any) -> Mapping[str, Mapping[str, str]]:
-    if type(input) is not frozendict:
-        raise MyException("Invalid products format")
-
-    for package, version_info in input.items():
-        if type(package) is not str:
-            raise MyException("Invalid products format")
-
-        json_check_format(
-            debug,
-            version_info,
-            {"version", "product_id"},
-            set(),
-            "Invalid products format",
-        )
-
-        version = version_info["version"]
-        product_id = version_info["product_id"]
-
-        if type(version) is not str:
-            raise MyException("Invalid products format")
-
-        if type(product_id) is not str:
-            raise MyException("Invalid products format")
-
-    return input
-
-
-class Product:
-    def __init__(self, package: str, version: str, product_id: str):
-        self.package = package
-        self.version = version
-        self.product_id = product_id
-
-
-def parse_products(debug: bool, input: Any) -> Set[Product]:
-    input_checked = check_products_simple(debug, input)
-
-    return {
-        Product(
-            package=package,
-            version=version_info["version"],
-            product_id=version_info["product_id"],
-        )
-        for package, version_info in input_checked.items()
-    }
 
 
 class FakerootInfo:
