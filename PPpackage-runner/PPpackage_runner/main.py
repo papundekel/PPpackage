@@ -61,18 +61,18 @@ async def handle_command(
         return False
 
     image_path = container_path / await stream_read_relative_path(
-        debug, "PPpackage-runc", reader
+        debug, "PPpackage-runner", reader
     )
 
-    command = await stream_read_string(debug, "PPpackage-runc", reader)
-    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runc", reader)]
+    command = await stream_read_string(debug, "PPpackage-runner", reader)
+    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
     pipe_path = container_path / await stream_read_relative_path(
-        debug, "PPpackage-runc", reader
+        debug, "PPpackage-runner", reader
     )
 
     with pipe_path.open("r") as pipe:
@@ -91,7 +91,7 @@ async def handle_command(
 
         return_code = await process.wait()
 
-    stream_write_int(debug, "PPpackage-runc", writer, return_code)
+    stream_write_int(debug, "PPpackage-runner", writer, return_code)
 
     return True
 
@@ -107,7 +107,7 @@ async def handle_init(
 
     stream_write_string(
         debug,
-        "PPpackage-runc",
+        "PPpackage-runner",
         writer,
         str(container_path.relative_to(containers_path)),
     )
@@ -121,11 +121,11 @@ async def handle_connection(
     bundle_path: Path,
     root_path: Path,
 ):
-    container_id = await stream_read_string(debug, "PPpackage-runc", reader)
+    container_id = await stream_read_string(debug, "PPpackage-runner", reader)
     container_path = containers_path / container_id
 
     while True:
-        request = await stream_read_line(debug, "PPpackage-runc", reader)
+        request = await stream_read_line(debug, "PPpackage-runner", reader)
 
         if reader.at_eof():
             break
@@ -209,13 +209,13 @@ async def main_command(daemon_path: Path, debug: bool = False):
 
     run_path = daemon_path / "run"
 
-    socket_path = run_path / "PPpackage-runc.sock"
+    socket_path = run_path / "PPpackage-runner.sock"
 
     containers_path = daemon_path / "containers"
     bundle_path = daemon_path / "bundle"
 
     try:
-        with PidFile("PPpackage-runc", piddir=run_path):
+        with PidFile("PPpackage-runner", piddir=run_path):
             containers_path.mkdir(exist_ok=True)
             bundle_path.mkdir(exist_ok=True)
 
@@ -226,9 +226,9 @@ async def main_command(daemon_path: Path, debug: bool = False):
                     debug, containers_path, bundle_path, socket_path, root_path
                 )
     except PidFileAlreadyLockedError:
-        print("PPpackage-runc is already running.", file=stderr)
+        print("PPpackage-runner is already running.", file=stderr)
         raise Exit(1)
 
 
 def main():
-    run(app, "PPpackage-runc")
+    run(app, "PPpackage-runner")
