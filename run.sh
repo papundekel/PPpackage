@@ -13,7 +13,7 @@ wd="$(pwd)"
 tmp_path="$wd/$tmp"
 cache_path="$tmp_path/cache"
 generators_path="$tmp_path/generators"
-runc_path="$tmp_path/PPpackage-runc"
+runc_path="$tmp_path/PPpackage-runner"
 
 
 mkdir -p "$cache_path" "$generators_path" "$runc_path/run" "$runc_path/containers" && \
@@ -25,7 +25,7 @@ runc_id="$(./"run-$mode-runc.sh" "$runc_path" "$debug")" && \
 \
 sleep 1 && \
 \
-container_relative_path="$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$tmp/PPpackage-runc/run/PPpackage-runc.sock" | tail --lines 1)" && \
+container_relative_path="$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$tmp/PPpackage-runner/run/PPpackage-runner.sock" | tail --lines 1)" && \
 \
 ./"run-$mode-PPpackage.sh" "$cache_path" "$generators_path" "$runc_path" "$container_relative_path" "$debug"
 
