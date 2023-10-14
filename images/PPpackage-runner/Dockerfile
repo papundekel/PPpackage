@@ -15,7 +15,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY PPpackage-utils/ /workdir/packages/PPpackage-utils/
 RUN pip install packages/PPpackage-utils/
 
-COPY PPpackage-runc/ /workdir/packages/PPpackage-runc/
-RUN pip install packages/PPpackage-runc/
+COPY PPpackage-runner/ /workdir/packages/PPpackage-runner/
+RUN pip install packages/PPpackage-runner/
 
-RUN mkdir --parents --mode 777 /workdir/PPpackage-runc
+RUN mkdir --parents --mode 777 /workdir/PPpackage-runner
