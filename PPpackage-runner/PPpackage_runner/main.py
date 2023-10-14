@@ -15,6 +15,8 @@ from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL
 from sys import stderr
+from typing import Tuple
+from typing import cast as type_cast
 
 from pid import PidFile, PidFileAlreadyLockedError
 from PPpackage_utils.app import AsyncTyper, run
@@ -117,13 +119,12 @@ async def handle_init(
     )
 
 
-async def handle_run(
-    debug: bool, reader: StreamReader, writer: StreamWriter, container_path: Path
-):
-    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
-
+async def pull_image(
+    debug: bool, reader: StreamReader, image_type: str
+) -> Tuple[bool, str | None]:
     if image_type == "IMAGE":
         image = await stream_read_string(debug, "PPpackage-runner", reader)
+        return True, image
     elif image_type == "DOCKERFILE":
         dockerfile = await stream_read_string(debug, "PPpackage-runner", reader)
 
@@ -141,21 +142,31 @@ async def handle_run(
         await process.communicate(dockerfile.encode("ascii"))
         return_code = await process.wait()
 
-        stream_write_line(
-            debug,
-            "PPpackage-runner",
-            writer,
-            "SUCCESS" if return_code == 0 else "FAILURE",
-        )
-
-        if return_code != 0:
-            return False
-
-        await writer.drain()
-
-        image = "pppackage/runner-image"
+        return return_code == 0, "pppackage/runner-image"
     else:
+        return False, None
+
+
+async def handle_run(
+    debug: bool, reader: StreamReader, writer: StreamWriter, container_path: Path
+) -> bool:
+    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
+
+    success, image = await pull_image(debug, reader, image_type)
+
+    stream_write_line(
+        debug,
+        "PPpackage-runner",
+        writer,
+        "SUCCESS" if success else "FAILURE",
+    )
+
+    if not success:
         return False
+
+    image = type_cast(str, image)
+
+    await writer.drain()
 
     args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
     stdin_pipe_path = container_path / await stream_read_relative_path(
@@ -200,12 +211,14 @@ async def handle_run(
             )
         ).wait()
 
-        stream_write_line(
-            debug,
-            "PPpackage-runner",
-            writer,
-            "SUCCESS" if return_code == 0 else "FAILURE",
-        )
+    stream_write_line(
+        debug,
+        "PPpackage-runner",
+        writer,
+        "SUCCESS" if return_code == 0 else "FAILURE",
+    )
+
+    return True
 
 
 async def handle_connection(

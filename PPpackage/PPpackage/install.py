@@ -1,12 +1,6 @@
-from asyncio import (
-    StreamReader,
-    StreamWriter,
-    create_subprocess_exec,
-    open_unix_connection,
-)
+from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping
-from contextlib import asynccontextmanager
 from functools import partial
 from io import TextIOWrapper
 from pathlib import Path
@@ -32,6 +26,7 @@ from PPpackage_utils.utils import (
 )
 
 from .sub import install as PP_install
+from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
 
 def merge_lockfiles(
@@ -210,35 +205,6 @@ def generate_machine_id(machine_id_path: Path):
         machine_id_file.write(
             "".join(random_choices([str(digit) for digit in range(10)], k=32)) + "\n"
         )
-
-
-def read_machine_id(machine_id_path: Path) -> str:
-    with machine_id_path.open("r") as machine_id_file:
-        machine_id = machine_id_file.readline().strip()
-
-        return machine_id
-
-
-@asynccontextmanager
-async def communicate_with_daemon(
-    debug: bool,
-    daemon_path: Path,
-):
-    (
-        daemon_reader,
-        daemon_writer,
-    ) = await open_unix_connection(daemon_path)
-
-    try:
-        yield daemon_reader, daemon_writer
-    finally:
-        stream_write_line(debug, "PPpackage", daemon_writer, "END")
-        await daemon_writer.drain()
-        daemon_writer.close()
-        await daemon_writer.wait_closed()
-
-
-machine_id_relative_path = Path("etc") / "machine-id"
 
 
 async def install(
