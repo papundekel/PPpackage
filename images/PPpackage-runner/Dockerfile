@@ -7,6 +7,7 @@ RUN pacman --noconfirm --sync --refresh --sysupgrade
 
 RUN pacman --noconfirm --sync python
 RUN pacman --noconfirm --sync runc
+RUN pacman --noconfirm --sync --refresh --sysupgrade podman
 
 ENV VIRTUAL_ENV=/workdir/.venv/
 RUN python -m venv $VIRTUAL_ENV
@@ -19,3 +20,7 @@ COPY PPpackage-runner/ /workdir/packages/PPpackage-runner/
 RUN pip install packages/PPpackage-runner/
 
 RUN mkdir --parents --mode 777 /workdir/PPpackage-runner
+
+RUN mkdir --parents --mode 777 /home/runner
+
+ENV HOME=/home/runner
