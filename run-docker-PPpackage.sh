@@ -13,6 +13,6 @@ docker run \
     --user "$(id -u):$(id -g)" \
     --mount type=bind,source="$cache_path",destination="/workdir/tmp/cache" \
     --mount type=bind,source="$generators_path",destination="/workdir/tmp/generators" \
-    --mount type=bind,source="$runc_path/run/PPpackage-runc.sock",destination="/run/PPpackage-runc.sock" \
-    --mount type=bind,source="$runc_path/containers/$container_relative_path",destination="/mnt/PPpackage-runc/" \
-    fackop/pppackage PPpackage tmp/cache tmp/generators /run/PPpackage-runc.sock /mnt/PPpackage-runc/ root/ $debug
+    --mount type=bind,source="$runc_path/run/PPpackage-runner.sock",destination="/run/PPpackage-runner.sock" \
+    --mount type=bind,source="$runc_path/containers/$container_relative_path",destination="/mnt/PPpackage-runner/" \
+    fackop/pppackage PPpackage tmp/cache tmp/generators /run/PPpackage-runner.sock /mnt/PPpackage-runner/ root/ $debug

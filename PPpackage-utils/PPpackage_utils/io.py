@@ -181,16 +181,34 @@ async def stream_read_strings(debug, prefix, reader: StreamReader):
         yield string
 
 
+def check_relative_path(path: Path):
+    if path.is_absolute():
+        raise ValueError(f"Expected relative path, got {path}.")
+
+    return path
+
+
 async def stream_read_relative_path(debug, prefix, reader: StreamReader) -> Path:
     path = Path(await stream_read_string(debug, prefix, reader))
 
     if debug:
         print(f"DEBUG {prefix}: stream read path: {path}", file=stderr)
 
-    if path.is_absolute():
-        raise ValueError(f"Expected relative path, got {path}.")
+    check_relative_path(path)
 
     return path
+
+
+async def stream_read_relative_paths(debug, prefix, reader: StreamReader):
+    async for path_string in stream_read_strings(debug, prefix, reader):
+        path = Path(path_string)
+
+        if debug:
+            print(f"DEBUG {prefix}: stream read paths: {path}", file=stderr)
+
+        check_relative_path(path)
+
+        yield path
 
 
 def stream_write_string(debug, prefix, writer: StreamWriter, string: str):

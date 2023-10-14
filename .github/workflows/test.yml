@@ -35,19 +35,19 @@ jobs:
         cache-from: type=registry,ref=fackop/pppackage:buildcache
         cache-to: type=registry,ref=fackop/pppackage:buildcache,mode=max
 
-    - name: Build and push fackop/pppackage-runc
+    - name: Build and push fackop/pppackage-runner
       uses: docker/build-push-action@v5.0.0
       with:
         context: ${{ github.workspace }}
-        file: ${{ github.workspace }}/images/PPpackage-runc/Dockerfile
+        file: ${{ github.workspace }}/images/PPpackage-runner/Dockerfile
         push: ${{ github.ref_name == 'main' }}
-        tags: fackop/pppackage-runc:latest
+        tags: fackop/pppackage-runner:latest
         outputs: type=${{ github.ref_name == 'main' && 'image' || 'docker' }}
-        cache-from: type=registry,ref=fackop/pppackage-runc:buildcache
-        cache-to: type=registry,ref=fackop/pppackage-runc:buildcache,mode=max
+        cache-from: type=registry,ref=fackop/pppackage-runner:buildcache
+        cache-to: type=registry,ref=fackop/pppackage-runner:buildcache,mode=max
 
     - name: Try run.sh
       run: ./run.sh docker tmp/ --debug <tmp/input/input-basic.json
 
     - name: See if ldconfig ran
-      run: ls -l tmp/PPpackage-runc/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
+      run: ls -l tmp/PPpackage-runner/containers/$(docker run --rm fackop/pppackage head --lines=1 /etc/machine-id)/root/etc/ld.so.cache
