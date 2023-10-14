@@ -6,7 +6,9 @@ from asyncio import (
     get_running_loop,
     start_unix_server,
 )
+from asyncio.subprocess import PIPE
 from contextlib import contextmanager
+from io import StringIO
 from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
@@ -19,9 +21,11 @@ from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.io import (
     stream_read_line,
     stream_read_relative_path,
+    stream_read_relative_paths,
     stream_read_string,
     stream_read_strings,
     stream_write_int,
+    stream_write_line,
     stream_write_string,
 )
 from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate, json_dump
@@ -113,6 +117,97 @@ async def handle_init(
     )
 
 
+async def handle_run(
+    debug: bool, reader: StreamReader, writer: StreamWriter, container_path: Path
+):
+    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
+
+    if image_type == "IMAGE":
+        image = await stream_read_string(debug, "PPpackage-runner", reader)
+    elif image_type == "DOCKERFILE":
+        dockerfile = await stream_read_string(debug, "PPpackage-runner", reader)
+
+        process = await create_subprocess_exec(
+            "podman",
+            "build",
+            "--tag",
+            "pppackage/runner-image",
+            "-",
+            stdin=PIPE,
+            stdout=DEVNULL,
+            stderr=None,
+        )
+
+        await process.communicate(dockerfile.encode("ascii"))
+        return_code = await process.wait()
+
+        stream_write_line(
+            debug,
+            "PPpackage-runner",
+            writer,
+            "SUCCESS" if return_code == 0 else "FAILURE",
+        )
+
+        if return_code != 0:
+            return False
+
+        await writer.drain()
+
+        image = "pppackage/runner-image"
+    else:
+        return False
+
+    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
+    stdin_pipe_path = container_path / await stream_read_relative_path(
+        debug, "PPpackage-runner", reader
+    )
+    stdout_pipe_path = container_path / await stream_read_relative_path(
+        debug, "PPpackage-runner", reader
+    )
+    mount_source_paths = [
+        container_path / mount_relative_path
+        async for mount_relative_path in stream_read_relative_paths(
+            debug, "PPpackage-runner", reader
+        )
+    ]
+    mount_destination_paths = [
+        Path(mount_destination_path_string)
+        async for mount_destination_path_string in stream_read_strings(
+            debug, "PPpackage-runner", reader
+        )
+    ]
+
+    with stdin_pipe_path.open("r") as stdin_pipe, stdout_pipe_path.open(
+        "w"
+    ) as stdout_pipe:
+        return_code = await (
+            await create_subprocess_exec(
+                "podman",
+                "run",
+                "--rm",
+                "--interactive",
+                *[
+                    f"--mount=type=bind,source={mount_source_path},destination={mount_destination_path}"
+                    for mount_source_path, mount_destination_path in zip(
+                        mount_source_paths, mount_destination_paths
+                    )
+                ],
+                image,
+                *args,
+                stdin=stdin_pipe,
+                stdout=stdout_pipe,
+                stderr=None,
+            )
+        ).wait()
+
+        stream_write_line(
+            debug,
+            "PPpackage-runner",
+            writer,
+            "SUCCESS" if return_code == 0 else "FAILURE",
+        )
+
+
 async def handle_connection(
     debug: bool,
     reader: StreamReader,
@@ -138,6 +233,10 @@ async def handle_connection(
             result = await handle_command(
                 debug, reader, writer, container_path, bundle_path, root_path
             )
+            if not result:
+                break
+        elif request == "RUN":
+            result = await handle_run(debug, reader, writer, container_path)
             if not result:
                 break
 
