@@ -29,9 +29,9 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage:latest
-        outputs: type=image
+        outputs: type=${{ github.ref_name == 'main' && 'image' || 'docker' }}
         cache-from: type=registry,ref=fackop/pppackage:buildcache
         cache-to: type=registry,ref=fackop/pppackage:buildcache,mode=max
 
@@ -40,14 +40,15 @@ jobs:
       with:
         context: ${{ github.workspace }}
         file: ${{ github.workspace }}/images/PPpackage-runner/Dockerfile
-        push: true
+        push: ${{ github.ref_name == 'main' }}
         tags: fackop/pppackage-runner:latest
-        outputs: type=image
+        outputs: type=${{ github.ref_name == 'main' && 'image' || 'docker' }}
         cache-from: type=registry,ref=fackop/pppackage-runner:buildcache
         cache-to: type=registry,ref=fackop/pppackage-runner:buildcache,mode=max
 
     - name: Pull pushed fackop/pppackage-runner
       run: docker pull fackop/pppackage-runner:latest
+      if: github.ref_name == 'main'
 
     - name: Try run.sh
       run: ./run.sh docker ${{ github.workspace }}/cache "$(pwd)/generators" "$(pwd)/root" --debug <input/basic.json
