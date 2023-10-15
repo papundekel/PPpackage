@@ -33,15 +33,14 @@ async def resolve(
 
 async def fetch(
     debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     versions: Mapping[str, str],
     options: Mapping[str, Any] | None,
     generators: Iterable[str],
     generators_path: Path,
 ) -> Mapping[str, str]:
-    run_path = Path("/") / "run"
-    runner_path = run_path / "PPpackage-runner.sock"
-
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
         runner_writer,
@@ -65,23 +64,21 @@ async def fetch(
 
         stream_write_strings(debug, "PPpackage-sub", runner_writer, ["cat", "-"])
 
-        runner_workdir = Path("/") / "mnt" / "PPpackage-runner"
-
-        with TemporaryPipe(runner_workdir) as stdin_pipe_path, TemporaryPipe(
-            runner_workdir
+        with TemporaryPipe(runner_workdir_path) as stdin_pipe_path, TemporaryPipe(
+            runner_workdir_path
         ) as stdout_pipe_path:
             stream_write_string(
                 debug,
                 "PPpackage-sub",
                 runner_writer,
-                str(stdin_pipe_path.relative_to(runner_workdir)),
+                str(stdin_pipe_path.relative_to(runner_workdir_path)),
             )
 
             stream_write_string(
                 debug,
                 "PPpackage-sub",
                 runner_writer,
-                str(stdout_pipe_path.relative_to(runner_workdir)),
+                str(stdout_pipe_path.relative_to(runner_workdir_path)),
             )
 
             stream_write_strings(debug, "PPpackage-sub", runner_writer, [])
