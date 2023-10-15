@@ -3,8 +3,8 @@ workdirs_path="$2"
 debug="$3"
 name="fackop-pppackage-runner"
 
-podman volume create --ignore podman-store > /dev/null && \
-\
+podman volume create podman-store > /dev/null
+
 podman run \
     --privileged \
     --detach \
