@@ -20,7 +20,3 @@ COPY PPpackage-runner/ /workdir/packages/PPpackage-runner/
 RUN pip install packages/PPpackage-runner/
 
 RUN mkdir --parents --mode 777 /workdir/PPpackage-runner
-
-RUN mkdir --parents --mode 777 /home/runner
-
-ENV HOME=/home/runner
