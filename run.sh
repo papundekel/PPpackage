@@ -11,7 +11,8 @@ cache_path="$2"
 generators_path="$3"
 destination_path="$4"
 
-debug="$5"
+update_database="$5"
+debug="$6"
 
 run_path="$XDG_RUNTIME_DIR"
 runner_path="$run_path/PPpackage-runner.sock"
@@ -29,7 +30,7 @@ sleep 1 && \
 \
 container_workdir_path="$runner_workdirs_path/$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$runner_path" | tail --lines 1)" && \
 \
-./"run-$mode-PPpackage.sh" "$runner_path" "$container_workdir_path" "$cache_path" "$generators_path" "$destination_path" "$debug"
+./"run-$mode-PPpackage.sh" "$runner_path" "$container_workdir_path" "$cache_path" "$generators_path" "$destination_path" "$update_database" "$debug"
 
 rm -rf "$runner_workdirs_path" && \
 ./"run-$mode-stop.sh" "$runc_id"
