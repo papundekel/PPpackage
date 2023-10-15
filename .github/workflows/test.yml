@@ -47,7 +47,7 @@ jobs:
         cache-to: type=registry,ref=fackop/pppackage-runner:buildcache,mode=max
 
     - name: Try run.sh
-      run: ./run.sh docker "$(pwd)/cache" "$(pwd)/generators" "$(pwd)/root" --debug <input/input-basic.json
+      run: ./run.sh docker "$(pwd)/cache" "$(pwd)/generators" "$(pwd)/root" --debug <input/basic.json
 
     - name: See if ldconfig ran
       run: ls -l root/etc/ld.so.cache
