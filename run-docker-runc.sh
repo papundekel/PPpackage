@@ -1,16 +1,17 @@
-runc_path="$1"
-debug="$2"
+run_path="$1"
+workdirs_path="$2"
+debug="$3"
 name="fackop-pppackage-runner"
 
-mkdir -p "$runc_path/storage"
-
+podman volume create --ignore podman-store > /dev/null && \
+\
 podman run \
     --privileged \
     --detach \
     --name "$name" \
-    --mount type=bind,source="$runc_path/run",destination="/workdir/PPpackage-runner/run" \
-    --mount type=bind,source="$runc_path/containers",destination="/workdir/PPpackage-runner/containers" \
-    --mount type=bind,source="$runc_path/storage",destination="/var/lib/containers" \
-    fackop/pppackage-runner PPpackage-runner PPpackage-runner/ $debug > /dev/null
+    --mount type=bind,source="$run_path",destination="/run" \
+    --mount type=bind,source="$workdirs_path",destination="/root/workdirs" \
+    --mount type=volume,source=podman-store,destination=/var/lib/containers \
+    fackop/pppackage-runner PPpackage-runner /run /root/workdirs $debug > /dev/null
 
 echo "$name"

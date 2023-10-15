@@ -68,6 +68,8 @@ async def fetch_external_manager(
 
 async def fetch_manager(
     debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
     manager: str,
     cache_path: Path,
     versions: Mapping[str, str],
@@ -76,7 +78,9 @@ async def fetch_manager(
     generators_path: Path,
 ) -> Mapping[str, str]:
     if manager == "PP":
-        fetcher = PP_fetch
+        fetcher = partial(
+            PP_fetch, runner_path=runner_path, runner_workdir_path=runner_workdir_path
+        )
     else:
         fetcher = partial(fetch_external_manager, manager=manager)
 
@@ -94,6 +98,8 @@ async def fetch_manager(
 
 async def fetch(
     debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     meta_versions: Mapping[str, Mapping[str, str]],
     meta_options: Mapping[str, Any],
@@ -105,6 +111,8 @@ async def fetch(
             manager: group.create_task(
                 fetch_manager(
                     debug,
+                    runner_path,
+                    runner_workdir_path,
                     manager,
                     cache_path,
                     versions,
