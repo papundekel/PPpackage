@@ -1,4 +1,4 @@
-FROM docker.io/greyltc/archlinux-aur:paru-20231001.0.289
+FROM docker.io/greyltc/archlinux-aur:paru-20231105.0.294
 
 RUN mkdir --parents /workdir
 WORKDIR /workdir
