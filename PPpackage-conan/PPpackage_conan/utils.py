@@ -43,9 +43,8 @@ def create_and_render_temp_file(
     suffix: Optional[str] = None,
 ) -> Generator[_TemporaryFileWrapper, Any, Any]:
     with NamedTemporaryFile(mode="w", suffix=suffix) as file:
-        content = template.render(**template_context)
+        template.stream(**template_context).dump(file)
 
-        file.write(content)
         file.flush()
 
         yield file

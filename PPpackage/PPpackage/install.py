@@ -1,16 +1,12 @@
-from asyncio import (
-    StreamReader,
-    StreamWriter,
-    create_subprocess_exec,
-    open_unix_connection,
-)
+from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping
-from contextlib import asynccontextmanager
 from functools import partial
 from io import TextIOWrapper
+from os import listdir
 from pathlib import Path
 from random import choices as random_choices
+from shutil import move
 from sys import stderr
 
 from PPpackage_utils.io import (
@@ -32,6 +28,7 @@ from PPpackage_utils.utils import (
 )
 
 from .sub import install as PP_install
+from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
 
 def merge_lockfiles(
@@ -212,51 +209,35 @@ def generate_machine_id(machine_id_path: Path):
         )
 
 
-def read_machine_id(machine_id_path: Path) -> str:
-    with machine_id_path.open("r") as machine_id_file:
-        machine_id = machine_id_file.readline().strip()
-
-        return machine_id
-
-
-@asynccontextmanager
-async def communicate_with_daemon(
-    debug: bool,
-    daemon_path: Path,
-):
-    (
-        daemon_reader,
-        daemon_writer,
-    ) = await open_unix_connection(daemon_path)
-
-    try:
-        yield daemon_reader, daemon_writer
-    finally:
-        stream_write_line(debug, "PPpackage", daemon_writer, "END")
-        await daemon_writer.drain()
-        daemon_writer.close()
-        await daemon_writer.wait_closed()
-
-
-machine_id_relative_path = Path("etc") / "machine-id"
-
-
 async def install(
     debug: bool,
     cache_path: Path,
-    daemon_socket_path: Path,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
+    runner_path: Path,
+    runner_workdir_path: Path,
+    destination_path: Path,
     meta_versions: Mapping[str, Mapping[str, str]],
     meta_product_ids: Mapping[str, Mapping[str, str]],
 ) -> None:
+    workdir_relative_path = Path("root")
+
+    (runner_workdir_path / workdir_relative_path).mkdir(exist_ok=True, parents=True)
+
+    for content in listdir(destination_path):
+        move(
+            destination_path / content,
+            runner_workdir_path / workdir_relative_path / content,
+        )
+
     generate_machine_id(
-        daemon_workdir_path / destination_relative_path / machine_id_relative_path
+        runner_workdir_path / workdir_relative_path / machine_id_relative_path
     )
 
     machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-    async with communicate_with_daemon(debug, daemon_socket_path) as (
+    if debug:
+        print(f"DEBUG PPpackage: {runner_path=}", file=stderr)
+
+    async with communicate_with_daemon(debug, runner_path) as (
         daemon_reader,
         daemon_writer,
     ):
@@ -271,8 +252,14 @@ async def install(
                 cache_path,
                 daemon_reader,
                 daemon_writer,
-                daemon_workdir_path,
-                destination_relative_path,
+                runner_workdir_path,
+                workdir_relative_path,
                 versions,
                 product_ids,
+            )
+
+        for content in listdir(runner_workdir_path / workdir_relative_path):
+            move(
+                runner_workdir_path / workdir_relative_path / content,
+                destination_path / content,
             )

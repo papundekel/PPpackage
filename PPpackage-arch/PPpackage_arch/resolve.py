@@ -11,6 +11,7 @@ from PPpackage_utils.utils import (
     frozendict,
 )
 
+from .update_database import update_database
 from .utils import get_cache_paths
 
 
@@ -49,6 +50,9 @@ async def resolve(
     cache_path: Path, requirements: Set[str], options: None
 ) -> Set[Resolution]:
     database_path, _ = get_cache_paths(cache_path)
+
+    if not database_path.exists():
+        await update_database(cache_path)
 
     async with TaskGroup() as group:
         tasks = [

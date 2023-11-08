@@ -2,7 +2,6 @@ devel/
 __pycache__/
 .venv/
 .vscode/
-tmp/*
-!tmp/input/
+tmp/
 build/
 *.egg-info/

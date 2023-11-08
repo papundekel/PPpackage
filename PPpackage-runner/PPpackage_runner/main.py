@@ -8,13 +8,15 @@ from asyncio import (
 )
 from asyncio.subprocess import PIPE
 from contextlib import contextmanager
-from io import StringIO
 from json import load as json_load
-from os import getgid, getuid
+from os import getgid, getuid, listdir
 from pathlib import Path
+from shutil import rmtree
 from signal import SIGTERM
 from subprocess import DEVNULL
 from sys import stderr
+from typing import Tuple
+from typing import cast as type_cast
 
 from pid import PidFile, PidFileAlreadyLockedError
 from PPpackage_utils.app import AsyncTyper, run
@@ -104,26 +106,25 @@ async def handle_init(
     debug,
     reader: StreamReader,
     writer: StreamWriter,
-    containers_path: Path,
-    container_path: Path,
+    workdirs_path: Path,
+    container_workdir_path: Path,
 ):
-    container_path.mkdir(exist_ok=True)
+    container_workdir_path.mkdir(exist_ok=True)
 
     stream_write_string(
         debug,
         "PPpackage-runner",
         writer,
-        str(container_path.relative_to(containers_path)),
+        str(container_workdir_path.relative_to(workdirs_path)),
     )
 
 
-async def handle_run(
-    debug: bool, reader: StreamReader, writer: StreamWriter, container_path: Path
-):
-    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
-
+async def pull_image(
+    debug: bool, reader: StreamReader, image_type: str
+) -> Tuple[bool, str | None]:
     if image_type == "IMAGE":
         image = await stream_read_string(debug, "PPpackage-runner", reader)
+        return True, image
     elif image_type == "DOCKERFILE":
         dockerfile = await stream_read_string(debug, "PPpackage-runner", reader)
 
@@ -141,31 +142,44 @@ async def handle_run(
         await process.communicate(dockerfile.encode("ascii"))
         return_code = await process.wait()
 
-        stream_write_line(
-            debug,
-            "PPpackage-runner",
-            writer,
-            "SUCCESS" if return_code == 0 else "FAILURE",
-        )
-
-        if return_code != 0:
-            return False
-
-        await writer.drain()
-
-        image = "pppackage/runner-image"
+        return return_code == 0, "pppackage/runner-image"
     else:
+        return False, None
+
+
+async def handle_run(
+    debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
+    container_workdir_path: Path,
+) -> bool:
+    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
+
+    success, image = await pull_image(debug, reader, image_type)
+
+    stream_write_line(
+        debug,
+        "PPpackage-runner",
+        writer,
+        "SUCCESS" if success else "FAILURE",
+    )
+
+    if not success:
         return False
 
+    image = type_cast(str, image)
+
+    await writer.drain()
+
     args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
-    stdin_pipe_path = container_path / await stream_read_relative_path(
+    stdin_pipe_path = container_workdir_path / await stream_read_relative_path(
         debug, "PPpackage-runner", reader
     )
-    stdout_pipe_path = container_path / await stream_read_relative_path(
+    stdout_pipe_path = container_workdir_path / await stream_read_relative_path(
         debug, "PPpackage-runner", reader
     )
     mount_source_paths = [
-        container_path / mount_relative_path
+        container_workdir_path / mount_relative_path
         async for mount_relative_path in stream_read_relative_paths(
             debug, "PPpackage-runner", reader
         )
@@ -200,24 +214,26 @@ async def handle_run(
             )
         ).wait()
 
-        stream_write_line(
-            debug,
-            "PPpackage-runner",
-            writer,
-            "SUCCESS" if return_code == 0 else "FAILURE",
-        )
+    stream_write_line(
+        debug,
+        "PPpackage-runner",
+        writer,
+        "SUCCESS" if return_code == 0 else "FAILURE",
+    )
+
+    return True
 
 
 async def handle_connection(
     debug: bool,
     reader: StreamReader,
     writer: StreamWriter,
-    containers_path: Path,
+    workdirs_path: Path,
     bundle_path: Path,
     root_path: Path,
 ):
     container_id = await stream_read_string(debug, "PPpackage-runner", reader)
-    container_path = containers_path / container_id
+    container_workdir_path = workdirs_path / container_id
 
     while True:
         request = await stream_read_line(debug, "PPpackage-runner", reader)
@@ -228,15 +244,17 @@ async def handle_connection(
         if request == "END":
             break
         elif request == "INIT":
-            await handle_init(debug, reader, writer, containers_path, container_path)
+            await handle_init(
+                debug, reader, writer, workdirs_path, container_workdir_path
+            )
         elif request == "COMMAND":
             result = await handle_command(
-                debug, reader, writer, container_path, bundle_path, root_path
+                debug, reader, writer, container_workdir_path, bundle_path, root_path
             )
             if not result:
                 break
         elif request == "RUN":
-            result = await handle_run(debug, reader, writer, container_path)
+            result = await handle_run(debug, reader, writer, container_workdir_path)
             if not result:
                 break
 
@@ -245,11 +263,11 @@ async def handle_connection(
     writer.close()
     await writer.wait_closed()
 
+    for content in listdir(container_workdir_path):
+        rmtree(container_workdir_path / content)
+
 
 async def create_config(debug: bool, bundle_path: Path):
-    if (bundle_path / config_relative_path).exists():
-        return
-
     process_creation = create_subprocess_exec(
         "runc",
         "spec",
@@ -272,7 +290,7 @@ async def create_config(debug: bool, bundle_path: Path):
 
 async def run_server(
     debug: bool,
-    containers_path: Path,
+    workdirs_path: Path,
     bundle_path: Path,
     socket_path: Path,
     root_path: Path,
@@ -280,7 +298,12 @@ async def run_server(
     try:
         async with await start_unix_server(
             lambda reader, writer: handle_connection(
-                debug, reader, writer, containers_path, bundle_path, root_path
+                debug,
+                reader,
+                writer,
+                workdirs_path,
+                bundle_path,
+                root_path,
             ),
             socket_path,
         ) as server:
@@ -303,27 +326,24 @@ app = AsyncTyper()
 
 
 @app.command()
-async def main_command(daemon_path: Path, debug: bool = False):
-    daemon_path = daemon_path.absolute()
-
-    run_path = daemon_path / "run"
-
+async def main_command(run_path: Path, workdirs_path: Path, debug: bool = False):
     socket_path = run_path / "PPpackage-runner.sock"
 
-    containers_path = daemon_path / "containers"
-    bundle_path = daemon_path / "bundle"
-
     try:
-        with PidFile("PPpackage-runner", piddir=run_path):
-            containers_path.mkdir(exist_ok=True)
-            bundle_path.mkdir(exist_ok=True)
-
+        with (
+            PidFile("PPpackage-runner", piddir=run_path),
+            TemporaryDirectory() as bundle_path,
+            TemporaryDirectory() as runc_root_path,
+        ):
             await create_config(debug, bundle_path)
 
-            with TemporaryDirectory() as root_path:
-                await run_server(
-                    debug, containers_path, bundle_path, socket_path, root_path
-                )
+            await run_server(
+                debug,
+                workdirs_path,
+                bundle_path,
+                socket_path,
+                runc_root_path,
+            )
     except PidFileAlreadyLockedError:
         print("PPpackage-runner is already running.", file=stderr)
         raise Exit(1)

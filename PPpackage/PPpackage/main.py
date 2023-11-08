@@ -17,11 +17,11 @@ app = AsyncTyper()
 
 @app.command()
 async def main_command(
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     generators_path: Path,
-    daemon_socket_path: Path,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
+    destination_path: Path,
     do_update_database: Annotated[bool, TyperOption("--update-database")] = False,
     debug: bool = False,
     resolve_iteration_limit: int = 10,
@@ -53,7 +53,14 @@ async def main_command(
         )
 
     product_ids = await fetch(
-        debug, cache_path, versions, options, generators, generators_path
+        debug,
+        runner_path,
+        runner_workdir_path,
+        cache_path,
+        versions,
+        options,
+        generators,
+        generators_path,
     )
 
     if debug:
@@ -62,9 +69,9 @@ async def main_command(
     await install(
         debug,
         cache_path,
-        daemon_socket_path,
-        daemon_workdir_path,
-        destination_relative_path,
+        runner_path,
+        runner_workdir_path,
+        destination_path,
         versions,
         product_ids,
     )
