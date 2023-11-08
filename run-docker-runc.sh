@@ -3,7 +3,7 @@ workdirs_path="$2"
 debug="$3"
 name="fackop-pppackage-runner"
 
-podman volume create podman-store > /dev/null
+podman volume create podman-store > /dev/null 2> /dev/null
 
 podman run \
     --privileged \
