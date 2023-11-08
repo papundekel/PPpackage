@@ -1,7 +1,7 @@
 from ast import parse
 from asyncio import Lock, TaskGroup, create_subprocess_exec, taskgroups
 from asyncio.subprocess import PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable, Mapping, Sequence, Set
 from functools import partial, reduce
 from hmac import new
 from itertools import chain as itertools_chain
@@ -28,7 +28,7 @@ async def resolve_external_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    requirements: Set[Any],
+    requirements_list: Sequence[Set[Any]],
     options: Mapping[str, Any] | None,
 ) -> Set[Resolution]:
     process = await create_subprocess_exec(
@@ -45,7 +45,7 @@ async def resolve_external_manager(
 
     resolve_input_json = json_dumps(
         {
-            "requirements": requirements,
+            "requirements": requirements_list,
             "options": options,
         },
         indent=indent,
@@ -87,7 +87,10 @@ async def resolve_manager(
         resolver = partial(resolve_external_manager, manager=manager)
 
     resolutions = await resolver(
-        debug=debug, cache_path=cache_path, requirements=requirements, options=options
+        debug=debug,
+        cache_path=cache_path,
+        requirements_list=[requirements],
+        options=options,
     )
 
     return resolutions

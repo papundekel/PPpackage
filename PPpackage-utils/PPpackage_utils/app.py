@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Mapping, Set
+from collections.abc import Awaitable, Callable, Mapping, Sequence, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -56,7 +56,7 @@ def callback(debug: bool = False) -> None:
 
 def init(
     database_updater: Callable[[Path], Awaitable[None]],
-    resolver: Callable[[Path, Set[Any], Any], Awaitable[Set[Resolution]]],
+    resolver: Callable[[Path, Sequence[Set[Any]], Any], Awaitable[Set[Resolution]]],
     fetcher: Callable[
         [Path, Mapping[str, str], Any, Set[str], Path],
         Awaitable[Mapping[str, str]],
@@ -75,11 +75,11 @@ def init(
     async def resolve(cache_path: Path) -> None:
         input = json_load(stdin)
 
-        requirements, options = parse_resolve_input(
+        requirements_list, options = parse_resolve_input(
             __debug, requirements_parser, options_parser, input
         )
 
-        resolutions = await resolver(cache_path, requirements, options)
+        resolutions = await resolver(cache_path, requirements_list, options)
 
         if __debug:
             print(

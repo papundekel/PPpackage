@@ -1,5 +1,4 @@
-from collections.abc import Iterable, Mapping, Set
-from os import environ
+from collections.abc import Iterable, Mapping, Sequence, Set
 from pathlib import Path
 from sys import stderr
 from typing import Any
@@ -22,10 +21,10 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements: Set[Any],
+    requirements_list: Sequence[Set[Any]],
     options: Mapping[str, Any] | None,
 ) -> Set[Resolution]:
-    lockfile = frozendict({name: "1.0.0" for name in set(requirements)})
+    lockfile = frozendict({name: "1.0.0" for name in set(requirements_list[0])})
     new_requirements = frozendict({"arch": frozenset(["iana-etc"])})
 
     return frozenset([Resolution(lockfile, new_requirements)])

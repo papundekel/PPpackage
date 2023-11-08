@@ -141,13 +141,22 @@ def parse_resolve_input(
     requirements_parser: Callable[[bool, Any], Set[Any]],
     options_parser: Callable[[bool, Any], Any],
     input_json: Any,
-) -> tuple[Set[Any], Any]:
+) -> tuple[Sequence[Set[Any]], Any]:
     input_checked = check_resolve_input(debug, input_json)
 
-    requirements = requirements_parser(debug, input_checked["requirements"])
+    requirements_list_json = input_checked["requirements"]
+
+    for requirements_json in requirements_list_json:
+        if type(requirements_json) is not list:
+            raise MyException("Invalid requirements format. Must be a JSON array.")
+
+    requirements_list = [
+        requirements_parser(debug, requirements_json)
+        for requirements_json in requirements_list_json
+    ]
     options = options_parser(debug, input_checked["options"])
 
-    return requirements, options
+    return requirements_list, options
 
 
 class FetchInput(TypedDict):

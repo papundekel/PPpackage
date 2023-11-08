@@ -1,4 +1,4 @@
-from asyncio import Lock, create_subprocess_exec
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import (
     Iterable,
@@ -9,7 +9,7 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 from typing import cast as typing_cast
 
 from jinja2 import Environment as Jinja2Environment
@@ -165,7 +165,7 @@ async def get_lockfile(
 async def resolve(
     templates_path: Path,
     cache_path: Path,
-    requirements: Iterable[Requirement],
+    requirements_list: Sequence[Set[Requirement]],
     options: Options,
 ) -> Set[Resolution]:
     cache_path = get_cache_path(cache_path)
@@ -175,7 +175,7 @@ async def resolve(
     # CONAN_HOME must be an absolute path
     environment = make_conan_environment(cache_path)
 
-    requirement_partitions = create_requirement_partitions(requirements)
+    requirement_partitions = create_requirement_partitions(requirements_list[0])
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(templates_path),

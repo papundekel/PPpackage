@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Generator, Set
+from collections.abc import Generator, Sequence, Set
 from pathlib import Path
 from re import compile as re_compile
 
@@ -47,7 +47,7 @@ def resolve_requirement_parse(stdout: bytes) -> Generator[str, None, None]:
 
 
 async def resolve(
-    cache_path: Path, requirements: Set[str], options: None
+    cache_path: Path, requirements_list: Sequence[Set[str]], options: None
 ) -> Set[Resolution]:
     database_path, _ = get_cache_paths(cache_path)
 
@@ -57,7 +57,7 @@ async def resolve(
     async with TaskGroup() as group:
         tasks = [
             group.create_task(resolve_requirement_invoke(database_path, requirement))
-            for requirement in requirements
+            for requirement in requirements_list[0]
         ]
 
     dependencies = {
