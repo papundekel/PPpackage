@@ -1,77 +1,90 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Generator, Sequence, Set
+from collections.abc import Iterable, Mapping, Sequence, Set
 from pathlib import Path
-from re import compile as re_compile
+from sys import stderr
 
+from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.utils import (
     MyException,
-    Resolution,
+    ResolutionGraph,
+    ResolutionGraphNodeValue,
     asubprocess_communicate,
     frozendict,
+    json_dumps,
 )
+from pydot import graph_from_dot_data
 
 from .update_database import update_database
 from .utils import get_cache_paths
 
 
-async def resolve_requirement_invoke(database_path: Path, requirement: str) -> bytes:
+async def resolve_pactree(
+    database_path: Path, requirement: str
+) -> tuple[MultiDiGraph, str]:
     process = await create_subprocess_exec(
         "pactree",
         "--dbpath",
         str(database_path),
         "--sync",
+        "--graph",
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
         stderr=None,
     )
 
-    stdout = await asubprocess_communicate(process, "Error in `pactree`.")
+    graph_bytes = await asubprocess_communicate(process, "Error in `pactree`.")
 
-    return stdout
+    graph_string = graph_bytes.decode("ascii")
 
+    dot = graph_from_dot_data(graph_string)
 
-regex_package_name = re_compile(r"[a-zA-Z0-9\-@._+]+")
+    if dot is None:
+        raise MyException("Error in `pactree`. Output is not a graph.")
 
+    graph: MultiDiGraph = nx_pydot.from_pydot(dot[0])
 
-def resolve_requirement_parse(stdout: bytes) -> Generator[str, None, None]:
-    for line in stdout.decode("utf-8").splitlines():
-        match = regex_package_name.search(line)
+    root = clean_graph(graph)
 
-        if match is None:
-            raise MyException("Invalid pactree output.")
-
-        dependency = match.group()
-        yield dependency
+    return graph, root
 
 
-async def resolve(
-    cache_path: Path, requirements_list: Sequence[Set[str]], options: None
-) -> Set[Resolution]:
-    database_path, _ = get_cache_paths(cache_path)
+def get_graph_root(graph: MultiDiGraph) -> str:
+    for edge in graph.out_edges("START"):
+        return edge[1]
 
-    if not database_path.exists():
-        await update_database(cache_path)
+    raise MyException("Error in `pactree`. Graph has no root.")
 
-    async with TaskGroup() as group:
-        tasks = [
-            group.create_task(resolve_requirement_invoke(database_path, requirement))
-            for requirement in requirements_list[0]
-        ]
 
-    dependencies = {
-        dependency
-        for task in tasks
-        for dependency in resolve_requirement_parse(task.result())
-    }
+def clean_graph(graph: MultiDiGraph) -> str:
+    root = get_graph_root(graph)
 
+    nodes_to_remove = {"START", "\\n"}
+    edges_to_add = set()
+
+    for edge in graph.edges(data=True):
+        data = edge[2]
+        if data.get("arrowhead") == "none":
+            nodes_to_remove.add(edge[0])
+            for node in graph.in_edges(edge[0]):
+                edges_to_add.add((node[0], edge[1]))
+
+    graph.add_edges_from(edges_to_add)
+    graph.remove_nodes_from(nodes_to_remove)
+
+    return root
+
+
+async def resolve_versions(
+    database_path: Path, packages: Set[str]
+) -> Mapping[str, str]:
     process = create_subprocess_exec(
         "pacinfo",
         "--dbpath",
         str(database_path),
         "--short",
-        *dependencies,
+        *packages,
         stdin=DEVNULL,
         stdout=PIPE,
         stderr=None,
@@ -89,4 +102,66 @@ async def resolve(
         }
     )
 
-    return frozenset([Resolution(lockfile, frozendict())])
+    return lockfile
+
+
+def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str]]:
+    dependencies = {}
+
+    for graph in graphs:
+        for node in graph:
+            if node not in dependencies:
+                dependencies[node] = frozenset(
+                    [edge[1] for edge in graph.out_edges(node)]
+                )
+
+    return dependencies
+
+
+async def resolve(
+    cache_path: Path, requirements_list: Sequence[Set[str]], options: None
+) -> Set[ResolutionGraph]:
+    database_path, _ = get_cache_paths(cache_path)
+
+    if not database_path.exists():
+        await update_database(cache_path)
+
+    async with TaskGroup() as group:
+        tasks_list = [
+            {
+                group.create_task(resolve_pactree(database_path, requirement))
+                for requirement in requirements
+            }
+            for requirements in requirements_list
+        ]
+
+    graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
+
+    roots = tuple(frozenset([root for _, root in graphs]) for graphs in graphs_list)
+
+    versions_task = resolve_versions(
+        database_path,
+        {package for graphs in graphs_list for graph, _ in graphs for package in graph},
+    )
+
+    dependencies = resolve_dependencies(
+        graph for graphs in graphs_list for graph, _ in graphs
+    )
+
+    versions = await versions_task
+
+    return frozenset(
+        [
+            ResolutionGraph(
+                roots,
+                frozendict(
+                    {
+                        package: ResolutionGraphNodeValue(
+                            versions[package], dependencies[package], frozendict()
+                        )
+                        for package in versions
+                    }
+                ),
+            )
+        ]
+    )

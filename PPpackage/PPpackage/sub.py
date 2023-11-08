@@ -9,7 +9,13 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.utils import MyException, Resolution, TemporaryPipe, frozendict
+from PPpackage_utils.utils import (
+    MyException,
+    ResolutionGraph,
+    ResolutionGraphNodeValue,
+    TemporaryPipe,
+    frozendict,
+)
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -23,11 +29,26 @@ async def resolve(
     cache_path: Path,
     requirements_list: Sequence[Set[Any]],
     options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
-    lockfile = frozendict({name: "1.0.0" for name in set(requirements_list[0])})
-    new_requirements = frozendict({"arch": frozenset(["iana-etc"])})
+) -> Set[ResolutionGraph]:
+    requirements_merged = frozenset.union(frozenset(), *requirements_list)
 
-    return frozenset([Resolution(lockfile, new_requirements)])
+    graph = frozendict(
+        {
+            name: ResolutionGraphNodeValue(
+                "1.0.0", frozenset(), frozendict({"arch": frozenset(["iana-etc"])})
+            )
+            for name in requirements_merged
+        }
+    )
+
+    return frozenset(
+        [
+            ResolutionGraph(
+                requirements_list,
+                graph,
+            )
+        ]
+    )
 
 
 async def fetch(

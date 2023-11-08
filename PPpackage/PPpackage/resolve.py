@@ -1,10 +1,7 @@
-from ast import parse
-from asyncio import Lock, TaskGroup, create_subprocess_exec, taskgroups
+from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
 from collections.abc import Iterable, Mapping, Sequence, Set
 from functools import partial, reduce
-from hmac import new
-from itertools import chain as itertools_chain
 from itertools import product as itertools_product
 from pathlib import Path
 from sys import stderr
@@ -13,14 +10,14 @@ from typing import Any, Tuple
 from PPpackage_utils.parse import Lockfile
 from PPpackage_utils.utils import (
     MyException,
-    Resolution,
+    ResolutionGraph,
     asubprocess_communicate,
     frozendict,
     json_dumps,
     json_loads,
 )
 
-from .parse import parse_resolutions
+from .parse import parse_resolution_graphs
 from .sub import resolve as PP_resolve
 
 
@@ -30,7 +27,7 @@ async def resolve_external_manager(
     cache_path: Path,
     requirements_list: Sequence[Set[Any]],
     options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
+) -> Set[ResolutionGraph]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -57,21 +54,23 @@ async def resolve_external_manager(
 
     resolve_input_json_bytes = resolve_input_json.encode("ascii")
 
-    resolutions_bytes = await asubprocess_communicate(
+    resolution_graphs_bytes = await asubprocess_communicate(
         process,
         f"Error in {manager}'s resolve.",
         resolve_input_json_bytes,
     )
 
-    resolutions_string = resolutions_bytes.decode("ascii")
+    resolution_graphs_string = resolution_graphs_bytes.decode("ascii")
 
     if debug:
         print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
-        print(resolutions_string, file=stderr)
+        print(resolution_graphs_string, file=stderr)
 
-    resolutions = parse_resolutions(debug, json_loads(resolutions_string))
+    resolution_graphs = parse_resolution_graphs(
+        debug, json_loads(resolution_graphs_string)
+    )
 
-    return resolutions
+    return resolution_graphs
 
 
 async def resolve_manager(
@@ -80,7 +79,7 @@ async def resolve_manager(
     cache_path: Path,
     requirements: Set[Any],
     options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
+) -> Set[ResolutionGraph]:
     if manager == "PP":
         resolver = PP_resolve
     else:
