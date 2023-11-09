@@ -18,22 +18,30 @@ def get_cache_path(cache_path: Path) -> Path:
     return cache_path / "conan"
 
 
+class DependencyValueJSON(TypedDict):
+    direct: bool
+
+
 class Node(TypedDict):
+    id: str
     ref: str
+    user: str
+    name: str
+    version: str
     package_id: str
     prev: str
-    user: str
     cpp_info: Mapping[str, Any]
+    dependencies: Mapping[str, DependencyValueJSON]
 
 
 def parse_conan_graph_nodes(
     graph_string: str,
-) -> Iterable[Node]:
-    return [
-        node
+) -> Mapping[str, Node]:
+    return {
+        node["id"]: node
         for node in json_loads(graph_string)["graph"]["nodes"].values()
         if node["ref"] != ""
-    ]
+    }
 
 
 @contextmanager

@@ -8,6 +8,6 @@ class Conan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     def requirements(self):
-        {% for leaf_index in leaf_indices %}
-        self.requires("leaf-{{leaf_index}}/1.0.0@pppackage")
+        {% for requirement_index in requirement_indices %}
+        self.requires("requirement-{{requirement_index}}/1.0.0@pppackage")
         {% endfor %}
