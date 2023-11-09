@@ -3,6 +3,7 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
 from collections.abc import (
     AsyncIterator,
+    Hashable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -221,7 +222,7 @@ def json_dumps(obj, **kwargs) -> str:
 class ResolutionGraphNodeValue:
     version: str
     dependencies: Set[str]
-    requirements: Mapping[str, Set[Any]]
+    requirements: Mapping[str, frozenset[Hashable]]
 
 
 @dataclass(frozen=True)
@@ -233,7 +234,7 @@ class ResolutionGraph:
 class ResolutionGraphNodeValueJSON(TypedDict):
     version: str
     dependencies: list[str]
-    requirements: Mapping[str, list[Any]]
+    requirements: Mapping[str, list[Hashable]]
 
 
 class ResolutionGraphJSON(TypedDict):

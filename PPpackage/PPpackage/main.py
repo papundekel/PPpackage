@@ -1,6 +1,7 @@
 from pathlib import Path
 from sys import stderr, stdin
 
+from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.utils import json_dumps, json_load
 from typer import Option as TyperOption
@@ -42,13 +43,24 @@ async def main_command(
         managers = requirements.keys()
         await update_database(debug, managers, cache_path)
 
-    versions = await resolve(
+    graph = await resolve(
         debug, resolve_iteration_limit, cache_path, requirements, options
     )
 
     if debug:
         print(
-            f"DEBUG PPpackage: after resolve, versions: {json_dumps(versions)}",
+            f"DEBUG PPpackage: after resolve, graph:\n {to_pydot(graph).to_string()}",
+            file=stderr,
+        )
+
+    versions = {}
+
+    for (manager, package), data in graph.nodes(data=True):
+        versions.setdefault(manager, {})[package] = data["version"]
+
+    if debug:
+        print(
+            f"DEBUG PPpackage: after resolve, versions:\n {json_dumps(versions, indent=4)}",
             file=stderr,
         )
 
