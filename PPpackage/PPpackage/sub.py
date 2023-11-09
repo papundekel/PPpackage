@@ -1,7 +1,7 @@
-from collections.abc import Iterable, Mapping, Sequence, Set
+from collections.abc import Hashable, Iterable, Mapping, Sequence, Set
 from pathlib import Path
 from sys import stderr
-from typing import Any
+from typing import Any, cast
 
 from PPpackage_utils.io import (
     stream_read_line,
@@ -24,12 +24,25 @@ async def update_database(debug: bool, cache_path: Path) -> None:
     pass
 
 
+def check_requirements_list(
+    requirements_list: Sequence[Set[Hashable]],
+) -> Sequence[Set[str]]:
+    for requirements in requirements_list:
+        for requirement in requirements:
+            if not isinstance(requirement, str):
+                raise MyException("PPpackage: Requirements must be strings.")
+
+    return cast(Sequence[Set[str]], requirements_list)
+
+
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements_list: Sequence[Set[Any]],
+    requirements_list: Sequence[Set[Hashable]],
     options: Mapping[str, Any] | None,
 ) -> Set[ResolutionGraph]:
+    requirements_list = check_requirements_list(requirements_list)
+
     requirements_merged = frozenset.union(frozenset(), *requirements_list)
 
     graph = frozendict(
