@@ -1,8 +1,7 @@
-from collections.abc import Iterable, Mapping, Set
-from os import environ
+from collections.abc import Hashable, Iterable, Mapping, Sequence, Set
 from pathlib import Path
 from sys import stderr
-from typing import Any
+from typing import Any, cast
 
 from PPpackage_utils.io import (
     stream_read_line,
@@ -10,7 +9,13 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.utils import MyException, Resolution, TemporaryPipe, frozendict
+from PPpackage_utils.utils import (
+    MyException,
+    ResolutionGraph,
+    ResolutionGraphNodeValue,
+    TemporaryPipe,
+    frozendict,
+)
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -19,16 +24,44 @@ async def update_database(debug: bool, cache_path: Path) -> None:
     pass
 
 
+def check_requirements_list(
+    requirements_list: Sequence[Set[Hashable]],
+) -> Sequence[Set[str]]:
+    for requirements in requirements_list:
+        for requirement in requirements:
+            if not isinstance(requirement, str):
+                raise MyException("PPpackage: Requirements must be strings.")
+
+    return cast(Sequence[Set[str]], requirements_list)
+
+
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements: Set[Any],
+    requirements_list: Sequence[Set[Hashable]],
     options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
-    lockfile = frozendict({name: "1.0.0" for name in set(requirements)})
-    new_requirements = frozendict({"arch": frozenset(["iana-etc"])})
+) -> Set[ResolutionGraph]:
+    requirements_list = check_requirements_list(requirements_list)
 
-    return frozenset([Resolution(lockfile, new_requirements)])
+    requirements_merged = frozenset.union(frozenset(), *requirements_list)
+
+    graph = frozendict(
+        {
+            name: ResolutionGraphNodeValue(
+                "1.0.0", frozenset(), frozendict({"arch": frozenset(["iana-etc"])})
+            )
+            for name in requirements_merged
+        }
+    )
+
+    return frozenset(
+        [
+            ResolutionGraph(
+                requirements_list,
+                graph,
+            )
+        ]
+    )
 
 
 async def fetch(

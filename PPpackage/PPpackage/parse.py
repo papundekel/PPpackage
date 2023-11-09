@@ -1,10 +1,16 @@
-from collections.abc import Mapping, Set
+from collections.abc import Mapping, Sequence, Set
 from sys import stderr
 from typing import Any, Iterable, TypedDict
 from typing import cast as type_cast
 
 from PPpackage_utils.parse import json_check_format, parse_generators, parse_lockfile
-from PPpackage_utils.utils import MyException, Resolution, frozendict
+from PPpackage_utils.utils import (
+    MyException,
+    ResolutionGraph,
+    ResolutionGraphJSON,
+    ResolutionGraphNodeValue,
+    frozendict,
+)
 
 
 def check_requirements(debug: bool, requirements_json: Any) -> Iterable[Any]:
@@ -103,28 +109,23 @@ def parse_input(
     return meta_requirements, meta_options, generators
 
 
-class ResolutionJSON(TypedDict):
-    lockfile: Any
-    requirements: Any
-
-
-def check_resolution(
+def check_resolution_graph(
     debug: bool,
     resolution_json: Any,
-) -> ResolutionJSON:
+) -> ResolutionGraphJSON:
     return type_cast(
-        ResolutionJSON,
+        ResolutionGraphJSON,
         json_check_format(
             debug,
             resolution_json,
-            {"lockfile", "requirements"},
+            {"roots", "graph"},
             set(),
             "Invalid resolution format.",
         ),
     )
 
 
-def check_resolutions(
+def check_resolution_graphs(
     debug: bool,
     resolutions_json: Any,
 ) -> Iterable[Any]:
@@ -134,27 +135,42 @@ def check_resolutions(
     return resolutions_json
 
 
-def parse_resolution(
+def parse_resolution_graph(
     debug: bool,
-    resolution_json: Any,
-) -> Resolution:
-    resolution_checked = check_resolution(debug, resolution_json)
+    resolution_graph_json: Any,
+) -> ResolutionGraph:
+    resolution_checked = check_resolution_graph(debug, resolution_graph_json)
 
-    lockfile = parse_lockfile(debug, resolution_checked["lockfile"])
-    requirements = parse_meta_requirements(debug, resolution_checked["requirements"])
+    roots = tuple(frozenset(root) for root in resolution_checked["roots"])
 
-    return Resolution(lockfile, requirements)
-
-
-def parse_resolutions(
-    debug: bool,
-    resolutions_json: Any,
-) -> Set[Resolution]:
-    resolutions_checked = check_resolutions(debug, resolutions_json)
-
-    resolutions = frozenset(
-        parse_resolution(debug, resolution_json)
-        for resolution_json in resolutions_checked
+    nodes = frozendict(
+        {
+            name: ResolutionGraphNodeValue(
+                node_json["version"],
+                frozenset(node_json["dependencies"]),
+                frozendict(
+                    {
+                        manager: frozenset(requirements)
+                        for manager, requirements in node_json["requirements"].items()
+                    }
+                ),
+            )
+            for name, node_json in resolution_checked["graph"].items()
+        }
     )
 
-    return resolutions
+    return ResolutionGraph(roots, nodes)
+
+
+def parse_resolution_graphs(
+    debug: bool,
+    resolutions_json: Any,
+) -> Set[ResolutionGraph]:
+    resolution_graphs_checked = check_resolution_graphs(debug, resolutions_json)
+
+    resolution_graphs = frozenset(
+        parse_resolution_graph(debug, resolution_graph_json)
+        for resolution_graph_json in resolution_graphs_checked
+    )
+
+    return resolution_graphs

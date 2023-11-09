@@ -22,7 +22,7 @@ from .utils import (
 def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
     nodes = parse_conan_graph_nodes(input)
 
-    return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes}
+    return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes.values()}
 
 
 def patch_native_generators_paths(

@@ -1,8 +1,17 @@
+import dataclasses
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
-from collections import namedtuple
-from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
+from collections.abc import (
+    AsyncIterator,
+    Hashable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+    Set,
+)
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass, is_dataclass
 from json import JSONEncoder
 from json import dump as json_dump_base
 from json import dumps as json_dumps_base
@@ -13,7 +22,7 @@ from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 from frozendict import frozendict
 
@@ -179,12 +188,6 @@ def json_load(fp) -> Any:
     return json_load_base(fp, object_hook=json_hook)
 
 
-def isinstance_namedtuple(obj) -> bool:
-    return (
-        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
-    )
-
-
 class CustomEncoder(JSONEncoder):
     def default(self, obj: Any) -> Any:
         if isinstance(obj, str):
@@ -197,8 +200,8 @@ class CustomEncoder(JSONEncoder):
             return obj
         elif isinstance(obj, float):
             return obj
-        elif isinstance_namedtuple(obj):
-            return self.default(obj._asdict())
+        elif is_dataclass(obj):
+            return self.default(dataclasses.asdict(obj))
         elif isinstance(obj, Mapping):
             return {self.default(k): self.default(v) for k, v in obj.items()}
         elif isinstance(obj, Iterable):
@@ -215,4 +218,25 @@ def json_dumps(obj, **kwargs) -> str:
     return json_dumps_base(obj, cls=CustomEncoder, **kwargs)
 
 
-Resolution = namedtuple("Resolution", ["lockfile", "requirements"])
+@dataclass(frozen=True)
+class ResolutionGraphNodeValue:
+    version: str
+    dependencies: Set[str]
+    requirements: Mapping[str, frozenset[Hashable]]
+
+
+@dataclass(frozen=True)
+class ResolutionGraph:
+    roots: Sequence[Set[str]]
+    graph: Mapping[str, ResolutionGraphNodeValue]
+
+
+class ResolutionGraphNodeValueJSON(TypedDict):
+    version: str
+    dependencies: list[str]
+    requirements: Mapping[str, list[Hashable]]
+
+
+class ResolutionGraphJSON(TypedDict):
+    roots: Sequence[list[str]]
+    graph: Mapping[str, ResolutionGraphNodeValueJSON]
