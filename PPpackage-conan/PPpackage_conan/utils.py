@@ -1,4 +1,4 @@
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from os import environ
 from pathlib import Path
@@ -28,6 +28,7 @@ class Node(TypedDict):
     user: str
     name: str
     version: str
+    rrev: str
     package_id: str
     prev: str
     cpp_info: Mapping[str, Any]

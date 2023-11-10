@@ -9,23 +9,19 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
-from sys import stderr
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 from typing import cast as typing_cast
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from pkg_resources import require
-from PPpackage_utils.parse import Lockfile
 from PPpackage_utils.utils import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
     asubprocess_communicate,
     ensure_dir_exists,
     frozendict,
-    json_dumps,
 )
 
 from .utils import (
@@ -171,7 +167,7 @@ def parse_conan_graph_resolve(graph_string: str) -> ResolutionGraph:
                 )
             )
         elif user != "pppackage":
-            version = node["version"]
+            version = f"{node['version']}#{node['rrev']}"
 
             graph[name] = ResolutionGraphNodeValue(
                 version, frozenset(parse_direct_dependencies(nodes, node)), frozendict()

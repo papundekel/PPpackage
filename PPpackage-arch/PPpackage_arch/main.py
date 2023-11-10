@@ -1,6 +1,6 @@
 from PPpackage_utils.app import init, run
 from PPpackage_utils.parse import parse_lockfile, parse_products
-from PPpackage_utils.utils import noop
+from PPpackage_utils.utils import anoop, noop
 
 from .fetch import fetch
 from .install import install
@@ -14,6 +14,7 @@ def main():
         update_database,
         resolve,
         fetch,
+        anoop,
         install,
         parse_requirements,
         noop,

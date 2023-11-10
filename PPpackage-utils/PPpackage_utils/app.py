@@ -6,7 +6,12 @@ from pathlib import Path
 from sys import exit, stderr, stdin, stdout
 from typing import Any
 
-from PPpackage_utils.parse import parse_fetch_input, parse_resolve_input
+from PPpackage_utils.parse import (
+    GenerateInputPackagesValue,
+    parse_fetch_input,
+    parse_generate_input,
+    parse_resolve_input,
+)
 from typer import Typer
 
 from .utils import (
@@ -55,15 +60,25 @@ def callback(debug: bool = False) -> None:
 
 
 def init(
-    database_updater: Callable[[Path], Awaitable[None]],
-    resolver: Callable[
+    update_database_callback: Callable[[Path], Awaitable[None]],
+    resolve_callback: Callable[
         [Path, Sequence[Set[Any]], Any], Awaitable[Set[ResolutionGraph]]
     ],
-    fetcher: Callable[
-        [Path, Mapping[str, str], Any, Set[str], Path],
+    fetch_callback: Callable[
+        [Path, Mapping[str, str], Any],
         Awaitable[Mapping[str, str]],
     ],
-    installer: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
+    generate_callback: Callable[
+        [
+            Path,
+            Set[str],
+            Path,
+            Any,
+            Mapping[str, GenerateInputPackagesValue],
+        ],
+        Awaitable[None],
+    ],
+    install_callback: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
     requirements_parser: Callable[[bool, Any], Set[Any]],
     options_parser: Callable[[bool, Any], Any],
     lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
@@ -71,7 +86,7 @@ def init(
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
-        await database_updater(cache_path)
+        await update_database_callback(cache_path)
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:
@@ -81,11 +96,14 @@ def init(
             __debug, requirements_parser, options_parser, input
         )
 
-        resolution_graphs = await resolver(cache_path, requirements_list, options)
+        resolution_graphs = await resolve_callback(
+            cache_path, requirements_list, options
+        )
 
         if __debug:
             print(
-                f"DEBUG: PPpackage-utils: resolver returned {json_dumps(resolution_graphs)}",
+                f"DEBUG: PPpackage-utils: "
+                f"resolver returned {json_dumps(resolution_graphs)}",
                 file=stderr,
             )
 
@@ -94,15 +112,31 @@ def init(
         json_dump(resolution_graphs, stdout, indent=indent)
 
     @__app.command()
-    async def fetch(cache_path: Path, generators_path: Path) -> None:
+    async def fetch(cache_path: Path) -> None:
         input = json_load(stdin)
 
-        lockfile, options, generators = parse_fetch_input(
+        lockfile, options = parse_fetch_input(
             __debug, lockfile_parser, options_parser, input
         )
 
-        product_ids = await fetcher(
-            cache_path, lockfile, options, generators, generators_path
+        product_ids = await fetch_callback(cache_path, lockfile, options)
+
+        indent = 4 if __debug else None
+
+        json_dump(product_ids, stdout, indent=indent)
+
+    @__app.command()
+    async def generate(cache_path: Path, generators_path: Path) -> None:
+        input = json_load(stdin)
+
+        input = parse_generate_input(__debug, input)
+
+        product_ids = await generate_callback(
+            cache_path,
+            input.generators,
+            generators_path,
+            input.options,
+            input.packages,
         )
 
         indent = 4 if __debug else None
@@ -122,7 +156,7 @@ def init(
 
         products = products_parser(__debug, input)
 
-        await installer(
+        await install_callback(
             cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
         )
 

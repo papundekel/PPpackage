@@ -71,8 +71,6 @@ async def fetch(
     cache_path: Path,
     versions: Mapping[str, str],
     options: Mapping[str, Any] | None,
-    generators: Iterable[str],
-    generators_path: Path,
 ) -> Mapping[str, str]:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
@@ -133,6 +131,18 @@ async def fetch(
     product_ids = {name: "id" for name in versions.keys()}
 
     return product_ids
+
+
+async def generate(
+    debug: bool,
+    cache_path: Path,
+    generators: Iterable[str],
+    generators_path: Path,
+    options: Mapping[str, Any] | None,
+    versions: Mapping[str, str],
+    product_ids: Mapping[str, str],
+):
+    pass
 
 
 async def install(

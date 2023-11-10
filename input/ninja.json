@@ -40,7 +40,6 @@
     "generators": [
         "CMakeDeps",
         "CMakeToolchain",
-        "info",
         "versions"
     ]
 }

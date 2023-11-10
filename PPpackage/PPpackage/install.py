@@ -28,16 +28,12 @@ from PPpackage_utils.utils import (
 )
 
 from .sub import install as PP_install
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
-
-
-def merge_lockfiles(
-    versions: Mapping[str, str], product_ids: Mapping[str, str]
-) -> Mapping[str, Mapping[str, str]]:
-    return {
-        package: {"version": versions[package], "product_id": product_ids[package]}
-        for package in versions.keys() & product_ids.keys()
-    }
+from .utils import (
+    communicate_with_daemon,
+    machine_id_relative_path,
+    merge_lockfiles,
+    read_machine_id,
+)
 
 
 async def install_manager_command(

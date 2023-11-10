@@ -3,7 +3,8 @@ from sys import stderr
 from typing import Any, Sequence, TypedDict
 from typing import cast as type_cast
 
-from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict
+from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict, json_dumps
+from pydantic import BaseModel, ValidationError
 
 
 def json_check_format(
@@ -28,7 +29,8 @@ def json_check_format(
             print(f"json_check_format: {input_json}", file=stderr)
 
         raise MyException(
-            f"{error_message} Must be a JSON object with keys {keys_required} required and {keys_permitted_unequired} optional."
+            f"{error_message} Must be a JSON object with keys {keys_required} required"
+            f"and {keys_permitted_unequired} optional."
         )
 
     return input_json
@@ -162,7 +164,6 @@ def parse_resolve_input(
 class FetchInput(TypedDict):
     lockfile: Any
     options: Any
-    generators: Any
 
 
 def check_fetch_input(debug: bool, input_json: Any) -> FetchInput:
@@ -171,7 +172,7 @@ def check_fetch_input(debug: bool, input_json: Any) -> FetchInput:
         json_check_format(
             debug,
             input_json,
-            {"lockfile", "options", "generators"},
+            {"lockfile", "options"},
             set(),
             "Invalid fetch input format.",
         ),
@@ -183,11 +184,33 @@ def parse_fetch_input(
     lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
     options_parser: Callable[[bool, Any], Any],
     input_json: Any,
-) -> tuple[Mapping[str, str], Any, Set[str]]:
+) -> tuple[Mapping[str, str], Any]:
     input_checked = check_fetch_input(debug, input_json)
 
     lockfile = lockfile_parser(debug, input_checked["lockfile"])
     options = options_parser(debug, input_checked["options"])
-    generators = parse_generators(input_checked["generators"])
 
-    return lockfile, options, generators
+    return lockfile, options
+
+
+class GenerateInputPackagesValue(BaseModel):
+    version: str
+    product_id: str
+
+
+class GenerateInput(BaseModel):
+    generators: Set[str]
+    packages: Mapping[str, GenerateInputPackagesValue]
+    options: Mapping[str, Any] | None
+
+
+def parse_generate_input(
+    debug: bool,
+    input_json: Any,
+) -> GenerateInput:
+    try:
+        return GenerateInput.model_validate(input_json)
+    except ValidationError:
+        raise MyException(
+            f"Invalid generate input format: {json_dumps(input_json, indent=4)}."
+        )
