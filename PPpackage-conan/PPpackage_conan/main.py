@@ -3,6 +3,7 @@ from PPpackage_utils.parse import parse_lockfile, parse_products
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch
+from .generate import generate
 from .install import install
 from .parse import parse_options, parse_requirements
 from .resolve import resolve
@@ -17,14 +18,17 @@ def main():
         lambda cache_path, requirements, options: resolve(
             data_path, cache_path, requirements, options
         ),
-        lambda cache_path, lockfile, options, generators, generators_path: fetch(
+        lambda cache_path, lockfile, options: fetch(
+            data_path, cache_path, lockfile, options
+        ),
+        lambda cache_path, generators, generators_path, options, packages: generate(
             data_path,
             deployer_path,
             cache_path,
-            lockfile,
-            options,
             generators,
             generators_path,
+            options,
+            packages,
         ),
         install,
         parse_requirements,

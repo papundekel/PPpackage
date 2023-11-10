@@ -2,12 +2,12 @@ from conan import ConanFile
 
 
 class Conan(ConanFile):
-    virtualbuildenv = {% if "VirtualBuildEnv" in generators %}True{% else %}False{% endif %}
-    virtualrunenv = {% if "VirtualRunEnv" in generators %}True{% else %}False{% endif %}
-    generators = [{% for generator in generators %}{% if generator not in ["VirtualBuildEnv", "VirtualRunEnv"] %}"{{generator}}"{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}]
+    virtualbuildenv = False
+    virtualrunenv = False
+    generators = []
     settings = "os", "arch", "compiler", "build_type"
 
     def requirements(self):
-        {% for package, version in lockfile.items() %}
+        {% for package, version in packages %}
         self.requires("{{package}}/{{version}}")
         {% endfor %}

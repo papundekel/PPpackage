@@ -14,8 +14,6 @@ async def fetch(
     cache_path: Path,
     lockfile: Mapping[str, str],
     options: Any,
-    generators: Set[str],
-    generators_path: Path,
 ) -> Mapping[str, str]:
     database_path, cache_path = get_cache_paths(cache_path)
 

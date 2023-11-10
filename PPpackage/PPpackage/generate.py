@@ -6,8 +6,7 @@ from pathlib import Path
 from sys import stderr
 from typing import Any, Iterable
 
-from networkx import partial_duplication_graph
-from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
+from PPpackage_utils.utils import asubprocess_communicate, json_dumps
 
 from .generators import builtin as builtin_generators
 from .sub import generate as PP_generate
@@ -97,7 +96,7 @@ async def generate(
                     debug,
                     cache_path,
                     manager,
-                    generators,
+                    generators - builtin_generators.keys(),
                     generators_path,
                     meta_options.get(manager),
                     versions,
