@@ -8,6 +8,7 @@ from typer import Option as TyperOption
 from typing_extensions import Annotated
 
 from .fetch import fetch
+from .generate import generate
 from .install import install
 from .parse import parse_input
 from .resolve import resolve
@@ -71,12 +72,14 @@ async def main_command(
         cache_path,
         versions,
         options,
-        generators,
-        generators_path,
     )
 
     if debug:
         print("DEBUG PPpackage: after fetch", file=stderr)
+
+    await generate(
+        debug, cache_path, generators, generators_path, options, versions, product_ids
+    )
 
     await install(
         debug,
