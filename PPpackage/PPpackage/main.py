@@ -3,14 +3,15 @@ from sys import stderr, stdin
 
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.utils import json_dumps, json_load
+from PPpackage_utils.parse import model_validate
+from PPpackage_utils.utils import json_dumps
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
 from .fetch import fetch
 from .generate import generate
 from .install import install
-from .parse import parse_input
+from .parse import Input
 from .resolve import resolve
 from .update_database import update_database
 
@@ -28,24 +29,23 @@ async def main_command(
     debug: bool = False,
     resolve_iteration_limit: int = 10,
 ) -> None:
-    requirements_generators_input = json_load(stdin)
+    input_json_bytes = stdin.buffer.read()
 
-    requirements, options, generators = parse_input(
-        debug, requirements_generators_input
-    )
+    input = model_validate(Input, input_json_bytes)
 
     if debug:
         print(
-            f"DEBUG PPpackage: after parse, requirements: {json_dumps(requirements)}",
+            f"DEBUG PPpackage: after parse, "
+            f"requirements: {json_dumps(input.requirements)}",
             file=stderr,
         )
 
     if do_update_database:
-        managers = requirements.keys()
+        managers = input.requirements.keys()
         await update_database(debug, managers, cache_path)
 
     graph = await resolve(
-        debug, resolve_iteration_limit, cache_path, requirements, options
+        debug, resolve_iteration_limit, cache_path, input.requirements, input.options
     )
 
     if debug:
@@ -60,7 +60,7 @@ async def main_command(
         runner_workdir_path,
         cache_path,
         graph,
-        options,
+        input.options,
     )
 
     if debug:
@@ -77,7 +77,13 @@ async def main_command(
     }
 
     await generate(
-        debug, cache_path, generators, generators_path, options, versions, product_ids
+        debug,
+        cache_path,
+        input.generators,
+        generators_path,
+        input.options,
+        versions,
+        product_ids,
     )
 
     await install(

@@ -1,10 +1,20 @@
 from collections.abc import Callable, Mapping, Set
 from sys import stderr
-from typing import Any, Sequence, TypedDict, TypeVar
+from typing import Annotated, Any, Sequence, TypedDict, TypeVar
 from typing import cast as type_cast
 
-from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict, json_dumps
-from pydantic import BaseModel, RootModel, ValidationError
+from PPpackage_utils.utils import MyException, Product, frozendict
+from pydantic import BaseModel, BeforeValidator, RootModel, ValidationError
+
+
+def frozen_validator(value: Any) -> Any:
+    if type(value) is dict:
+        return frozendict(value)
+
+    return value
+
+
+FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -57,25 +67,6 @@ def json_check_format(
     return input_json
 
 
-def check_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    if type(lockfile_json) is not frozendict:
-        raise MyException("Invalid lockfile format: not a dict.")
-
-    for version_json in lockfile_json.values():
-        if type(version_json) is not str:
-            raise MyException(
-                f"Invalid lockfile version format: `{version_json}` not a string."
-            )
-
-    return lockfile_json
-
-
-def parse_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    lockfile_checked = check_lockfile(debug, lockfile_json)
-
-    return lockfile_checked
-
-
 def check_generators(debug: bool, generators_json: Any) -> Sequence[str]:
     if type(generators_json) is not list:
         raise MyException("Invalid generators format. Must be a JSON array.")
@@ -85,17 +76,6 @@ def check_generators(debug: bool, generators_json: Any) -> Sequence[str]:
             raise MyException("Invalid generator format. Must be a string.")
 
     return generators_json
-
-
-def parse_generators(generators_json: Any) -> Set[str]:
-    generators_checked = check_generators(False, generators_json)
-
-    generators = set(generators_checked)
-
-    if len(generators) != len(generators_checked):
-        raise MyException("Invalid generators format. Generators must be unique.")
-
-    return generators
 
 
 class VersionInfo(TypedDict):
