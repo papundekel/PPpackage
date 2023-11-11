@@ -1,9 +1,8 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, MutableMapping
+from collections.abc import MutableMapping
 from pathlib import Path
 from sys import stderr
-from typing import Any
 
 from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
 from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, fakeroot

@@ -2,7 +2,6 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping
 from pathlib import Path
-from sys import stderr
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
@@ -12,7 +11,6 @@ from PPpackage_utils.utils import asubprocess_communicate
 
 from .utils import (
     GraphInfo,
-    Options,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
