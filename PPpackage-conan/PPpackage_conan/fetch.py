@@ -6,9 +6,15 @@ from pathlib import Path
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
+from PPpackage_utils.parse import (
+    FetchInput,
+    FetchOutput,
+    FetchOutputValue,
+    model_validate_obj,
+)
 from PPpackage_utils.utils import asubprocess_communicate
 
+from .parse import FetchProductInfo
 from .utils import (
     GraphInfo,
     create_and_render_temp_file,
@@ -46,11 +52,9 @@ async def fetch(
     for package, value in input.packages.items():
         packages.append((package, value.version))
 
-    for package, info in input.product_infos.get("conan", {}).items():
-        if isinstance(info, Mapping):
-            version = info.get("version")
-            if version is not None:
-                packages.append((package, version))
+    for package, product_info_raw in input.product_infos.get("conan", {}).items():
+        product_info = model_validate_obj(FetchProductInfo, product_info_raw)
+        packages.append((package, product_info.version))
 
     with (
         create_and_render_temp_file(
@@ -88,10 +92,9 @@ async def fetch(
     output = {
         package: FetchOutputValue(
             product_id=graph_info.product_id,
-            product_info={
-                "version": graph_info.version,
-                "cpp_info": graph_info.cpp_info,
-            },
+            product_info=FetchProductInfo(
+                version=graph_info.version, cpp_info=graph_info.cpp_info
+            ),
         )
         for package, graph_info in graph_infos.items()
     }

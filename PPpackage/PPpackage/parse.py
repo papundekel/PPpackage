@@ -1,5 +1,4 @@
 from collections.abc import Iterable, Mapping, Set
-from sys import stderr
 from typing import Any
 from typing import cast as type_cast
 

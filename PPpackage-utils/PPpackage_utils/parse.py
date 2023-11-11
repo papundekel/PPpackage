@@ -19,6 +19,15 @@ FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 T = TypeVar("T", bound=BaseModel)
 
 
+def model_validate_obj(Model: type[T], obj: Any) -> T:
+    try:
+        input = Model.model_validate(obj)
+
+        return input
+    except ValidationError as e:
+        raise MyException(f"Invalid model format:\n{e}.")
+
+
 def model_validate(Model: type[T], input_json_bytes: bytes) -> T:
     input_json_string = input_json_bytes.decode("utf-8")
 
@@ -26,8 +35,8 @@ def model_validate(Model: type[T], input_json_bytes: bytes) -> T:
         input = Model.model_validate_json(input_json_string)
 
         return input
-    except ValidationError:
-        raise MyException(f"Invalid generate input format:\n{input_json_string}.")
+    except ValidationError as e:
+        raise MyException(f"Invalid model format:\n{e}\n{input_json_string}.")
 
 
 def model_dump(debug: bool, output: BaseModel) -> bytes:

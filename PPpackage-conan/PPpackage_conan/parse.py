@@ -4,6 +4,7 @@ from typing import cast as type_cast
 
 from PPpackage_utils.parse import json_check_format
 from PPpackage_utils.utils import MyException, frozendict
+from pydantic import BaseModel
 
 from .utils import Options, Requirement
 
@@ -78,3 +79,8 @@ def parse_options(debug: bool, options_json: Any) -> Options:
     options_checked = check_options(debug, options_json)
 
     return options_checked
+
+
+class FetchProductInfo(BaseModel):
+    version: str
+    cpp_info: Any
