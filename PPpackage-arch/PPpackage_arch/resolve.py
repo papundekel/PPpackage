@@ -1,18 +1,15 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Sequence, Set
+from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
-from sys import stderr
 
 from networkx import MultiDiGraph, nx_pydot
-from PPpackage_utils.utils import (
-    MyException,
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
-    frozendict,
-    json_dumps,
+    ResolveInput,
 )
+from PPpackage_utils.utils import MyException, asubprocess_communicate, frozendict
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -118,9 +115,7 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
     return dependencies
 
 
-async def resolve(
-    cache_path: Path, requirements_list: Sequence[Set[str]], options: None
-) -> Set[ResolutionGraph]:
+async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionGraph]:
     database_path, _ = get_cache_paths(cache_path)
 
     if not database_path.exists():
@@ -132,7 +127,7 @@ async def resolve(
                 group.create_task(resolve_pactree(database_path, requirement))
                 for requirement in requirements
             }
-            for requirements in requirements_list
+            for requirements in input.requirements_list
         ]
 
     graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]

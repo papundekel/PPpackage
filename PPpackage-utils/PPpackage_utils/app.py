@@ -1,29 +1,26 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Mapping, Sequence, Set
+from collections.abc import Awaitable, Callable, Mapping, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import exit, stderr, stdin, stdout
-from typing import Any
+from typing import Any, TypeVar
 
 from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
+    GenerateInput,
     GenerateInputPackagesValue,
-    parse_generate_input,
-    parse_resolve_input,
+    InstallInput,
+    ResolveInput,
+    model_dump,
+    model_validate,
 )
+from pydantic import RootModel
 from typer import Typer
 
-from .utils import (
-    MyException,
-    Product,
-    ResolutionGraph,
-    ensure_dir_exists,
-    json_dump,
-    json_dumps,
-    json_load,
-)
+from .parse import Product, ResolutionGraph
+from .utils import MyException, ensure_dir_exists
 
 
 class AsyncTyper(Typer):
@@ -60,10 +57,13 @@ def callback(debug: bool = False) -> None:
     __debug = debug
 
 
+T = TypeVar("T")
+
+
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
-        [Path, Sequence[Set[Any]], Any], Awaitable[Set[ResolutionGraph]]
+        [Path, ResolveInput[T]], Awaitable[Set[ResolutionGraph]]
     ],
     fetch_callback: Callable[[Path, FetchInput], Awaitable[FetchOutput]],
     generate_callback: Callable[
@@ -76,10 +76,8 @@ def init(
         ],
         Awaitable[None],
     ],
-    install_callback: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
-    products_parser: Callable[[bool, Any], Set[Product]],
+    install_callback: Callable[[Path, Path, Path, Path, Set[Product]], Awaitable[None]],
+    RequirementType: type[T],
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
@@ -87,56 +85,41 @@ def init(
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:
-        input = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        requirements_list, options = parse_resolve_input(
-            __debug, requirements_parser, options_parser, input
-        )
+        input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
 
-        resolution_graphs = await resolve_callback(
-            cache_path, requirements_list, options
-        )
+        output = await resolve_callback(cache_path, input)
 
-        if __debug:
-            print(
-                f"DEBUG: PPpackage-utils: "
-                f"resolver returned {json_dumps(resolution_graphs)}",
-                file=stderr,
-            )
+        output_json_bytes = model_dump(__debug, RootModel[Set[ResolutionGraph]](output))
 
-        indent = 4 if __debug else None
-
-        json_dump(resolution_graphs, stdout, indent=indent)
+        stdout.buffer.write(output_json_bytes)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
-        input_json = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        input = FetchInput.model_validate(input_json)
+        input = model_validate(__debug, FetchInput, input_json_bytes)
 
         output = await fetch_callback(cache_path, input)
 
-        indent = 4 if __debug else None
+        output_json_bytes = model_dump(__debug, output)
 
-        json_dump(output.model_dump(), stdout, indent=indent)
+        stdout.buffer.write(output_json_bytes)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
-        input = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        input = parse_generate_input(__debug, input)
+        input = model_validate(__debug, GenerateInput, input_json_bytes)
 
-        product_ids = await generate_callback(
+        await generate_callback(
             cache_path,
             input.generators,
             generators_path,
             input.options,
             input.packages,
         )
-
-        indent = 4 if __debug else None
-
-        json_dump(product_ids, stdout, indent=indent)
 
     @__app.command()
     async def install(
@@ -145,14 +128,18 @@ def init(
         pipe_from_sub_path: Path,
         pipe_to_sub_path: Path,
     ) -> None:
-        input = json_load(stdin)
-
         ensure_dir_exists(destination_path)
 
-        products = products_parser(__debug, input)
+        input_json_bytes = stdin.buffer.read()
+
+        input = model_validate(__debug, InstallInput, input_json_bytes)
 
         await install_callback(
-            cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
+            cache_path,
+            destination_path,
+            pipe_from_sub_path,
+            pipe_to_sub_path,
+            input.root,
         )
 
     return __app

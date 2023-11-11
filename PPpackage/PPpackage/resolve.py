@@ -5,26 +5,20 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from frozendict import frozendict
-from networkx import (
-    MultiDiGraph,
-    NetworkXNoCycle,
-    find_cycle,
-    is_directed_acyclic_graph,
-)
-from PPpackage_utils.utils import (
-    MyException,
+from networkx import MultiDiGraph, is_directed_acyclic_graph
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
-    json_dumps,
-    json_loads,
+    ResolveInput,
+    model_dump,
+    model_validate,
 )
+from PPpackage_utils.utils import MyException, asubprocess_communicate
+from pydantic import RootModel
 
-from .parse import parse_resolution_graphs
 from .sub import resolve as PP_resolve
 
 
@@ -32,8 +26,7 @@ async def resolve_external_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    requirements_list: Sequence[Set[Hashable]],
-    options: Mapping[str, Any] | None,
+    input: ResolveInput[Any],
 ) -> Set[ResolutionGraph]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -45,47 +38,24 @@ async def resolve_external_manager(
         stderr=None,
     )
 
-    indent = 4 if debug else None
+    input_json_bytes = model_dump(debug, input)
 
-    resolve_input_json = json_dumps(
-        {
-            "requirements": requirements_list,
-            "options": options,
-        },
-        indent=indent,
-    )
-
-    if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s resolve:", file=stderr)
-        print(resolve_input_json, file=stderr)
-
-    resolve_input_json_bytes = resolve_input_json.encode("ascii")
-
-    resolution_graphs_bytes = await asubprocess_communicate(
+    output_json_bytes = await asubprocess_communicate(
         process,
         f"Error in {manager}'s resolve.",
-        resolve_input_json_bytes,
+        input_json_bytes,
     )
 
-    resolution_graphs_string = resolution_graphs_bytes.decode("ascii")
+    output = model_validate(debug, RootModel[Set[ResolutionGraph]], output_json_bytes)
 
-    if debug:
-        print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
-        print(resolution_graphs_string, file=stderr)
-
-    resolution_graphs = parse_resolution_graphs(
-        debug, json_loads(resolution_graphs_string)
-    )
-
-    return resolution_graphs
+    return output.root
 
 
 async def resolve_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    requirements_list: Sequence[Set[Hashable]],
-    options: Mapping[str, Any] | None,
+    input: ResolveInput[Any],
 ) -> Set[ResolutionGraph]:
     if manager == "PP":
         resolver = PP_resolve
@@ -95,8 +65,7 @@ async def resolve_manager(
     resolutions = await resolver(
         debug=debug,
         cache_path=cache_path,
-        requirements_list=requirements_list,
-        options=options,
+        input=input,
     )
 
     return resolutions
@@ -162,8 +131,10 @@ async def resolve_iteration(
                         debug=debug,
                         manager=manager,
                         cache_path=cache_path,
-                        requirements_list=requirements_list,
-                        options=meta_options.get(manager),
+                        input=ResolveInput[Any](
+                            requirements_list=requirements_list,
+                            options=meta_options.get(manager),
+                        ),
                     )
                 ),
             )

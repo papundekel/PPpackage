@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from functools import partial
 from io import TextIOWrapper
 from os import listdir
@@ -20,20 +20,11 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.utils import (
-    MyException,
-    TemporaryPipe,
-    asubprocess_communicate,
-    json_dumps,
-)
+from PPpackage_utils.parse import InstallInput, Product, model_dump
+from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
 
 from .sub import install as PP_install
-from .utils import (
-    communicate_with_daemon,
-    machine_id_relative_path,
-    merge_lockfiles,
-    read_machine_id,
-)
+from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
 
 async def install_manager_command(
@@ -83,8 +74,7 @@ async def install_external_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
+    products: Set[Product],
 ) -> None:
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
         if debug:
@@ -106,24 +96,14 @@ async def install_external_manager(
             stderr=None,
         )
 
-        products = merge_lockfiles(versions, product_ids)
-
-        indent = 4 if debug else None
-
-        products_json = json_dumps(products, indent=indent)
-
-        if debug:
-            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=stderr)
-            print(products_json, file=stderr)
-
-        products_json_bytes = products_json.encode("ascii")
+        input_json_bytes = model_dump(debug, InstallInput(products))
 
         process = await process_creation
 
         if process.stdin is None:
             raise MyException(f"Error in {manager}'s install.")
 
-        process.stdin.write(products_json_bytes)
+        process.stdin.write(input_json_bytes)
         process.stdin.close()
         await process.stdin.wait_closed()
 
@@ -167,13 +147,11 @@ async def install_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
+    products: Set[Product],
 ) -> None:
     if manager == "PP":
         installer = partial(
-            PP_install,
-            destination_path=daemon_workdir_path / destination_relative_path,
+            PP_install, destination_path=daemon_workdir_path / destination_relative_path
         )
     else:
         installer = partial(
@@ -185,12 +163,7 @@ async def install_manager(
             destination_relative_path=destination_relative_path,
         )
 
-    await installer(
-        debug=debug,
-        cache_path=cache_path,
-        versions=versions,
-        product_ids=product_ids,
-    )
+    await installer(debug=debug, cache_path=cache_path, products=products)
 
 
 def generate_machine_id(machine_id_path: Path):
@@ -211,8 +184,7 @@ async def install(
     runner_path: Path,
     runner_workdir_path: Path,
     destination_path: Path,
-    meta_versions: Mapping[str, Mapping[str, str]],
-    meta_product_ids: Mapping[str, Mapping[str, str]],
+    meta_products: Mapping[str, Set[Product]],
 ) -> None:
     workdir_relative_path = Path("root")
 
@@ -239,9 +211,7 @@ async def install(
     ):
         stream_write_string(debug, "PPpackage", daemon_writer, machine_id)
 
-        for manager, versions in meta_versions.items():
-            product_ids = meta_product_ids[manager]
-
+        for manager, products in meta_products.items():
             await install_manager(
                 debug,
                 manager,
@@ -250,8 +220,7 @@ async def install(
                 daemon_writer,
                 runner_workdir_path,
                 workdir_relative_path,
-                versions,
-                product_ids,
+                products,
             )
 
         for content in listdir(runner_workdir_path / workdir_relative_path):

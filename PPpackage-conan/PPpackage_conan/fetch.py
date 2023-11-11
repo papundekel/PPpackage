@@ -1,27 +1,26 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
+from PPpackage_utils.parse import (
+    FetchInput,
+    FetchOutput,
+    FetchOutputValue,
+    model_validate_obj,
+)
 from PPpackage_utils.utils import asubprocess_communicate
 
+from .parse import FetchProductInfo
 from .utils import (
-    GraphInfo,
+    FetchNode,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
     parse_conan_graph_nodes,
 )
-
-
-def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
-    nodes = parse_conan_graph_nodes(input)
-
-    return {node["name"]: GraphInfo(node) for node in nodes.values()}
 
 
 async def fetch(
@@ -46,11 +45,9 @@ async def fetch(
     for package, value in input.packages.items():
         packages.append((package, value.version))
 
-    for package, info in input.product_infos.get("conan", {}).items():
-        if isinstance(info, Mapping):
-            version = info.get("version")
-            if version is not None:
-                packages.append((package, version))
+    for package, product_info_raw in input.product_infos.get("conan", {}).items():
+        product_info = model_validate_obj(FetchProductInfo, product_info_raw)
+        packages.append((package, product_info.version))
 
     with (
         create_and_render_temp_file(
@@ -79,21 +76,20 @@ async def fetch(
             env=environment,
         )
 
-        graph_json = await asubprocess_communicate(
+        graph_json_bytes = await asubprocess_communicate(
             await process, "Error in `conan install`"
         )
 
-    graph_infos = parse_conan_graph_fetch(graph_json.decode("ascii"))
+    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
     output = {
-        package: FetchOutputValue(
-            product_id=graph_info.product_id,
-            product_info={
-                "version": graph_info.version,
-                "cpp_info": graph_info.cpp_info,
-            },
+        node.name: FetchOutputValue(
+            product_id=node.get_product_id(),
+            product_info=FetchProductInfo(
+                version=node.get_version(), cpp_info=node.cpp_info
+            ),
         )
-        for package, graph_info in graph_infos.items()
+        for node in nodes.values()
     }
 
     return FetchOutput(output)

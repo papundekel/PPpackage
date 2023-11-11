@@ -1,11 +1,10 @@
 from PPpackage_utils.app import init, run
-from PPpackage_utils.parse import parse_products
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch
 from .generate import generate
 from .install import install
-from .parse import parse_options, parse_requirements
+from .parse import Requirement
 from .resolve import resolve
 from .utils import get_package_paths
 
@@ -15,9 +14,7 @@ def main():
 
     app = init(
         anoop,
-        lambda cache_path, requirements, options: resolve(
-            data_path, cache_path, requirements, options
-        ),
+        lambda cache_path, input: resolve(data_path, cache_path, input),
         lambda cache_path, input: fetch(data_path, cache_path, input),
         lambda cache_path, generators, generators_path, options, packages: generate(
             data_path,
@@ -29,8 +26,6 @@ def main():
             packages,
         ),
         install,
-        parse_requirements,
-        parse_options,
-        parse_products,
+        Requirement,
     )
     run(app, "conan")

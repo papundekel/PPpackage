@@ -1,164 +1,95 @@
-from collections.abc import Callable, Mapping, Set
+from collections.abc import Hashable, Mapping, Set
 from sys import stderr
-from typing import Any, Sequence, TypedDict
-from typing import cast as type_cast
+from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
 
-from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict, json_dumps
-from pydantic import BaseModel, RootModel, ValidationError
+from PPpackage_utils.utils import MyException, frozendict
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    GetCoreSchemaHandler,
+    RootModel,
+    ValidationError,
+)
+from pydantic.dataclasses import dataclass
+from pydantic_core import CoreSchema, core_schema
+
+Key = TypeVar("Key")
+Value = TypeVar("Value")
 
 
-def json_check_format(
-    debug: bool,
-    input_json: Any,
-    keys_required: Set[str],
-    keys_permitted_unequired: Set[str],
-    error_message: str,
-) -> Mapping[str, Any]:
-    if type(input_json) is not frozendict:
-        raise MyException(error_message)
+class FrozenDictAnnotation(Generic[Key, Value]):
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        key, value = get_args(source_type)
 
-    keys = input_json.keys()
-
-    keys_permitted = keys_required | keys_permitted_unequired
-
-    are_present_required = keys_required <= keys
-    are_present_only_permitted = keys <= keys_permitted
-
-    if not are_present_required or not are_present_only_permitted:
-        if debug:
-            print(f"json_check_format: {input_json}", file=stderr)
-
-        raise MyException(
-            f"{error_message} Must be a JSON object with keys {keys_required} required"
-            f"and {keys_permitted_unequired} optional."
+        return core_schema.no_info_after_validator_function(
+            lambda x: frozendict(x),
+            core_schema.dict_schema(
+                handler.generate_schema(key), handler.generate_schema(value)
+            ),
         )
 
-    return input_json
+
+def frozen_validator(value: Any) -> Any:
+    if type(value) is dict:
+        return frozendict(value)
+
+    return value
 
 
-def check_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    if type(lockfile_json) is not frozendict:
-        raise MyException("Invalid lockfile format: not a dict.")
+FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
-    for version_json in lockfile_json.values():
-        if type(version_json) is not str:
-            raise MyException(
-                f"Invalid lockfile version format: `{version_json}` not a string."
-            )
-
-    return lockfile_json
+ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
-def parse_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    lockfile_checked = check_lockfile(debug, lockfile_json)
+def model_validate_obj(Model: type[ModelType], obj: Any) -> ModelType:
+    try:
+        input = Model.model_validate(obj)
 
-    return lockfile_checked
-
-
-def check_generators(debug: bool, generators_json: Any) -> Sequence[str]:
-    if type(generators_json) is not list:
-        raise MyException("Invalid generators format. Must be a JSON array.")
-
-    for generator_json in generators_json:
-        if type(generator_json) is not str:
-            raise MyException("Invalid generator format. Must be a string.")
-
-    return generators_json
+        return input
+    except ValidationError as e:
+        raise MyException(f"Invalid model format:\n{e}.")
 
 
-def parse_generators(generators_json: Any) -> Set[str]:
-    generators_checked = check_generators(False, generators_json)
+def model_validate(
+    debug: bool, Model: type[ModelType], input_json_bytes: bytes
+) -> ModelType:
+    input_json_string = input_json_bytes.decode("utf-8")
 
-    generators = set(generators_checked)
-
-    if len(generators) != len(generators_checked):
-        raise MyException("Invalid generators format. Generators must be unique.")
-
-    return generators
-
-
-class VersionInfo(TypedDict):
-    version: str
-    product_id: str
-
-
-def check_products(debug: bool, products_json: Any) -> Mapping[str, VersionInfo]:
-    if type(products_json) is not frozendict:
-        raise MyException("Invalid products format. Must be a JSON object.")
-
-    for version_info_json in products_json.values():
-        version_info_checked = json_check_format(
-            debug,
-            version_info_json,
-            {"version", "product_id"},
-            set(),
-            "Invalid products verson info format.",
+    if debug:
+        print(
+            f"DEBUG model_validate {Model}:\n{input_json_string}",
+            file=stderr,
+            flush=True,
         )
 
-        version_json = version_info_checked["version"]
-        product_id_json = version_info_checked["product_id"]
+    try:
+        input = Model.model_validate_json(input_json_string)
 
-        if type(version_json) is not str:
-            raise MyException("Invalid products version format. Must be a string.")
-
-        if type(product_id_json) is not str:
-            raise MyException("Invalid products product id format. Must be a string.")
-
-    return products_json
+        return input
+    except ValidationError as e:
+        raise MyException(f"Invalid model format:\n{e}\n{input_json_string}.")
 
 
-def parse_products(debug: bool, products_json: Any) -> Set[Product]:
-    products_checked = check_products(debug, products_json)
+def model_dump(debug: bool, output: BaseModel) -> bytes:
+    output_json_string = output.model_dump_json(indent=4 if debug else None)
 
-    return {
-        Product(
-            package=package_checked,
-            version=version_info_checked["version"],
-            product_id=version_info_checked["product_id"],
-        )
-        for package_checked, version_info_checked in products_checked.items()
-    }
+    if debug:
+        print(f"DEBUG model_dump:\n{output_json_string}", file=stderr)
+
+    output_json_bytes = output_json_string.encode("utf-8")
+
+    return output_json_bytes
 
 
-class ResolveInput(TypedDict):
-    requirements: Any
-    options: Any
+Requirement = TypeVar("Requirement")
 
 
-def check_resolve_input(debug: bool, input_json: Any) -> ResolveInput:
-    return type_cast(
-        ResolveInput,
-        json_check_format(
-            debug,
-            input_json,
-            {"requirements", "options"},
-            set(),
-            "Invalid resolve input format.",
-        ),
-    )
-
-
-def parse_resolve_input(
-    debug: bool,
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
-    input_json: Any,
-) -> tuple[Sequence[Set[Any]], Any]:
-    input_checked = check_resolve_input(debug, input_json)
-
-    requirements_list_json = input_checked["requirements"]
-
-    for requirements_json in requirements_list_json:
-        if type(requirements_json) is not list:
-            raise MyException("Invalid requirements format. Must be a JSON array.")
-
-    requirements_list = [
-        requirements_parser(debug, requirements_json)
-        for requirements_json in requirements_list_json
-    ]
-    options = options_parser(debug, input_checked["options"])
-
-    return requirements_list, options
+class ResolveInput(BaseModel, Generic[Requirement]):
+    requirements_list: Sequence[Set[Requirement]]
+    options: Mapping[str, Any] | None
 
 
 class GenerateInputPackagesValue(BaseModel):
@@ -170,18 +101,6 @@ class GenerateInput(BaseModel):
     generators: Set[str]
     packages: Mapping[str, GenerateInputPackagesValue]
     options: Mapping[str, Any] | None
-
-
-def parse_generate_input(
-    debug: bool,
-    input_json: Any,
-) -> GenerateInput:
-    try:
-        return GenerateInput.model_validate(input_json)
-    except ValidationError:
-        raise MyException(
-            f"Invalid generate input format: {json_dumps(input_json, indent=4)}."
-        )
 
 
 class FetchOutputValue(BaseModel):
@@ -201,3 +120,31 @@ class FetchInput(BaseModel):
     packages: Mapping[str, FetchInputPackageValue]
     product_infos: Mapping[str, Mapping[str, Any]]
     options: Mapping[str, Any] | None
+
+
+@dataclass(frozen=True)
+class Product:
+    package: str
+    version: str
+    product_id: str
+
+
+InstallInput = RootModel[Set[Product]]
+
+
+FrozenDictAnnotated = Annotated[
+    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
+]
+
+
+@dataclass(frozen=True)
+class ResolutionGraphNodeValue:
+    version: str
+    dependencies: Set[str]
+    requirements: FrozenDictAnnotated[str, frozenset[Hashable]]
+
+
+@dataclass(frozen=True)
+class ResolutionGraph:
+    roots: tuple[Set[str], ...]
+    graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]

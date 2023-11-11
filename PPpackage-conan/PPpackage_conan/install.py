@@ -4,7 +4,8 @@ from collections.abc import Mapping, Set
 from pathlib import Path
 from shutil import copytree, rmtree
 
-from PPpackage_utils.utils import Product, asubprocess_communicate, communicate_from_sub
+from PPpackage_utils.parse import Product
+from PPpackage_utils.utils import asubprocess_communicate, communicate_from_sub
 
 from .utils import get_cache_path, make_conan_environment
 
@@ -37,10 +38,10 @@ async def install_product(
 
 async def install(
     cache_path: Path,
-    products: Set[Product],
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
+    products: Set[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 

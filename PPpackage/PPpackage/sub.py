@@ -9,14 +9,17 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
-from PPpackage_utils.utils import (
-    MyException,
+from PPpackage_utils.parse import (
+    FetchInput,
+    FetchOutput,
+    FetchOutputValue,
+    GenerateInput,
+    Product,
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    TemporaryPipe,
-    frozendict,
+    ResolveInput,
 )
+from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -27,22 +30,21 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 def check_requirements_list(
     requirements_list: Sequence[Set[Hashable]],
-) -> Sequence[Set[str]]:
+) -> tuple[Set[str], ...]:
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
                 raise MyException("PPpackage: Requirements must be strings.")
 
-    return cast(Sequence[Set[str]], requirements_list)
+    return tuple(cast(Sequence[Set[str]], requirements_list))
 
 
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements_list: Sequence[Set[Hashable]],
-    options: Mapping[str, Any] | None,
+    input: ResolveInput[Any],
 ) -> Set[ResolutionGraph]:
-    requirements_list = check_requirements_list(requirements_list)
+    requirements_list = check_requirements_list(input.requirements_list)
 
     requirements_merged = frozenset.union(frozenset(), *requirements_list)
 
@@ -55,14 +57,12 @@ async def resolve(
         }
     )
 
-    return frozenset(
-        [
-            ResolutionGraph(
-                requirements_list,
-                graph,
-            )
-        ]
+    resolve_graph = ResolutionGraph(
+        requirements_list,
+        graph,
     )
+
+    return frozenset([resolve_graph])
 
 
 async def fetch(
@@ -137,14 +137,8 @@ async def fetch(
 
 
 async def generate(
-    debug: bool,
-    cache_path: Path,
-    generators: Iterable[str],
-    generators_path: Path,
-    options: Mapping[str, Any] | None,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
-):
+    debug: bool, cache_path: Path, generators_path: Path, input: GenerateInput
+) -> None:
     pass
 
 
@@ -152,15 +146,12 @@ async def install(
     debug: bool,
     cache_path: Path,
     destination_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
+    products: Set[Product],
 ) -> None:
     products_path = destination_path / "PP"
 
     products_path.mkdir(exist_ok=True)
 
-    for name, version in versions.items():
-        product_id = product_ids[name]
-
-        product_path = products_path / name
-        product_path.write_text(f"{version} {product_id}")
+    for product in products:
+        product_path = products_path / product.package
+        product_path.write_text(f"{product.version} {product.product_id}")

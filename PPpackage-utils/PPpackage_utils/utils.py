@@ -1,28 +1,13 @@
-import dataclasses
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
-from collections.abc import (
-    AsyncIterator,
-    Hashable,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    Sequence,
-    Set,
-)
+from collections.abc import AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass, is_dataclass
-from json import JSONEncoder
-from json import dump as json_dump_base
-from json import dumps as json_dumps_base
-from json import load as json_load_base
-from json import loads as json_loads_base
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Any, Optional, TypedDict
+from typing import Optional
 
 from frozendict import frozendict
 
@@ -41,13 +26,6 @@ class STDERRException(Exception):
 
 
 Lockfile = frozendict[str, str]
-
-
-class Product:
-    def __init__(self, package: str, version: str, product_id: str):
-        self.package = package
-        self.version = version
-        self.product_id = product_id
 
 
 def ensure_dir_exists(path: Path) -> None:
@@ -174,69 +152,3 @@ def noop(*args, **kwargs):
 
 async def anoop(*args, **kwargs):
     pass
-
-
-def json_hook(d: dict[str, Any]) -> Mapping[str, Any]:
-    return frozendict(d)
-
-
-def json_loads(input: str) -> Any:
-    return json_loads_base(input, object_hook=json_hook)
-
-
-def json_load(fp) -> Any:
-    return json_load_base(fp, object_hook=json_hook)
-
-
-class CustomEncoder(JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, str):
-            return obj
-        elif isinstance(obj, bool):
-            return obj
-        elif obj is None:
-            return obj
-        elif isinstance(obj, int):
-            return obj
-        elif isinstance(obj, float):
-            return obj
-        elif is_dataclass(obj):
-            return self.default(dataclasses.asdict(obj))
-        elif isinstance(obj, Mapping):
-            return {self.default(k): self.default(v) for k, v in obj.items()}
-        elif isinstance(obj, Iterable):
-            return [self.default(o) for o in obj]
-
-        super().default(obj)
-
-
-def json_dump(obj, fp, **kwargs) -> None:
-    json_dump_base(obj, fp, cls=CustomEncoder, **kwargs)
-
-
-def json_dumps(obj, **kwargs) -> str:
-    return json_dumps_base(obj, cls=CustomEncoder, **kwargs)
-
-
-@dataclass(frozen=True)
-class ResolutionGraphNodeValue:
-    version: str
-    dependencies: Set[str]
-    requirements: Mapping[str, frozenset[Hashable]]
-
-
-@dataclass(frozen=True)
-class ResolutionGraph:
-    roots: Sequence[Set[str]]
-    graph: Mapping[str, ResolutionGraphNodeValue]
-
-
-class ResolutionGraphNodeValueJSON(TypedDict):
-    version: str
-    dependencies: list[str]
-    requirements: Mapping[str, list[Hashable]]
-
-
-class ResolutionGraphJSON(TypedDict):
-    roots: Sequence[list[str]]
-    graph: Mapping[str, ResolutionGraphNodeValueJSON]

@@ -16,18 +16,16 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.utils import (
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
-    ensure_dir_exists,
-    frozendict,
+    ResolveInput,
 )
+from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, frozendict
 
+from .parse import Requirement
 from .utils import (
-    Node,
-    Options,
-    Requirement,
+    ResolveNode,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -135,23 +133,23 @@ def create_requirement_partitions(
     return requirement_partitions
 
 
-def parse_direct_dependencies(nodes: Mapping[str, Node], node: Node):
-    for dependency_id, attributes in node["dependencies"].items():
-        if attributes["direct"]:
-            yield nodes[dependency_id]["name"]
+def parse_direct_dependencies(nodes: Mapping[str, ResolveNode], node: ResolveNode):
+    for dependency_id, attributes in node.dependencies.items():
+        if attributes.direct:
+            yield nodes[dependency_id].name
 
 
-def parse_conan_graph_resolve(graph_string: str) -> ResolutionGraph:
+def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
     requirement_prefix = "requirement-"
 
-    nodes = parse_conan_graph_nodes(graph_string)
+    nodes = parse_conan_graph_nodes(ResolveNode, conan_graph_json_bytes)
 
     roots_unsorted: Sequence[tuple[int, Set[Any]]] = []
     graph: MutableMapping[str, ResolutionGraphNodeValue] = {}
 
     for node in nodes.values():
-        user = node["user"]
-        name = node["name"]
+        user = node.user
+        name = node.name
 
         if user == "pppackage" and name.startswith(requirement_prefix):
             requirement_index = int(name[len(requirement_prefix) :])
@@ -160,17 +158,17 @@ def parse_conan_graph_resolve(graph_string: str) -> ResolutionGraph:
                     requirement_index,
                     frozenset(
                         dependency
-                        for leaf_id in node["dependencies"].keys()
-                        if (leaf := nodes[leaf_id])["user"] == "pppackage"
+                        for leaf_id in node.dependencies.keys()
+                        if (leaf := nodes[leaf_id]).user == "pppackage"
                         for dependency in parse_direct_dependencies(nodes, leaf)
                     ),
                 )
             )
         elif user != "pppackage":
-            version = f"{node['version']}#{node['rrev']}"
-
             graph[name] = ResolutionGraphNodeValue(
-                version, frozenset(parse_direct_dependencies(nodes, node)), frozendict()
+                node.get_version(),
+                frozenset(parse_direct_dependencies(nodes, node)),
+                frozendict(),
             )
 
     roots = tuple(
@@ -186,7 +184,7 @@ async def create_graph(
     profile_template: Jinja2Template,
     build_profile_path: Path,
     requirements_list: Sequence[Any],
-    options: Options,
+    options: Any,
 ) -> ResolutionGraph:
     with (
         create_and_render_temp_file(
@@ -215,11 +213,11 @@ async def create_graph(
             env=environment,
         )
 
-        graph_string = await asubprocess_communicate(
+        conan_graph_json_bytes = await asubprocess_communicate(
             await process, "Error in `conan graph info`"
         )
 
-    graph = parse_conan_graph_resolve(graph_string.decode("ascii"))
+    graph = parse_conan_graph_resolve(conan_graph_json_bytes)
 
     return graph
 
@@ -227,8 +225,7 @@ async def create_graph(
 async def resolve(
     templates_path: Path,
     cache_path: Path,
-    requirements_list: Sequence[Set[Requirement]],
-    options: Options,
+    input: ResolveInput[Requirement],
 ) -> Set[ResolutionGraph]:
     cache_path = get_cache_path(cache_path)
 
@@ -249,7 +246,7 @@ async def resolve(
 
     build_profile_path = templates_path / "profile"
 
-    for requirement_index, requirements in enumerate(requirements_list):
+    for requirement_index, requirements in enumerate(input.requirements_list):
         requirement_partitions = create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
@@ -271,8 +268,8 @@ async def resolve(
         root_template,
         profile_template,
         build_profile_path,
-        requirements_list,
-        options,
+        input.requirements_list,
+        input.options,
     )
 
     await remove_temporary_packages_from_cache(environment)

@@ -4,7 +4,6 @@ from collections.abc import Mapping, MutableMapping
 from functools import partial
 from itertools import islice
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
@@ -13,8 +12,10 @@ from PPpackage_utils.parse import (
     FetchInputPackageValue,
     FetchOutput,
     FetchOutputValue,
+    model_dump,
+    model_validate,
 )
-from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
+from PPpackage_utils.utils import asubprocess_communicate
 
 from .sub import fetch as PP_fetch
 
@@ -35,15 +36,7 @@ async def fetch_external_manager(
         stderr=None,
     )
 
-    indent = 4 if debug else None
-
-    input_json = json_dumps(input.model_dump(), indent=indent)
-
-    if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s fetch:", file=stderr)
-        print(input_json, file=stderr)
-
-    input_json_bytes = input_json.encode("ascii")
+    input_json_bytes = model_dump(debug, input)
 
     output_json_bytes = await asubprocess_communicate(
         await process,
@@ -51,15 +44,7 @@ async def fetch_external_manager(
         input_json_bytes,
     )
 
-    output_json = output_json_bytes.decode("ascii")
-
-    if debug:
-        print(f"DEBUG PPpackage: received from {manager}'s fetch:", file=stderr)
-        print(output_json, file=stderr)
-
-    output = FetchOutput.model_validate(json_loads(output_json))
-
-    return output
+    return model_validate(debug, FetchOutput, output_json_bytes)
 
 
 async def fetch_manager(
@@ -99,8 +84,6 @@ async def fetch(
     reversed_graph = graph.reverse(copy=False)
 
     for generation in topological_generations(reversed_graph):
-        print(f"GENERATION: {generation}", file=stderr)
-
         manager_product_infos: MutableMapping[str, MutableMapping[str, Any]] = {}
         manager_packages: MutableMapping[
             str, MutableMapping[str, FetchInputPackageValue]
