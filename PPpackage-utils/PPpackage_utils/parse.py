@@ -1,10 +1,31 @@
 from collections.abc import Callable, Mapping, Set
 from sys import stderr
-from typing import Any, Sequence, TypedDict
+from typing import Any, Sequence, TypedDict, TypeVar
 from typing import cast as type_cast
 
 from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict, json_dumps
 from pydantic import BaseModel, RootModel, ValidationError
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def model_validate(Model: type[T], input_json_bytes: bytes) -> T:
+    input_json_string = input_json_bytes.decode("utf-8")
+
+    try:
+        input = Model.model_validate_json(input_json_string)
+
+        return input
+    except ValidationError:
+        raise MyException(f"Invalid generate input format:\n{input_json_string}.")
+
+
+def model_dump(debug: bool, output: BaseModel) -> bytes:
+    output_json_string = output.model_dump_json(indent=4 if debug else None)
+
+    output_json_bytes = output_json_string.encode("utf-8")
+
+    return output_json_bytes
 
 
 def json_check_format(
@@ -170,18 +191,6 @@ class GenerateInput(BaseModel):
     generators: Set[str]
     packages: Mapping[str, GenerateInputPackagesValue]
     options: Mapping[str, Any] | None
-
-
-def parse_generate_input(
-    debug: bool,
-    input_json: Any,
-) -> GenerateInput:
-    try:
-        return GenerateInput.model_validate(input_json)
-    except ValidationError:
-        raise MyException(
-            f"Invalid generate input format: {json_dumps(input_json, indent=4)}."
-        )
 
 
 class FetchOutputValue(BaseModel):

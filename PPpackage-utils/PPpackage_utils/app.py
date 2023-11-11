@@ -9,8 +9,10 @@ from typing import Any
 from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
+    GenerateInput,
     GenerateInputPackagesValue,
-    parse_generate_input,
+    model_dump,
+    model_validate,
     parse_resolve_input,
 )
 from typer import Typer
@@ -97,46 +99,33 @@ def init(
             cache_path, requirements_list, options
         )
 
-        if __debug:
-            print(
-                f"DEBUG: PPpackage-utils: "
-                f"resolver returned {json_dumps(resolution_graphs)}",
-                file=stderr,
-            )
-
-        indent = 4 if __debug else None
-
-        json_dump(resolution_graphs, stdout, indent=indent)
+        json_dump(resolution_graphs, stdout, indent=4 if __debug else None)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
-        input_json = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        input = FetchInput.model_validate(input_json)
+        input = model_validate(FetchInput, input_json_bytes)
 
         output = await fetch_callback(cache_path, input)
 
-        indent = 4 if __debug else None
+        output_json_bytes = model_dump(__debug, output)
 
-        json_dump(output.model_dump(), stdout, indent=indent)
+        stdout.buffer.write(output_json_bytes)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
-        input = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        input = parse_generate_input(__debug, input)
+        input = model_validate(GenerateInput, input_json_bytes)
 
-        product_ids = await generate_callback(
+        await generate_callback(
             cache_path,
             input.generators,
             generators_path,
             input.options,
             input.packages,
         )
-
-        indent = 4 if __debug else None
-
-        json_dump(product_ids, stdout, indent=indent)
 
     @__app.command()
     async def install(
