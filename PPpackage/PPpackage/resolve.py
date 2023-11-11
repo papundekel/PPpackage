@@ -9,7 +9,12 @@ from sys import stderr
 from typing import Any
 
 from frozendict import frozendict
-from networkx import MultiDiGraph
+from networkx import (
+    MultiDiGraph,
+    NetworkXNoCycle,
+    find_cycle,
+    is_directed_acyclic_graph,
+)
 from PPpackage_utils.utils import (
     MyException,
     ResolutionGraph,
@@ -312,5 +317,8 @@ async def resolve(
     result_work_graph = results_work_graph.pop()
 
     graph = process_graph(result_work_graph)
+
+    if not is_directed_acyclic_graph(graph):
+        raise MyException("Cycle found in the resolution graph.")
 
     return graph
