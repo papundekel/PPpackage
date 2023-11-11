@@ -31,6 +31,8 @@ async def fetch(
             "--noconfirm",
             "--sync",
             "--downloadonly",
+            "--nodeps",
+            "--nodeps",
             *packages,
             stdin=DEVNULL,
             stdout=stderr,
