@@ -9,7 +9,7 @@ from sys import stderr
 from typing import Any
 
 from frozendict import frozendict
-from networkx import MultiDiGraph
+from networkx import MultiDiGraph, NetworkXNoCycle, find_cycle
 from PPpackage_utils.utils import (
     MyException,
     ResolutionGraph,
@@ -313,4 +313,9 @@ async def resolve(
 
     graph = process_graph(result_work_graph)
 
-    return graph
+    try:
+        find_cycle(graph)
+    except NetworkXNoCycle:
+        return graph
+    else:
+        raise MyException("Cycle found in the resolution graph.")
