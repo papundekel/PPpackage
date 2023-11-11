@@ -1,11 +1,15 @@
+from ast import Mult
 from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import Iterable, Mapping
+from curses import meta
 from functools import partial
 from pathlib import Path
 from sys import stderr
 from typing import Any
 
+from networkx import MultiDiGraph, topological_generations
+from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
 
 from .sub import fetch as PP_fetch
@@ -92,28 +96,38 @@ async def fetch(
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    meta_versions: Mapping[str, Mapping[str, str]],
+    graph: MultiDiGraph,
     meta_options: Mapping[str, Any],
 ) -> Mapping[str, Mapping[str, str]]:
-    async with TaskGroup() as group:
-        meta_product_ids_tasks = {
-            manager: group.create_task(
-                fetch_manager(
-                    debug,
-                    runner_path,
-                    runner_workdir_path,
-                    manager,
-                    cache_path,
-                    versions,
-                    meta_options.get(manager),
-                )
-            )
-            for manager, versions in meta_versions.items()
-        }
+    meta_product_ids = {}
 
-    meta_product_ids = {
-        manager: product_ids_task.result()
-        for manager, product_ids_task in meta_product_ids_tasks.items()
-    }
+    reversed_graph = graph.reverse(copy=False)
+
+    for generation in topological_generations(reversed_graph):
+        versions = {}
+        for manager, package in generation:
+            versions.setdefault(manager, {})[package] = graph.nodes[(manager, package)][
+                "version"
+            ]
+
+        async with TaskGroup() as group:
+            manager_tasks = {
+                manager: group.create_task(
+                    fetch_manager(
+                        debug,
+                        runner_path,
+                        runner_workdir_path,
+                        manager,
+                        cache_path,
+                        versions,
+                        meta_options.get(manager),
+                    )
+                )
+                for manager, versions in versions.items()
+            }
+
+        for manager, task in manager_tasks.items():
+            for package, product_id in task.result().items():
+                meta_product_ids.setdefault(manager, {})[package] = product_id
 
     return meta_product_ids
