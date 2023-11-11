@@ -4,9 +4,8 @@ from collections.abc import Set
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.io import pipe_read_int, pipe_read_string, pipe_write_string
+from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
-    Product,
     asubprocess_communicate,
     communicate_from_sub,
     ensure_dir_exists,
@@ -18,10 +17,10 @@ from .utils import get_cache_paths
 
 async def install(
     cache_path: Path,
-    products: Set[Product],
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
+    products: Set[Product],
 ) -> None:
     _, cache_path = get_cache_paths(cache_path)
     database_path = destination_path / "var" / "lib" / "pacman"

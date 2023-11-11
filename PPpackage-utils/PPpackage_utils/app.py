@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Mapping, Sequence, Set
+from collections.abc import Awaitable, Callable, Mapping, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -11,20 +11,15 @@ from PPpackage_utils.parse import (
     FetchOutput,
     GenerateInput,
     GenerateInputPackagesValue,
+    InstallInput,
     ResolveInput,
     model_dump,
     model_validate,
 )
 from typer import Typer
 
-from .utils import (
-    MyException,
-    Product,
-    ResolutionGraph,
-    ensure_dir_exists,
-    json_dump,
-    json_load,
-)
+from .parse import Product
+from .utils import MyException, ResolutionGraph, ensure_dir_exists, json_dump
 
 
 class AsyncTyper(Typer):
@@ -80,9 +75,8 @@ def init(
         ],
         Awaitable[None],
     ],
-    install_callback: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
+    install_callback: Callable[[Path, Path, Path, Path, Set[Product]], Awaitable[None]],
     RequirementType: type[T],
-    products_parser: Callable[[bool, Any], Set[Product]],
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
@@ -131,14 +125,18 @@ def init(
         pipe_from_sub_path: Path,
         pipe_to_sub_path: Path,
     ) -> None:
-        input = json_load(stdin)
-
         ensure_dir_exists(destination_path)
 
-        products = products_parser(__debug, input)
+        input_json_bytes = stdin.buffer.read()
+
+        input = model_validate(InstallInput, input_json_bytes)
 
         await install_callback(
-            cache_path, products, destination_path, pipe_from_sub_path, pipe_to_sub_path
+            cache_path,
+            destination_path,
+            pipe_from_sub_path,
+            pipe_to_sub_path,
+            input.root,
         )
 
     return __app

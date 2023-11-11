@@ -2,8 +2,9 @@ from collections.abc import Mapping, Set
 from sys import stderr
 from typing import Annotated, Any, Generic, Sequence, TypedDict, TypeVar
 
-from PPpackage_utils.utils import MyException, Product, frozendict
+from PPpackage_utils.utils import MyException, frozendict
 from pydantic import BaseModel, BeforeValidator, RootModel, ValidationError
+from pydantic.dataclasses import dataclass
 
 
 def frozen_validator(value: Any) -> Any:
@@ -41,6 +42,9 @@ def model_validate(Model: type[ModelType], input_json_bytes: bytes) -> ModelType
 def model_dump(debug: bool, output: BaseModel) -> bytes:
     output_json_string = output.model_dump_json(indent=4 if debug else None)
 
+    if debug:
+        print(f"DEBUG model_dump:\n{output_json_string}", file=stderr)
+
     output_json_bytes = output_json_string.encode("utf-8")
 
     return output_json_bytes
@@ -75,58 +79,9 @@ def json_check_format(
     return input_json
 
 
-def check_generators(debug: bool, generators_json: Any) -> Sequence[str]:
-    if type(generators_json) is not list:
-        raise MyException("Invalid generators format. Must be a JSON array.")
-
-    for generator_json in generators_json:
-        if type(generator_json) is not str:
-            raise MyException("Invalid generator format. Must be a string.")
-
-    return generators_json
-
-
 class VersionInfo(TypedDict):
     version: str
     product_id: str
-
-
-def check_products(debug: bool, products_json: Any) -> Mapping[str, VersionInfo]:
-    if type(products_json) is not frozendict:
-        raise MyException("Invalid products format. Must be a JSON object.")
-
-    for version_info_json in products_json.values():
-        version_info_checked = json_check_format(
-            debug,
-            version_info_json,
-            {"version", "product_id"},
-            set(),
-            "Invalid products verson info format.",
-        )
-
-        version_json = version_info_checked["version"]
-        product_id_json = version_info_checked["product_id"]
-
-        if type(version_json) is not str:
-            raise MyException("Invalid products version format. Must be a string.")
-
-        if type(product_id_json) is not str:
-            raise MyException("Invalid products product id format. Must be a string.")
-
-    return products_json
-
-
-def parse_products(debug: bool, products_json: Any) -> Set[Product]:
-    products_checked = check_products(debug, products_json)
-
-    return {
-        Product(
-            package=package_checked,
-            version=version_info_checked["version"],
-            product_id=version_info_checked["product_id"],
-        )
-        for package_checked, version_info_checked in products_checked.items()
-    }
 
 
 Requirement = TypeVar("Requirement")
@@ -165,3 +120,13 @@ class FetchInput(BaseModel):
     packages: Mapping[str, FetchInputPackageValue]
     product_infos: Mapping[str, Mapping[str, Any]]
     options: Mapping[str, Any] | None
+
+
+@dataclass(frozen=True)
+class Product:
+    package: str
+    version: str
+    product_id: str
+
+
+InstallInput = RootModel[Set[Product]]

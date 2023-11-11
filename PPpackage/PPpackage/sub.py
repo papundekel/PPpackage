@@ -13,6 +13,7 @@ from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
+    Product,
     ResolveInput,
 )
 from PPpackage_utils.utils import (
@@ -156,15 +157,12 @@ async def install(
     debug: bool,
     cache_path: Path,
     destination_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
+    products: Set[Product],
 ) -> None:
     products_path = destination_path / "PP"
 
     products_path.mkdir(exist_ok=True)
 
-    for name, version in versions.items():
-        product_id = product_ids[name]
-
-        product_path = products_path / name
-        product_path.write_text(f"{version} {product_id}")
+    for product in products:
+        product_path = products_path / product.package
+        product_path.write_text(f"{product.version} {product.product_id}")

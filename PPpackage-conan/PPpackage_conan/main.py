@@ -1,5 +1,4 @@
 from PPpackage_utils.app import init, run
-from PPpackage_utils.parse import parse_products
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch
@@ -28,6 +27,5 @@ def main():
         ),
         install,
         Requirement,
-        parse_products,
     )
     run(app, "conan")

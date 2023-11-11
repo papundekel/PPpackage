@@ -43,13 +43,6 @@ class STDERRException(Exception):
 Lockfile = frozendict[str, str]
 
 
-class Product:
-    def __init__(self, package: str, version: str, product_id: str):
-        self.package = package
-        self.version = version
-        self.product_id = product_id
-
-
 def ensure_dir_exists(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 

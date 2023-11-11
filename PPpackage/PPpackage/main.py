@@ -1,9 +1,10 @@
+from collections.abc import MutableMapping, MutableSet
 from pathlib import Path
 from sys import stderr, stdin
 
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import model_validate
+from PPpackage_utils.parse import Product, model_validate
 from PPpackage_utils.utils import json_dumps
 from typer import Option as TyperOption
 from typing_extensions import Annotated
@@ -66,10 +67,10 @@ async def main_command(
     if debug:
         print("DEBUG PPpackage: after fetch", file=stderr)
 
-    versions = {}
+    meta_versions = {}
 
     for (manager, package), data in graph.nodes(data=True):
-        versions.setdefault(manager, {})[package] = data["version"]
+        meta_versions.setdefault(manager, {})[package] = data["version"]
 
     product_ids = {
         manager: {package: value.product_id for package, value in values.items()}
@@ -82,9 +83,21 @@ async def main_command(
         input.generators,
         generators_path,
         input.options,
-        versions,
+        meta_versions,
         product_ids,
     )
+
+    meta_products: MutableMapping[str, MutableSet[Product]] = {}
+
+    for manager, versions in meta_versions.items():
+        for package, version in versions.items():
+            meta_products.setdefault(manager, set()).add(
+                Product(
+                    package=package,
+                    version=version,
+                    product_id=product_ids[manager][package],
+                )
+            )
 
     await install(
         debug,
@@ -92,8 +105,7 @@ async def main_command(
         runner_path,
         runner_workdir_path,
         destination_path,
-        versions,
-        product_ids,
+        meta_products,
     )
 
     if debug:
