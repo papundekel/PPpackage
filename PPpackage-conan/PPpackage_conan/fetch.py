@@ -2,10 +2,12 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping
 from pathlib import Path
+from sys import stderr
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
+from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .utils import (
@@ -21,15 +23,14 @@ from .utils import (
 def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
     nodes = parse_conan_graph_nodes(input)
 
-    return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes.values()}
+    return {node["name"]: GraphInfo(node) for node in nodes.values()}
 
 
 async def fetch(
     templates_path: Path,
     cache_path: Path,
-    lockfile: Mapping[str, str],
-    options: Options,
-) -> Mapping[str, str]:
+    input: FetchInput,
+) -> FetchOutput:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -42,12 +43,23 @@ async def fetch(
     conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
+    packages = []
+
+    for package, value in input.packages.items():
+        packages.append((package, value.version))
+
+    for package, info in input.product_infos.get("conan", {}).items():
+        if isinstance(info, Mapping):
+            version = info.get("version")
+            if version is not None:
+                packages.append((package, version))
+
     with (
         create_and_render_temp_file(
-            conanfile_template, {"packages": lockfile.items()}, ".py"
+            conanfile_template, {"packages": packages}, ".py"
         ) as conanfile_file,
         create_and_render_temp_file(
-            profile_template, {"options": options}
+            profile_template, {"options": input.options}
         ) as host_profile_file,
     ):
         host_profile_path = Path(host_profile_file.name)
@@ -75,8 +87,15 @@ async def fetch(
 
     graph_infos = parse_conan_graph_fetch(graph_json.decode("ascii"))
 
-    product_ids = {
-        package: graph_info.product_id for package, graph_info in graph_infos.items()
+    output = {
+        package: FetchOutputValue(
+            product_id=graph_info.product_id,
+            product_info={
+                "version": graph_info.version,
+                "cpp_info": graph_info.cpp_info,
+            },
+        )
+        for package, graph_info in graph_infos.items()
     }
 
-    return product_ids
+    return FetchOutput(output)

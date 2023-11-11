@@ -7,8 +7,9 @@ from sys import exit, stderr, stdin, stdout
 from typing import Any
 
 from PPpackage_utils.parse import (
+    FetchInput,
+    FetchOutput,
     GenerateInputPackagesValue,
-    parse_fetch_input,
     parse_generate_input,
     parse_resolve_input,
 )
@@ -64,10 +65,7 @@ def init(
     resolve_callback: Callable[
         [Path, Sequence[Set[Any]], Any], Awaitable[Set[ResolutionGraph]]
     ],
-    fetch_callback: Callable[
-        [Path, Mapping[str, str], Any],
-        Awaitable[Mapping[str, str]],
-    ],
+    fetch_callback: Callable[[Path, FetchInput], Awaitable[FetchOutput]],
     generate_callback: Callable[
         [
             Path,
@@ -81,7 +79,6 @@ def init(
     install_callback: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
     requirements_parser: Callable[[bool, Any], Set[Any]],
     options_parser: Callable[[bool, Any], Any],
-    lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
     products_parser: Callable[[bool, Any], Set[Product]],
 ) -> Typer:
     @__app.command("update-database")
@@ -113,17 +110,15 @@ def init(
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
-        input = json_load(stdin)
+        input_json = json_load(stdin)
 
-        lockfile, options = parse_fetch_input(
-            __debug, lockfile_parser, options_parser, input
-        )
+        input = FetchInput.model_validate(input_json)
 
-        product_ids = await fetch_callback(cache_path, lockfile, options)
+        output = await fetch_callback(cache_path, input)
 
         indent = 4 if __debug else None
 
-        json_dump(product_ids, stdout, indent=indent)
+        json_dump(output.model_dump(), stdout, indent=indent)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:

@@ -54,7 +54,7 @@ async def main_command(
             file=stderr,
         )
 
-    product_ids = await fetch(
+    fetch_outputs = await fetch(
         debug,
         runner_path,
         runner_workdir_path,
@@ -70,6 +70,11 @@ async def main_command(
 
     for (manager, package), data in graph.nodes(data=True):
         versions.setdefault(manager, {})[package] = data["version"]
+
+    product_ids = {
+        manager: {package: value.product_id for package, value in values.items()}
+        for manager, values in fetch_outputs.items()
+    }
 
     await generate(
         debug, cache_path, generators, generators_path, options, versions, product_ids

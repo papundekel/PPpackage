@@ -4,7 +4,7 @@ from typing import Any, Sequence, TypedDict
 from typing import cast as type_cast
 
 from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict, json_dumps
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, RootModel, ValidationError
 
 
 def json_check_format(
@@ -161,38 +161,6 @@ def parse_resolve_input(
     return requirements_list, options
 
 
-class FetchInput(TypedDict):
-    lockfile: Any
-    options: Any
-
-
-def check_fetch_input(debug: bool, input_json: Any) -> FetchInput:
-    return type_cast(
-        FetchInput,
-        json_check_format(
-            debug,
-            input_json,
-            {"lockfile", "options"},
-            set(),
-            "Invalid fetch input format.",
-        ),
-    )
-
-
-def parse_fetch_input(
-    debug: bool,
-    lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
-    options_parser: Callable[[bool, Any], Any],
-    input_json: Any,
-) -> tuple[Mapping[str, str], Any]:
-    input_checked = check_fetch_input(debug, input_json)
-
-    lockfile = lockfile_parser(debug, input_checked["lockfile"])
-    options = options_parser(debug, input_checked["options"])
-
-    return lockfile, options
-
-
 class GenerateInputPackagesValue(BaseModel):
     version: str
     product_id: str
@@ -214,3 +182,22 @@ def parse_generate_input(
         raise MyException(
             f"Invalid generate input format: {json_dumps(input_json, indent=4)}."
         )
+
+
+class FetchOutputValue(BaseModel):
+    product_id: str
+    product_info: Any
+
+
+FetchOutput = RootModel[Mapping[str, FetchOutputValue]]
+
+
+class FetchInputPackageValue(BaseModel):
+    version: str
+    dependencies: Mapping[str, Set[str]]
+
+
+class FetchInput(BaseModel):
+    packages: Mapping[str, FetchInputPackageValue]
+    product_infos: Mapping[str, Mapping[str, Any]]
+    options: Mapping[str, Any] | None

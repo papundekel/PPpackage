@@ -9,6 +9,7 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
+from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
 from PPpackage_utils.utils import (
     MyException,
     ResolutionGraph,
@@ -69,9 +70,8 @@ async def fetch(
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    versions: Mapping[str, str],
-    options: Mapping[str, Any] | None,
-) -> Mapping[str, str]:
+    input: FetchInput,
+) -> FetchOutput:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
         runner_writer,
@@ -128,9 +128,12 @@ async def fetch(
         if success != "SUCCESS":
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    product_ids = {name: "id" for name in versions.keys()}
+    output = {
+        name: FetchOutputValue(product_id="id", product_info=None)
+        for name in input.packages.keys()
+    }
 
-    return product_ids
+    return FetchOutput(output)
 
 
 async def generate(

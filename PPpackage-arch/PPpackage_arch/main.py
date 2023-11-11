@@ -1,5 +1,5 @@
 from PPpackage_utils.app import init, run
-from PPpackage_utils.parse import parse_lockfile, parse_products
+from PPpackage_utils.parse import parse_products
 from PPpackage_utils.utils import anoop, noop
 
 from .fetch import fetch
@@ -18,7 +18,6 @@ def main():
         install,
         parse_requirements,
         noop,
-        parse_lockfile,
         parse_products,
     )
     run(app, "arch")

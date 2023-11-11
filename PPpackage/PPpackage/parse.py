@@ -99,7 +99,7 @@ def check_input(debug: bool, input_json: Any) -> Input:
 def parse_input(
     debug: bool,
     input_json: Any,
-) -> tuple[Mapping[str, Set[Any]], Mapping[str, Any], Set[str]]:
+) -> tuple[Mapping[str, Set[Any]], Mapping[str, Mapping[str, Any] | None], Set[str]]:
     input_checked = check_input(debug, input_json)
 
     meta_requirements = parse_meta_requirements(debug, input_checked["requirements"])
