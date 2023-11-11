@@ -54,28 +54,27 @@ async def main_command(
             file=stderr,
         )
 
-    versions = {}
-
-    for (manager, package), data in graph.nodes(data=True):
-        versions.setdefault(manager, {})[package] = data["version"]
-
-    if debug:
-        print(
-            f"DEBUG PPpackage: after resolve, versions:\n {json_dumps(versions, indent=4)}",
-            file=stderr,
-        )
-
-    product_ids = await fetch(
+    fetch_outputs = await fetch(
         debug,
         runner_path,
         runner_workdir_path,
         cache_path,
-        versions,
+        graph,
         options,
     )
 
     if debug:
         print("DEBUG PPpackage: after fetch", file=stderr)
+
+    versions = {}
+
+    for (manager, package), data in graph.nodes(data=True):
+        versions.setdefault(manager, {})[package] = data["version"]
+
+    product_ids = {
+        manager: {package: value.product_id for package, value in values.items()}
+        for manager, values in fetch_outputs.items()
+    }
 
     await generate(
         debug, cache_path, generators, generators_path, options, versions, product_ids

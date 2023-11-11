@@ -1,5 +1,5 @@
 from PPpackage_utils.app import init, run
-from PPpackage_utils.parse import parse_lockfile, parse_products
+from PPpackage_utils.parse import parse_products
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch
@@ -18,9 +18,7 @@ def main():
         lambda cache_path, requirements, options: resolve(
             data_path, cache_path, requirements, options
         ),
-        lambda cache_path, lockfile, options: fetch(
-            data_path, cache_path, lockfile, options
-        ),
+        lambda cache_path, input: fetch(data_path, cache_path, input),
         lambda cache_path, generators, generators_path, options, packages: generate(
             data_path,
             deployer_path,
@@ -33,7 +31,6 @@ def main():
         install,
         parse_requirements,
         parse_options,
-        parse_lockfile,
         parse_products,
     )
     run(app, "conan")

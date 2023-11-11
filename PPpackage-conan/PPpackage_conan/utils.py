@@ -61,6 +61,7 @@ def create_and_render_temp_file(
 
 class GraphInfo:
     def __init__(self, node: Node):
+        self.version = f"{node['version']}#{node['rrev']}"
         self.product_id = f"{node['package_id']}#{node['prev']}"
         self.cpp_info = node["cpp_info"]
 
