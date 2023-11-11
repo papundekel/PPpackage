@@ -13,6 +13,7 @@ from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
+    GenerateInput,
     Product,
     ResolutionGraph,
     ResolutionGraphNodeValue,
@@ -136,14 +137,8 @@ async def fetch(
 
 
 async def generate(
-    debug: bool,
-    cache_path: Path,
-    generators: Iterable[str],
-    generators_path: Path,
-    options: Mapping[str, Any] | None,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
-):
+    debug: bool, cache_path: Path, generators_path: Path, input: GenerateInput
+) -> None:
     pass
 
 

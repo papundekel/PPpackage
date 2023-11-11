@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from PPpackage_utils.io import stream_write_line
+from PPpackage_utils.parse import GenerateInputPackagesValue
 
 machine_id_relative_path = Path("etc") / "machine-id"
 
@@ -32,12 +33,3 @@ def read_machine_id(machine_id_path: Path) -> str:
         machine_id = machine_id_file.readline().strip()
 
         return machine_id
-
-
-def merge_lockfiles(
-    versions: Mapping[str, str], product_ids: Mapping[str, str]
-) -> Mapping[str, Mapping[str, str]]:
-    return {
-        package: {"version": versions[package], "product_id": product_ids[package]}
-        for package in versions.keys() & product_ids.keys()
-    }

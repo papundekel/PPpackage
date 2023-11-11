@@ -2,9 +2,8 @@ from collections.abc import MutableMapping, MutableSet
 from pathlib import Path
 from sys import stderr, stdin
 
-from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, json_dumps, model_validate
+from PPpackage_utils.parse import GenerateInputPackagesValue, Product, model_validate
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -33,13 +32,6 @@ async def main_command(
 
     input = model_validate(debug, Input, input_json_bytes)
 
-    if debug:
-        print(
-            f"DEBUG PPpackage: after parse, "
-            f"requirements: {json_dumps(input.requirements)}",
-            file=stderr,
-        )
-
     if do_update_database:
         managers = input.requirements.keys()
         await update_database(debug, managers, cache_path)
@@ -47,12 +39,6 @@ async def main_command(
     graph = await resolve(
         debug, resolve_iteration_limit, cache_path, input.requirements, input.options
     )
-
-    if debug:
-        print(
-            f"DEBUG PPpackage: after resolve, graph:\n {to_pydot(graph).to_string()}",
-            file=stderr,
-        )
 
     fetch_outputs = await fetch(
         debug,
@@ -63,28 +49,15 @@ async def main_command(
         input.options,
     )
 
-    if debug:
-        print("DEBUG PPpackage: after fetch", file=stderr)
-
     meta_versions = {}
 
     for (manager, package), data in graph.nodes(data=True):
         meta_versions.setdefault(manager, {})[package] = data["version"]
 
-    product_ids = {
+    meta_product_ids = {
         manager: {package: value.product_id for package, value in values.items()}
         for manager, values in fetch_outputs.items()
     }
-
-    await generate(
-        debug,
-        cache_path,
-        input.generators,
-        generators_path,
-        input.options,
-        meta_versions,
-        product_ids,
-    )
 
     meta_products: MutableMapping[str, MutableSet[Product]] = {}
 
@@ -94,9 +67,28 @@ async def main_command(
                 Product(
                     package=package,
                     version=version,
-                    product_id=product_ids[manager][package],
+                    product_id=meta_product_ids[manager][package],
                 )
             )
+
+    meta_packages = {
+        manager: {
+            product.package: GenerateInputPackagesValue(
+                version=product.version, product_id=product.product_id
+            )
+            for product in products
+        }
+        for manager, products in meta_products.items()
+    }
+
+    await generate(
+        debug,
+        cache_path,
+        generators_path,
+        input.generators,
+        meta_packages,
+        input.options,
+    )
 
     await install(
         debug,
