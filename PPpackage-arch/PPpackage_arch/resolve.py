@@ -4,15 +4,12 @@ from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
-from PPpackage_utils.parse import ResolveInput
-from PPpackage_utils.utils import (
-    MyException,
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
-    frozendict,
-    json_dumps,
+    ResolveInput,
 )
+from PPpackage_utils.utils import MyException, asubprocess_communicate, frozendict
 from pydot import graph_from_dot_data
 
 from .update_database import update_database

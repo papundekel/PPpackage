@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypedDict
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.utils import json_loads
+from PPpackage_utils.parse import json_loads
 
 
 def get_cache_path(cache_path: Path) -> Path:

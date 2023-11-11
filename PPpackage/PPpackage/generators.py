@@ -1,7 +1,8 @@
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from PPpackage_utils.utils import ensure_dir_exists, json_dump
+from PPpackage_utils.parse import json_dump
+from PPpackage_utils.utils import ensure_dir_exists
 
 
 def versions(

@@ -9,13 +9,14 @@ from typing import Any
 
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
-from PPpackage_utils.parse import ResolveInput, model_dump, model_validate
-from PPpackage_utils.utils import (
-    MyException,
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
+    ResolveInput,
+    model_dump,
+    model_validate,
 )
+from PPpackage_utils.utils import MyException, asubprocess_communicate
 from pydantic import RootModel
 
 from .sub import resolve as PP_resolve

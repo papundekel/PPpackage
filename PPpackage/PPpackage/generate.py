@@ -6,7 +6,8 @@ from pathlib import Path
 from sys import stderr
 from typing import Any, Iterable
 
-from PPpackage_utils.utils import asubprocess_communicate, json_dumps
+from PPpackage_utils.parse import json_dumps
+from PPpackage_utils.utils import asubprocess_communicate
 
 from .generators import builtin as builtin_generators
 from .sub import generate as PP_generate

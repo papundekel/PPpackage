@@ -30,7 +30,8 @@ from PPpackage_utils.io import (
     stream_write_line,
     stream_write_string,
 )
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate, json_dump
+from PPpackage_utils.parse import json_dump
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
 from typer import Exit
 
 

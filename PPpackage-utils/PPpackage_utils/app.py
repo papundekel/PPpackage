@@ -19,8 +19,8 @@ from PPpackage_utils.parse import (
 from pydantic import RootModel
 from typer import Typer
 
-from .parse import Product
-from .utils import MyException, ResolutionGraph, ensure_dir_exists, json_dump
+from .parse import Product, ResolutionGraph
+from .utils import MyException, ensure_dir_exists
 
 
 class AsyncTyper(Typer):

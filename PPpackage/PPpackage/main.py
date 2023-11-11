@@ -4,8 +4,7 @@ from sys import stderr, stdin
 
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, model_validate
-from PPpackage_utils.utils import json_dumps
+from PPpackage_utils.parse import Product, json_dumps, model_validate
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 

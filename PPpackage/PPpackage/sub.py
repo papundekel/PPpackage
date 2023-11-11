@@ -14,15 +14,11 @@ from PPpackage_utils.parse import (
     FetchOutput,
     FetchOutputValue,
     Product,
-    ResolveInput,
-)
-from PPpackage_utils.utils import (
-    MyException,
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    TemporaryPipe,
-    frozendict,
+    ResolveInput,
 )
+from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 

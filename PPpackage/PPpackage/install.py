@@ -3,11 +3,9 @@ from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping, Set
 from functools import partial
 from io import TextIOWrapper
-from itertools import product
 from os import listdir
 from pathlib import Path
 from random import choices as random_choices
-from re import S
 from shutil import move
 from sys import stderr
 
@@ -23,20 +21,10 @@ from PPpackage_utils.io import (
     stream_write_strings,
 )
 from PPpackage_utils.parse import InstallInput, Product, model_dump
-from PPpackage_utils.utils import (
-    MyException,
-    TemporaryPipe,
-    asubprocess_communicate,
-    json_dumps,
-)
+from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
 
 from .sub import install as PP_install
-from .utils import (
-    communicate_with_daemon,
-    machine_id_relative_path,
-    merge_lockfiles,
-    read_machine_id,
-)
+from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
 
 async def install_manager_command(

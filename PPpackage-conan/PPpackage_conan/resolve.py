@@ -16,14 +16,12 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import ResolveInput
-from PPpackage_utils.utils import (
+from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
-    asubprocess_communicate,
-    ensure_dir_exists,
-    frozendict,
+    ResolveInput,
 )
+from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, frozendict
 
 from .parse import Requirement
 from .utils import (
