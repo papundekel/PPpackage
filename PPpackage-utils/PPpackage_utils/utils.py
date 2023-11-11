@@ -7,11 +7,10 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
-    Sequence,
     Set,
 )
 from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass, is_dataclass
+from dataclasses import is_dataclass
 from json import JSONEncoder
 from json import dump as json_dump_base
 from json import dumps as json_dumps_base
@@ -22,9 +21,12 @@ from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Any, Optional, TypedDict
+from typing import Annotated, Any, Generic, Optional, TypeVar, get_args
 
 from frozendict import frozendict
+from pydantic import GetCoreSchemaHandler
+from pydantic.dataclasses import dataclass
+from pydantic_core import CoreSchema, core_schema
 
 
 class MyException(Exception):
@@ -211,25 +213,42 @@ def json_dumps(obj, **kwargs) -> str:
     return json_dumps_base(obj, cls=CustomEncoder, **kwargs)
 
 
+def make_frozendict(obj):
+    return frozendict(obj)
+
+
+Key = TypeVar("Key")
+Value = TypeVar("Value")
+
+
+class FrozenDictAnnotation(Generic[Key, Value]):
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        key, value = get_args(source_type)
+
+        return core_schema.no_info_after_validator_function(
+            make_frozendict,
+            core_schema.dict_schema(
+                handler.generate_schema(key), handler.generate_schema(value)
+            ),
+        )
+
+
+FrozenDictAnnotated = Annotated[
+    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
+]
+
+
 @dataclass(frozen=True)
 class ResolutionGraphNodeValue:
     version: str
     dependencies: Set[str]
-    requirements: Mapping[str, frozenset[Hashable]]
+    requirements: FrozenDictAnnotated[str, frozenset[Hashable]]
 
 
 @dataclass(frozen=True)
 class ResolutionGraph:
-    roots: Sequence[Set[str]]
-    graph: Mapping[str, ResolutionGraphNodeValue]
-
-
-class ResolutionGraphNodeValueJSON(TypedDict):
-    version: str
-    dependencies: list[str]
-    requirements: Mapping[str, list[Hashable]]
-
-
-class ResolutionGraphJSON(TypedDict):
-    roots: Sequence[list[str]]
-    graph: Mapping[str, ResolutionGraphNodeValueJSON]
+    roots: tuple[Set[str], ...]
+    graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]

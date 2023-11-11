@@ -9,16 +9,15 @@ from typing import Any
 
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
-from PPpackage_utils.parse import ResolveInput, model_dump
+from PPpackage_utils.parse import ResolveInput, model_dump, model_validate
 from PPpackage_utils.utils import (
     MyException,
     ResolutionGraph,
     ResolutionGraphNodeValue,
     asubprocess_communicate,
-    json_loads,
 )
+from pydantic import RootModel
 
-from .parse import parse_resolution_graphs
 from .sub import resolve as PP_resolve
 
 
@@ -46,11 +45,9 @@ async def resolve_external_manager(
         input_json_bytes,
     )
 
-    output_json_string = output_json_bytes.decode("utf-8")
+    output = model_validate(debug, RootModel[Set[ResolutionGraph]], output_json_bytes)
 
-    resolution_graphs = parse_resolution_graphs(debug, json_loads(output_json_string))
-
-    return resolution_graphs
+    return output.root
 
 
 async def resolve_manager(

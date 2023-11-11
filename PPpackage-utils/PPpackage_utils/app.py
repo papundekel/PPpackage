@@ -16,6 +16,7 @@ from PPpackage_utils.parse import (
     model_dump,
     model_validate,
 )
+from pydantic import RootModel
 from typer import Typer
 
 from .parse import Product
@@ -86,17 +87,19 @@ def init(
     async def resolve(cache_path: Path) -> None:
         input_json_bytes = stdin.buffer.read()
 
-        input = model_validate(ResolveInput[RequirementType], input_json_bytes)
+        input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
 
-        resolution_graphs = await resolve_callback(cache_path, input)
+        output = await resolve_callback(cache_path, input)
 
-        json_dump(resolution_graphs, stdout, indent=4 if __debug else None)
+        output_json_bytes = model_dump(__debug, RootModel[Set[ResolutionGraph]](output))
+
+        stdout.buffer.write(output_json_bytes)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
         input_json_bytes = stdin.buffer.read()
 
-        input = model_validate(FetchInput, input_json_bytes)
+        input = model_validate(__debug, FetchInput, input_json_bytes)
 
         output = await fetch_callback(cache_path, input)
 
@@ -108,7 +111,7 @@ def init(
     async def generate(cache_path: Path, generators_path: Path) -> None:
         input_json_bytes = stdin.buffer.read()
 
-        input = model_validate(GenerateInput, input_json_bytes)
+        input = model_validate(__debug, GenerateInput, input_json_bytes)
 
         await generate_callback(
             cache_path,
@@ -129,7 +132,7 @@ def init(
 
         input_json_bytes = stdin.buffer.read()
 
-        input = model_validate(InstallInput, input_json_bytes)
+        input = model_validate(__debug, InstallInput, input_json_bytes)
 
         await install_callback(
             cache_path,

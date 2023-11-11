@@ -4,7 +4,6 @@ from collections.abc import Mapping, MutableMapping
 from functools import partial
 from itertools import islice
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
@@ -16,7 +15,7 @@ from PPpackage_utils.parse import (
     model_dump,
     model_validate,
 )
-from PPpackage_utils.utils import asubprocess_communicate, json_dumps, json_loads
+from PPpackage_utils.utils import asubprocess_communicate
 
 from .sub import fetch as PP_fetch
 
@@ -45,7 +44,7 @@ async def fetch_external_manager(
         input_json_bytes,
     )
 
-    return model_validate(FetchOutput, output_json_bytes)
+    return model_validate(debug, FetchOutput, output_json_bytes)
 
 
 async def fetch_manager(

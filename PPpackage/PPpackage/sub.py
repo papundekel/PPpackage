@@ -33,13 +33,13 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 def check_requirements_list(
     requirements_list: Sequence[Set[Hashable]],
-) -> Sequence[Set[str]]:
+) -> tuple[Set[str], ...]:
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
                 raise MyException("PPpackage: Requirements must be strings.")
 
-    return cast(Sequence[Set[str]], requirements_list)
+    return tuple(cast(Sequence[Set[str]], requirements_list))
 
 
 async def resolve(
@@ -60,14 +60,12 @@ async def resolve(
         }
     )
 
-    return frozenset(
-        [
-            ResolutionGraph(
-                requirements_list,
-                graph,
-            )
-        ]
+    resolve_graph = ResolutionGraph(
+        requirements_list,
+        graph,
     )
+
+    return frozenset([resolve_graph])
 
 
 async def fetch(

@@ -28,8 +28,17 @@ def model_validate_obj(Model: type[ModelType], obj: Any) -> ModelType:
         raise MyException(f"Invalid model format:\n{e}.")
 
 
-def model_validate(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
+def model_validate(
+    debug: bool, Model: type[ModelType], input_json_bytes: bytes
+) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
+
+    if debug:
+        print(
+            f"DEBUG model_validate {Model}:\n{input_json_string}",
+            file=stderr,
+            flush=True,
+        )
 
     try:
         input = Model.model_validate_json(input_json_string)
@@ -48,40 +57,6 @@ def model_dump(debug: bool, output: BaseModel) -> bytes:
     output_json_bytes = output_json_string.encode("utf-8")
 
     return output_json_bytes
-
-
-def json_check_format(
-    debug: bool,
-    input_json: Any,
-    keys_required: Set[str],
-    keys_permitted_unequired: Set[str],
-    error_message: str,
-) -> Mapping[str, Any]:
-    if type(input_json) is not frozendict:
-        raise MyException(error_message)
-
-    keys = input_json.keys()
-
-    keys_permitted = keys_required | keys_permitted_unequired
-
-    are_present_required = keys_required <= keys
-    are_present_only_permitted = keys <= keys_permitted
-
-    if not are_present_required or not are_present_only_permitted:
-        if debug:
-            print(f"json_check_format: {input_json}", file=stderr)
-
-        raise MyException(
-            f"{error_message} Must be a JSON object with keys {keys_required} required"
-            f"and {keys_permitted_unequired} optional."
-        )
-
-    return input_json
-
-
-class VersionInfo(TypedDict):
-    version: str
-    product_id: str
 
 
 Requirement = TypeVar("Requirement")

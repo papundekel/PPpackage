@@ -32,7 +32,7 @@ async def main_command(
 ) -> None:
     input_json_bytes = stdin.buffer.read()
 
-    input = model_validate(Input, input_json_bytes)
+    input = model_validate(debug, Input, input_json_bytes)
 
     if debug:
         print(
