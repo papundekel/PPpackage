@@ -3,40 +3,67 @@ from contextlib import contextmanager
 from os import environ
 from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.parse import json_loads
+from PPpackage_utils.parse import model_validate, model_validate_obj
+from pydantic import BaseModel
 
 
 def get_cache_path(cache_path: Path) -> Path:
     return cache_path / "conan"
 
 
-class DependencyValueJSON(TypedDict):
+class DependencyValueJSON(BaseModel):
     direct: bool
 
 
-class Node(TypedDict):
+class BaseNode(BaseModel):
     id: str
     ref: str
-    user: str
+    user: str | None
     name: str
     version: str
     rrev: str
+
+    def get_version(self) -> str:
+        return f"{self.version}#{self.rrev}"
+
+
+class FetchNode(BaseNode):
     package_id: str
     prev: str
     cpp_info: Mapping[str, Any]
+
+    def get_product_id(self) -> str:
+        return f"{self.package_id}#{self.prev}"
+
+
+class ResolveNode(BaseNode):
     dependencies: Mapping[str, DependencyValueJSON]
 
 
+class ConanGraphNodes(BaseModel):
+    nodes: Mapping[str, Mapping[str, Any]]
+
+
+class ConanGraph(BaseModel):
+    graph: ConanGraphNodes
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
 def parse_conan_graph_nodes(
-    graph_string: str,
-) -> Mapping[str, Node]:
+    NodeType: type[T],
+    conan_graph_json_bytes: bytes,
+) -> Mapping[str, T]:
+    conan_graph = model_validate(False, ConanGraph, conan_graph_json_bytes)
+
     return {
-        node["id"]: node
-        for node in json_loads(graph_string)["graph"]["nodes"].values()
-        if node["ref"] != ""
+        node_id: model_validate_obj(NodeType, node_json)
+        for node_id, node_json in conan_graph.graph.nodes.items()
+        if node_id != "0"
     }
 
 
@@ -52,13 +79,6 @@ def create_and_render_temp_file(
         file.flush()
 
         yield file
-
-
-class GraphInfo:
-    def __init__(self, node: Node):
-        self.version = f"{node['version']}#{node['rrev']}"
-        self.product_id = f"{node['package_id']}#{node['prev']}"
-        self.cpp_info = node["cpp_info"]
 
 
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:

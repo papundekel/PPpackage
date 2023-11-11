@@ -1,6 +1,5 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
@@ -16,18 +15,12 @@ from PPpackage_utils.utils import asubprocess_communicate
 
 from .parse import FetchProductInfo
 from .utils import (
-    GraphInfo,
+    FetchNode,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
     parse_conan_graph_nodes,
 )
-
-
-def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
-    nodes = parse_conan_graph_nodes(input)
-
-    return {node["name"]: GraphInfo(node) for node in nodes.values()}
 
 
 async def fetch(
@@ -83,20 +76,20 @@ async def fetch(
             env=environment,
         )
 
-        graph_json = await asubprocess_communicate(
+        graph_json_bytes = await asubprocess_communicate(
             await process, "Error in `conan install`"
         )
 
-    graph_infos = parse_conan_graph_fetch(graph_json.decode("ascii"))
+    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
     output = {
-        package: FetchOutputValue(
-            product_id=graph_info.product_id,
+        node.name: FetchOutputValue(
+            product_id=node.get_product_id(),
             product_info=FetchProductInfo(
-                version=graph_info.version, cpp_info=graph_info.cpp_info
+                version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
-        for package, graph_info in graph_infos.items()
+        for node in nodes.values()
     }
 
     return FetchOutput(output)
