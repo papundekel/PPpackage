@@ -3,15 +3,10 @@ from contextlib import contextmanager
 from os import environ
 from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
-from typing import Any, NotRequired, Optional, TypedDict
+from typing import Any, Optional, TypedDict
 
 from jinja2 import Template as Jinja2Template
 from PPpackage_utils.utils import json_loads
-
-
-class Options(TypedDict):
-    settings: NotRequired[Mapping[str, str]]
-    options: NotRequired[Mapping[str, str]]
 
 
 def get_cache_path(cache_path: Path) -> Path:
@@ -64,12 +59,6 @@ class GraphInfo:
         self.version = f"{node['version']}#{node['rrev']}"
         self.product_id = f"{node['package_id']}#{node['prev']}"
         self.cpp_info = node["cpp_info"]
-
-
-class Requirement:
-    def __init__(self, package: str, version: str):
-        self.package = package
-        self.version = version
 
 
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:

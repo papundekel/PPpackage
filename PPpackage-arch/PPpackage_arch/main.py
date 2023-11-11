@@ -1,10 +1,9 @@
 from PPpackage_utils.app import init, run
 from PPpackage_utils.parse import parse_products
-from PPpackage_utils.utils import anoop, noop
+from PPpackage_utils.utils import anoop
 
 from .fetch import fetch
 from .install import install
-from .parse import parse_requirements
 from .resolve import resolve
 from .update_database import update_database
 
@@ -16,8 +15,7 @@ def main():
         fetch,
         anoop,
         install,
-        parse_requirements,
-        noop,
+        str,
         parse_products,
     )
     run(app, "arch")

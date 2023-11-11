@@ -4,16 +4,16 @@ from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import exit, stderr, stdin, stdout
-from typing import Any
+from typing import Any, TypeVar
 
 from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     GenerateInput,
     GenerateInputPackagesValue,
+    ResolveInput,
     model_dump,
     model_validate,
-    parse_resolve_input,
 )
 from typer import Typer
 
@@ -23,7 +23,6 @@ from .utils import (
     ResolutionGraph,
     ensure_dir_exists,
     json_dump,
-    json_dumps,
     json_load,
 )
 
@@ -62,10 +61,13 @@ def callback(debug: bool = False) -> None:
     __debug = debug
 
 
+T = TypeVar("T")
+
+
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
-        [Path, Sequence[Set[Any]], Any], Awaitable[Set[ResolutionGraph]]
+        [Path, ResolveInput[T]], Awaitable[Set[ResolutionGraph]]
     ],
     fetch_callback: Callable[[Path, FetchInput], Awaitable[FetchOutput]],
     generate_callback: Callable[
@@ -79,8 +81,7 @@ def init(
         Awaitable[None],
     ],
     install_callback: Callable[[Path, Set[Product], Path, Path, Path], Awaitable[None]],
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
+    RequirementType: type[T],
     products_parser: Callable[[bool, Any], Set[Product]],
 ) -> Typer:
     @__app.command("update-database")
@@ -89,15 +90,11 @@ def init(
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:
-        input = json_load(stdin)
+        input_json_bytes = stdin.buffer.read()
 
-        requirements_list, options = parse_resolve_input(
-            __debug, requirements_parser, options_parser, input
-        )
+        input = model_validate(ResolveInput[RequirementType], input_json_bytes)
 
-        resolution_graphs = await resolve_callback(
-            cache_path, requirements_list, options
-        )
+        resolution_graphs = await resolve_callback(cache_path, input)
 
         json_dump(resolution_graphs, stdout, indent=4 if __debug else None)
 

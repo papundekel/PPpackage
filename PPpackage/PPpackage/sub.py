@@ -9,7 +9,12 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.parse import FetchInput, FetchOutput, FetchOutputValue
+from PPpackage_utils.parse import (
+    FetchInput,
+    FetchOutput,
+    FetchOutputValue,
+    ResolveInput,
+)
 from PPpackage_utils.utils import (
     MyException,
     ResolutionGraph,
@@ -39,10 +44,9 @@ def check_requirements_list(
 async def resolve(
     debug: bool,
     cache_path: Path,
-    requirements_list: Sequence[Set[Hashable]],
-    options: Mapping[str, Any] | None,
+    input: ResolveInput[Any],
 ) -> Set[ResolutionGraph]:
-    requirements_list = check_requirements_list(requirements_list)
+    requirements_list = check_requirements_list(input.requirements_list)
 
     requirements_merged = frozenset.union(frozenset(), *requirements_list)
 

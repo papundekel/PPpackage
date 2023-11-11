@@ -1,7 +1,6 @@
-from collections.abc import Callable, Mapping, Set
+from collections.abc import Mapping, Set
 from sys import stderr
-from typing import Annotated, Any, Sequence, TypedDict, TypeVar
-from typing import cast as type_cast
+from typing import Annotated, Any, Generic, Sequence, TypedDict, TypeVar
 
 from PPpackage_utils.utils import MyException, Product, frozendict
 from pydantic import BaseModel, BeforeValidator, RootModel, ValidationError
@@ -16,10 +15,10 @@ def frozen_validator(value: Any) -> Any:
 
 FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
-T = TypeVar("T", bound=BaseModel)
+ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
-def model_validate_obj(Model: type[T], obj: Any) -> T:
+def model_validate_obj(Model: type[ModelType], obj: Any) -> ModelType:
     try:
         input = Model.model_validate(obj)
 
@@ -28,7 +27,7 @@ def model_validate_obj(Model: type[T], obj: Any) -> T:
         raise MyException(f"Invalid model format:\n{e}.")
 
 
-def model_validate(Model: type[T], input_json_bytes: bytes) -> T:
+def model_validate(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
     try:
@@ -130,45 +129,12 @@ def parse_products(debug: bool, products_json: Any) -> Set[Product]:
     }
 
 
-class ResolveInput(TypedDict):
-    requirements: Any
-    options: Any
+Requirement = TypeVar("Requirement")
 
 
-def check_resolve_input(debug: bool, input_json: Any) -> ResolveInput:
-    return type_cast(
-        ResolveInput,
-        json_check_format(
-            debug,
-            input_json,
-            {"requirements", "options"},
-            set(),
-            "Invalid resolve input format.",
-        ),
-    )
-
-
-def parse_resolve_input(
-    debug: bool,
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
-    input_json: Any,
-) -> tuple[Sequence[Set[Any]], Any]:
-    input_checked = check_resolve_input(debug, input_json)
-
-    requirements_list_json = input_checked["requirements"]
-
-    for requirements_json in requirements_list_json:
-        if type(requirements_json) is not list:
-            raise MyException("Invalid requirements format. Must be a JSON array.")
-
-    requirements_list = [
-        requirements_parser(debug, requirements_json)
-        for requirements_json in requirements_list_json
-    ]
-    options = options_parser(debug, input_checked["options"])
-
-    return requirements_list, options
+class ResolveInput(BaseModel, Generic[Requirement]):
+    requirements_list: Sequence[Set[Requirement]]
+    options: Mapping[str, Any] | None
 
 
 class GenerateInputPackagesValue(BaseModel):

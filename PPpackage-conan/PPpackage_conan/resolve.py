@@ -16,6 +16,7 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
+from PPpackage_utils.parse import ResolveInput
 from PPpackage_utils.utils import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
@@ -24,10 +25,9 @@ from PPpackage_utils.utils import (
     frozendict,
 )
 
+from .parse import Requirement
 from .utils import (
     Node,
-    Options,
-    Requirement,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -186,7 +186,7 @@ async def create_graph(
     profile_template: Jinja2Template,
     build_profile_path: Path,
     requirements_list: Sequence[Any],
-    options: Options,
+    options: Any,
 ) -> ResolutionGraph:
     with (
         create_and_render_temp_file(
@@ -227,8 +227,7 @@ async def create_graph(
 async def resolve(
     templates_path: Path,
     cache_path: Path,
-    requirements_list: Sequence[Set[Requirement]],
-    options: Options,
+    input: ResolveInput[Requirement],
 ) -> Set[ResolutionGraph]:
     cache_path = get_cache_path(cache_path)
 
@@ -249,7 +248,7 @@ async def resolve(
 
     build_profile_path = templates_path / "profile"
 
-    for requirement_index, requirements in enumerate(requirements_list):
+    for requirement_index, requirements in enumerate(input.requirements_list):
         requirement_partitions = create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
@@ -271,8 +270,8 @@ async def resolve(
         root_template,
         profile_template,
         build_profile_path,
-        requirements_list,
-        options,
+        input.requirements_list,
+        input.options,
     )
 
     await remove_temporary_packages_from_cache(environment)
