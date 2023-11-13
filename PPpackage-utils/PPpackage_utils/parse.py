@@ -90,9 +90,11 @@ FrozenDictPydantic = Annotated[
 
 Requirement = TypeVar("Requirement")
 
+Options = Mapping[str, Any] | None
+
 
 class ResolveInput(BaseModel, Generic[Requirement]):
-    options: Mapping[str, Any] | None
+    options: Options
     requirements_list: Sequence[Set[Requirement]]
 
 
@@ -104,7 +106,7 @@ class Product:
 
 
 class GenerateInput(BaseModel):
-    options: Mapping[str, Any] | None
+    options: Options
     generators: Set[str]
     products: Set[Product]
 
@@ -118,14 +120,20 @@ FetchOutput = RootModel[Mapping[str, FetchOutputValue]]
 
 
 @dataclass(frozen=True)
+class Dependency:
+    manager: str
+    name: str
+
+
+@dataclass(frozen=True)
 class PackageWithDependencies:
     name: str
     version: str
-    dependencies: FrozenDictPydantic[str, Set[str]]
+    dependencies: Set[Dependency]
 
 
 class FetchInput(BaseModel):
-    options: Mapping[str, Any] | None
+    options: Options
     packages: Set[PackageWithDependencies]
     product_infos: Mapping[str, Mapping[str, Any]]
 

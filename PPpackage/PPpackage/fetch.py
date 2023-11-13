@@ -9,6 +9,7 @@ from typing import Any
 from frozendict import frozendict
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
+    Dependency,
     FetchInput,
     FetchOutput,
     FetchOutputValue,
@@ -90,26 +91,28 @@ async def fetch(
         for manager, name in generation:
             version = graph.nodes[(manager, name)]["version"]
 
-            dependencies = list(
+            node_dependencies = list(
                 islice(dfs_preorder_nodes(graph, source=(manager, name)), 1, None)
             )
 
-            value_dependencies = {}
-            for dependency_manager, dependency in dependencies:
-                value_dependencies.setdefault(dependency_manager, set()).add(dependency)
+            dependencies = set()
+            for dependency_manager, dependency_name in node_dependencies:
+                dependencies.add(
+                    Dependency(manager=dependency_manager, name=dependency_name)
+                )
 
                 product_infos = manager_product_infos.setdefault(dependency_manager, {})
 
-                if dependency not in product_infos:
-                    product_infos[dependency] = outputs[dependency_manager][
-                        dependency
+                if dependency_name not in product_infos:
+                    product_infos[dependency_name] = outputs[dependency_manager][
+                        dependency_name
                     ].product_info
 
             manager_packages.setdefault(manager, set()).add(
                 PackageWithDependencies(
                     name=name,
                     version=version,
-                    dependencies=frozendict(value_dependencies),
+                    dependencies=dependencies,
                 )
             )
 
