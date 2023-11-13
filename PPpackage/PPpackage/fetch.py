@@ -1,17 +1,18 @@
 from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, MutableSet
 from functools import partial
 from itertools import islice
 from pathlib import Path
 from typing import Any
 
+from frozendict import frozendict
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
     FetchInput,
-    FetchInputPackageValue,
     FetchOutput,
     FetchOutputValue,
+    PackageWithDependencies,
     model_dump,
     model_validate,
 )
@@ -85,14 +86,12 @@ async def fetch(
 
     for generation in topological_generations(reversed_graph):
         manager_product_infos: MutableMapping[str, MutableMapping[str, Any]] = {}
-        manager_packages: MutableMapping[
-            str, MutableMapping[str, FetchInputPackageValue]
-        ] = {}
-        for manager, package in generation:
-            version = graph.nodes[(manager, package)]["version"]
+        manager_packages: MutableMapping[str, MutableSet[PackageWithDependencies]] = {}
+        for manager, name in generation:
+            version = graph.nodes[(manager, name)]["version"]
 
             dependencies = list(
-                islice(dfs_preorder_nodes(graph, source=(manager, package)), 1, None)
+                islice(dfs_preorder_nodes(graph, source=(manager, name)), 1, None)
             )
 
             value_dependencies = {}
@@ -106,11 +105,13 @@ async def fetch(
                         dependency
                     ].product_info
 
-            value = FetchInputPackageValue(
-                version=version, dependencies=value_dependencies
+            manager_packages.setdefault(manager, set()).add(
+                PackageWithDependencies(
+                    name=name,
+                    version=version,
+                    dependencies=frozendict(value_dependencies),
+                )
             )
-
-            manager_packages.setdefault(manager, {})[package] = value
 
         inputs = {
             manager: FetchInput(

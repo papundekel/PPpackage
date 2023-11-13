@@ -84,6 +84,10 @@ def model_dump(debug: bool, output: BaseModel) -> bytes:
     return output_json_bytes
 
 
+FrozenDictPydantic = Annotated[
+    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
+]
+
 Requirement = TypeVar("Requirement")
 
 
@@ -113,13 +117,15 @@ class FetchOutputValue(BaseModel):
 FetchOutput = RootModel[Mapping[str, FetchOutputValue]]
 
 
-class FetchInputPackageValue(BaseModel):
+@dataclass(frozen=True)
+class PackageWithDependencies:
+    name: str
     version: str
-    dependencies: Mapping[str, Set[str]]
+    dependencies: FrozenDictPydantic[str, Set[str]]
 
 
 class FetchInput(BaseModel):
-    packages: Mapping[str, FetchInputPackageValue]
+    packages: Set[PackageWithDependencies]
     product_infos: Mapping[str, Mapping[str, Any]]
     options: Mapping[str, Any] | None
 
@@ -127,19 +133,14 @@ class FetchInput(BaseModel):
 InstallInput = RootModel[Set[Product]]
 
 
-FrozenDictAnnotated = Annotated[
-    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
-]
-
-
 @dataclass(frozen=True)
 class ResolutionGraphNodeValue:
     version: str
     dependencies: Set[str]
-    requirements: FrozenDictAnnotated[str, frozenset[Hashable]]
+    requirements: FrozenDictPydantic[str, frozenset[Hashable]]
 
 
 @dataclass(frozen=True)
 class ResolutionGraph:
     roots: tuple[Set[str], ...]
-    graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]
+    graph: FrozenDictPydantic[str, ResolutionGraphNodeValue]

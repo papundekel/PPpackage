@@ -42,8 +42,8 @@ async def fetch(
 
     packages = []
 
-    for package, value in input.packages.items():
-        packages.append((package, value.version))
+    for package in input.packages:
+        packages.append((package.name, package.version))
 
     for package, product_info_raw in input.product_infos.get("conan", {}).items():
         product_info = model_validate_obj(FetchProductInfo, product_info_raw)

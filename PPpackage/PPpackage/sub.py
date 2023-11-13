@@ -129,8 +129,8 @@ async def fetch(
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
     output = {
-        name: FetchOutputValue(product_id="id", product_info=None)
-        for name in input.packages.keys()
+        package.name: FetchOutputValue(product_id="id", product_info=None)
+        for package in input.packages
     }
 
     return FetchOutput(output)

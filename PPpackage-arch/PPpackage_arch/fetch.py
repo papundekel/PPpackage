@@ -18,7 +18,7 @@ async def fetch(
 
     ensure_dir_exists(cache_path)
 
-    packages = list(input.packages.keys())
+    packages = [package.name for package in input.packages]
 
     async with fakeroot() as environment:
         process = create_subprocess_exec(
