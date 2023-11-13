@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import stderr, stdin
 
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import GenerateInputPackagesValue, Product, model_validate
+from PPpackage_utils.parse import Product, model_validate
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -54,39 +54,24 @@ async def main_command(
     for (manager, package), data in graph.nodes(data=True):
         meta_versions.setdefault(manager, {})[package] = data["version"]
 
-    meta_product_ids = {
-        manager: {package: value.product_id for package, value in values.items()}
-        for manager, values in fetch_outputs.items()
-    }
-
     meta_products: MutableMapping[str, MutableSet[Product]] = {}
 
     for manager, versions in meta_versions.items():
-        for package, version in versions.items():
+        for name, version in versions.items():
             meta_products.setdefault(manager, set()).add(
                 Product(
-                    package=package,
+                    name=name,
                     version=version,
-                    product_id=meta_product_ids[manager][package],
+                    product_id=fetch_outputs[manager][name].product_id,
                 )
             )
-
-    meta_packages = {
-        manager: {
-            product.package: GenerateInputPackagesValue(
-                version=product.version, product_id=product.product_id
-            )
-            for product in products
-        }
-        for manager, products in meta_products.items()
-    }
 
     await generate(
         debug,
         cache_path,
         generators_path,
         input.generators,
-        meta_packages,
+        meta_products,
         input.options,
     )
 

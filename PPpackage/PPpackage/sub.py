@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Iterable, Mapping, Sequence, Set
+from collections.abc import Hashable, Sequence, Set
 from pathlib import Path
 from sys import stderr
 from typing import Any, cast
@@ -153,5 +153,5 @@ async def install(
     products_path.mkdir(exist_ok=True)
 
     for product in products:
-        product_path = products_path / product.package
+        product_path = products_path / product.name
         product_path.write_text(f"{product.version} {product.product_id}")

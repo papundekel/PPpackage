@@ -1,11 +1,11 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, GenerateInputPackagesValue, model_dump
+from PPpackage_utils.parse import GenerateInput, Product, model_dump
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .generators import builtin as builtin_generators
@@ -64,11 +64,11 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     generators: Iterable[str],
-    meta_packages: Mapping[str, Mapping[str, GenerateInputPackagesValue]],
+    meta_products: Mapping[str, Set[Product]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
 ):
     async with TaskGroup() as group:
-        for manager, packages in meta_packages.items():
+        for manager, products in meta_products.items():
             group.create_task(
                 generate_manager(
                     debug,
@@ -76,7 +76,7 @@ async def generate(
                     generators_path,
                     GenerateInput(
                         generators=generators - builtin_generators.keys(),
-                        packages=packages,
+                        products=products,
                         options=meta_options.get(manager),
                     ),
                     manager,
@@ -84,4 +84,4 @@ async def generate(
             )
 
         for generator in generators & builtin_generators.keys():
-            builtin_generators[generator](generators_path, meta_packages)
+            builtin_generators[generator](generators_path, meta_products)

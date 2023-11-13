@@ -1,26 +1,26 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Set
 from json import dump as json_dump
 from pathlib import Path
 
-from PPpackage_utils.parse import GenerateInputPackagesValue
+from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import ensure_dir_exists
 
 
 def versions(
     generators_path: Path,
-    meta_packages: Mapping[str, Mapping[str, GenerateInputPackagesValue]],
+    meta_products: Mapping[str, Set[Product]],
 ) -> None:
     versions_path = generators_path / "versions"
 
-    for manager, packages in meta_packages.items():
+    for manager, products in meta_products.items():
         manager_path = versions_path / manager
 
         ensure_dir_exists(manager_path)
 
-        for package, value in packages.items():
-            with (manager_path / f"{package}.json").open("w") as versions_file:
+        for product in products:
+            with (manager_path / f"{product.name}.json").open("w") as versions_file:
                 json_dump(
-                    {"version": value.version, "product_id": value.product_id},
+                    {"version": product.version, "product_id": product.product_id},
                     versions_file,
                     indent=4,
                 )
@@ -31,7 +31,7 @@ builtin: Mapping[
     Callable[
         [
             Path,
-            Mapping[str, Mapping[str, GenerateInputPackagesValue]],
+            Mapping[str, Set[Product]],
         ],
         None,
     ],

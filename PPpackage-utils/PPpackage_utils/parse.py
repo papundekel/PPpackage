@@ -92,14 +92,16 @@ class ResolveInput(BaseModel, Generic[Requirement]):
     options: Mapping[str, Any] | None
 
 
-class GenerateInputPackagesValue(BaseModel):
+@dataclass(frozen=True)
+class Product:
+    name: str
     version: str
     product_id: str
 
 
 class GenerateInput(BaseModel):
     generators: Set[str]
-    packages: Mapping[str, GenerateInputPackagesValue]
+    products: Set[Product]
     options: Mapping[str, Any] | None
 
 
@@ -120,13 +122,6 @@ class FetchInput(BaseModel):
     packages: Mapping[str, FetchInputPackageValue]
     product_infos: Mapping[str, Mapping[str, Any]]
     options: Mapping[str, Any] | None
-
-
-@dataclass(frozen=True)
-class Product:
-    package: str
-    version: str
-    product_id: str
 
 
 InstallInput = RootModel[Set[Product]]

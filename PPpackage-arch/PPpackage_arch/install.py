@@ -50,7 +50,7 @@ async def install(
                 *[
                     str(
                         cache_path
-                        / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+                        / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
                     )
                     for product in products
                 ],

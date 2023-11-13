@@ -17,7 +17,7 @@ async def install_product(
         "conan",
         "cache",
         "path",
-        f"{product.package}/{product.version}:{product.product_id}",
+        f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
         stderr=None,
@@ -30,7 +30,7 @@ async def install_product(
 
     copytree(
         product_path,
-        destination_path / product.package,
+        destination_path / product.name,
         symlinks=True,
         dirs_exist_ok=True,
     )

@@ -1,25 +1,25 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Mapping, Set
+from collections.abc import Awaitable, Callable, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import exit, stderr, stdin, stdout
 from typing import Any, TypeVar
 
-from PPpackage_utils.parse import (
+from pydantic import RootModel
+from typer import Typer
+
+from .parse import (
     FetchInput,
     FetchOutput,
     GenerateInput,
-    GenerateInputPackagesValue,
     InstallInput,
+    Product,
+    ResolutionGraph,
     ResolveInput,
     model_dump,
     model_validate,
 )
-from pydantic import RootModel
-from typer import Typer
-
-from .parse import Product, ResolutionGraph
 from .utils import MyException, ensure_dir_exists
 
 
@@ -72,7 +72,7 @@ def init(
             Set[str],
             Path,
             Any,
-            Mapping[str, GenerateInputPackagesValue],
+            Set[Product],
         ],
         Awaitable[None],
     ],
@@ -118,7 +118,7 @@ def init(
             input.generators,
             generators_path,
             input.options,
-            input.packages,
+            input.products,
         )
 
     @__app.command()
