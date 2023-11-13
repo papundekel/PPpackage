@@ -107,8 +107,8 @@ class Product:
 
 class GenerateInput(BaseModel):
     options: Options
-    generators: Set[str]
-    products: Set[Product]
+    products: Iterable[Product]
+    generators: Iterable[str]
 
 
 class FetchOutputValue(BaseModel):

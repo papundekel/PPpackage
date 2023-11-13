@@ -54,10 +54,10 @@ async def generate(
     templates_path: Path,
     deployer_path: Path,
     cache_path: Path,
-    generators: Set[str],
+    generators: Iterable[str],
     generators_path: Path,
     options: Any,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 

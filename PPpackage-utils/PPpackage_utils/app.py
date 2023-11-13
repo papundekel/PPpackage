@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Set
+from collections.abc import Awaitable, Callable, Iterable, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -69,10 +69,10 @@ def init(
     generate_callback: Callable[
         [
             Path,
-            Set[str],
+            Iterable[str],
             Path,
             Any,
-            Set[Product],
+            Iterable[Product],
         ],
         Awaitable[None],
     ],
