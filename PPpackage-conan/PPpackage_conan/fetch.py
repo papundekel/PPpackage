@@ -82,14 +82,15 @@ async def fetch(
 
     nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
-    output = {
-        node.name: FetchOutputValue(
+    output = [
+        FetchOutputValue(
+            name=node.name,
             product_id=node.get_product_id(),
             product_info=FetchProductInfo(
                 version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
         for node in nodes.values()
-    }
+    ]
 
     return FetchOutput(output)

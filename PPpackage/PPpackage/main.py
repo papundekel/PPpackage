@@ -40,7 +40,7 @@ async def main_command(
         debug, resolve_iteration_limit, cache_path, input.requirements, input.options
     )
 
-    fetch_outputs = await fetch(
+    await fetch(
         debug,
         runner_path,
         runner_workdir_path,
@@ -56,7 +56,7 @@ async def main_command(
             Product(
                 name=name,
                 version=data["version"],
-                product_id=fetch_outputs[manager][name].product_id,
+                product_id=data["product_id"],
             )
         )
 

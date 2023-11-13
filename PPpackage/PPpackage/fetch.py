@@ -1,10 +1,10 @@
 from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Mapping, MutableMapping, MutableSet
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSet
 from functools import partial
 from itertools import islice
 from pathlib import Path
-from typing import Any
+from typing import Any, MutableSequence
 
 from frozendict import frozendict
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
@@ -80,9 +80,7 @@ async def fetch(
     cache_path: Path,
     graph: MultiDiGraph,
     meta_options: Mapping[str, Mapping[str, Any] | None],
-) -> Mapping[str, Mapping[str, FetchOutputValue]]:
-    outputs: MutableMapping[str, MutableMapping[str, FetchOutputValue]] = {}
-
+) -> None:
     reversed_graph = graph.reverse(copy=False)
 
     for generation in topological_generations(reversed_graph):
@@ -104,9 +102,9 @@ async def fetch(
                 product_infos = manager_product_infos.setdefault(dependency_manager, {})
 
                 if dependency_name not in product_infos:
-                    product_infos[dependency_name] = outputs[dependency_manager][
-                        dependency_name
-                    ].product_info
+                    product_infos[dependency_name] = graph.nodes[
+                        (dependency_manager, dependency_name)
+                    ]["product_info"]
 
             manager_packages.setdefault(manager, set()).add(
                 PackageWithDependencies(
@@ -141,7 +139,7 @@ async def fetch(
             }
 
         for manager, task in manager_tasks.items():
-            for package, value in task.result().root.items():
-                outputs.setdefault(manager, {})[package] = value
-
-    return outputs
+            for package in task.result().root:
+                node = graph.nodes[(manager, package.name)]
+                node["product_id"] = package.product_id
+                node["product_info"] = package.product_info

@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Mapping, Set
+from collections.abc import Hashable, Iterable, Mapping, Set
 from sys import stderr
 from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
 
@@ -112,11 +112,12 @@ class GenerateInput(BaseModel):
 
 
 class FetchOutputValue(BaseModel):
+    name: str
     product_id: str
     product_info: Any
 
 
-FetchOutput = RootModel[Mapping[str, FetchOutputValue]]
+FetchOutput = RootModel[Iterable[FetchOutputValue]]
 
 
 @dataclass(frozen=True)
@@ -129,12 +130,12 @@ class Dependency:
 class PackageWithDependencies:
     name: str
     version: str
-    dependencies: Set[Dependency]
+    dependencies: Iterable[Dependency]
 
 
 class FetchInput(BaseModel):
     options: Options
-    packages: Set[PackageWithDependencies]
+    packages: Iterable[PackageWithDependencies]
     product_infos: Mapping[str, Mapping[str, Any]]
 
 
