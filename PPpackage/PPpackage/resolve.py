@@ -1,6 +1,14 @@
 from asyncio import Task, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
-from collections.abc import Hashable, Mapping, MutableMapping, MutableSet, Sequence, Set
+from collections.abc import (
+    Hashable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSet,
+    Sequence,
+    Set,
+)
 from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
@@ -72,9 +80,16 @@ async def resolve_manager(
 
 
 @dataclass(frozen=True)
+class WorkGraphNodeValue:
+    version: str
+    dependencies: Set[str]
+    requirements: Mapping[str, frozenset[Any]]
+
+
+@dataclass(frozen=True)
 class WorkGraph:
     roots: Mapping[frozenset[Hashable], Set[str]]
-    graph: Mapping[str, ResolutionGraphNodeValue]
+    graph: Mapping[str, WorkGraphNodeValue]
 
 
 def get_resolved_requirements(
@@ -109,7 +124,23 @@ def make_graph(
         }
     )
 
-    return WorkGraph(roots, resolution_graph.graph)
+    graph = frozendict(
+        {
+            package: WorkGraphNodeValue(
+                value.version,
+                frozenset(value.dependencies),
+                frozendict(
+                    {
+                        manager: frozenset(requirements)
+                        for manager, requirements in value.requirements.items()
+                    }
+                ),
+            )
+            for package, value in resolution_graph.graph.items()
+        }
+    )
+
+    return WorkGraph(roots, graph)
 
 
 async def resolve_iteration(
