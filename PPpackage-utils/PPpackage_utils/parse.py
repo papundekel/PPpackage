@@ -155,5 +155,5 @@ class ResolutionGraphNodeValue:
 
 @dataclass(frozen=True)
 class ResolutionGraph:
-    roots: tuple[Iterable[str], ...]
+    roots: Iterable[Iterable[str]]
     graph: FrozenDictPydantic[str, ResolutionGraphNodeValue]
