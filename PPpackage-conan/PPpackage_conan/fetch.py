@@ -1,16 +1,12 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
+from collections.abc import Mapping
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import (
-    FetchInput,
-    FetchOutput,
-    FetchOutputValue,
-    model_validate_obj,
-)
+from PPpackage_utils.parse import FetchInput, FetchOutputValueBase, model_validate_obj
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .parse import FetchProductInfo
@@ -27,7 +23,7 @@ async def fetch(
     templates_path: Path,
     cache_path: Path,
     input: FetchInput,
-) -> FetchOutput:
+) -> Mapping[str, FetchOutputValueBase]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -85,15 +81,14 @@ async def fetch(
 
     nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
-    output = [
-        FetchOutputValue(
-            name=node.name,
+    output = {
+        node.name: FetchOutputValueBase(
             product_id=node.get_product_id(),
             product_info=FetchProductInfo(
                 version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
         for node in nodes.values()
-    ]
+    }
 
-    return FetchOutput(output)
+    return output

@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Iterable, Mapping, Set
+from collections.abc import Iterable, Mapping
 from sys import stderr
 from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
 
@@ -107,10 +107,15 @@ class GenerateInput(BaseModel):
     generators: Iterable[str]
 
 
-class FetchOutputValue(BaseModel):
-    name: str
+@dataclass(frozen=True)
+class FetchOutputValueBase:
     product_id: str
     product_info: Any
+
+
+@dataclass(frozen=True)
+class FetchOutputValue(FetchOutputValueBase):
+    name: str
 
 
 FetchOutput = RootModel[Iterable[FetchOutputValue]]

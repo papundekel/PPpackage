@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Iterable, Set
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Set
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -12,6 +12,8 @@ from typer import Typer
 from .parse import (
     FetchInput,
     FetchOutput,
+    FetchOutputValue,
+    FetchOutputValueBase,
     GenerateInput,
     InstallInput,
     Product,
@@ -65,7 +67,9 @@ def init(
     resolve_callback: Callable[
         [Path, ResolveInput[T]], Awaitable[Set[ResolutionGraph]]
     ],
-    fetch_callback: Callable[[Path, FetchInput], Awaitable[FetchOutput]],
+    fetch_callback: Callable[
+        [Path, FetchInput], Awaitable[Mapping[str, FetchOutputValueBase]]
+    ],
     generate_callback: Callable[
         [
             Path,
@@ -76,7 +80,9 @@ def init(
         ],
         Awaitable[None],
     ],
-    install_callback: Callable[[Path, Path, Path, Path, Iterable[Product]], Awaitable[None]],
+    install_callback: Callable[
+        [Path, Path, Path, Path, Iterable[Product]], Awaitable[None]
+    ],
     RequirementType: type[T],
 ) -> Typer:
     @__app.command("update-database")
@@ -103,7 +109,18 @@ def init(
 
         output = await fetch_callback(cache_path, input)
 
-        output_json_bytes = model_dump(__debug, output)
+        output_model = FetchOutput(
+            [
+                FetchOutputValue(
+                    name=name,
+                    product_id=value.product_id,
+                    product_info=value.product_info,
+                )
+                for name, value in output.items()
+            ]
+        )
+
+        output_json_bytes = model_dump(__debug, output_model)
 
         stdout.buffer.write(output_json_bytes)
 

@@ -12,7 +12,6 @@ from collections.abc import (
 from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
-from logging import Manager
 from pathlib import Path
 from typing import Any
 
