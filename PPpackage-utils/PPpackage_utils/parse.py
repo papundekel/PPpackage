@@ -92,8 +92,8 @@ Requirement = TypeVar("Requirement")
 
 
 class ResolveInput(BaseModel, Generic[Requirement]):
-    requirements_list: Sequence[Set[Requirement]]
     options: Mapping[str, Any] | None
+    requirements_list: Sequence[Set[Requirement]]
 
 
 @dataclass(frozen=True)
@@ -104,9 +104,9 @@ class Product:
 
 
 class GenerateInput(BaseModel):
+    options: Mapping[str, Any] | None
     generators: Set[str]
     products: Set[Product]
-    options: Mapping[str, Any] | None
 
 
 class FetchOutputValue(BaseModel):
@@ -125,9 +125,9 @@ class PackageWithDependencies:
 
 
 class FetchInput(BaseModel):
+    options: Mapping[str, Any] | None
     packages: Set[PackageWithDependencies]
     product_infos: Mapping[str, Mapping[str, Any]]
-    options: Mapping[str, Any] | None
 
 
 InstallInput = RootModel[Set[Product]]
