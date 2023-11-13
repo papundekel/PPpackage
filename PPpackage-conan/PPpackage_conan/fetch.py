@@ -45,9 +45,12 @@ async def fetch(
     for package in input.packages:
         packages.append((package.name, package.version))
 
-    for package, product_info_raw in input.product_infos.get("conan", {}).items():
-        product_info = model_validate_obj(FetchProductInfo, product_info_raw)
-        packages.append((package, product_info.version))
+        for dependency in package.dependencies:
+            if dependency.manager == "conan" and dependency.product_info is not None:
+                product_info_parsed = model_validate_obj(
+                    FetchProductInfo, dependency.product_info
+                )
+                packages.append((dependency.name, product_info_parsed.version))
 
     with (
         create_and_render_temp_file(

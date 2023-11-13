@@ -121,9 +121,14 @@ FetchOutput = RootModel[Iterable[FetchOutputValue]]
 
 
 @dataclass(frozen=True)
-class Dependency:
+class ManagerAndName:
     manager: str
     name: str
+
+
+@dataclass(frozen=True)
+class Dependency(ManagerAndName):
+    product_info: Any | None
 
 
 @dataclass(frozen=True)
@@ -136,7 +141,6 @@ class PackageWithDependencies:
 class FetchInput(BaseModel):
     options: Options
     packages: Iterable[PackageWithDependencies]
-    product_infos: Mapping[str, Mapping[str, Any]]
 
 
 InstallInput = RootModel[Iterable[Product]]

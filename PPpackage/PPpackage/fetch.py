@@ -13,6 +13,7 @@ from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
+    ManagerAndName,
     PackageWithDependencies,
     model_dump,
     model_validate,
@@ -73,6 +74,38 @@ async def fetch_manager(
     return output
 
 
+def create_dependencies(
+    sent_product_infos: MutableSet[ManagerAndName],
+    graph: MultiDiGraph,
+    manager: str,
+    package_name: str,
+):
+    dependencies = []
+
+    node_dependencies = list(
+        islice(dfs_preorder_nodes(graph, source=(manager, package_name)), 1, None)
+    )
+
+    for dependency_manager, dependency_name in node_dependencies:
+        product_info = (
+            None
+            if ManagerAndName(name=dependency_name, manager=dependency_manager)
+            in sent_product_infos
+            else graph.nodes[(dependency_manager, dependency_name)]["product_info"]
+        )
+
+        dependency = Dependency(
+            manager=dependency_manager,
+            name=dependency_name,
+            product_info=product_info,
+        )
+
+        dependencies.append(dependency)
+        sent_product_infos.add(super(Dependency, dependency))
+
+    return dependencies
+
+
 async def fetch(
     debug: bool,
     runner_path: Path,
@@ -84,27 +117,13 @@ async def fetch(
     reversed_graph = graph.reverse(copy=False)
 
     for generation in topological_generations(reversed_graph):
-        manager_product_infos: MutableMapping[str, MutableMapping[str, Any]] = {}
+        sent_product_infos: MutableSet[ManagerAndName] = set()
         manager_packages: MutableMapping[str, MutableSet[PackageWithDependencies]] = {}
+
         for manager, name in generation:
             version = graph.nodes[(manager, name)]["version"]
 
-            node_dependencies = list(
-                islice(dfs_preorder_nodes(graph, source=(manager, name)), 1, None)
-            )
-
-            dependencies = set()
-            for dependency_manager, dependency_name in node_dependencies:
-                dependencies.add(
-                    Dependency(manager=dependency_manager, name=dependency_name)
-                )
-
-                product_infos = manager_product_infos.setdefault(dependency_manager, {})
-
-                if dependency_name not in product_infos:
-                    product_infos[dependency_name] = graph.nodes[
-                        (dependency_manager, dependency_name)
-                    ]["product_info"]
+            dependencies = create_dependencies(sent_product_infos, graph, manager, name)
 
             manager_packages.setdefault(manager, set()).add(
                 PackageWithDependencies(
@@ -118,7 +137,6 @@ async def fetch(
             manager: FetchInput(
                 options=meta_options.get(manager),
                 packages=packages,
-                product_infos=manager_product_infos,
             )
             for manager, packages in manager_packages.items()
         }
