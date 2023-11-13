@@ -4,11 +4,7 @@ from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
-from PPpackage_utils.parse import (
-    ResolutionGraph,
-    ResolutionGraphNodeValue,
-    ResolveInput,
-)
+from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
 from PPpackage_utils.utils import MyException, asubprocess_communicate, frozendict
 from pydot import graph_from_dot_data
 
@@ -149,14 +145,15 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
         [
             ResolutionGraph(
                 roots,
-                frozendict(
-                    {
-                        package: ResolutionGraphNodeValue(
-                            versions[package], dependencies[package], frozendict()
-                        )
-                        for package in versions
-                    }
-                ),
+                [
+                    ResolutionGraphNode(
+                        package_name,
+                        versions[package_name],
+                        dependencies[package_name],
+                        [],
+                    )
+                    for package_name in versions
+                ],
             )
         ]
     )

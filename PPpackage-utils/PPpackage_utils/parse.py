@@ -147,13 +147,20 @@ InstallInput = RootModel[Iterable[Product]]
 
 
 @dataclass(frozen=True)
-class ResolutionGraphNodeValue:
+class ManagerRequirement:
+    manager: str
+    requirement: Any
+
+
+@dataclass(frozen=True)
+class ResolutionGraphNode:
+    name: str
     version: str
     dependencies: Iterable[str]
-    requirements: FrozenDictPydantic[str, Iterable[Any]]
+    requirements: Iterable[ManagerRequirement]
 
 
 @dataclass(frozen=True)
 class ResolutionGraph:
     roots: Iterable[Iterable[str]]
-    graph: FrozenDictPydantic[str, ResolutionGraphNodeValue]
+    graph: Iterable[ResolutionGraphNode]

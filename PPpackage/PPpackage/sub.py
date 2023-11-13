@@ -14,9 +14,10 @@ from PPpackage_utils.parse import (
     FetchOutput,
     FetchOutputValue,
     GenerateInput,
+    ManagerRequirement,
     Product,
     ResolutionGraph,
-    ResolutionGraphNodeValue,
+    ResolutionGraphNode,
     ResolveInput,
 )
 from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
@@ -48,14 +49,15 @@ async def resolve(
 
     requirements_merged = frozenset.union(frozenset(), *requirements_list)
 
-    graph = frozendict(
-        {
-            name: ResolutionGraphNodeValue(
-                "1.0.0", frozenset(), frozendict({"arch": frozenset(["iana-etc"])})
-            )
-            for name in requirements_merged
-        }
-    )
+    graph = [
+        ResolutionGraphNode(
+            name,
+            "1.0.0",
+            frozenset(),
+            [ManagerRequirement(manager="arch", requirement="iana-etc")],
+        )
+        for name in requirements_merged
+    ]
 
     resolve_graph = ResolutionGraph(
         requirements_list,

@@ -12,14 +12,15 @@ from collections.abc import (
 from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
+from logging import Manager
 from pathlib import Path
 from typing import Any
 
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_utils.parse import (
+    ManagerRequirement,
     ResolutionGraph,
-    ResolutionGraphNodeValue,
     ResolveInput,
     model_dump,
     model_validate,
@@ -114,6 +115,21 @@ def get_all_requirements(
     return frozendict(all_requirements)
 
 
+def process_manager_requirements(
+    manager_requirements: Iterable[ManagerRequirement],
+) -> Mapping[str, frozenset[Any]]:
+    result: MutableMapping[str, MutableSet[Any]] = {}
+
+    for manager_requirement in manager_requirements:
+        result.setdefault(manager_requirement.manager, set()).add(
+            manager_requirement.requirement
+        )
+
+    return {
+        manager: frozenset(requirements) for manager, requirements in result.items()
+    }
+
+
 def make_graph(
     requirements_list: Sequence[Set[Hashable]], resolution_graph: ResolutionGraph
 ) -> WorkGraph:
@@ -126,17 +142,12 @@ def make_graph(
 
     graph = frozendict(
         {
-            package: WorkGraphNodeValue(
-                value.version,
-                frozenset(value.dependencies),
-                frozendict(
-                    {
-                        manager: frozenset(requirements)
-                        for manager, requirements in value.requirements.items()
-                    }
-                ),
+            node.name: WorkGraphNodeValue(
+                node.version,
+                frozenset(node.dependencies),
+                frozendict(process_manager_requirements(node.requirements)),
             )
-            for package, value in resolution_graph.graph.items()
+            for node in resolution_graph.graph
         }
     )
 

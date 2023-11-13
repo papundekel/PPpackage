@@ -16,11 +16,7 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import (
-    ResolutionGraph,
-    ResolutionGraphNodeValue,
-    ResolveInput,
-)
+from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
 from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, frozendict
 
 from .parse import Requirement
@@ -145,7 +141,7 @@ def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
     nodes = parse_conan_graph_nodes(ResolveNode, conan_graph_json_bytes)
 
     roots_unsorted: Sequence[tuple[int, Set[Any]]] = []
-    graph: MutableMapping[str, ResolutionGraphNodeValue] = {}
+    graph: MutableSequence[ResolutionGraphNode] = []
 
     for node in nodes.values():
         user = node.user
@@ -165,17 +161,20 @@ def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
                 )
             )
         elif user != "pppackage":
-            graph[name] = ResolutionGraphNodeValue(
-                node.get_version(),
-                frozenset(parse_direct_dependencies(nodes, node)),
-                frozendict(),
+            graph.append(
+                ResolutionGraphNode(
+                    name,
+                    node.get_version(),
+                    frozenset(parse_direct_dependencies(nodes, node)),
+                    [],
+                )
             )
 
     roots = tuple(
         [root for _, root in sorted(roots_unsorted, key=lambda pair: pair[0])]
     )
 
-    return ResolutionGraph(roots, frozendict(graph))
+    return ResolutionGraph(roots, graph)
 
 
 async def create_graph(
