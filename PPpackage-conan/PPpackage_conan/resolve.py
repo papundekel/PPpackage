@@ -17,7 +17,7 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
-from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, frozendict
+from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists
 
 from .parse import Requirement
 from .utils import (
@@ -152,12 +152,12 @@ def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
             roots_unsorted.append(
                 (
                     requirement_index,
-                    frozenset(
+                    {
                         dependency
                         for leaf_id in node.dependencies.keys()
                         if (leaf := nodes[leaf_id]).user == "pppackage"
                         for dependency in parse_direct_dependencies(nodes, leaf)
-                    ),
+                    },
                 )
             )
         elif user != "pppackage":
@@ -165,14 +165,12 @@ def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
                 ResolutionGraphNode(
                     name,
                     node.get_version(),
-                    frozenset(parse_direct_dependencies(nodes, node)),
+                    parse_direct_dependencies(nodes, node),
                     [],
                 )
             )
 
-    roots = tuple(
-        [root for _, root in sorted(roots_unsorted, key=lambda pair: pair[0])]
-    )
+    roots = [root for _, root in sorted(roots_unsorted, key=lambda pair: pair[0])]
 
     return ResolutionGraph(roots, graph)
 
@@ -273,4 +271,4 @@ async def resolve(
 
     await remove_temporary_packages_from_cache(environment)
 
-    return frozenset([graph])
+    return {graph}

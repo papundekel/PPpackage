@@ -84,10 +84,6 @@ def model_dump(debug: bool, output: BaseModel) -> bytes:
     return output_json_bytes
 
 
-FrozenDictPydantic = Annotated[
-    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
-]
-
 Requirement = TypeVar("Requirement")
 
 Options = Mapping[str, Any] | None

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
-from PPpackage_utils.utils import MyException, asubprocess_communicate, frozendict
+from PPpackage_utils.utils import MyException, asubprocess_communicate
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -85,15 +85,11 @@ async def resolve_versions(
 
     stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
 
-    lockfile = frozendict(
-        {
-            (split_line := line.split())[0]
-            .split("/")[-1]: split_line[1]
-            .rsplit("-", 1)[0]
-            for line in stdout.decode("ascii").splitlines()
-            if not line.startswith(" ")
-        }
-    )
+    lockfile = {
+        (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]
+        for line in stdout.decode("ascii").splitlines()
+        if not line.startswith(" ")
+    }
 
     return lockfile
 
@@ -104,9 +100,7 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
     for graph in graphs:
         for node in graph:
             if node not in dependencies:
-                dependencies[node] = frozenset(
-                    [edge[1] for edge in graph.out_edges(node)]
-                )
+                dependencies[node] = {edge[1] for edge in graph.out_edges(node)}
 
     return dependencies
 
@@ -128,7 +122,7 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
 
     graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
 
-    roots = tuple(frozenset([root for _, root in graphs]) for graphs in graphs_list)
+    roots = [[root for _, root in graphs] for graphs in graphs_list]
 
     versions_task = resolve_versions(
         database_path,
@@ -141,19 +135,17 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
 
     versions = await versions_task
 
-    return frozenset(
-        [
-            ResolutionGraph(
-                roots,
-                [
-                    ResolutionGraphNode(
-                        package_name,
-                        versions[package_name],
-                        dependencies[package_name],
-                        [],
-                    )
-                    for package_name in versions
-                ],
-            )
-        ]
-    )
+    return {
+        ResolutionGraph(
+            roots,
+            [
+                ResolutionGraphNode(
+                    package_name,
+                    versions[package_name],
+                    dependencies[package_name],
+                    [],
+                )
+                for package_name in versions
+            ],
+        )
+    }

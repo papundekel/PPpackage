@@ -20,7 +20,7 @@ from PPpackage_utils.parse import (
     ResolutionGraphNode,
     ResolveInput,
 )
-from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
+from PPpackage_utils.utils import MyException, TemporaryPipe
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -30,14 +30,14 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 
 def check_requirements_list(
-    requirements_list: Sequence[Iterable[Hashable]],
-) -> tuple[Iterable[str], ...]:
+    requirements_list: Sequence[Iterable[Any]],
+) -> Iterable[Iterable[str]]:
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
                 raise MyException("PPpackage: Requirements must be strings.")
 
-    return tuple(cast(Sequence[Iterable[str]], requirements_list))
+    return cast(Iterable[Iterable[str]], requirements_list)
 
 
 async def resolve(
@@ -47,13 +47,13 @@ async def resolve(
 ) -> Set[ResolutionGraph]:
     requirements_list = check_requirements_list(input.requirements_list)
 
-    requirements_merged = frozenset.union(frozenset(), *requirements_list)
+    requirements_merged = set.union(set(), *requirements_list)
 
     graph = [
         ResolutionGraphNode(
             name,
             "1.0.0",
-            frozenset(),
+            [],
             [ManagerRequirement(manager="arch", requirement="iana-etc")],
         )
         for name in requirements_merged
@@ -64,7 +64,7 @@ async def resolve(
         graph,
     )
 
-    return frozenset([resolve_graph])
+    return {resolve_graph}
 
 
 async def fetch(
