@@ -76,7 +76,7 @@ def init(
         ],
         Awaitable[None],
     ],
-    install_callback: Callable[[Path, Path, Path, Path, Set[Product]], Awaitable[None]],
+    install_callback: Callable[[Path, Path, Path, Path, Iterable[Product]], Awaitable[None]],
     RequirementType: type[T],
 ) -> Typer:
     @__app.command("update-database")

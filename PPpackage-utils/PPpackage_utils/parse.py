@@ -139,7 +139,7 @@ class FetchInput(BaseModel):
     product_infos: Mapping[str, Mapping[str, Any]]
 
 
-InstallInput = RootModel[Set[Product]]
+InstallInput = RootModel[Iterable[Product]]
 
 
 @dataclass(frozen=True)

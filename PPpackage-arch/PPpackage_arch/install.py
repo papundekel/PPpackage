@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Set
+from collections.abc import Iterable, Set
 from pathlib import Path
 from sys import stderr
 
@@ -20,7 +20,7 @@ async def install(
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     _, cache_path = get_cache_paths(cache_path)
     database_path = destination_path / "var" / "lib" / "pacman"

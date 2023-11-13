@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, Set
+from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 from shutil import copytree, rmtree
 
@@ -41,7 +41,7 @@ async def install(
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
