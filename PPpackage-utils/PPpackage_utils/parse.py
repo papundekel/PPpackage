@@ -95,7 +95,7 @@ Options = Mapping[str, Any] | None
 
 class ResolveInput(BaseModel, Generic[Requirement]):
     options: Options
-    requirements_list: Sequence[Set[Requirement]]
+    requirements_list: Sequence[Iterable[Requirement]]
 
 
 @dataclass(frozen=True)
@@ -155,5 +155,5 @@ class ResolutionGraphNodeValue:
 
 @dataclass(frozen=True)
 class ResolutionGraph:
-    roots: tuple[Set[str], ...]
+    roots: tuple[Iterable[str], ...]
     graph: FrozenDictPydantic[str, ResolutionGraphNodeValue]

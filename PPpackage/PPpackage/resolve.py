@@ -104,7 +104,7 @@ def make_graph(
 ) -> WorkGraph:
     roots = frozendict(
         {
-            frozenset(requirements): roots
+            frozenset(requirements): frozenset(roots)
             for requirements, roots in zip(requirements_list, resolution_graph.roots)
         }
     )
