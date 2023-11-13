@@ -145,7 +145,7 @@ InstallInput = RootModel[Iterable[Product]]
 @dataclass(frozen=True)
 class ResolutionGraphNodeValue:
     version: str
-    dependencies: Set[str]
+    dependencies: Iterable[str]
     requirements: FrozenDictPydantic[str, frozenset[Hashable]]
 
 
