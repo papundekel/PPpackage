@@ -49,22 +49,16 @@ async def main_command(
         input.options,
     )
 
-    meta_versions = {}
-
-    for (manager, package), data in graph.nodes(data=True):
-        meta_versions.setdefault(manager, {})[package] = data["version"]
-
     meta_products: MutableMapping[str, MutableSet[Product]] = {}
 
-    for manager, versions in meta_versions.items():
-        for name, version in versions.items():
-            meta_products.setdefault(manager, set()).add(
-                Product(
-                    name=name,
-                    version=version,
-                    product_id=fetch_outputs[manager][name].product_id,
-                )
+    for (manager, name), data in graph.nodes(data=True):
+        meta_products.setdefault(manager, set()).add(
+            Product(
+                name=name,
+                version=data["version"],
+                product_id=fetch_outputs[manager][name].product_id,
             )
+        )
 
     await generate(
         debug,
