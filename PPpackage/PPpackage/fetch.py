@@ -109,8 +109,8 @@ async def fetch(
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    graph: MultiDiGraph,
     meta_options: Mapping[str, Mapping[str, Any] | None],
+    graph: MultiDiGraph,
 ) -> None:
     reversed_graph = graph.reverse(copy=False)
 

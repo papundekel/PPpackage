@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 from sys import stderr
-from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
+from typing import Annotated, Any, Generic, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
 from pydantic import (
@@ -91,14 +91,21 @@ Options = Mapping[str, Any] | None
 
 class ResolveInput(BaseModel, Generic[Requirement]):
     options: Options
-    requirements_list: Sequence[Iterable[Requirement]]
+    requirements_list: Iterable[Iterable[Requirement]]
 
 
 @dataclass(frozen=True)
-class Product:
-    name: str
+class ProductBase:
     version: str
     product_id: str
+
+
+@dataclass(frozen=True)
+class Product(ProductBase):
+    name: str
+
+
+Products = Mapping[str, ProductBase]
 
 
 class GenerateInput(BaseModel):

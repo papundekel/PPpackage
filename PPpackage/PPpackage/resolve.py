@@ -19,6 +19,7 @@ from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_utils.parse import (
     ManagerRequirement,
+    Options,
     ResolutionGraph,
     ResolveInput,
     model_dump,
@@ -34,8 +35,9 @@ async def resolve_external_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    input: ResolveInput[Any],
-) -> Set[ResolutionGraph]:
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> Iterable[ResolutionGraph]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -46,7 +48,9 @@ async def resolve_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(debug, input)
+    input_json_bytes = model_dump(
+        debug, ResolveInput[Any](options=options, requirements_list=requirements_list)
+    )
 
     output_json_bytes = await asubprocess_communicate(
         process,
@@ -54,7 +58,9 @@ async def resolve_external_manager(
         input_json_bytes,
     )
 
-    output = model_validate(debug, RootModel[Set[ResolutionGraph]], output_json_bytes)
+    output = model_validate(
+        debug, RootModel[Iterable[ResolutionGraph]], output_json_bytes
+    )
 
     return output.root
 
@@ -63,8 +69,9 @@ async def resolve_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    input: ResolveInput[Any],
-) -> Set[ResolutionGraph]:
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> Iterable[ResolutionGraph]:
     if manager == "PP":
         resolver = PP_resolve
     else:
@@ -73,7 +80,8 @@ async def resolve_manager(
     resolutions = await resolver(
         debug=debug,
         cache_path=cache_path,
-        input=input,
+        options=options,
+        requirements_list=requirements_list,
     )
 
     return resolutions
@@ -161,7 +169,7 @@ async def resolve_iteration(
 ) -> Set[Mapping[str, WorkGraph]]:
     async with TaskGroup() as group:
         lists_and_tasks: Mapping[
-            str, tuple[Sequence[Set[Hashable]], Task[Set[ResolutionGraph]]]
+            str, tuple[Sequence[Set[Hashable]], Task[Iterable[ResolutionGraph]]]
         ] = {}
         for manager, requirements_set in requirements.items():
             requirements_list = tuple(requirements_set)
@@ -169,13 +177,11 @@ async def resolve_iteration(
                 requirements_list,
                 group.create_task(
                     resolve_manager(
-                        debug=debug,
-                        manager=manager,
-                        cache_path=cache_path,
-                        input=ResolveInput[Any](
-                            requirements_list=requirements_list,
-                            options=meta_options.get(manager),
-                        ),
+                        debug,
+                        manager,
+                        cache_path,
+                        meta_options.get(manager),
+                        requirements_list,
                     )
                 ),
             )

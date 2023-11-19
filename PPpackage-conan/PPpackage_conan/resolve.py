@@ -16,7 +16,7 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
+from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists
 
 from .parse import Requirement
@@ -180,13 +180,13 @@ async def create_graph(
     root_template: Jinja2Template,
     profile_template: Jinja2Template,
     build_profile_path: Path,
-    requirements_list: Sequence[Any],
     options: Any,
+    requirements_list_length: int,
 ) -> ResolutionGraph:
     with (
         create_and_render_temp_file(
             root_template,
-            {"requirement_indices": range(len(requirements_list))},
+            {"requirement_indices": range(requirements_list_length)},
             ".py",
         ) as requirement_file,
         create_and_render_temp_file(
@@ -222,8 +222,9 @@ async def create_graph(
 async def resolve(
     templates_path: Path,
     cache_path: Path,
-    input: ResolveInput[Requirement],
-) -> Set[ResolutionGraph]:
+    options: Options,
+    requirements_list: Iterable[Iterable[Requirement]],
+) -> Iterable[ResolutionGraph]:
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -243,7 +244,9 @@ async def resolve(
 
     build_profile_path = templates_path / "profile"
 
-    for requirement_index, requirements in enumerate(input.requirements_list):
+    requirements_list_length = 0
+
+    for requirement_index, requirements in enumerate(requirements_list):
         requirement_partitions = create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
@@ -260,15 +263,17 @@ async def resolve(
         await leaves_task
         await requirement_task
 
+        requirements_list_length += 1
+
     graph = await create_graph(
         environment,
         root_template,
         profile_template,
         build_profile_path,
-        input.requirements_list,
-        input.options,
+        options,
+        requirements_list_length,
     )
 
     await remove_temporary_packages_from_cache(environment)
 
-    return {graph}
+    return [graph]

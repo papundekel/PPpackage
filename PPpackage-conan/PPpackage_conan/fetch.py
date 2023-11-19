@@ -1,12 +1,17 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping
+from collections.abc import Iterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import FetchInput, FetchOutputValueBase, model_validate_obj
+from PPpackage_utils.parse import (
+    FetchOutputValue,
+    Options,
+    PackageWithDependencies,
+    model_validate_obj,
+)
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .parse import FetchProductInfo
@@ -22,8 +27,9 @@ from .utils import (
 async def fetch(
     templates_path: Path,
     cache_path: Path,
-    input: FetchInput,
-) -> Mapping[str, FetchOutputValueBase]:
+    options: Options,
+    packages: Iterable[PackageWithDependencies],
+) -> Iterable[FetchOutputValue]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -36,24 +42,24 @@ async def fetch(
     conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    packages = []
+    requirements = []
 
-    for package in input.packages:
-        packages.append((package.name, package.version))
+    for package in packages:
+        requirements.append((package.name, package.version))
 
         for dependency in package.dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
                 product_info_parsed = model_validate_obj(
                     FetchProductInfo, dependency.product_info
                 )
-                packages.append((dependency.name, product_info_parsed.version))
+                requirements.append((dependency.name, product_info_parsed.version))
 
     with (
         create_and_render_temp_file(
-            conanfile_template, {"packages": packages}, ".py"
+            conanfile_template, {"requirements": requirements}, ".py"
         ) as conanfile_file,
         create_and_render_temp_file(
-            profile_template, {"options": input.options}
+            profile_template, {"options": options}
         ) as host_profile_file,
     ):
         host_profile_path = Path(host_profile_file.name)
@@ -81,14 +87,13 @@ async def fetch(
 
     nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
-    output = {
-        node.name: FetchOutputValueBase(
+    return [
+        FetchOutputValue(
+            name=node.name,
             product_id=node.get_product_id(),
             product_info=FetchProductInfo(
                 version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
         for node in nodes.values()
-    }
-
-    return output
+    ]

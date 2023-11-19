@@ -5,7 +5,14 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, Product, model_dump
+from PPpackage_utils.parse import (
+    GenerateInput,
+    Options,
+    Product,
+    ProductBase,
+    Products,
+    model_dump,
+)
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .generators import builtin as builtin_generators
@@ -16,7 +23,9 @@ async def generate_external_manager(
     debug: bool,
     cache_path: Path,
     generators_path: Path,
-    input: GenerateInput,
+    options: Options,
+    products: Products,
+    generators: Set[str],
     manager: str,
 ) -> None:
     process = create_subprocess_exec(
@@ -30,7 +39,15 @@ async def generate_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(debug, input)
+    products_input = [
+        Product(name=name, version=product.version, product_id=product.product_id)
+        for name, product in products.items()
+    ]
+
+    input_json_bytes = model_dump(
+        debug,
+        GenerateInput(options=options, products=products_input, generators=generators),
+    )
 
     await asubprocess_communicate(
         await process,
@@ -43,7 +60,9 @@ async def generate_manager(
     debug: bool,
     cache_path: Path,
     generators_path: Path,
-    input: GenerateInput,
+    options: Options,
+    products: Products,
+    generators: Set[str],
     manager: str,
 ) -> None:
     if manager == "PP":
@@ -55,7 +74,9 @@ async def generate_manager(
         debug=debug,
         cache_path=cache_path,
         generators_path=generators_path,
-        input=input,
+        options=options,
+        products=products,
+        generators=generators,
     )
 
 
@@ -64,7 +85,7 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     generators: Iterable[str],
-    meta_products: Mapping[str, Set[Product]],
+    meta_products: Mapping[str, Mapping[str, ProductBase]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
 ):
     async with TaskGroup() as group:
@@ -74,11 +95,9 @@ async def generate(
                     debug,
                     cache_path,
                     generators_path,
-                    GenerateInput(
-                        generators=generators - builtin_generators.keys(),
-                        products=products,
-                        options=meta_options.get(manager),
-                    ),
+                    meta_options.get(manager),
+                    products,
+                    generators - builtin_generators.keys(),
                     manager,
                 )
             )

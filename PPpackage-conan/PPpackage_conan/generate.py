@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -54,10 +54,10 @@ async def generate(
     templates_path: Path,
     deployer_path: Path,
     cache_path: Path,
-    generators: Iterable[str],
     generators_path: Path,
     options: Any,
     products: Iterable[Product],
+    generators: Iterable[str],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 

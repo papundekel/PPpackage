@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Set
+from collections.abc import Awaitable, Callable, Iterable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -13,9 +13,9 @@ from .parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
-    FetchOutputValueBase,
     GenerateInput,
     InstallInput,
+    PackageWithDependencies,
     Product,
     ResolutionGraph,
     ResolveInput,
@@ -59,31 +59,33 @@ def callback(debug: bool = False) -> None:
     __debug = debug
 
 
-T = TypeVar("T")
+RequirementTypeType = TypeVar("RequirementTypeType")
 
 
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
-        [Path, ResolveInput[T]], Awaitable[Set[ResolutionGraph]]
+        [Path, Any, Iterable[Iterable[RequirementTypeType]]],
+        Awaitable[Iterable[ResolutionGraph]],
     ],
     fetch_callback: Callable[
-        [Path, FetchInput], Awaitable[Mapping[str, FetchOutputValueBase]]
+        [Path, Any, Iterable[PackageWithDependencies]],
+        Awaitable[Iterable[FetchOutputValue]],
     ],
     generate_callback: Callable[
         [
             Path,
-            Iterable[str],
             Path,
             Any,
             Iterable[Product],
+            Iterable[str],
         ],
         Awaitable[None],
     ],
     install_callback: Callable[
         [Path, Path, Path, Path, Iterable[Product]], Awaitable[None]
     ],
-    RequirementType: type[T],
+    RequirementType: type[RequirementTypeType],
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
@@ -95,9 +97,13 @@ def init(
 
         input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
 
-        output = await resolve_callback(cache_path, input)
+        output = await resolve_callback(
+            cache_path, input.options, input.requirements_list
+        )
 
-        output_json_bytes = model_dump(__debug, RootModel[Set[ResolutionGraph]](output))
+        output_json_bytes = model_dump(
+            __debug, RootModel[Iterable[ResolutionGraph]](output)
+        )
 
         stdout.buffer.write(output_json_bytes)
 
@@ -107,20 +113,9 @@ def init(
 
         input = model_validate(__debug, FetchInput, input_json_bytes)
 
-        output = await fetch_callback(cache_path, input)
+        output = await fetch_callback(cache_path, input.options, input.packages)
 
-        output_model = FetchOutput(
-            [
-                FetchOutputValue(
-                    name=name,
-                    product_id=value.product_id,
-                    product_info=value.product_info,
-                )
-                for name, value in output.items()
-            ]
-        )
-
-        output_json_bytes = model_dump(__debug, output_model)
+        output_json_bytes = model_dump(__debug, FetchOutput(output))
 
         stdout.buffer.write(output_json_bytes)
 
@@ -132,10 +127,10 @@ def init(
 
         await generate_callback(
             cache_path,
-            input.generators,
             generators_path,
             input.options,
             input.products,
+            input.generators,
         )
 
     @__app.command()

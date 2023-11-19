@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Iterable, Sequence, Set
+from collections.abc import Iterable
 from pathlib import Path
 from sys import stderr
 from typing import Any, cast
@@ -13,12 +13,11 @@ from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
-    GenerateInput,
     ManagerRequirement,
-    Product,
+    Options,
+    Products,
     ResolutionGraph,
     ResolutionGraphNode,
-    ResolveInput,
 )
 from PPpackage_utils.utils import MyException, TemporaryPipe
 
@@ -30,8 +29,10 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 
 def check_requirements_list(
-    requirements_list: Sequence[Iterable[Any]],
+    requirements_list: Iterable[Iterable[Any]],
 ) -> Iterable[Iterable[str]]:
+    requirements_list = list(requirements_list)
+
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
@@ -43,9 +44,10 @@ def check_requirements_list(
 async def resolve(
     debug: bool,
     cache_path: Path,
-    input: ResolveInput[Any],
-) -> Set[ResolutionGraph]:
-    requirements_list = check_requirements_list(input.requirements_list)
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> Iterable[ResolutionGraph]:
+    requirements_list = check_requirements_list(requirements_list)
 
     requirements_merged = set.union(set(), *requirements_list)
 
@@ -64,7 +66,7 @@ async def resolve(
         graph,
     )
 
-    return {resolve_graph}
+    return [resolve_graph]
 
 
 async def fetch(
@@ -139,7 +141,12 @@ async def fetch(
 
 
 async def generate(
-    debug: bool, cache_path: Path, generators_path: Path, input: GenerateInput
+    debug: bool,
+    cache_path: Path,
+    generators_path: Path,
+    options: Options,
+    products: Products,
+    generators: Iterable[str],
 ) -> None:
     pass
 
@@ -148,12 +155,12 @@ async def install(
     debug: bool,
     cache_path: Path,
     destination_path: Path,
-    products: Set[Product],
+    products: Products,
 ) -> None:
     products_path = destination_path / "PP"
 
     products_path.mkdir(exist_ok=True)
 
-    for product in products:
-        product_path = products_path / product.name
-        product_path.write_text(f"{product.version} {product.product_id}")
+    for package_name, product_base in products.items():
+        product_path = products_path / package_name
+        product_path.write_text(f"{product_base.version} {product_base.product_id}")

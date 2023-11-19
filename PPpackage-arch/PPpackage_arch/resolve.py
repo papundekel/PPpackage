@@ -4,7 +4,7 @@ from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
-from PPpackage_utils.parse import ResolutionGraph, ResolutionGraphNode, ResolveInput
+from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import MyException, asubprocess_communicate
 from pydot import graph_from_dot_data
 
@@ -105,7 +105,9 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
     return dependencies
 
 
-async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionGraph]:
+async def resolve(
+    cache_path: Path, options: Options, requirements_list: Iterable[Iterable[str]]
+) -> Iterable[ResolutionGraph]:
     database_path, _ = get_cache_paths(cache_path)
 
     if not database_path.exists():
@@ -117,7 +119,7 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
                 group.create_task(resolve_pactree(database_path, requirement))
                 for requirement in requirements
             }
-            for requirements in input.requirements_list
+            for requirements in requirements_list
         ]
 
     graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
@@ -135,7 +137,7 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
 
     versions = await versions_task
 
-    return {
+    return [
         ResolutionGraph(
             roots,
             [
@@ -148,4 +150,4 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
                 for package_name in versions
             ],
         )
-    }
+    ]

@@ -20,7 +20,7 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.parse import InstallInput, Product, model_dump
+from PPpackage_utils.parse import InstallInput, Product, Products, model_dump
 from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
 
 from .sub import install as PP_install
@@ -147,7 +147,7 @@ async def install_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Set[Product],
+    products: Products,
 ) -> None:
     if manager == "PP":
         installer = partial(
@@ -184,7 +184,7 @@ async def install(
     runner_path: Path,
     runner_workdir_path: Path,
     destination_path: Path,
-    meta_products: Mapping[str, Set[Product]],
+    meta_products: Mapping[str, Products],
 ) -> None:
     workdir_relative_path = Path("root")
 
