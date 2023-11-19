@@ -1,4 +1,5 @@
-from collections.abc import Hashable, Mapping, Set
+from asyncio import StreamReader, StreamWriter
+from collections.abc import AsyncIterable, Hashable, Mapping, Set
 from sys import stderr
 from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
 
@@ -148,3 +149,48 @@ class ResolutionGraphNodeValue:
 class ResolutionGraph:
     roots: tuple[Set[str], ...]
     graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]
+
+
+def model_dump_stream(debug: bool, writer: StreamWriter, output: BaseModel) -> None:
+    output_json_bytes = model_dump(debug, output)
+
+    writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
+    writer.write(output_json_bytes)
+
+
+def model_dump_stream_end(debug: bool, writer: StreamWriter) -> None:
+    writer.write("-1\n".encode("utf-8"))
+
+
+async def model_validate_stream_impl(
+    debug: bool, reader: StreamReader, Model: type[ModelType], length: int
+) -> ModelType:
+    input_json_bytes = await reader.readexactly(length)
+
+    return model_validate(debug, Model, input_json_bytes)
+
+
+async def stream_read_length(debug: bool, reader: StreamReader) -> int:
+    length = int((await reader.readline()).decode("utf-8"))
+
+    return length
+
+
+async def model_validate_stream(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> ModelType:
+    length = await stream_read_length(debug, reader)
+
+    return await model_validate_stream_impl(debug, reader, Model, length)
+
+
+async def models_validate_stream(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> AsyncIterable[ModelType]:
+    while True:
+        length = await stream_read_length(debug, reader)
+
+        if length < 0:
+            break
+
+        yield await model_validate_stream_impl(debug, reader, Model, length)

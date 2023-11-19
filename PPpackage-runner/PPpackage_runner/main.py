@@ -31,7 +31,9 @@ from PPpackage_utils.io import (
     stream_write_line,
     stream_write_string,
 )
+from PPpackage_utils.parse import model_dump_stream
 from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from pydantic import RootModel
 from typer import Exit
 
 
@@ -158,12 +160,7 @@ async def handle_run(
 
     success, image = await pull_image(debug, reader, image_type)
 
-    stream_write_line(
-        debug,
-        "PPpackage-runner",
-        writer,
-        "SUCCESS" if success else "FAILURE",
-    )
+    model_dump_stream(debug, writer, RootModel[bool](success))
 
     if not success:
         return False
@@ -215,12 +212,7 @@ async def handle_run(
             )
         ).wait()
 
-    stream_write_line(
-        debug,
-        "PPpackage-runner",
-        writer,
-        "SUCCESS" if return_code == 0 else "FAILURE",
-    )
+    model_dump_stream(debug, writer, RootModel[bool](return_code == 0))
 
     return True
 

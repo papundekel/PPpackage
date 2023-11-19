@@ -18,8 +18,10 @@ from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
     ResolveInput,
+    model_validate_stream,
 )
 from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
+from pydantic import RootModel
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -88,9 +90,11 @@ async def fetch(
 
         await runner_writer.drain()
 
-        success = await stream_read_line(debug, "PPpackage-sub", runner_reader)
+        success = (
+            await model_validate_stream(debug, runner_reader, RootModel[bool])
+        ).root
 
-        if success != "SUCCESS":
+        if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
 
         stream_write_strings(debug, "PPpackage-sub", runner_writer, ["cat", "-"])
@@ -123,9 +127,11 @@ async def fetch(
 
         await runner_writer.drain()
 
-        success = await stream_read_line(debug, "PPpackage-sub", runner_reader)
+        success = (
+            await model_validate_stream(debug, runner_reader, RootModel[bool])
+        ).root
 
-        if success != "SUCCESS":
+        if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
     output = {
