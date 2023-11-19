@@ -1,11 +1,11 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, GenerateInputPackagesValue, model_dump
+from PPpackage_utils.parse import GenerateInput, Options, Product, model_dump
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .generators import builtin as builtin_generators
@@ -16,7 +16,9 @@ async def generate_external_manager(
     debug: bool,
     cache_path: Path,
     generators_path: Path,
-    input: GenerateInput,
+    options: Options,
+    products: Iterable[Product],
+    generators: Set[str],
     manager: str,
 ) -> None:
     process = create_subprocess_exec(
@@ -30,7 +32,10 @@ async def generate_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(debug, input)
+    input_json_bytes = model_dump(
+        debug,
+        GenerateInput(options=options, products=products, generators=generators),
+    )
 
     await asubprocess_communicate(
         await process,
@@ -43,7 +48,9 @@ async def generate_manager(
     debug: bool,
     cache_path: Path,
     generators_path: Path,
-    input: GenerateInput,
+    options: Options,
+    products: Iterable[Product],
+    generators: Set[str],
     manager: str,
 ) -> None:
     if manager == "PP":
@@ -55,7 +62,9 @@ async def generate_manager(
         debug=debug,
         cache_path=cache_path,
         generators_path=generators_path,
-        input=input,
+        options=options,
+        products=products,
+        generators=generators,
     )
 
 
@@ -64,24 +73,22 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     generators: Iterable[str],
-    meta_packages: Mapping[str, Mapping[str, GenerateInputPackagesValue]],
+    meta_products: Mapping[str, Iterable[Product]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
 ):
     async with TaskGroup() as group:
-        for manager, packages in meta_packages.items():
+        for manager, products in meta_products.items():
             group.create_task(
                 generate_manager(
                     debug,
                     cache_path,
                     generators_path,
-                    GenerateInput(
-                        generators=generators - builtin_generators.keys(),
-                        packages=packages,
-                        options=meta_options.get(manager),
-                    ),
+                    meta_options.get(manager),
+                    products,
+                    generators - builtin_generators.keys(),
                     manager,
                 )
             )
 
         for generator in generators & builtin_generators.keys():
-            builtin_generators[generator](generators_path, meta_packages)
+            builtin_generators[generator](generators_path, meta_products)

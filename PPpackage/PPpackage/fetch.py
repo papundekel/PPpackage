@@ -1,6 +1,6 @@
 from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping, MutableSet
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -8,10 +8,11 @@ from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
+    Dependency,
     FetchInput,
-    FetchInputPackageValue,
     FetchOutput,
-    FetchOutputValue,
+    ManagerAndName,
+    PackageWithDependencies,
     model_dump,
     model_validate,
 )
@@ -71,52 +72,69 @@ async def fetch_manager(
     return output
 
 
+def create_dependencies(
+    sent_product_infos: MutableSet[ManagerAndName],
+    graph: MultiDiGraph,
+    manager: str,
+    package_name: str,
+):
+    dependencies = []
+
+    node_dependencies = list(
+        islice(dfs_preorder_nodes(graph, source=(manager, package_name)), 1, None)
+    )
+
+    for dependency_manager, dependency_name in node_dependencies:
+        product_info = (
+            None
+            if ManagerAndName(name=dependency_name, manager=dependency_manager)
+            in sent_product_infos
+            else graph.nodes[(dependency_manager, dependency_name)]["product_info"]
+        )
+
+        dependency = Dependency(
+            manager=dependency_manager,
+            name=dependency_name,
+            product_info=product_info,
+        )
+
+        dependencies.append(dependency)
+        sent_product_infos.add(super(Dependency, dependency))
+
+    return dependencies
+
+
 async def fetch(
     debug: bool,
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    graph: MultiDiGraph,
     meta_options: Mapping[str, Mapping[str, Any] | None],
-) -> Mapping[str, Mapping[str, FetchOutputValue]]:
-    outputs: MutableMapping[str, MutableMapping[str, FetchOutputValue]] = {}
-
+    graph: MultiDiGraph,
+) -> None:
     reversed_graph = graph.reverse(copy=False)
 
     for generation in topological_generations(reversed_graph):
-        manager_product_infos: MutableMapping[str, MutableMapping[str, Any]] = {}
-        manager_packages: MutableMapping[
-            str, MutableMapping[str, FetchInputPackageValue]
-        ] = {}
-        for manager, package in generation:
-            version = graph.nodes[(manager, package)]["version"]
+        sent_product_infos: MutableSet[ManagerAndName] = set()
+        manager_packages: MutableMapping[str, MutableSet[PackageWithDependencies]] = {}
 
-            dependencies = list(
-                islice(dfs_preorder_nodes(graph, source=(manager, package)), 1, None)
+        for manager, name in generation:
+            version = graph.nodes[(manager, name)]["version"]
+
+            dependencies = create_dependencies(sent_product_infos, graph, manager, name)
+
+            manager_packages.setdefault(manager, set()).add(
+                PackageWithDependencies(
+                    name=name,
+                    version=version,
+                    dependencies=dependencies,
+                )
             )
-
-            value_dependencies = {}
-            for dependency_manager, dependency in dependencies:
-                value_dependencies.setdefault(dependency_manager, set()).add(dependency)
-
-                product_infos = manager_product_infos.setdefault(dependency_manager, {})
-
-                if dependency not in product_infos:
-                    product_infos[dependency] = outputs[dependency_manager][
-                        dependency
-                    ].product_info
-
-            value = FetchInputPackageValue(
-                version=version, dependencies=value_dependencies
-            )
-
-            manager_packages.setdefault(manager, {})[package] = value
 
         inputs = {
             manager: FetchInput(
                 options=meta_options.get(manager),
                 packages=packages,
-                product_infos=manager_product_infos,
             )
             for manager, packages in manager_packages.items()
         }
@@ -137,7 +155,7 @@ async def fetch(
             }
 
         for manager, task in manager_tasks.items():
-            for package, value in task.result().root.items():
-                outputs.setdefault(manager, {})[package] = value
-
-    return outputs
+            for package in task.result().root:
+                node = graph.nodes[(manager, package.name)]
+                node["product_id"] = package.product_id
+                node["product_info"] = package.product_info
