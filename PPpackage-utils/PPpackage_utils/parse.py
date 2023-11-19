@@ -105,9 +105,6 @@ class Product(ProductBase):
     name: str
 
 
-Products = Mapping[str, ProductBase]
-
-
 class GenerateInput(BaseModel):
     options: Options
     products: Iterable[Product]

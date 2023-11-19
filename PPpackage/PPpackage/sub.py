@@ -15,7 +15,7 @@ from PPpackage_utils.parse import (
     FetchOutputValue,
     ManagerRequirement,
     Options,
-    Products,
+    Product,
     ResolutionGraph,
     ResolutionGraphNode,
 )
@@ -145,7 +145,7 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     options: Options,
-    products: Products,
+    products: Iterable[Product],
     generators: Iterable[str],
 ) -> None:
     pass
@@ -155,12 +155,12 @@ async def install(
     debug: bool,
     cache_path: Path,
     destination_path: Path,
-    products: Products,
+    products: Iterable[Product],
 ) -> None:
     products_path = destination_path / "PP"
 
     products_path.mkdir(exist_ok=True)
 
-    for package_name, product_base in products.items():
-        product_path = products_path / package_name
-        product_path.write_text(f"{product_base.version} {product_base.product_id}")
+    for product in products:
+        product_path = products_path / product.name
+        product_path.write_text(f"{product.version} {product.product_id}")

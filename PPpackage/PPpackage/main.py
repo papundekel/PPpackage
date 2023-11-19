@@ -1,9 +1,9 @@
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr, stdin
 
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import ProductBase, model_validate
+from PPpackage_utils.parse import Product, ProductBase, model_validate
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -49,12 +49,15 @@ async def main_command(
         graph,
     )
 
-    meta_products: MutableMapping[str, MutableMapping[str, ProductBase]] = {}
+    meta_products: MutableMapping[str, MutableSequence[Product]] = {}
 
     for (manager, name), data in graph.nodes(data=True):
-        meta_products.setdefault(manager, {})[name] = ProductBase(
-            version=data["version"],
-            product_id=data["product_id"],
+        meta_products.setdefault(manager, []).append(
+            Product(
+                name=name,
+                version=data["version"],
+                product_id=data["product_id"],
+            )
         )
 
     await generate(

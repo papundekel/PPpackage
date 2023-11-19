@@ -5,14 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import (
-    GenerateInput,
-    Options,
-    Product,
-    ProductBase,
-    Products,
-    model_dump,
-)
+from PPpackage_utils.parse import GenerateInput, Options, Product, model_dump
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .generators import builtin as builtin_generators
@@ -24,7 +17,7 @@ async def generate_external_manager(
     cache_path: Path,
     generators_path: Path,
     options: Options,
-    products: Products,
+    products: Iterable[Product],
     generators: Set[str],
     manager: str,
 ) -> None:
@@ -39,14 +32,9 @@ async def generate_external_manager(
         stderr=None,
     )
 
-    products_input = [
-        Product(name=name, version=product.version, product_id=product.product_id)
-        for name, product in products.items()
-    ]
-
     input_json_bytes = model_dump(
         debug,
-        GenerateInput(options=options, products=products_input, generators=generators),
+        GenerateInput(options=options, products=products, generators=generators),
     )
 
     await asubprocess_communicate(
@@ -61,7 +49,7 @@ async def generate_manager(
     cache_path: Path,
     generators_path: Path,
     options: Options,
-    products: Products,
+    products: Iterable[Product],
     generators: Set[str],
     manager: str,
 ) -> None:
@@ -85,7 +73,7 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     generators: Iterable[str],
-    meta_products: Mapping[str, Mapping[str, ProductBase]],
+    meta_products: Mapping[str, Iterable[Product]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
 ):
     async with TaskGroup() as group:

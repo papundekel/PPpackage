@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, Set
+from collections.abc import Iterable, Mapping, Set
 from functools import partial
 from io import TextIOWrapper
 from os import listdir
@@ -20,7 +20,7 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.parse import InstallInput, Product, Products, model_dump
+from PPpackage_utils.parse import InstallInput, Product, model_dump
 from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
 
 from .sub import install as PP_install
@@ -74,7 +74,7 @@ async def install_external_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
         if debug:
@@ -147,7 +147,7 @@ async def install_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Products,
+    products: Iterable[Product],
 ) -> None:
     if manager == "PP":
         installer = partial(
@@ -184,7 +184,7 @@ async def install(
     runner_path: Path,
     runner_workdir_path: Path,
     destination_path: Path,
-    meta_products: Mapping[str, Products],
+    meta_products: Mapping[str, Iterable[Product]],
 ) -> None:
     workdir_relative_path = Path("root")
 
