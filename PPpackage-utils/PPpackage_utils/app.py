@@ -93,7 +93,7 @@ def init(
     async def resolve(cache_path: Path) -> None:
         stdin, stdout = await get_standard_streams()
 
-        input = await load_one(__debug, stdin, ResolveInput[RequirementType])
+        input = await load_one(stdin, ResolveInput[RequirementType])
 
         output = await resolve_callback(
             cache_path, input.options, input.requirements_list
@@ -105,8 +105,8 @@ def init(
     async def fetch(cache_path: Path) -> None:
         stdin, stdout = await get_standard_streams()
 
-        options = await load_one(__debug, stdin, Options)
-        packages = load_many(__debug, stdin, PackageWithDependencies)
+        options = await load_one(stdin, Options)
+        packages = load_many(stdin, PackageWithDependencies)
 
         output = await fetch_callback(cache_path, options, packages)
 
@@ -116,7 +116,7 @@ def init(
     async def generate(cache_path: Path, generators_path: Path) -> None:
         stdin, _ = await get_standard_streams()
 
-        input = await load_one(__debug, stdin, GenerateInput)
+        input = await load_one(stdin, GenerateInput)
 
         await generate_callback(
             cache_path,
@@ -137,7 +137,7 @@ def init(
 
         stdin, _ = await get_standard_streams()
 
-        products = load_many(__debug, stdin, Product)
+        products = load_many(stdin, Product)
 
         await install_callback(
             cache_path,

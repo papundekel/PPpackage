@@ -53,7 +53,7 @@ async def fetch_external_manager(
     assert process.stdout is not None
 
     input_task = fetch_external_send_input(debug, process.stdin, options, packages)
-    output_task = load_one(debug, process.stdout, FetchOutput)
+    output_task = load_one(process.stdout, FetchOutput)
 
     await input_task
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")

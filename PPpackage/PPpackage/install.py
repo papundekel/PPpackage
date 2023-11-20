@@ -57,7 +57,7 @@ async def install_manager_command(
             pipe_hook_path.relative_to(daemon_workdir_path),
         )
 
-        return_value = await load_one(debug, daemon_reader, int)
+        return_value = await load_one(daemon_reader, int)
 
         pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()

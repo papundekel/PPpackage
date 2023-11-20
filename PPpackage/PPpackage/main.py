@@ -32,7 +32,7 @@ async def main_command(
 ) -> None:
     input_json_bytes = stdin.buffer.read()
 
-    input = load_bytes(debug, Input, input_json_bytes)
+    input = load_bytes(Input, input_json_bytes)
 
     if do_update_database:
         managers = input.requirements.keys()

@@ -18,7 +18,7 @@ async def main():
         await dump_one(debug, writer, machine_id)
         await dump_one(debug, writer, RunnerRequestType.INIT)
 
-        workdir_relative_path = await load_one(debug, reader, Path)
+        workdir_relative_path = await load_one(reader, Path)
 
     print(workdir_relative_path, end=None)
 

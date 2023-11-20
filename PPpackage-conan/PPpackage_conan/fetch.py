@@ -51,7 +51,7 @@ async def fetch(
         for dependency in package.dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
                 product_info_parsed = load_object(
-                    debug, FetchProductInfo, dependency.product_info
+                    FetchProductInfo, dependency.product_info
                 )
                 requirements.append((dependency.name, product_info_parsed.version))
 

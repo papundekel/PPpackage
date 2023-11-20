@@ -63,16 +63,16 @@ async def handle_command(
     if not container_path.exists():
         return False
 
-    image_path = container_path / await load_one(debug, reader, Path)
+    image_path = container_path / await load_one(reader, Path)
 
-    command = await load_one(debug, reader, str)
-    args = [arg async for arg in load_many(debug, reader, str)]
+    command = await load_one(reader, str)
+    args = [arg async for arg in load_many(reader, str)]
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
-    pipe_path = container_path / await load_one(debug, reader, Path)
+    pipe_path = container_path / await load_one(reader, Path)
 
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
@@ -112,11 +112,11 @@ async def pull_image(
 ) -> Tuple[bool, str | None]:
     match image_type:
         case ImageType.TAG:
-            image = await load_one(debug, reader, str)
+            image = await load_one(reader, str)
             return True, image
 
         case ImageType.DOCKERFILE:
-            dockerfile = await load_one(debug, reader, str)
+            dockerfile = await load_one(reader, str)
 
             process = await create_subprocess_exec(
                 "podman",
@@ -141,7 +141,7 @@ async def handle_run(
     writer: StreamWriter,
     container_workdir_path: Path,
 ) -> bool:
-    image_type = await load_one(debug, reader, ImageType)
+    image_type = await load_one(reader, ImageType)
 
     success, image = await pull_image(debug, reader, image_type)
 
@@ -152,20 +152,20 @@ async def handle_run(
 
     image = type_cast(str, image)
 
-    args = [arg async for arg in load_many(debug, reader, str)]
+    args = [arg async for arg in load_many(reader, str)]
 
-    stdin_pipe_path = container_workdir_path / await load_one(debug, reader, Path)
+    stdin_pipe_path = container_workdir_path / await load_one(reader, Path)
 
-    stdout_pipe_path = container_workdir_path / await load_one(debug, reader, Path)
+    stdout_pipe_path = container_workdir_path / await load_one(reader, Path)
 
     mount_source_paths = [
         container_workdir_path / mount_relative_path
-        async for mount_relative_path in load_many(debug, reader, Path)
+        async for mount_relative_path in load_many(reader, Path)
     ]
 
     mount_destination_paths = [
         Path(mount_destination_path_string)
-        async for mount_destination_path_string in load_many(debug, reader, str)
+        async for mount_destination_path_string in load_many(reader, str)
     ]
 
     with stdin_pipe_path.open("r") as stdin_pipe, stdout_pipe_path.open(
@@ -204,11 +204,11 @@ async def handle_connection(
     bundle_path: Path,
     root_path: Path,
 ):
-    container_id = await load_one(debug, reader, str)
+    container_id = await load_one(reader, str)
     container_workdir_path = workdirs_path / container_id
 
     while True:
-        request = await load_one(debug, reader, RunnerRequestType)
+        request = await load_one(reader, RunnerRequestType)
 
         if reader.at_eof():
             break

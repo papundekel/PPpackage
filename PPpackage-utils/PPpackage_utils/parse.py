@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from inspect import isclass
 from json import dumps as json_dumps
 from json import loads as json_loads
-from sys import stderr
 from typing import Annotated, Any, Generic, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
@@ -51,7 +50,7 @@ FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 ModelType = TypeVar("ModelType")
 
 
-def load_object(debug: bool, Model: type[ModelType], input_json: Any) -> ModelType:
+def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
     ModelWrapped = (
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
@@ -70,14 +69,12 @@ def load_object(debug: bool, Model: type[ModelType], input_json: Any) -> ModelTy
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
 
-def load_bytes(
-    debug: bool, Model: type[ModelType], input_json_bytes: bytes
-) -> ModelType:
+def load_bytes(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
     input_json = json_loads(input_json_string)
 
-    return load_object(False, Model, input_json)
+    return load_object(Model, input_json)
 
 
 Requirement = TypeVar("Requirement")
@@ -197,34 +194,32 @@ async def dump_many_async(
 
 
 async def _load_impl(
-    debug: bool, reader: StreamReader, Model: type[ModelType], length: int
+    reader: StreamReader, Model: type[ModelType], length: int
 ) -> ModelType:
     input_json_bytes = await reader.readexactly(length)
 
-    return load_bytes(debug, Model, input_json_bytes)
+    return load_bytes(Model, input_json_bytes)
 
 
-async def _load_length(debug: bool, reader: StreamReader) -> int:
+async def _load_length(reader: StreamReader) -> int:
     length = int((await reader.readline()).decode("utf-8"))
 
     return length
 
 
-async def load_one(
-    debug: bool, reader: StreamReader, Model: type[ModelType]
-) -> ModelType:
-    length = await _load_length(debug, reader)
+async def load_one(reader: StreamReader, Model: type[ModelType]) -> ModelType:
+    length = await _load_length(reader)
 
-    return await _load_impl(debug, reader, Model, length)
+    return await _load_impl(reader, Model, length)
 
 
 async def load_many(
-    debug: bool, reader: StreamReader, Model: type[ModelType]
+    reader: StreamReader, Model: type[ModelType]
 ) -> AsyncIterable[ModelType]:
     while True:
-        length = await _load_length(debug, reader)
+        length = await _load_length(reader)
 
         if length < 0:
             break
 
-        yield await _load_impl(debug, reader, Model, length)
+        yield await _load_impl(reader, Model, length)

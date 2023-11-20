@@ -57,7 +57,7 @@ async def resolve_external_manager(
         ResolveInput[Any](options=options, requirements_list=requirements_list),
     )
 
-    output_task = load_one(debug, process.stdout, Iterable[ResolutionGraph])
+    output_task = load_one(process.stdout, Iterable[ResolutionGraph])
 
     await input_task
     await asubprocess_wait(process, f"Error in {manager}'s resolve.")
