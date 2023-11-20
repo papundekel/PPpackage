@@ -10,13 +10,11 @@ from typer import Typer
 
 from .parse import (
     FetchOutputValue,
-    GenerateInput,
     Options,
     PackageWithDependencies,
     Product,
     ResolutionGraph,
     ResolveInput,
-    dump_many,
     dump_many_async,
     dump_one,
     load_many,
@@ -77,8 +75,8 @@ def init(
             Path,
             Path,
             Any,
-            Iterable[Product],
-            Iterable[str],
+            AsyncIterable[Product],
+            AsyncIterable[str],
         ],
         Awaitable[None],
     ],
@@ -118,14 +116,12 @@ def init(
     async def generate(cache_path: Path, generators_path: Path) -> None:
         stdin, _ = await get_standard_streams()
 
-        input = await load_one(stdin, GenerateInput)
+        options = await load_one(stdin, Options)
+        products = load_many(stdin, Product)
+        generators = load_many(stdin, str)
 
         await generate_callback(
-            cache_path,
-            generators_path,
-            input.options,
-            input.products,
-            input.generators,
+            cache_path, generators_path, options, products, generators
         )
 
     @__app.command()

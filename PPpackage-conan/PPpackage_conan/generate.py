@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -56,8 +56,8 @@ async def generate(
     cache_path: Path,
     generators_path: Path,
     options: Any,
-    products: Iterable[Product],
-    generators: Iterable[str],
+    products: AsyncIterable[Product],
+    generators: AsyncIterable[str],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -78,8 +78,8 @@ async def generate(
         create_and_render_temp_file(
             conanfile_template,
             {
-                "packages": products,
-                "generators": generators,
+                "packages": [product async for product in products],
+                "generators": [generator async for generator in generators],
             },
             ".py",
         ) as conanfile_file,

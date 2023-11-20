@@ -5,7 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, Options, Product, dump_one
+from PPpackage_utils.parse import Options, Product, dump_many, dump_one
 from PPpackage_utils.utils import asubprocess_wait
 
 from .generators import builtin as builtin_generators
@@ -35,11 +35,9 @@ async def generate_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    await dump_one(
-        debug,
-        process.stdin,
-        GenerateInput(options=options, products=products, generators=generators),
-    )
+    await dump_one(debug, process.stdin, options)
+    await dump_many(debug, process.stdin, products)
+    await dump_many(debug, process.stdin, generators)
 
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
 

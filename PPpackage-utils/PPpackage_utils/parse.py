@@ -98,12 +98,6 @@ class Product(ProductBase):
     name: str
 
 
-class GenerateInput(BaseModel):
-    options: Options
-    products: Iterable[Product]
-    generators: Iterable[str]
-
-
 @dataclass(frozen=True)
 class FetchOutputValueBase:
     product_id: str
