@@ -51,7 +51,9 @@ FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 ModelType = TypeVar("ModelType")
 
 
-def model_validate_obj(Model: type[ModelType], input_json: Any) -> ModelType:
+def model_validate_obj(
+    debug: bool, Model: type[ModelType], input_json: Any
+) -> ModelType:
     ModelWrapped = Model if issubclass(Model, BaseModel) else RootModel[ModelType]
 
     try:
@@ -63,7 +65,9 @@ def model_validate_obj(Model: type[ModelType], input_json: Any) -> ModelType:
             return input
 
     except ValidationError as e:
-        raise MyException(f"Model validation failed:\n{e}\n{json.dumps(input_json)}.")
+        input_json_string = json.dumps(input_json, indent=4 if debug else None)
+
+        raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
 
 def model_validate(
@@ -71,9 +75,9 @@ def model_validate(
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
-    input_json = json.loads(input_json_string, indent=4 if debug else None)
+    input_json = json.loads(input_json_string)
 
-    return model_validate_obj(Model, input_json)
+    return model_validate_obj(debug, Model, input_json)
 
 
 def model_dump(debug: bool, output: BaseModel) -> bytes:
