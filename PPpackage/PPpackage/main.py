@@ -24,7 +24,9 @@ async def main_command(
     cache_path: Path,
     generators_path: Path,
     destination_path: Path,
-    do_update_database: Annotated[bool, TyperOption("--update-database")] = False,
+    do_update_database: Annotated[
+        bool, TyperOption("--update-database/--no-update-database")
+    ] = False,
     debug: bool = False,
     resolve_iteration_limit: int = 10,
 ) -> None:

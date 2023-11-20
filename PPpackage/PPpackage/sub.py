@@ -3,11 +3,7 @@ from pathlib import Path
 from sys import stderr
 from typing import Any, cast
 
-from PPpackage_utils.io import (
-    stream_write_line,
-    stream_write_string,
-    stream_write_strings,
-)
+from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
@@ -17,11 +13,19 @@ from PPpackage_utils.parse import (
     ResolutionGraph,
     ResolutionGraphNodeValue,
     ResolveInput,
+    model_dump_stream,
     model_validate_stream,
+    models_dump_stream,
 )
-from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
+from PPpackage_utils.utils import (
+    ImageType,
+    MyException,
+    RunnerRequestType,
+    TemporaryPipe,
+    frozendict,
+)
 
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
+from .utils import machine_id_relative_path, read_machine_id
 
 
 async def update_database(debug: bool, cache_path: Path) -> None:
@@ -78,13 +82,10 @@ async def fetch(
     ):
         machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-        stream_write_string(debug, "PPpackage-sub", runner_writer, machine_id)
-
-        stream_write_line(debug, "PPpackage-sub", runner_writer, "RUN")
-        stream_write_line(debug, "PPpackage-sub", runner_writer, "IMAGE")
-        stream_write_string(
-            debug, "PPpackage-sub", runner_writer, "docker.io/archlinux:latest"
-        )
+        model_dump_stream(debug, runner_writer, machine_id)
+        model_dump_stream(debug, runner_writer, RunnerRequestType.RUN)
+        model_dump_stream(debug, runner_writer, ImageType.TAG)
+        model_dump_stream(debug, runner_writer, "docker.io/archlinux:latest")
 
         await runner_writer.drain()
 
@@ -93,27 +94,25 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
 
-        stream_write_strings(debug, "PPpackage-sub", runner_writer, ["cat", "-"])
+        models_dump_stream(debug, runner_writer, ["cat", "-"])
 
         with TemporaryPipe(runner_workdir_path) as stdin_pipe_path, TemporaryPipe(
             runner_workdir_path
         ) as stdout_pipe_path:
-            stream_write_string(
+            model_dump_stream(
                 debug,
-                "PPpackage-sub",
                 runner_writer,
-                str(stdin_pipe_path.relative_to(runner_workdir_path)),
+                stdin_pipe_path.relative_to(runner_workdir_path),
             )
 
-            stream_write_string(
+            model_dump_stream(
                 debug,
-                "PPpackage-sub",
                 runner_writer,
-                str(stdout_pipe_path.relative_to(runner_workdir_path)),
+                stdout_pipe_path.relative_to(runner_workdir_path),
             )
 
-            stream_write_strings(debug, "PPpackage-sub", runner_writer, [])
-            stream_write_strings(debug, "PPpackage-sub", runner_writer, [])
+            models_dump_stream(debug, runner_writer, [])
+            models_dump_stream(debug, runner_writer, [])
 
             with stdin_pipe_path.open("w") as stdin_pipe:
                 stdin_pipe.write("ahoj!")

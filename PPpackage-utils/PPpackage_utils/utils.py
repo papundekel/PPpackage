@@ -2,6 +2,9 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import Process
 from collections.abc import AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
+from enum import Enum
+from enum import auto as enum_auto
+from enum import unique as enum_unique
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
@@ -152,3 +155,17 @@ def noop(*args, **kwargs):
 
 async def anoop(*args, **kwargs):
     pass
+
+
+@enum_unique
+class ImageType(Enum):
+    TAG = enum_auto()
+    DOCKERFILE = enum_auto()
+
+
+@enum_unique
+class RunnerRequestType(Enum):
+    INIT = enum_auto()
+    COMMAND = enum_auto()
+    RUN = enum_auto()
+    END = enum_auto()

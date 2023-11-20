@@ -10,21 +10,29 @@ from shutil import move
 from sys import stderr
 
 from PPpackage_utils.io import (
+    communicate_with_daemon,
     pipe_read_line,
     pipe_read_string,
     pipe_read_strings,
     pipe_write_int,
     pipe_write_string,
-    stream_read_int,
-    stream_write_line,
-    stream_write_string,
-    stream_write_strings,
 )
-from PPpackage_utils.parse import Product, model_dump
-from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
+from PPpackage_utils.parse import (
+    Product,
+    model_dump,
+    model_dump_stream,
+    model_validate_stream,
+    models_dump_stream,
+)
+from PPpackage_utils.utils import (
+    MyException,
+    RunnerRequestType,
+    TemporaryPipe,
+    asubprocess_communicate,
+)
 
 from .sub import install as PP_install
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
+from .utils import machine_id_relative_path, read_machine_id
 
 
 async def install_manager_command(
@@ -36,31 +44,28 @@ async def install_manager_command(
     daemon_workdir_path: Path,
     destination_relative_path: Path,
 ):
-    stream_write_line(debug, "PPpackage", daemon_writer, "COMMAND")
-    stream_write_string(
-        debug, "PPpackage", daemon_writer, str(destination_relative_path)
-    )
+    model_dump_stream(debug, daemon_writer, RunnerRequestType.COMMAND)
+    model_dump_stream(debug, daemon_writer, destination_relative_path)
 
     command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
-    stream_write_string(debug, "PPpackage", daemon_writer, command)
+    model_dump_stream(debug, daemon_writer, command)
 
     args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
-    stream_write_strings(debug, "PPpackage", daemon_writer, args)
+    models_dump_stream(debug, daemon_writer, args)
 
     with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
         pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
         pipe_to_sub.flush()
 
-        stream_write_string(
+        model_dump_stream(
             debug,
-            "PPpackage",
             daemon_writer,
-            str(pipe_hook_path.relative_to(daemon_workdir_path)),
+            pipe_hook_path.relative_to(daemon_workdir_path),
         )
 
         await daemon_writer.drain()
 
-        return_value = await stream_read_int(debug, "PPpackage", daemon_reader)
+        return_value = await model_validate_stream(debug, daemon_reader, int)
 
         pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()
@@ -209,7 +214,7 @@ async def install(
         daemon_reader,
         daemon_writer,
     ):
-        stream_write_string(debug, "PPpackage", daemon_writer, machine_id)
+        model_dump_stream(debug, daemon_writer, machine_id)
 
         for manager, products in meta_products.items():
             await install_manager(

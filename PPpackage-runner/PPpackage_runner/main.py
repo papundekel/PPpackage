@@ -21,17 +21,17 @@ from typing import cast as type_cast
 
 from pid import PidFile, PidFileAlreadyLockedError
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.io import (
-    stream_read_line,
-    stream_read_relative_path,
-    stream_read_relative_paths,
-    stream_read_string,
-    stream_read_strings,
-    stream_write_int,
-    stream_write_string,
+from PPpackage_utils.parse import (
+    model_dump_stream,
+    model_validate_stream,
+    models_validate_stream,
 )
-from PPpackage_utils.parse import model_dump_stream
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from PPpackage_utils.utils import (
+    ImageType,
+    RunnerRequestType,
+    TemporaryDirectory,
+    asubprocess_communicate,
+)
 from typer import Exit
 
 
@@ -67,20 +67,16 @@ async def handle_command(
     if not container_path.exists():
         return False
 
-    image_path = container_path / await stream_read_relative_path(
-        debug, "PPpackage-runner", reader
-    )
+    image_path = container_path / await model_validate_stream(debug, reader, Path)
 
-    command = await stream_read_string(debug, "PPpackage-runner", reader)
-    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
+    command = await model_validate_stream(debug, reader, str)
+    args = [arg async for arg in models_validate_stream(debug, reader, str)]
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
-    pipe_path = container_path / await stream_read_relative_path(
-        debug, "PPpackage-runner", reader
-    )
+    pipe_path = container_path / await model_validate_stream(debug, reader, Path)
 
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
@@ -98,7 +94,7 @@ async def handle_command(
 
         return_code = await process.wait()
 
-    stream_write_int(debug, "PPpackage-runner", writer, return_code)
+    model_dump_stream(debug, writer, return_code)
 
     return True
 
@@ -112,40 +108,35 @@ async def handle_init(
 ):
     container_workdir_path.mkdir(exist_ok=True)
 
-    stream_write_string(
-        debug,
-        "PPpackage-runner",
-        writer,
-        str(container_workdir_path.relative_to(workdirs_path)),
-    )
+    model_dump_stream(debug, writer, container_workdir_path.relative_to(workdirs_path))
 
 
 async def pull_image(
-    debug: bool, reader: StreamReader, image_type: str
+    debug: bool, reader: StreamReader, image_type: ImageType
 ) -> Tuple[bool, str | None]:
-    if image_type == "IMAGE":
-        image = await stream_read_string(debug, "PPpackage-runner", reader)
-        return True, image
-    elif image_type == "DOCKERFILE":
-        dockerfile = await stream_read_string(debug, "PPpackage-runner", reader)
+    match image_type:
+        case ImageType.TAG:
+            image = await model_validate_stream(debug, reader, str)
+            return True, image
 
-        process = await create_subprocess_exec(
-            "podman",
-            "build",
-            "--tag",
-            "pppackage/runner-image",
-            "-",
-            stdin=PIPE,
-            stdout=DEVNULL,
-            stderr=None,
-        )
+        case ImageType.DOCKERFILE:
+            dockerfile = await model_validate_stream(debug, reader, str)
 
-        await process.communicate(dockerfile.encode("ascii"))
-        return_code = await process.wait()
+            process = await create_subprocess_exec(
+                "podman",
+                "build",
+                "--tag",
+                "pppackage/runner-image",
+                "-",
+                stdin=PIPE,
+                stdout=DEVNULL,
+                stderr=None,
+            )
 
-        return return_code == 0, "pppackage/runner-image"
-    else:
-        return False, None
+            await process.communicate(dockerfile.encode("ascii"))
+            return_code = await process.wait()
+
+            return return_code == 0, "pppackage/runner-image"
 
 
 async def handle_run(
@@ -154,7 +145,7 @@ async def handle_run(
     writer: StreamWriter,
     container_workdir_path: Path,
 ) -> bool:
-    image_type = await stream_read_line(debug, "PPpackage-runner", reader)
+    image_type = await model_validate_stream(debug, reader, ImageType)
 
     success, image = await pull_image(debug, reader, image_type)
 
@@ -167,23 +158,25 @@ async def handle_run(
 
     await writer.drain()
 
-    args = [arg async for arg in stream_read_strings(debug, "PPpackage-runner", reader)]
-    stdin_pipe_path = container_workdir_path / await stream_read_relative_path(
-        debug, "PPpackage-runner", reader
+    args = [arg async for arg in models_validate_stream(debug, reader, str)]
+
+    stdin_pipe_path = container_workdir_path / await model_validate_stream(
+        debug, reader, Path
     )
-    stdout_pipe_path = container_workdir_path / await stream_read_relative_path(
-        debug, "PPpackage-runner", reader
+
+    stdout_pipe_path = container_workdir_path / await model_validate_stream(
+        debug, reader, Path
     )
+
     mount_source_paths = [
         container_workdir_path / mount_relative_path
-        async for mount_relative_path in stream_read_relative_paths(
-            debug, "PPpackage-runner", reader
-        )
+        async for mount_relative_path in models_validate_stream(debug, reader, Path)
     ]
+
     mount_destination_paths = [
         Path(mount_destination_path_string)
-        async for mount_destination_path_string in stream_read_strings(
-            debug, "PPpackage-runner", reader
+        async for mount_destination_path_string in models_validate_stream(
+            debug, reader, str
         )
     ]
 
@@ -223,31 +216,42 @@ async def handle_connection(
     bundle_path: Path,
     root_path: Path,
 ):
-    container_id = await stream_read_string(debug, "PPpackage-runner", reader)
+    container_id = await model_validate_stream(debug, reader, str)
     container_workdir_path = workdirs_path / container_id
 
     while True:
-        request = await stream_read_line(debug, "PPpackage-runner", reader)
+        request = await model_validate_stream(debug, reader, RunnerRequestType)
 
         if reader.at_eof():
             break
 
-        if request == "END":
-            break
-        elif request == "INIT":
-            await handle_init(
-                debug, reader, writer, workdirs_path, container_workdir_path
-            )
-        elif request == "COMMAND":
-            result = await handle_command(
-                debug, reader, writer, container_workdir_path, bundle_path, root_path
-            )
-            if not result:
+        match request:
+            case RunnerRequestType.END:
                 break
-        elif request == "RUN":
-            result = await handle_run(debug, reader, writer, container_workdir_path)
-            if not result:
-                break
+
+            case RunnerRequestType.INIT:
+                await handle_init(
+                    debug, reader, writer, workdirs_path, container_workdir_path
+                )
+
+            case RunnerRequestType.COMMAND:
+                result = await handle_command(
+                    debug,
+                    reader,
+                    writer,
+                    container_workdir_path,
+                    bundle_path,
+                    root_path,
+                )
+
+                if not result:
+                    break
+
+            case RunnerRequestType.RUN:
+                result = await handle_run(debug, reader, writer, container_workdir_path)
+
+                if not result:
+                    break
 
         await writer.drain()
 

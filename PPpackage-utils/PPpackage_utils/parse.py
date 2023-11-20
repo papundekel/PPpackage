@@ -1,5 +1,5 @@
 from asyncio import StreamReader, StreamWriter
-from collections.abc import AsyncIterable, Hashable, Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Generator, Hashable, Iterable, Mapping, Set
 from contextlib import contextmanager
 from inspect import isclass
 from json import dumps as json_dumps
@@ -52,6 +52,13 @@ ModelType = TypeVar("ModelType")
 def model_validate_obj(
     debug: bool, Model: type[ModelType], input_json: Any
 ) -> ModelType:
+    input_json_string = (
+        None if not debug else json_dumps(input_json, indent=4 if debug else None)
+    )
+
+    if debug:
+        print(f"DEBUG model_validate_obj:\n{input_json_string}", file=stderr)
+
     ModelWrapped = (
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
@@ -65,7 +72,8 @@ def model_validate_obj(
             return input  # type: ignore
 
     except ValidationError as e:
-        input_json_string = json_dumps(input_json, indent=4 if debug else None)
+        if input_json_string is None:
+            input_json_string = json_dumps(input_json, indent=4 if debug else None)
 
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
@@ -75,9 +83,12 @@ def model_validate(
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
+    if debug:
+        print(f"DEBUG model_validate:\n{input_json_string}", file=stderr)
+
     input_json = json_loads(input_json_string)
 
-    return model_validate_obj(debug, Model, input_json)
+    return model_validate_obj(False, Model, input_json)
 
 
 def model_dump(debug: bool, output: BaseModel | Any) -> bytes:
@@ -169,11 +180,29 @@ def model_dump_stream(
 
 
 @contextmanager
-def models_dump_stream(debug: bool, writer: StreamWriter):
+def models_dump_stream_end(
+    debug: bool, writer: StreamWriter
+) -> Generator[None, Any, None]:
     try:
         yield
     finally:
         writer.write("-1\n".encode("utf-8"))
+
+
+def models_dump_stream(
+    debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
+) -> None:
+    with models_dump_stream_end(debug, writer):
+        for output in outputs:
+            model_dump_stream(debug, writer, output)
+
+
+async def models_dump_stream_async(
+    debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
+) -> None:
+    with models_dump_stream_end(debug, writer):
+        async for output in outputs:
+            model_dump_stream(debug, writer, output)
 
 
 async def model_validate_stream_impl(
