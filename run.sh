@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 if [ -z "$2" ]; then
-    echo "Usage: $0 [native|docker] <cache_path> <generators_path> <destination_path> [--debug] < <input>"
+    echo "Usage: $0 [native|docker] <cache_path> <generators_path> <destination_path> [--update-database|--no-update-database] [--debug|--no-debug] < <input>"
     exit 1
 fi
 
@@ -26,8 +26,7 @@ machine_id="$(./"run-$mode-machine-id.sh")" && \
 runc_id="$(./"run-$mode-runc.sh" "$run_path" "$runner_workdirs_path" "$debug")" && \
 \
 sleep 1 && \
-\
-container_workdir_path="$runner_workdirs_path/$(./run-init.py "$runner_path" "$machine_id" "$debug")" && \
+container_workdir_path="$runner_workdirs_path/$(./"run-$mode-init.sh" "$runner_path" "$machine_id" "$debug")" && \
 \
 ./"run-$mode-PPpackage.sh" "$runner_path" "$container_workdir_path" "$cache_path" "$generators_path" "$destination_path" "$update_database" "$debug"
 

@@ -20,3 +20,7 @@ COPY PPpackage-runner/ /workdir/packages/PPpackage-runner/
 RUN pip install packages/PPpackage-runner/
 
 RUN mkdir --parents --mode 777 /workdir/PPpackage-runner
+
+COPY run-init.py /workdir/run-init.py
+
+RUN chmod u+x run-init.py
