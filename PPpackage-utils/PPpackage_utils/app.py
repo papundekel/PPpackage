@@ -63,13 +63,6 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
-async def helper(
-    stdin: StreamReader,
-):
-    async for length in load_many_helper(stdin):
-        yield (await load_impl(stdin, Package, length), load_many(stdin, Dependency))
-
-
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
@@ -117,7 +110,10 @@ def init(
 
         options = await load_one(stdin, Options)
 
-        packages = helper(stdin)
+        packages = (
+            (await load_impl(stdin, Package, length), load_many(stdin, Dependency))
+            async for length in load_many_helper(stdin)
+        )
 
         output = fetch_callback(cache_path, options, packages)
 
