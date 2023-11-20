@@ -90,9 +90,7 @@ async def fetch(
 
         await runner_writer.drain()
 
-        success = (
-            await model_validate_stream(debug, runner_reader, RootModel[bool])
-        ).root
+        success = await model_validate_stream(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
@@ -127,9 +125,7 @@ async def fetch(
 
         await runner_writer.drain()
 
-        success = (
-            await model_validate_stream(debug, runner_reader, RootModel[bool])
-        ).root
+        success = await model_validate_stream(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")

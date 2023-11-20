@@ -160,7 +160,7 @@ async def handle_run(
 
     success, image = await pull_image(debug, reader, image_type)
 
-    model_dump_stream(debug, writer, RootModel[bool](success))
+    model_dump_stream(debug, writer, success)
 
     if not success:
         return False
@@ -212,7 +212,7 @@ async def handle_run(
             )
         ).wait()
 
-    model_dump_stream(debug, writer, RootModel[bool](return_code == 0))
+    model_dump_stream(debug, writer, return_code == 0)
 
     return True
 

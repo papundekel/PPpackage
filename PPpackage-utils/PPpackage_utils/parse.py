@@ -1,7 +1,13 @@
+import json
 from asyncio import StreamReader, StreamWriter
 from collections.abc import AsyncIterable, Hashable, Mapping, Set
+from contextlib import contextmanager
+from email import contentmanager
+from lib2to3.pytree import Base
+from re import M
 from sys import stderr
-from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
+from textwrap import indent
+from typing import Annotated, Any, Generic, Sequence, TypeGuard, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
 from pydantic import (
@@ -42,16 +48,22 @@ def frozen_validator(value: Any) -> Any:
 
 FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
-ModelType = TypeVar("ModelType", bound=BaseModel)
+ModelType = TypeVar("ModelType")
 
 
-def model_validate_obj(Model: type[ModelType], obj: Any) -> ModelType:
+def model_validate_obj(Model: type[ModelType], input_json: Any) -> ModelType:
+    ModelWrapped = Model if issubclass(Model, BaseModel) else RootModel[ModelType]
+
     try:
-        input = Model.model_validate(obj)
+        input = ModelWrapped.model_validate(input_json)
 
-        return input
+        if isinstance(input, RootModel):
+            return input.root
+        else:
+            return input
+
     except ValidationError as e:
-        raise MyException(f"Invalid model format:\n{e}.")
+        raise MyException(f"Model validation failed:\n{e}\n{json.dumps(input_json)}.")
 
 
 def model_validate(
@@ -59,19 +71,9 @@ def model_validate(
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
-    if debug:
-        print(
-            f"DEBUG model_validate {Model}:\n{input_json_string}",
-            file=stderr,
-            flush=True,
-        )
+    input_json = json.loads(input_json_string, indent=4 if debug else None)
 
-    try:
-        input = Model.model_validate_json(input_json_string)
-
-        return input
-    except ValidationError as e:
-        raise MyException(f"Invalid model format:\n{e}\n{input_json_string}.")
+    return model_validate_obj(Model, input_json)
 
 
 def model_dump(debug: bool, output: BaseModel) -> bytes:
@@ -151,15 +153,23 @@ class ResolutionGraph:
     graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]
 
 
-def model_dump_stream(debug: bool, writer: StreamWriter, output: BaseModel) -> None:
-    output_json_bytes = model_dump(debug, output)
+def model_dump_stream(
+    debug: bool, writer: StreamWriter, output: BaseModel | Any
+) -> None:
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_bytes = model_dump(debug, output_wrapped)
 
     writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
     writer.write(output_json_bytes)
 
 
-def model_dump_stream_end(debug: bool, writer: StreamWriter) -> None:
-    writer.write("-1\n".encode("utf-8"))
+@contextmanager
+def models_dump_stream(debug: bool, writer: StreamWriter):
+    try:
+        yield
+    finally:
+        writer.write("-1\n".encode("utf-8"))
 
 
 async def model_validate_stream_impl(
