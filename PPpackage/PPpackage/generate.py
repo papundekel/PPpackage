@@ -35,13 +35,12 @@ async def generate_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    model_dump_stream(
+    await model_dump_stream(
         debug,
         process.stdin,
         GenerateInput(options=options, products=products, generators=generators),
     )
 
-    await process.stdin.drain()
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
 
 

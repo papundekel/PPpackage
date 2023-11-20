@@ -15,9 +15,8 @@ async def main():
     debug = argv[3] == "--debug"
 
     async with communicate_with_daemon(debug, runner_path) as (reader, writer):
-        model_dump_stream(debug, writer, machine_id)
-        model_dump_stream(debug, writer, RunnerRequestType.INIT)
-        await writer.drain()
+        await model_dump_stream(debug, writer, machine_id)
+        await model_dump_stream(debug, writer, RunnerRequestType.INIT)
 
         workdir_relative_path = await model_validate_stream(debug, reader, Path)
 

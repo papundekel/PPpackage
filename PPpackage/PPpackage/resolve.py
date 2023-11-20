@@ -51,7 +51,7 @@ async def resolve_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    model_dump_stream(
+    await model_dump_stream(
         debug,
         process.stdin,
         ResolveInput[Any](options=options, requirements_list=requirements_list),
@@ -59,7 +59,6 @@ async def resolve_external_manager(
 
     output = model_validate_stream(debug, process.stdout, Iterable[ResolutionGraph])
 
-    await process.stdin.drain()
     await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
     return await output

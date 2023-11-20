@@ -43,26 +43,24 @@ async def install_manager_command(
     daemon_workdir_path: Path,
     destination_relative_path: Path,
 ):
-    model_dump_stream(debug, daemon_writer, RunnerRequestType.COMMAND)
-    model_dump_stream(debug, daemon_writer, destination_relative_path)
+    await model_dump_stream(debug, daemon_writer, RunnerRequestType.COMMAND)
+    await model_dump_stream(debug, daemon_writer, destination_relative_path)
 
     command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
-    model_dump_stream(debug, daemon_writer, command)
+    await model_dump_stream(debug, daemon_writer, command)
 
     args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
-    models_dump_stream(debug, daemon_writer, args)
+    await models_dump_stream(debug, daemon_writer, args)
 
     with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
         pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
         pipe_to_sub.flush()
 
-        model_dump_stream(
+        await model_dump_stream(
             debug,
             daemon_writer,
             pipe_hook_path.relative_to(daemon_workdir_path),
         )
-
-        await daemon_writer.drain()
 
         return_value = await model_validate_stream(debug, daemon_reader, int)
 
@@ -101,8 +99,7 @@ async def install_external_manager(
         )
         assert process.stdin is not None
 
-        models_dump_stream(debug, process.stdin, products)
-        await process.stdin.drain()
+        await models_dump_stream(debug, process.stdin, products)
 
         process.stdin.close()
         await process.stdin.wait_closed()
@@ -202,7 +199,7 @@ async def install(
         daemon_reader,
         daemon_writer,
     ):
-        model_dump_stream(debug, daemon_writer, machine_id)
+        await model_dump_stream(debug, daemon_writer, machine_id)
 
         for manager, products in meta_products.items():
             await install_manager(

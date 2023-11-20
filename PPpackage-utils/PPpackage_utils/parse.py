@@ -161,7 +161,7 @@ class ResolutionGraph:
     graph: Iterable[ResolutionGraphNode]
 
 
-def model_dump_stream(
+async def model_dump_stream(
     debug: bool, writer: StreamWriter, output: BaseModel | Any
 ) -> None:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
@@ -172,6 +172,8 @@ def model_dump_stream(
 
     writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
     writer.write(output_json_bytes)
+
+    await writer.drain()
 
 
 @contextmanager
@@ -184,12 +186,12 @@ def models_dump_stream_end(
         writer.write("-1\n".encode("utf-8"))
 
 
-def models_dump_stream(
+async def models_dump_stream(
     debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
 ) -> None:
     with models_dump_stream_end(debug, writer):
         for output in outputs:
-            model_dump_stream(debug, writer, output)
+            await model_dump_stream(debug, writer, output)
 
 
 async def models_dump_stream_async(
@@ -197,7 +199,7 @@ async def models_dump_stream_async(
 ) -> None:
     with models_dump_stream_end(debug, writer):
         async for output in outputs:
-            model_dump_stream(debug, writer, output)
+            await model_dump_stream(debug, writer, output)
 
 
 async def model_validate_stream_impl(

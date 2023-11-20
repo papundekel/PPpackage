@@ -88,45 +88,41 @@ async def fetch(
     ):
         machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-        model_dump_stream(debug, runner_writer, machine_id)
-        model_dump_stream(debug, runner_writer, RunnerRequestType.RUN)
-        model_dump_stream(debug, runner_writer, ImageType.TAG)
-        model_dump_stream(debug, runner_writer, "docker.io/archlinux:latest")
-
-        await runner_writer.drain()
+        await model_dump_stream(debug, runner_writer, machine_id)
+        await model_dump_stream(debug, runner_writer, RunnerRequestType.RUN)
+        await model_dump_stream(debug, runner_writer, ImageType.TAG)
+        await model_dump_stream(debug, runner_writer, "docker.io/archlinux:latest")
 
         success = await model_validate_stream(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
 
-        models_dump_stream(debug, runner_writer, ["cat", "-"])
+        await models_dump_stream(debug, runner_writer, ["cat", "-"])
 
         with TemporaryPipe(runner_workdir_path) as stdin_pipe_path, TemporaryPipe(
             runner_workdir_path
         ) as stdout_pipe_path:
-            model_dump_stream(
+            await model_dump_stream(
                 debug,
                 runner_writer,
                 stdin_pipe_path.relative_to(runner_workdir_path),
             )
 
-            model_dump_stream(
+            await model_dump_stream(
                 debug,
                 runner_writer,
                 stdout_pipe_path.relative_to(runner_workdir_path),
             )
 
-            models_dump_stream(debug, runner_writer, [])
-            models_dump_stream(debug, runner_writer, [])
+            await models_dump_stream(debug, runner_writer, [])
+            await models_dump_stream(debug, runner_writer, [])
 
             with stdin_pipe_path.open("w") as stdin_pipe:
                 stdin_pipe.write("ahoj!")
 
             with stdout_pipe_path.open("r") as stdout_pipe:
                 print(stdout_pipe.read(), file=stderr)
-
-        await runner_writer.drain()
 
         success = await model_validate_stream(debug, runner_reader, bool)
 

@@ -94,7 +94,7 @@ async def handle_command(
 
         return_code = await process.wait()
 
-    model_dump_stream(debug, writer, return_code)
+    await model_dump_stream(debug, writer, return_code)
 
     return True
 
@@ -108,7 +108,9 @@ async def handle_init(
 ):
     container_workdir_path.mkdir(exist_ok=True)
 
-    model_dump_stream(debug, writer, container_workdir_path.relative_to(workdirs_path))
+    await model_dump_stream(
+        debug, writer, container_workdir_path.relative_to(workdirs_path)
+    )
 
 
 async def pull_image(
@@ -149,14 +151,12 @@ async def handle_run(
 
     success, image = await pull_image(debug, reader, image_type)
 
-    model_dump_stream(debug, writer, success)
+    await model_dump_stream(debug, writer, success)
 
     if not success:
         return False
 
     image = type_cast(str, image)
-
-    await writer.drain()
 
     args = [arg async for arg in models_validate_stream(debug, reader, str)]
 
@@ -203,7 +203,7 @@ async def handle_run(
             )
         ).wait()
 
-    model_dump_stream(debug, writer, return_code == 0)
+    await model_dump_stream(debug, writer, return_code == 0)
 
     return True
 

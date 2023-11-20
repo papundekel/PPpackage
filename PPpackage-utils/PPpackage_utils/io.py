@@ -112,7 +112,6 @@ async def communicate_with_daemon(
     try:
         yield daemon_reader, daemon_writer
     finally:
-        model_dump_stream(debug, daemon_writer, RunnerRequestType.END)
-        await daemon_writer.drain()
+        await model_dump_stream(debug, daemon_writer, RunnerRequestType.END)
         daemon_writer.close()
         await daemon_writer.wait_closed()

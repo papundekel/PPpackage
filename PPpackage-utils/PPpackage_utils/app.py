@@ -101,8 +101,7 @@ def init(
             cache_path, input.options, input.requirements_list
         )
 
-        model_dump_stream(__debug, stdout, output)
-        await stdout.drain()
+        await model_dump_stream(__debug, stdout, output)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
@@ -113,8 +112,7 @@ def init(
 
         output = await fetch_callback(cache_path, options, packages)
 
-        model_dump_stream(__debug, stdout, output)
-        await stdout.drain()
+        await model_dump_stream(__debug, stdout, output)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
