@@ -1,4 +1,4 @@
-from asyncio import StreamReader, StreamWriter
+from asyncio import StreamWriter
 from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from inspect import isclass
@@ -17,6 +17,8 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 from pydantic_core import CoreSchema, core_schema
+
+from .utils import StreamReader
 
 Key = TypeVar("Key")
 Value = TypeVar("Value")
@@ -52,13 +54,6 @@ ModelType = TypeVar("ModelType")
 def model_validate_obj(
     debug: bool, Model: type[ModelType], input_json: Any
 ) -> ModelType:
-    input_json_string = (
-        None if not debug else json_dumps(input_json, indent=4 if debug else None)
-    )
-
-    if debug:
-        print(f"DEBUG model_validate_obj:\n{input_json_string}", file=stderr)
-
     ModelWrapped = (
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
@@ -72,8 +67,7 @@ def model_validate_obj(
             return input  # type: ignore
 
     except ValidationError as e:
-        if input_json_string is None:
-            input_json_string = json_dumps(input_json, indent=4 if debug else None)
+        input_json_string = json_dumps(input_json, indent=4)
 
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
@@ -82,9 +76,6 @@ def model_validate(
     debug: bool, Model: type[ModelType], input_json_bytes: bytes
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
-
-    if debug:
-        print(f"DEBUG model_validate:\n{input_json_string}", file=stderr)
 
     input_json = json_loads(input_json_string)
 
@@ -95,9 +86,6 @@ def model_dump(debug: bool, output: BaseModel | Any) -> bytes:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
 
     output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
-
-    if debug:
-        print(f"DEBUG model_dump:\n{output_json_string}", file=stderr)
 
     output_json_bytes = output_json_string.encode("utf-8")
 

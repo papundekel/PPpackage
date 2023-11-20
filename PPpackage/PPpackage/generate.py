@@ -5,8 +5,8 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, Options, Product, model_dump
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.parse import GenerateInput, Options, Product, model_dump_stream
+from PPpackage_utils.utils import asubprocess_wait
 
 from .generators import builtin as builtin_generators
 from .sub import generate as PP_generate
@@ -21,7 +21,7 @@ async def generate_external_manager(
     generators: Set[str],
     manager: str,
 ) -> None:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "generate",
@@ -31,17 +31,17 @@ async def generate_external_manager(
         stdout=PIPE,
         stderr=None,
     )
+    assert process.stdin is not None
+    assert process.stdout is not None
 
-    input_json_bytes = model_dump(
+    model_dump_stream(
         debug,
+        process.stdin,
         GenerateInput(options=options, products=products, generators=generators),
     )
+    await process.stdin.drain()
 
-    await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s generate.",
-        input_json_bytes,
-    )
+    await asubprocess_wait(process, f"Error in {manager}'s generate.")
 
 
 async def generate_manager(

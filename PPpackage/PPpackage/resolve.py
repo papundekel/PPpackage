@@ -23,10 +23,10 @@ from PPpackage_utils.parse import (
     Options,
     ResolutionGraph,
     ResolveInput,
-    model_dump,
-    model_validate,
+    model_dump_stream,
+    model_validate_stream,
 )
-from PPpackage_utils.utils import MyException, asubprocess_communicate
+from PPpackage_utils.utils import MyException, asubprocess_wait
 
 from .sub import resolve as PP_resolve
 
@@ -48,17 +48,24 @@ async def resolve_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(
-        debug, ResolveInput[Any](options=options, requirements_list=requirements_list)
-    )
+    assert process.stdin is not None
+    assert process.stdout is not None
 
-    output_json_bytes = await asubprocess_communicate(
+    model_dump_stream(
+        debug,
+        process.stdin,
+        ResolveInput[Any](options=options, requirements_list=requirements_list),
+    )
+    await process.stdin.drain()
+
+    await asubprocess_wait(
         process,
         f"Error in {manager}'s resolve.",
-        input_json_bytes,
     )
 
-    output = model_validate(debug, Iterable[ResolutionGraph], output_json_bytes)
+    output = await model_validate_stream(
+        debug, process.stdout, Iterable[ResolutionGraph]
+    )
 
     return output
 

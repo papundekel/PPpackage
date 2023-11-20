@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable, Mapping
 from functools import partial
 from io import TextIOWrapper
 from os import listdir
@@ -19,7 +19,6 @@ from PPpackage_utils.io import (
 )
 from PPpackage_utils.parse import (
     Product,
-    model_dump,
     model_dump_stream,
     model_validate_stream,
     models_dump_stream,
@@ -28,7 +27,7 @@ from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
     TemporaryPipe,
-    asubprocess_communicate,
+    asubprocess_wait,
 )
 
 from .sub import install as PP_install
@@ -88,7 +87,7 @@ async def install_external_manager(
                 file=stderr,
             )
 
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             f"PPpackage-{manager}",
             "--debug" if debug else "--no-debug",
             "install",
@@ -100,20 +99,13 @@ async def install_external_manager(
             stdout=DEVNULL,
             stderr=None,
         )
+        assert process.stdin is not None
 
-        input_json_bytes = model_dump(debug, products)
+        model_dump_stream(debug, process.stdin, products)
+        await process.stdin.drain()
 
-        process = await process_creation
-
-        if process.stdin is None:
-            raise MyException(f"Error in {manager}'s install.")
-
-        process.stdin.write(input_json_bytes)
         process.stdin.close()
         await process.stdin.wait_closed()
-
-        if debug:
-            print(f"DEBUG PPpackage: closed sub's stdin", file=stderr)
 
         with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
             with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
@@ -137,11 +129,7 @@ async def install_external_manager(
                             f"Invalid hook header from {manager} `{header}`."
                         )
 
-        await asubprocess_communicate(
-            process,
-            f"Error in {manager}'s install.",
-            None,
-        )
+        await asubprocess_wait(process, f"Error in {manager}'s install.")
 
 
 async def install_manager(

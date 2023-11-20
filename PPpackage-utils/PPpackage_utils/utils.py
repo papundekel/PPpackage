@@ -1,4 +1,4 @@
-from asyncio import create_subprocess_exec
+from asyncio import StreamReader, create_subprocess_exec
 from asyncio.subprocess import Process
 from collections.abc import AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
@@ -10,8 +10,10 @@ from pathlib import Path
 from signal import SIGTERM
 from subprocess import DEVNULL, PIPE
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Optional
+from typing import Optional, Protocol
 
+from aioconsole.stream import NonFileStreamReader as BaseNonFileStreamReader
+from aioconsole.stream import get_standard_streams as base_get_standard_streams
 from frozendict import frozendict
 
 
@@ -41,6 +43,13 @@ def TemporaryDirectory(dir=None):
         dir_path = Path(dir_path_string)
 
         yield dir_path
+
+
+async def asubprocess_wait(process: Process, error_message: str) -> None:
+    return_code = await process.wait()
+
+    if return_code != 0:
+        raise MyException(error_message)
 
 
 async def asubprocess_communicate(
@@ -169,3 +178,42 @@ class RunnerRequestType(Enum):
     COMMAND = enum_auto()
     RUN = enum_auto()
     END = enum_auto()
+
+
+class BaseStreamReader(Protocol):
+    async def read(self, n: int) -> bytes:
+        ...
+
+    async def readline(self) -> bytes:
+        ...
+
+
+class StreamReader(BaseStreamReader, Protocol):
+    async def readexactly(self, n: int) -> bytes:
+        ...
+
+
+class NonFileStreamReader(StreamReader):
+    def __init__(self, stream_reader: BaseStreamReader) -> None:
+        self.stream_reader = stream_reader
+
+    async def readexactly(self, n: int) -> bytes:
+        output = bytearray()
+
+        while n > 0:
+            output.extend(await self.stream_reader.read(n))
+            n -= len(output)
+
+        return output
+
+    async def readline(self) -> bytes:
+        return await self.stream_reader.readline()
+
+    async def read(self, n: int) -> bytes:
+        return await self.stream_reader.read(n)
+
+
+async def get_standard_streams():
+    stdin, stdout = await base_get_standard_streams()
+
+    return NonFileStreamReader(stdin), stdout

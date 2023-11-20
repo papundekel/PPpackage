@@ -3,15 +3,13 @@ from collections.abc import Awaitable, Callable, Iterable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
-from sys import exit, stderr, stdin, stdout
+from sys import exit, stderr
 from typing import Any, TypeVar
 
-from pydantic import RootModel
 from typer import Typer
 
 from .parse import (
     FetchInput,
-    FetchOutput,
     FetchOutputValue,
     GenerateInput,
     InstallInput,
@@ -19,10 +17,10 @@ from .parse import (
     Product,
     ResolutionGraph,
     ResolveInput,
-    model_dump,
-    model_validate,
+    model_dump_stream,
+    model_validate_stream,
 )
-from .utils import MyException, ensure_dir_exists
+from .utils import MyException, ensure_dir_exists, get_standard_streams
 
 
 class AsyncTyper(Typer):
@@ -93,35 +91,35 @@ def init(
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, stdout = await get_standard_streams()
 
-        input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
+        input = await model_validate_stream(
+            __debug, stdin, ResolveInput[RequirementType]
+        )
 
         output = await resolve_callback(
             cache_path, input.options, input.requirements_list
         )
 
-        output_json_bytes = model_dump(__debug, output)
-
-        stdout.buffer.write(output_json_bytes)
+        model_dump_stream(__debug, stdout, output)
+        await stdout.drain()
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, stdout = await get_standard_streams()
 
-        input = model_validate(__debug, FetchInput, input_json_bytes)
+        input = await model_validate_stream(__debug, stdin, FetchInput)
 
         output = await fetch_callback(cache_path, input.options, input.packages)
 
-        output_json_bytes = model_dump(__debug, output)
-
-        stdout.buffer.write(output_json_bytes)
+        model_dump_stream(__debug, stdout, output)
+        await stdout.drain()
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, _ = await get_standard_streams()
 
-        input = model_validate(__debug, GenerateInput, input_json_bytes)
+        input = await model_validate_stream(__debug, stdin, GenerateInput)
 
         await generate_callback(
             cache_path,
@@ -140,9 +138,9 @@ def init(
     ) -> None:
         ensure_dir_exists(destination_path)
 
-        input_json_bytes = stdin.buffer.read()
+        stdin, _ = await get_standard_streams()
 
-        input = model_validate(__debug, InstallInput, input_json_bytes)
+        input = await model_validate_stream(__debug, stdin, InstallInput)
 
         await install_callback(
             cache_path,

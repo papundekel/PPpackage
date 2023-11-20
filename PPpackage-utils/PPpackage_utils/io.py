@@ -1,4 +1,4 @@
-from asyncio import StreamReader, StreamWriter, open_unix_connection
+from asyncio import open_unix_connection
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 from io import TextIOBase

@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from functools import partial
 from pathlib import Path
 
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_wait
 
 from .sub import update_database as PP_update_database
 
@@ -20,10 +20,7 @@ async def update_database_external_manager(debug: bool, manager: str, cache_path
         stderr=None,
     )
 
-    await asubprocess_communicate(
-        process,
-        f"Error in {manager}'s update-database.",
-    )
+    await asubprocess_wait(process, f"Error in {manager}'s update-database.")
 
 
 async def update_database_manager(debug: bool, manager: str, cache_path: Path):

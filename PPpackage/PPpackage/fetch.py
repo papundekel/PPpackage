@@ -13,10 +13,10 @@ from PPpackage_utils.parse import (
     FetchOutput,
     ManagerAndName,
     PackageWithDependencies,
-    model_dump,
-    model_validate,
+    model_dump_stream,
+    model_validate_stream,
 )
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_wait
 
 from .sub import fetch as PP_fetch
 
@@ -27,7 +27,7 @@ async def fetch_external_manager(
     cache_path: Path,
     input: FetchInput,
 ) -> FetchOutput:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "fetch",
@@ -37,15 +37,15 @@ async def fetch_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(debug, input)
+    assert process.stdin is not None
+    assert process.stdout is not None
 
-    output_json_bytes = await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s fetch.",
-        input_json_bytes,
-    )
+    model_dump_stream(debug, process.stdin, input)
+    await process.stdin.drain()
 
-    return model_validate(debug, FetchOutput, output_json_bytes)
+    await asubprocess_wait(process, f"Error in {manager}'s fetch.")
+
+    return await model_validate_stream(debug, process.stdout, FetchOutput)
 
 
 async def fetch_manager(
