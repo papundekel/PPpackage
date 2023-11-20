@@ -1,6 +1,7 @@
+import asyncio
 from asyncio import StreamWriter, TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Iterable, Mapping, MutableMapping, MutableSet
+from collections.abc import AsyncIterable, Iterable, Mapping, MutableMapping, MutableSet
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -9,27 +10,17 @@ from typing import Any
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
     Dependency,
-    FetchOutput,
+    FetchOutputValue,
     ManagerAndName,
     Options,
     PackageWithDependencies,
     dump_many,
     dump_one,
-    load_one,
+    load_many,
 )
 from PPpackage_utils.utils import asubprocess_wait
 
 from .sub import fetch as PP_fetch
-
-
-async def fetch_external_send_input(
-    debug: bool,
-    input: StreamWriter,
-    options: Options,
-    packages: Iterable[PackageWithDependencies],
-):
-    await dump_one(debug, input, options)
-    await dump_many(debug, input, packages)
 
 
 async def fetch_external_manager(
@@ -38,7 +29,7 @@ async def fetch_external_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[PackageWithDependencies],
-) -> FetchOutput:
+) -> AsyncIterable[FetchOutputValue]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -52,13 +43,13 @@ async def fetch_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    input_task = fetch_external_send_input(debug, process.stdin, options, packages)
-    output_task = load_one(process.stdout, FetchOutput)
+    await dump_one(debug, process.stdin, options)
+    await dump_many(debug, process.stdin, packages)
 
-    await input_task
+    async for output in load_many(process.stdout, FetchOutputValue):
+        yield output
+
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
-
-    return await output_task
 
 
 async def fetch_manager(
@@ -69,7 +60,7 @@ async def fetch_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[PackageWithDependencies],
-) -> FetchOutput:
+) -> AsyncIterable[FetchOutputValue]:
     if manager == "PP":
         fetcher = partial(
             PP_fetch, runner_path=runner_path, runner_workdir_path=runner_workdir_path
@@ -77,7 +68,7 @@ async def fetch_manager(
     else:
         fetcher = partial(fetch_external_manager, manager=manager)
 
-    output = await fetcher(
+    output = fetcher(
         debug=debug, cache_path=cache_path, options=options, packages=packages
     )
 
@@ -161,7 +152,7 @@ async def fetch(
             }
 
         for manager, task in manager_tasks.items():
-            for package in task.result():
+            async for package in task.result():
                 node = graph.nodes[(manager, package.name)]
                 node["product_id"] = package.product_id
                 node["product_info"] = package.product_info

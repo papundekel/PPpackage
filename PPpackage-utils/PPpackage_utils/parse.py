@@ -115,9 +115,6 @@ class FetchOutputValue(FetchOutputValueBase):
     name: str
 
 
-FetchOutput = Iterable[FetchOutputValue]
-
-
 @dataclass(frozen=True)
 class ManagerAndName:
     manager: str
@@ -170,7 +167,7 @@ async def dump_one(debug: bool, writer: StreamWriter, output: BaseModel | Any) -
 
 
 @contextmanager
-def _dump_multiple_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
+def _dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
     try:
         yield
     finally:
@@ -180,7 +177,7 @@ def _dump_multiple_end(debug: bool, writer: StreamWriter) -> Generator[None, Any
 async def dump_many(
     debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
 ) -> None:
-    with _dump_multiple_end(debug, writer):
+    with _dump_many_end(debug, writer):
         for output in outputs:
             await dump_one(debug, writer, output)
 
@@ -188,7 +185,7 @@ async def dump_many(
 async def dump_many_async(
     debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
 ) -> None:
-    with _dump_multiple_end(debug, writer):
+    with _dump_many_end(debug, writer):
         async for output in outputs:
             await dump_one(debug, writer, output)
 

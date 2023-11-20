@@ -16,6 +16,8 @@ from .parse import (
     Product,
     ResolutionGraph,
     ResolveInput,
+    dump_many,
+    dump_many_async,
     dump_one,
     load_many,
     load_one,
@@ -68,7 +70,7 @@ def init(
     ],
     fetch_callback: Callable[
         [Path, Any, AsyncIterable[PackageWithDependencies]],
-        Awaitable[Iterable[FetchOutputValue]],
+        AsyncIterable[FetchOutputValue],
     ],
     generate_callback: Callable[
         [
@@ -108,9 +110,9 @@ def init(
         options = await load_one(stdin, Options)
         packages = load_many(stdin, PackageWithDependencies)
 
-        output = await fetch_callback(cache_path, options, packages)
+        output = fetch_callback(cache_path, options, packages)
 
-        await dump_one(__debug, stdout, output)
+        await dump_many_async(__debug, stdout, output)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:

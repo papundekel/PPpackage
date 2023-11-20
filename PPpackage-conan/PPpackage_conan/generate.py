@@ -8,7 +8,7 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_wait
 
 from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment
 
@@ -108,6 +108,6 @@ async def generate(
             env=environment,
         )
 
-        await asubprocess_communicate(await process, "Error in `conan install`")
+        await asubprocess_wait(await process, "Error in `conan install`")
 
     patch_native_generators(native_generators_path, native_generators_path_suffix)

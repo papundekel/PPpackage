@@ -17,7 +17,11 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists
+from PPpackage_utils.utils import (
+    asubprocess_communicate,
+    asubprocess_wait,
+    ensure_dir_exists,
+)
 
 from .parse import Requirement
 from .utils import (
@@ -45,7 +49,7 @@ async def export_package(
             env=environment,
         )
 
-        await asubprocess_communicate(await process, "Error in `conan export`.")
+        await asubprocess_wait(await process, "Error in `conan export`.")
 
 
 async def export_leaf(
@@ -102,7 +106,7 @@ async def remove_temporary_packages_from_cache(environment: Mapping[str, str]) -
         env=environment,
     )
 
-    await asubprocess_communicate(await process, "Error in `conan remove`")
+    await asubprocess_wait(await process, "Error in `conan remove`")
 
 
 def create_requirement_partitions(

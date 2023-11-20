@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
@@ -30,7 +30,7 @@ async def fetch(
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[PackageWithDependencies],
-) -> Iterable[FetchOutputValue]:
+) -> AsyncIterable[FetchOutputValue]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -88,13 +88,11 @@ async def fetch(
 
     nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
-    return [
-        FetchOutputValue(
+    for node in nodes.values():
+        yield FetchOutputValue(
             name=node.name,
             product_id=node.get_product_id(),
             product_info=FetchProductInfo(
                 version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
-        for node in nodes.values()
-    ]

@@ -26,7 +26,7 @@ from PPpackage_utils.utils import (
     ImageType,
     RunnerRequestType,
     TemporaryDirectory,
-    asubprocess_communicate,
+    asubprocess_wait,
 )
 from typer import Exit
 
@@ -262,7 +262,7 @@ async def create_config(debug: bool, bundle_path: Path):
         stderr=None,
     )
 
-    await asubprocess_communicate(await process_creation, "Error in `runc spec`.", None)
+    await asubprocess_wait(await process_creation, "Error in `runc spec`.")
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["terminal"] = False

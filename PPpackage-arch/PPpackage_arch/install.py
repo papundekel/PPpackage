@@ -1,12 +1,12 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import AsyncIterable, Iterable, Set
+from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
-    asubprocess_communicate,
+    asubprocess_wait,
     communicate_from_sub,
     ensure_dir_exists,
     fakeroot,
@@ -60,4 +60,4 @@ async def install(
                 env=environment,
             )
 
-            await asubprocess_communicate(process, "Error in `pacman -Udd`")
+            await asubprocess_wait(process, "Error in `pacman -Udd`")

@@ -1,11 +1,10 @@
 from collections.abc import Iterable
 from pathlib import Path
 from sys import stderr
-from typing import Any, cast
+from typing import Any, AsyncIterable, cast
 
 from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
-    FetchOutput,
     FetchOutputValue,
     ManagerRequirement,
     Options,
@@ -79,7 +78,7 @@ async def fetch(
     cache_path: Path,
     options: Options,
     packages: Iterable[PackageWithDependencies],
-) -> FetchOutput:
+) -> AsyncIterable[FetchOutputValue]:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
         runner_writer,
@@ -127,10 +126,8 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    return [
-        FetchOutputValue(name=package.name, product_id="id", product_info=None)
-        for package in packages
-    ]
+    for package in packages:
+        yield FetchOutputValue(name=package.name, product_id="id", product_info=None)
 
 
 async def generate(

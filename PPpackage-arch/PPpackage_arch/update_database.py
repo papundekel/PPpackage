@@ -3,7 +3,7 @@ from asyncio.subprocess import DEVNULL
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, fakeroot
+from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
 
@@ -26,4 +26,4 @@ async def update_database(cache_path: Path) -> None:
             env=environment,
         )
 
-        await asubprocess_communicate(await process, "Error in `pacman -Sy`")
+        await asubprocess_wait(await process, "Error in `pacman -Sy`")
