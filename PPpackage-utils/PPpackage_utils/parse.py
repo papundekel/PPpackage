@@ -121,10 +121,9 @@ class Dependency(ManagerAndName):
 
 
 @dataclass(frozen=True)
-class PackageWithDependencies:
+class Package:
     name: str
     version: str
-    dependencies: Iterable[Dependency]
 
 
 @dataclass(frozen=True)
@@ -161,7 +160,7 @@ async def dump_one(debug: bool, writer: StreamWriter, output: BaseModel | Any) -
 
 
 @contextmanager
-def _dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
+def dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
     try:
         yield
     finally:
@@ -171,7 +170,7 @@ def _dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, No
 async def dump_many(
     debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
 ) -> None:
-    with _dump_many_end(debug, writer):
+    with dump_many_end(debug, writer):
         for output in outputs:
             await dump_one(debug, writer, output)
 
@@ -179,12 +178,12 @@ async def dump_many(
 async def dump_many_async(
     debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
 ) -> None:
-    with _dump_many_end(debug, writer):
+    with dump_many_end(debug, writer):
         async for output in outputs:
             await dump_one(debug, writer, output)
 
 
-async def _load_impl(
+async def load_impl(
     reader: StreamReader, Model: type[ModelType], length: int
 ) -> ModelType:
     input_json_bytes = await reader.readexactly(length)
@@ -201,16 +200,21 @@ async def _load_length(reader: StreamReader) -> int:
 async def load_one(reader: StreamReader, Model: type[ModelType]) -> ModelType:
     length = await _load_length(reader)
 
-    return await _load_impl(reader, Model, length)
+    return await load_impl(reader, Model, length)
 
 
-async def load_many(
-    reader: StreamReader, Model: type[ModelType]
-) -> AsyncIterable[ModelType]:
+async def load_many_helper(reader: StreamReader):
     while True:
         length = await _load_length(reader)
 
         if length < 0:
             break
 
-        yield await _load_impl(reader, Model, length)
+        yield length
+
+
+async def load_many(
+    reader: StreamReader, Model: type[ModelType]
+) -> AsyncIterable[ModelType]:
+    async for length in load_many_helper(reader):
+        yield await load_impl(reader, Model, length)

@@ -5,10 +5,11 @@ from typing import Any, AsyncIterable, cast
 
 from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
+    Dependency,
     FetchOutputValue,
     ManagerRequirement,
     Options,
-    PackageWithDependencies,
+    Package,
     Product,
     ResolutionGraph,
     ResolutionGraphNode,
@@ -77,7 +78,7 @@ async def fetch(
     runner_workdir_path: Path,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
+    packages: Iterable[tuple[Package, Iterable[Dependency]]],
 ) -> AsyncIterable[FetchOutputValue]:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
@@ -126,7 +127,7 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    for package in packages:
+    for package, dependencies in packages:
         yield FetchOutputValue(name=package.name, product_id="id", product_info=None)
 
 

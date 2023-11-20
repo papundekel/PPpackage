@@ -1,7 +1,14 @@
 import asyncio
 from asyncio import StreamWriter, TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import AsyncIterable, Iterable, Mapping, MutableMapping, MutableSet
+from collections.abc import (
+    AsyncIterable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    MutableSet,
+)
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -13,8 +20,9 @@ from PPpackage_utils.parse import (
     FetchOutputValue,
     ManagerAndName,
     Options,
-    PackageWithDependencies,
+    Package,
     dump_many,
+    dump_many_end,
     dump_one,
     load_many,
 )
@@ -28,7 +36,7 @@ async def fetch_external_manager(
     manager: str,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
+    packages: Iterable[tuple[Package, Iterable[Dependency]]],
 ) -> AsyncIterable[FetchOutputValue]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -44,7 +52,11 @@ async def fetch_external_manager(
     assert process.stdout is not None
 
     await dump_one(debug, process.stdin, options)
-    await dump_many(debug, process.stdin, packages)
+
+    with dump_many_end(debug, process.stdin):
+        for package, dependencies in packages:
+            await dump_one(debug, process.stdin, package)
+            await dump_many(debug, process.stdin, dependencies)
 
     async for output in load_many(process.stdout, FetchOutputValue):
         yield output
@@ -59,7 +71,7 @@ async def fetch_manager(
     manager: str,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
+    packages: Iterable[tuple[Package, Iterable[Dependency]]],
 ) -> AsyncIterable[FetchOutputValue]:
     if manager == "PP":
         fetcher = partial(
@@ -117,17 +129,17 @@ async def fetch(
 
     for generation in topological_generations(reversed_graph):
         sent_product_infos: MutableSet[ManagerAndName] = set()
-        manager_packages: MutableMapping[str, MutableSet[PackageWithDependencies]] = {}
+        manager_packages: MutableMapping[
+            str, MutableSequence[tuple[Package, Iterable[Dependency]]]
+        ] = {}
 
         for manager, name in generation:
             version = graph.nodes[(manager, name)]["version"]
 
             dependencies = create_dependencies(sent_product_infos, graph, manager, name)
 
-            manager_packages.setdefault(manager, set()).add(
-                PackageWithDependencies(
-                    name=name, version=version, dependencies=dependencies
-                )
+            manager_packages.setdefault(manager, []).append(
+                (Package(name=name, version=version), dependencies)
             )
 
         inputs = {

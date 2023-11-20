@@ -9,18 +9,21 @@ from typing import Any, TypeVar
 from typer import Typer
 
 from .parse import (
+    Dependency,
     FetchOutputValue,
     Options,
-    PackageWithDependencies,
+    Package,
     Product,
     ResolutionGraph,
     ResolveInput,
     dump_many_async,
     dump_one,
+    load_impl,
     load_many,
+    load_many_helper,
     load_one,
 )
-from .utils import MyException, ensure_dir_exists, get_standard_streams
+from .utils import MyException, StreamReader, ensure_dir_exists, get_standard_streams
 
 
 class AsyncTyper(Typer):
@@ -60,6 +63,13 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
+async def helper(
+    stdin: StreamReader,
+):
+    async for length in load_many_helper(stdin):
+        yield (await load_impl(stdin, Package, length), load_many(stdin, Dependency))
+
+
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
@@ -67,7 +77,7 @@ def init(
         Awaitable[Iterable[ResolutionGraph]],
     ],
     fetch_callback: Callable[
-        [Path, Any, AsyncIterable[PackageWithDependencies]],
+        [Path, Any, AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]],
         AsyncIterable[FetchOutputValue],
     ],
     generate_callback: Callable[
@@ -106,7 +116,8 @@ def init(
         stdin, stdout = await get_standard_streams()
 
         options = await load_one(stdin, Options)
-        packages = load_many(stdin, PackageWithDependencies)
+
+        packages = helper(stdin)
 
         output = fetch_callback(cache_path, options, packages)
 

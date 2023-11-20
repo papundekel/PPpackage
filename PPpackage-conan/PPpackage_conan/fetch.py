@@ -1,15 +1,16 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
+    Dependency,
     FetchOutputValue,
     Options,
-    PackageWithDependencies,
+    Package,
     load_object,
 )
 from PPpackage_utils.utils import asubprocess_communicate
@@ -29,7 +30,7 @@ async def fetch(
     templates_path: Path,
     cache_path: Path,
     options: Options,
-    packages: AsyncIterable[PackageWithDependencies],
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
 ) -> AsyncIterable[FetchOutputValue]:
     cache_path = get_cache_path(cache_path)
 
@@ -45,10 +46,10 @@ async def fetch(
 
     requirements = []
 
-    async for package in packages:
+    async for package, dependencies in packages:
         requirements.append((package.name, package.version))
 
-        for dependency in package.dependencies:
+        async for dependency in dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
                 product_info_parsed = load_object(
                     FetchProductInfo, dependency.product_info

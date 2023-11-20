@@ -4,7 +4,7 @@ from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import FetchOutputValue, Options, PackageWithDependencies
+from PPpackage_utils.parse import Dependency, FetchOutputValue, Options, Package
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
@@ -21,13 +21,19 @@ def process_product_id(line: str):
 async def fetch(
     cache_path: Path,
     options: Options,
-    packages: AsyncIterable[PackageWithDependencies],
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
 ) -> AsyncIterable[FetchOutputValue]:
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
 
-    package_names = [package.name async for package in packages]
+    package_names = []
+
+    async for package, dependencies in packages:
+        package_names.append(package.name)
+
+        async for _ in dependencies:
+            pass
 
     async with fakeroot() as environment:
         process = create_subprocess_exec(
