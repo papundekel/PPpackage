@@ -13,9 +13,9 @@ from PPpackage_utils.parse import (
     ManagerAndName,
     Options,
     PackageWithDependencies,
-    model_dump_stream,
-    model_validate_stream,
-    models_dump_stream,
+    dump_many,
+    dump_one,
+    load_one,
 )
 from PPpackage_utils.utils import asubprocess_wait
 
@@ -28,8 +28,8 @@ async def fetch_external_send_input(
     options: Options,
     packages: Iterable[PackageWithDependencies],
 ):
-    await model_dump_stream(debug, input, options)
-    await models_dump_stream(debug, input, packages)
+    await dump_one(debug, input, options)
+    await dump_many(debug, input, packages)
 
 
 async def fetch_external_manager(
@@ -53,7 +53,7 @@ async def fetch_external_manager(
     assert process.stdout is not None
 
     input_task = fetch_external_send_input(debug, process.stdin, options, packages)
-    output_task = model_validate_stream(debug, process.stdout, FetchOutput)
+    output_task = load_one(debug, process.stdout, FetchOutput)
 
     await input_task
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")

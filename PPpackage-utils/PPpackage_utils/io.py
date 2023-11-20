@@ -5,7 +5,7 @@ from io import TextIOBase
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import model_dump_stream
+from PPpackage_utils.parse import dump_one
 from PPpackage_utils.utils import RunnerRequestType
 
 
@@ -112,6 +112,6 @@ async def communicate_with_daemon(
     try:
         yield daemon_reader, daemon_writer
     finally:
-        await model_dump_stream(debug, daemon_writer, RunnerRequestType.END)
+        await dump_one(debug, daemon_writer, RunnerRequestType.END)
         daemon_writer.close()
         await daemon_writer.wait_closed()

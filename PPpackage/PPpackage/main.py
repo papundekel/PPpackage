@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import stderr, stdin
 
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, ProductBase, model_validate
+from PPpackage_utils.parse import Product, ProductBase, load_bytes
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -32,7 +32,7 @@ async def main_command(
 ) -> None:
     input_json_bytes = stdin.buffer.read()
 
-    input = model_validate(debug, Input, input_json_bytes)
+    input = load_bytes(debug, Input, input_json_bytes)
 
     if do_update_database:
         managers = input.requirements.keys()

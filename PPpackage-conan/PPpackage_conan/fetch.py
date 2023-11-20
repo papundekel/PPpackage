@@ -10,7 +10,7 @@ from PPpackage_utils.parse import (
     FetchOutputValue,
     Options,
     PackageWithDependencies,
-    model_validate_obj,
+    load_object,
 )
 from PPpackage_utils.utils import asubprocess_communicate
 
@@ -50,7 +50,7 @@ async def fetch(
 
         for dependency in package.dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
-                product_info_parsed = model_validate_obj(
+                product_info_parsed = load_object(
                     debug, FetchProductInfo, dependency.product_info
                 )
                 requirements.append((dependency.name, product_info_parsed.version))

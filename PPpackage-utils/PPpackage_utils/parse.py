@@ -51,9 +51,7 @@ FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 ModelType = TypeVar("ModelType")
 
 
-def model_validate_obj(
-    debug: bool, Model: type[ModelType], input_json: Any
-) -> ModelType:
+def load_object(debug: bool, Model: type[ModelType], input_json: Any) -> ModelType:
     ModelWrapped = (
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
@@ -72,14 +70,14 @@ def model_validate_obj(
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
 
-def model_validate(
+def load_bytes(
     debug: bool, Model: type[ModelType], input_json_bytes: bytes
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
     input_json = json_loads(input_json_string)
 
-    return model_validate_obj(False, Model, input_json)
+    return load_object(False, Model, input_json)
 
 
 Requirement = TypeVar("Requirement")
@@ -161,9 +159,7 @@ class ResolutionGraph:
     graph: Iterable[ResolutionGraphNode]
 
 
-async def model_dump_stream(
-    debug: bool, writer: StreamWriter, output: BaseModel | Any
-) -> None:
+async def dump_one(debug: bool, writer: StreamWriter, output: BaseModel | Any) -> None:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
 
     output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
@@ -177,60 +173,58 @@ async def model_dump_stream(
 
 
 @contextmanager
-def models_dump_stream_end(
-    debug: bool, writer: StreamWriter
-) -> Generator[None, Any, None]:
+def _dump_multiple_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
     try:
         yield
     finally:
         writer.write("-1\n".encode("utf-8"))
 
 
-async def models_dump_stream(
+async def dump_many(
     debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
 ) -> None:
-    with models_dump_stream_end(debug, writer):
+    with _dump_multiple_end(debug, writer):
         for output in outputs:
-            await model_dump_stream(debug, writer, output)
+            await dump_one(debug, writer, output)
 
 
-async def models_dump_stream_async(
+async def dump_many_async(
     debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
 ) -> None:
-    with models_dump_stream_end(debug, writer):
+    with _dump_multiple_end(debug, writer):
         async for output in outputs:
-            await model_dump_stream(debug, writer, output)
+            await dump_one(debug, writer, output)
 
 
-async def model_validate_stream_impl(
+async def _load_impl(
     debug: bool, reader: StreamReader, Model: type[ModelType], length: int
 ) -> ModelType:
     input_json_bytes = await reader.readexactly(length)
 
-    return model_validate(debug, Model, input_json_bytes)
+    return load_bytes(debug, Model, input_json_bytes)
 
 
-async def stream_read_length(debug: bool, reader: StreamReader) -> int:
+async def _load_length(debug: bool, reader: StreamReader) -> int:
     length = int((await reader.readline()).decode("utf-8"))
 
     return length
 
 
-async def model_validate_stream(
+async def load_one(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> ModelType:
-    length = await stream_read_length(debug, reader)
+    length = await _load_length(debug, reader)
 
-    return await model_validate_stream_impl(debug, reader, Model, length)
+    return await _load_impl(debug, reader, Model, length)
 
 
-async def models_validate_stream(
+async def load_many(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> AsyncIterable[ModelType]:
     while True:
-        length = await stream_read_length(debug, reader)
+        length = await _load_length(debug, reader)
 
         if length < 0:
             break
 
-        yield await model_validate_stream_impl(debug, reader, Model, length)
+        yield await _load_impl(debug, reader, Model, length)

@@ -16,9 +16,9 @@ from .parse import (
     Product,
     ResolutionGraph,
     ResolveInput,
-    model_dump_stream,
-    model_validate_stream,
-    models_validate_stream,
+    dump_one,
+    load_many,
+    load_one,
 )
 from .utils import MyException, ensure_dir_exists, get_standard_streams
 
@@ -93,32 +93,30 @@ def init(
     async def resolve(cache_path: Path) -> None:
         stdin, stdout = await get_standard_streams()
 
-        input = await model_validate_stream(
-            __debug, stdin, ResolveInput[RequirementType]
-        )
+        input = await load_one(__debug, stdin, ResolveInput[RequirementType])
 
         output = await resolve_callback(
             cache_path, input.options, input.requirements_list
         )
 
-        await model_dump_stream(__debug, stdout, output)
+        await dump_one(__debug, stdout, output)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
         stdin, stdout = await get_standard_streams()
 
-        options = await model_validate_stream(__debug, stdin, Options)
-        packages = models_validate_stream(__debug, stdin, PackageWithDependencies)
+        options = await load_one(__debug, stdin, Options)
+        packages = load_many(__debug, stdin, PackageWithDependencies)
 
         output = await fetch_callback(cache_path, options, packages)
 
-        await model_dump_stream(__debug, stdout, output)
+        await dump_one(__debug, stdout, output)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
         stdin, _ = await get_standard_streams()
 
-        input = await model_validate_stream(__debug, stdin, GenerateInput)
+        input = await load_one(__debug, stdin, GenerateInput)
 
         await generate_callback(
             cache_path,
@@ -139,7 +137,7 @@ def init(
 
         stdin, _ = await get_standard_streams()
 
-        products = models_validate_stream(__debug, stdin, Product)
+        products = load_many(__debug, stdin, Product)
 
         await install_callback(
             cache_path,

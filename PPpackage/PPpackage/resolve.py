@@ -23,8 +23,8 @@ from PPpackage_utils.parse import (
     Options,
     ResolutionGraph,
     ResolveInput,
-    model_dump_stream,
-    model_validate_stream,
+    dump_one,
+    load_one,
 )
 from PPpackage_utils.utils import MyException, asubprocess_wait
 
@@ -51,15 +51,13 @@ async def resolve_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    input_task = model_dump_stream(
+    input_task = dump_one(
         debug,
         process.stdin,
         ResolveInput[Any](options=options, requirements_list=requirements_list),
     )
 
-    output_task = model_validate_stream(
-        debug, process.stdout, Iterable[ResolutionGraph]
-    )
+    output_task = load_one(debug, process.stdout, Iterable[ResolutionGraph])
 
     await input_task
     await asubprocess_wait(process, f"Error in {manager}'s resolve.")

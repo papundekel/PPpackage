@@ -17,12 +17,7 @@ from PPpackage_utils.io import (
     pipe_write_int,
     pipe_write_string,
 )
-from PPpackage_utils.parse import (
-    Product,
-    model_dump_stream,
-    model_validate_stream,
-    models_dump_stream,
-)
+from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
@@ -43,26 +38,26 @@ async def install_manager_command(
     daemon_workdir_path: Path,
     destination_relative_path: Path,
 ):
-    await model_dump_stream(debug, daemon_writer, RunnerRequestType.COMMAND)
-    await model_dump_stream(debug, daemon_writer, destination_relative_path)
+    await dump_one(debug, daemon_writer, RunnerRequestType.COMMAND)
+    await dump_one(debug, daemon_writer, destination_relative_path)
 
     command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
-    await model_dump_stream(debug, daemon_writer, command)
+    await dump_one(debug, daemon_writer, command)
 
     args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
-    await models_dump_stream(debug, daemon_writer, args)
+    await dump_many(debug, daemon_writer, args)
 
     with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
         pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
         pipe_to_sub.flush()
 
-        await model_dump_stream(
+        await dump_one(
             debug,
             daemon_writer,
             pipe_hook_path.relative_to(daemon_workdir_path),
         )
 
-        return_value = await model_validate_stream(debug, daemon_reader, int)
+        return_value = await load_one(debug, daemon_reader, int)
 
         pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()
@@ -97,10 +92,10 @@ async def install_external_manager(
             stdout=DEVNULL,
             stderr=None,
         )
-        
+
         assert process.stdin is not None
 
-        await models_dump_stream(debug, process.stdin, products)
+        await dump_many(debug, process.stdin, products)
 
         process.stdin.close()
         await process.stdin.wait_closed()
@@ -200,7 +195,7 @@ async def install(
         daemon_reader,
         daemon_writer,
     ):
-        await model_dump_stream(debug, daemon_writer, machine_id)
+        await dump_one(debug, daemon_writer, machine_id)
 
         for manager, products in meta_products.items():
             await install_manager(

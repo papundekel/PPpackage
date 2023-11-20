@@ -13,9 +13,9 @@ from PPpackage_utils.parse import (
     Product,
     ResolutionGraph,
     ResolutionGraphNode,
-    model_dump_stream,
-    model_validate_stream,
-    models_dump_stream,
+    dump_many,
+    dump_one,
+    load_one,
 )
 from PPpackage_utils.utils import (
     ImageType,
@@ -86,35 +86,35 @@ async def fetch(
     ):
         machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-        await model_dump_stream(debug, runner_writer, machine_id)
-        await model_dump_stream(debug, runner_writer, RunnerRequestType.RUN)
-        await model_dump_stream(debug, runner_writer, ImageType.TAG)
-        await model_dump_stream(debug, runner_writer, "docker.io/archlinux:latest")
+        await dump_one(debug, runner_writer, machine_id)
+        await dump_one(debug, runner_writer, RunnerRequestType.RUN)
+        await dump_one(debug, runner_writer, ImageType.TAG)
+        await dump_one(debug, runner_writer, "docker.io/archlinux:latest")
 
-        success = await model_validate_stream(debug, runner_reader, bool)
+        success = await load_one(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
 
-        await models_dump_stream(debug, runner_writer, ["cat", "-"])
+        await dump_many(debug, runner_writer, ["cat", "-"])
 
         with TemporaryPipe(runner_workdir_path) as stdin_pipe_path, TemporaryPipe(
             runner_workdir_path
         ) as stdout_pipe_path:
-            await model_dump_stream(
+            await dump_one(
                 debug,
                 runner_writer,
                 stdin_pipe_path.relative_to(runner_workdir_path),
             )
 
-            await model_dump_stream(
+            await dump_one(
                 debug,
                 runner_writer,
                 stdout_pipe_path.relative_to(runner_workdir_path),
             )
 
-            await models_dump_stream(debug, runner_writer, [])
-            await models_dump_stream(debug, runner_writer, [])
+            await dump_many(debug, runner_writer, [])
+            await dump_many(debug, runner_writer, [])
 
             with stdin_pipe_path.open("w") as stdin_pipe:
                 stdin_pipe.write("ahoj!")
@@ -122,7 +122,7 @@ async def fetch(
             with stdout_pipe_path.open("r") as stdout_pipe:
                 print(stdout_pipe.read(), file=stderr)
 
-        success = await model_validate_stream(debug, runner_reader, bool)
+        success = await load_one(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
