@@ -1,6 +1,6 @@
 from asyncio import TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from collections.abc import Mapping, MutableMapping, MutableSet
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSet
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -9,12 +9,13 @@ from typing import Any
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
     Dependency,
-    FetchInput,
     FetchOutput,
     ManagerAndName,
+    Options,
     PackageWithDependencies,
     model_dump_stream,
     model_validate_stream,
+    models_dump_stream,
 )
 from PPpackage_utils.utils import asubprocess_wait
 
@@ -25,7 +26,8 @@ async def fetch_external_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    input: FetchInput,
+    options: Options,
+    packages: Iterable[PackageWithDependencies],
 ) -> FetchOutput:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -40,7 +42,8 @@ async def fetch_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    model_dump_stream(debug, process.stdin, input)
+    model_dump_stream(debug, process.stdin, options)
+    models_dump_stream(debug, process.stdin, packages)
 
     output = model_validate_stream(debug, process.stdout, FetchOutput)
 
@@ -56,7 +59,8 @@ async def fetch_manager(
     runner_workdir_path: Path,
     manager: str,
     cache_path: Path,
-    input: FetchInput,
+    options: Options,
+    packages: Iterable[PackageWithDependencies],
 ) -> FetchOutput:
     if manager == "PP":
         fetcher = partial(
@@ -66,9 +70,7 @@ async def fetch_manager(
         fetcher = partial(fetch_external_manager, manager=manager)
 
     output = await fetcher(
-        debug=debug,
-        cache_path=cache_path,
-        input=input,
+        debug=debug, cache_path=cache_path, options=options, packages=packages
     )
 
     return output
@@ -95,9 +97,7 @@ def create_dependencies(
         )
 
         dependency = Dependency(
-            manager=dependency_manager,
-            name=dependency_name,
-            product_info=product_info,
+            manager=dependency_manager, name=dependency_name, product_info=product_info
         )
 
         dependencies.append(dependency)
@@ -127,17 +127,12 @@ async def fetch(
 
             manager_packages.setdefault(manager, set()).add(
                 PackageWithDependencies(
-                    name=name,
-                    version=version,
-                    dependencies=dependencies,
+                    name=name, version=version, dependencies=dependencies
                 )
             )
 
         inputs = {
-            manager: FetchInput(
-                options=meta_options.get(manager),
-                packages=packages,
-            )
+            manager: (meta_options.get(manager), packages)
             for manager, packages in manager_packages.items()
         }
 
@@ -150,10 +145,11 @@ async def fetch(
                         runner_workdir_path,
                         manager,
                         cache_path,
-                        input,
+                        options,
+                        packages,
                     )
                 )
-                for manager, input in inputs.items()
+                for manager, (options, packages) in inputs.items()
             }
 
         for manager, task in manager_tasks.items():

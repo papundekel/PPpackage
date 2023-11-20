@@ -141,11 +141,6 @@ class PackageWithDependencies:
     dependencies: Iterable[Dependency]
 
 
-class FetchInput(BaseModel):
-    options: Options
-    packages: Iterable[PackageWithDependencies]
-
-
 @dataclass(frozen=True)
 class ManagerRequirement:
     manager: str

@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from sys import stderr
 
@@ -21,13 +21,13 @@ def process_product_id(line: str):
 async def fetch(
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
+    packages: AsyncIterable[PackageWithDependencies],
 ) -> Iterable[FetchOutputValue]:
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
 
-    package_names = [package.name for package in packages]
+    package_names = [package.name async for package in packages]
 
     async with fakeroot() as environment:
         process = create_subprocess_exec(

@@ -9,9 +9,9 @@ from typing import Any, TypeVar
 from typer import Typer
 
 from .parse import (
-    FetchInput,
     FetchOutputValue,
     GenerateInput,
+    Options,
     PackageWithDependencies,
     Product,
     ResolutionGraph,
@@ -67,7 +67,7 @@ def init(
         Awaitable[Iterable[ResolutionGraph]],
     ],
     fetch_callback: Callable[
-        [Path, Any, Iterable[PackageWithDependencies]],
+        [Path, Any, AsyncIterable[PackageWithDependencies]],
         Awaitable[Iterable[FetchOutputValue]],
     ],
     generate_callback: Callable[
@@ -108,9 +108,10 @@ def init(
     async def fetch(cache_path: Path) -> None:
         stdin, stdout = await get_standard_streams()
 
-        input = await model_validate_stream(__debug, stdin, FetchInput)
+        options = await model_validate_stream(__debug, stdin, Options)
+        packages = models_validate_stream(__debug, stdin, PackageWithDependencies)
 
-        output = await fetch_callback(cache_path, input.options, input.packages)
+        output = await fetch_callback(cache_path, options, packages)
 
         model_dump_stream(__debug, stdout, output)
         await stdout.drain()

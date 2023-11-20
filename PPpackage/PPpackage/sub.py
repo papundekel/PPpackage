@@ -1,15 +1,16 @@
-from collections.abc import Hashable, Iterable, Set
+from collections.abc import AsyncIterable, Hashable, Iterable, Set
 from pathlib import Path
 from sys import stderr
+from tkinter import Pack
 from typing import Any, cast
 
 from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
-    FetchInput,
     FetchOutput,
     FetchOutputValue,
     ManagerRequirement,
     Options,
+    PackageWithDependencies,
     Product,
     ResolutionGraph,
     ResolutionGraphNode,
@@ -78,7 +79,8 @@ async def fetch(
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    input: FetchInput,
+    options: Options,
+    packages: Iterable[PackageWithDependencies],
 ) -> FetchOutput:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
@@ -133,7 +135,7 @@ async def fetch(
 
     return [
         FetchOutputValue(name=package.name, product_id="id", product_info=None)
-        for package in input.packages
+        for package in packages
     ]
 
 

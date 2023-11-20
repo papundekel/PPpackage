@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
@@ -29,7 +29,7 @@ async def fetch(
     templates_path: Path,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
+    packages: AsyncIterable[PackageWithDependencies],
 ) -> Iterable[FetchOutputValue]:
     cache_path = get_cache_path(cache_path)
 
@@ -45,7 +45,7 @@ async def fetch(
 
     requirements = []
 
-    for package in packages:
+    async for package in packages:
         requirements.append((package.name, package.version))
 
         for dependency in package.dependencies:
