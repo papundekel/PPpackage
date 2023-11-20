@@ -56,18 +56,13 @@ async def resolve_external_manager(
         process.stdin,
         ResolveInput[Any](options=options, requirements_list=requirements_list),
     )
+
+    output = model_validate_stream(debug, process.stdout, Iterable[ResolutionGraph])
+
     await process.stdin.drain()
+    await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
-    await asubprocess_wait(
-        process,
-        f"Error in {manager}'s resolve.",
-    )
-
-    output = await model_validate_stream(
-        debug, process.stdout, Iterable[ResolutionGraph]
-    )
-
-    return output
+    return await output
 
 
 async def resolve_manager(

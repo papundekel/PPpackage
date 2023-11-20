@@ -31,6 +31,7 @@ async def generate_external_manager(
         stdout=PIPE,
         stderr=None,
     )
+
     assert process.stdin is not None
     assert process.stdout is not None
 
@@ -39,8 +40,8 @@ async def generate_external_manager(
         process.stdin,
         GenerateInput(options=options, products=products, generators=generators),
     )
-    await process.stdin.drain()
 
+    await process.stdin.drain()
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
 
 

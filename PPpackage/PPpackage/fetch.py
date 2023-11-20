@@ -41,11 +41,13 @@ async def fetch_external_manager(
     assert process.stdout is not None
 
     model_dump_stream(debug, process.stdin, input)
-    await process.stdin.drain()
 
+    output = model_validate_stream(debug, process.stdout, FetchOutput)
+
+    await process.stdin.drain()
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
-    return await model_validate_stream(debug, process.stdout, FetchOutput)
+    return await output
 
 
 async def fetch_manager(
