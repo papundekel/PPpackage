@@ -132,7 +132,7 @@ async def resolve(cache_path: Path, input: ResolveInput[str]) -> Set[ResolutionG
 
     graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
 
-    roots = tuple(frozenset([root for _, root in graphs]) for graphs in graphs_list)
+    roots = [frozenset([root for _, root in graphs]) for graphs in graphs_list]
 
     versions_task = resolve_versions(
         database_path,

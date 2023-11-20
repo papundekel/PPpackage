@@ -55,13 +55,14 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def parse_conan_graph_nodes(
+    debug: bool,
     NodeType: type[T],
     conan_graph_json_bytes: bytes,
 ) -> Mapping[str, T]:
     conan_graph = model_validate(False, ConanGraph, conan_graph_json_bytes)
 
     return {
-        node_id: model_validate_obj(NodeType, node_json)
+        node_id: model_validate_obj(debug, NodeType, node_json)
         for node_id, node_json in conan_graph.graph.nodes.items()
         if node_id != "0"
     }

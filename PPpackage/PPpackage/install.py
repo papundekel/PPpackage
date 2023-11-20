@@ -20,7 +20,7 @@ from PPpackage_utils.io import (
     stream_write_string,
     stream_write_strings,
 )
-from PPpackage_utils.parse import InstallInput, Product, model_dump
+from PPpackage_utils.parse import Product, model_dump
 from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
 
 from .sub import install as PP_install
@@ -96,7 +96,7 @@ async def install_external_manager(
             stderr=None,
         )
 
-        input_json_bytes = model_dump(debug, InstallInput(products))
+        input_json_bytes = model_dump(debug, products)
 
         process = await process_creation
 

@@ -83,9 +83,9 @@ async def get_fakeroot_info():
             await process_creation, "Error in `fakeroot`."
         )
 
-        ld_library_path, ld_preload = tuple(
-            [line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()]
-        )
+        ld_library_path, ld_preload = [
+            line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()
+        ]
 
         _fakeroot_info = FakerootInfo(ld_library_path, ld_preload)
 
@@ -109,7 +109,7 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
             await process_creation, "Error in `faked`."
         )
 
-        key, pid_string = tuple(faked_stdout.decode("ascii").strip().split(":"))
+        key, pid_string = faked_stdout.decode("ascii").strip().split(":")
 
         pid = int(pid_string)
 

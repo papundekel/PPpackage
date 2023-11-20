@@ -71,4 +71,4 @@ async def fetch(
 
         output[package] = FetchOutputValue(product_id=product_id, product_info=None)
 
-    return FetchOutput(output)
+    return output

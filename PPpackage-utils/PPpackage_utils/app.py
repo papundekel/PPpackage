@@ -16,7 +16,6 @@ from PPpackage_utils.parse import (
     model_dump,
     model_validate,
 )
-from pydantic import RootModel
 from typer import Typer
 
 from .parse import Product, ResolutionGraph
@@ -91,7 +90,7 @@ def init(
 
         output = await resolve_callback(cache_path, input)
 
-        output_json_bytes = model_dump(__debug, RootModel[Set[ResolutionGraph]](output))
+        output_json_bytes = model_dump(__debug, output)
 
         stdout.buffer.write(output_json_bytes)
 
@@ -139,7 +138,7 @@ def init(
             destination_path,
             pipe_from_sub_path,
             pipe_to_sub_path,
-            input.root,
+            input,
         )
 
     return __app

@@ -28,12 +28,10 @@ from PPpackage_utils.io import (
     stream_read_string,
     stream_read_strings,
     stream_write_int,
-    stream_write_line,
     stream_write_string,
 )
 from PPpackage_utils.parse import model_dump_stream
 from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
-from pydantic import RootModel
 from typer import Exit
 
 

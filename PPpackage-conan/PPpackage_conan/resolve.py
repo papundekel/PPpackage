@@ -139,10 +139,12 @@ def parse_direct_dependencies(nodes: Mapping[str, ResolveNode], node: ResolveNod
             yield nodes[dependency_id].name
 
 
-def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
+def parse_conan_graph_resolve(
+    debug: bool, conan_graph_json_bytes: bytes
+) -> ResolutionGraph:
     requirement_prefix = "requirement-"
 
-    nodes = parse_conan_graph_nodes(ResolveNode, conan_graph_json_bytes)
+    nodes = parse_conan_graph_nodes(debug, ResolveNode, conan_graph_json_bytes)
 
     roots_unsorted: Sequence[tuple[int, Set[Any]]] = []
     graph: MutableMapping[str, ResolutionGraphNodeValue] = {}
@@ -171,14 +173,13 @@ def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
                 frozendict(),
             )
 
-    roots = tuple(
-        [root for _, root in sorted(roots_unsorted, key=lambda pair: pair[0])]
-    )
+    roots = [root for _, root in sorted(roots_unsorted, key=lambda pair: pair[0])]
 
     return ResolutionGraph(roots, frozendict(graph))
 
 
 async def create_graph(
+    debug: bool,
     environment: Mapping[str, str],
     root_template: Jinja2Template,
     profile_template: Jinja2Template,
@@ -217,12 +218,13 @@ async def create_graph(
             await process, "Error in `conan graph info`"
         )
 
-    graph = parse_conan_graph_resolve(conan_graph_json_bytes)
+    graph = parse_conan_graph_resolve(debug, conan_graph_json_bytes)
 
     return graph
 
 
 async def resolve(
+    debug: bool,
     templates_path: Path,
     cache_path: Path,
     input: ResolveInput[Requirement],
@@ -264,6 +266,7 @@ async def resolve(
         await requirement_task
 
     graph = await create_graph(
+        debug,
         environment,
         root_template,
         profile_template,

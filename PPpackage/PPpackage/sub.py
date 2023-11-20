@@ -1,10 +1,9 @@
-from collections.abc import Hashable, Iterable, Mapping, Sequence, Set
+from collections.abc import Hashable, Iterable, Set
 from pathlib import Path
 from sys import stderr
 from typing import Any, cast
 
 from PPpackage_utils.io import (
-    stream_read_line,
     stream_write_line,
     stream_write_string,
     stream_write_strings,
@@ -21,7 +20,6 @@ from PPpackage_utils.parse import (
     model_validate_stream,
 )
 from PPpackage_utils.utils import MyException, TemporaryPipe, frozendict
-from pydantic import RootModel
 
 from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
 
@@ -31,24 +29,24 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 
 def check_requirements_list(
-    requirements_list: Sequence[Set[Hashable]],
-) -> tuple[Set[str], ...]:
+    requirements_list: Iterable[Set[Hashable]],
+) -> Iterable[Set[str]]:
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
                 raise MyException("PPpackage: Requirements must be strings.")
 
-    return tuple(cast(Sequence[Set[str]], requirements_list))
+    return cast(Iterable[Set[str]], requirements_list)
 
 
 async def resolve(
     debug: bool,
     cache_path: Path,
     input: ResolveInput[Any],
-) -> Set[ResolutionGraph]:
+) -> Iterable[ResolutionGraph]:
     requirements_list = check_requirements_list(input.requirements_list)
 
-    requirements_merged = frozenset.union(frozenset(), *requirements_list)
+    requirements_merged = frozenset[str]().union(*requirements_list)
 
     graph = frozendict(
         {
@@ -64,7 +62,7 @@ async def resolve(
         graph,
     )
 
-    return frozenset([resolve_graph])
+    return [resolve_graph]
 
 
 async def fetch(
@@ -135,7 +133,7 @@ async def fetch(
         for name in input.packages.keys()
     }
 
-    return FetchOutput(output)
+    return output
 
 
 async def generate(

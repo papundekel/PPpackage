@@ -24,6 +24,7 @@ from .utils import (
 
 
 async def fetch(
+    debug: bool,
     templates_path: Path,
     cache_path: Path,
     input: FetchInput,
@@ -46,7 +47,7 @@ async def fetch(
         packages.append((package, value.version))
 
     for package, product_info_raw in input.product_infos.get("conan", {}).items():
-        product_info = model_validate_obj(FetchProductInfo, product_info_raw)
+        product_info = model_validate_obj(debug, FetchProductInfo, product_info_raw)
         packages.append((package, product_info.version))
 
     with (
@@ -80,7 +81,7 @@ async def fetch(
             await process, "Error in `conan install`"
         )
 
-    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
+    nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
     output = {
         node.name: FetchOutputValue(
@@ -92,4 +93,4 @@ async def fetch(
         for node in nodes.values()
     }
 
-    return FetchOutput(output)
+    return output

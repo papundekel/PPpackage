@@ -14,8 +14,8 @@ def main():
 
     app = init(
         anoop,
-        lambda cache_path, input: resolve(data_path, cache_path, input),
-        lambda cache_path, input: fetch(data_path, cache_path, input),
+        lambda cache_path, input: resolve(False, data_path, cache_path, input),
+        lambda cache_path, input: fetch(False, data_path, cache_path, input),
         lambda cache_path, generators, generators_path, options, packages: generate(
             data_path,
             deployer_path,

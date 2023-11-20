@@ -1,13 +1,11 @@
-import json
 from asyncio import StreamReader, StreamWriter
-from collections.abc import AsyncIterable, Hashable, Mapping, Set
+from collections.abc import AsyncIterable, Hashable, Iterable, Mapping, Set
 from contextlib import contextmanager
-from email import contentmanager
-from lib2to3.pytree import Base
-from re import M
+from inspect import isclass
+from json import dumps as json_dumps
+from json import loads as json_loads
 from sys import stderr
-from textwrap import indent
-from typing import Annotated, Any, Generic, Sequence, TypeGuard, TypeVar, get_args
+from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
 from pydantic import (
@@ -54,7 +52,9 @@ ModelType = TypeVar("ModelType")
 def model_validate_obj(
     debug: bool, Model: type[ModelType], input_json: Any
 ) -> ModelType:
-    ModelWrapped = Model if issubclass(Model, BaseModel) else RootModel[ModelType]
+    ModelWrapped = (
+        Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
+    )
 
     try:
         input = ModelWrapped.model_validate(input_json)
@@ -62,10 +62,10 @@ def model_validate_obj(
         if isinstance(input, RootModel):
             return input.root
         else:
-            return input
+            return input  # type: ignore
 
     except ValidationError as e:
-        input_json_string = json.dumps(input_json, indent=4 if debug else None)
+        input_json_string = json_dumps(input_json, indent=4 if debug else None)
 
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
@@ -75,13 +75,15 @@ def model_validate(
 ) -> ModelType:
     input_json_string = input_json_bytes.decode("utf-8")
 
-    input_json = json.loads(input_json_string)
+    input_json = json_loads(input_json_string)
 
     return model_validate_obj(debug, Model, input_json)
 
 
-def model_dump(debug: bool, output: BaseModel) -> bytes:
-    output_json_string = output.model_dump_json(indent=4 if debug else None)
+def model_dump(debug: bool, output: BaseModel | Any) -> bytes:
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
 
     if debug:
         print(f"DEBUG model_dump:\n{output_json_string}", file=stderr)
@@ -115,7 +117,7 @@ class FetchOutputValue(BaseModel):
     product_info: Any
 
 
-FetchOutput = RootModel[Mapping[str, FetchOutputValue]]
+FetchOutput = Mapping[str, FetchOutputValue]
 
 
 class FetchInputPackageValue(BaseModel):
@@ -136,7 +138,7 @@ class Product:
     product_id: str
 
 
-InstallInput = RootModel[Set[Product]]
+InstallInput = Set[Product]
 
 
 FrozenDictAnnotated = Annotated[
@@ -153,16 +155,14 @@ class ResolutionGraphNodeValue:
 
 @dataclass(frozen=True)
 class ResolutionGraph:
-    roots: tuple[Set[str], ...]
+    roots: Iterable[Set[str]]
     graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]
 
 
 def model_dump_stream(
     debug: bool, writer: StreamWriter, output: BaseModel | Any
 ) -> None:
-    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
-
-    output_json_bytes = model_dump(debug, output_wrapped)
+    output_json_bytes = model_dump(debug, output)
 
     writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
     writer.write(output_json_bytes)

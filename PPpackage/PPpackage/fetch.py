@@ -137,7 +137,7 @@ async def fetch(
             }
 
         for manager, task in manager_tasks.items():
-            for package, value in task.result().root.items():
+            for package, value in task.result().items():
                 outputs.setdefault(manager, {})[package] = value
 
     return outputs
