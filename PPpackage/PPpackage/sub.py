@@ -131,12 +131,10 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    return FetchOutput(
-        [
-            FetchOutputValue(name=package.name, product_id="id", product_info=None)
-            for package in input.packages
-        ]
-    )
+    return [
+        FetchOutputValue(name=package.name, product_id="id", product_info=None)
+        for package in input.packages
+    ]
 
 
 async def generate(

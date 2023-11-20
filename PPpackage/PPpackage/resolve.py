@@ -5,6 +5,7 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
+    MutableSequence,
     MutableSet,
     Sequence,
     Set,

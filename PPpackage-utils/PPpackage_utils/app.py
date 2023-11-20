@@ -113,7 +113,7 @@ def init(
 
         output = await fetch_callback(cache_path, input.options, input.packages)
 
-        output_json_bytes = model_dump(__debug, FetchOutput(output))
+        output_json_bytes = model_dump(__debug, output)
 
         stdout.buffer.write(output_json_bytes)
 

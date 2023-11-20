@@ -142,7 +142,7 @@ class FetchOutputValue(FetchOutputValueBase):
     name: str
 
 
-FetchOutput = RootModel[Iterable[FetchOutputValue]]
+FetchOutput = Iterable[FetchOutputValue]
 
 
 @dataclass(frozen=True)
@@ -168,7 +168,7 @@ class FetchInput(BaseModel):
     packages: Iterable[PackageWithDependencies]
 
 
-InstallInput = RootModel[Iterable[Product]]
+InstallInput = Iterable[Product]
 
 
 @dataclass(frozen=True)
@@ -187,8 +187,8 @@ class ResolutionGraphNode:
 
 @dataclass(frozen=True)
 class ResolutionGraph:
-    roots: Iterable[Set[str]]
-    graph: FrozenDictAnnotated[str, ResolutionGraphNodeValue]
+    roots: Iterable[Iterable[str]]
+    graph: Iterable[ResolutionGraphNode]
 
 
 def model_dump_stream(
