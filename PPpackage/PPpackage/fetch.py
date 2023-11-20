@@ -1,4 +1,4 @@
-from asyncio import TaskGroup
+from asyncio import StreamWriter, TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSet
 from functools import partial
@@ -22,6 +22,16 @@ from PPpackage_utils.utils import asubprocess_wait
 from .sub import fetch as PP_fetch
 
 
+async def fetch_external_send_input(
+    debug: bool,
+    input: StreamWriter,
+    options: Options,
+    packages: Iterable[PackageWithDependencies],
+):
+    await model_dump_stream(debug, input, options)
+    await models_dump_stream(debug, input, packages)
+
+
 async def fetch_external_manager(
     debug: bool,
     manager: str,
@@ -42,14 +52,13 @@ async def fetch_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    await model_dump_stream(debug, process.stdin, options)
-    await models_dump_stream(debug, process.stdin, packages)
+    input_task = fetch_external_send_input(debug, process.stdin, options, packages)
+    output_task = model_validate_stream(debug, process.stdout, FetchOutput)
 
-    output = model_validate_stream(debug, process.stdout, FetchOutput)
-
+    await input_task
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
-    return await output
+    return await output_task
 
 
 async def fetch_manager(

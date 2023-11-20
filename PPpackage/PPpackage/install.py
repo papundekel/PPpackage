@@ -97,6 +97,7 @@ async def install_external_manager(
             stdout=DEVNULL,
             stderr=None,
         )
+        
         assert process.stdin is not None
 
         await models_dump_stream(debug, process.stdin, products)

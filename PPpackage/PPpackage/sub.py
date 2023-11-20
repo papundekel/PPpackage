@@ -22,7 +22,6 @@ from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
     TemporaryPipe,
-    frozendict,
 )
 
 from .utils import machine_id_relative_path, read_machine_id
