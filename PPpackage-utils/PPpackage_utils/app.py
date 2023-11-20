@@ -1,5 +1,5 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -12,13 +12,13 @@ from .parse import (
     FetchInput,
     FetchOutputValue,
     GenerateInput,
-    InstallInput,
     PackageWithDependencies,
     Product,
     ResolutionGraph,
     ResolveInput,
     model_dump_stream,
     model_validate_stream,
+    models_validate_stream,
 )
 from .utils import MyException, ensure_dir_exists, get_standard_streams
 
@@ -81,7 +81,7 @@ def init(
         Awaitable[None],
     ],
     install_callback: Callable[
-        [Path, Path, Path, Path, Iterable[Product]], Awaitable[None]
+        [Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
     ],
     RequirementType: type[RequirementTypeType],
 ) -> Typer:
@@ -140,14 +140,14 @@ def init(
 
         stdin, _ = await get_standard_streams()
 
-        input = await model_validate_stream(__debug, stdin, InstallInput)
+        products = models_validate_stream(__debug, stdin, Product)
 
         await install_callback(
             cache_path,
             destination_path,
             pipe_from_sub_path,
             pipe_to_sub_path,
-            input,
+            products,
         )
 
     return __app

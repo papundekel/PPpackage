@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 from shutil import copytree, rmtree
 
@@ -41,7 +41,7 @@ async def install(
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
-    products: Iterable[Product],
+    products: AsyncIterable[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -53,7 +53,7 @@ async def install(
         rmtree(destination_path)
 
     async with TaskGroup() as group:
-        for product in products:
+        async for product in products:
             group.create_task(install_product(environment, destination_path, product))
 
     with communicate_from_sub(pipe_from_sub_path), open(pipe_to_sub_path, "r"):

@@ -82,16 +82,6 @@ def model_validate(
     return model_validate_obj(False, Model, input_json)
 
 
-def model_dump(debug: bool, output: BaseModel | Any) -> bytes:
-    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
-
-    output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
-
-    output_json_bytes = output_json_string.encode("utf-8")
-
-    return output_json_bytes
-
-
 Requirement = TypeVar("Requirement")
 
 Options = Mapping[str, Any] | None
@@ -156,9 +146,6 @@ class FetchInput(BaseModel):
     packages: Iterable[PackageWithDependencies]
 
 
-InstallInput = Iterable[Product]
-
-
 @dataclass(frozen=True)
 class ManagerRequirement:
     manager: str
@@ -182,7 +169,11 @@ class ResolutionGraph:
 def model_dump_stream(
     debug: bool, writer: StreamWriter, output: BaseModel | Any
 ) -> None:
-    output_json_bytes = model_dump(debug, output)
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
+
+    output_json_bytes = output_json_string.encode("utf-8")
 
     writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
     writer.write(output_json_bytes)
