@@ -8,11 +8,11 @@ from PPpackage_utils.parse import (
     FetchInput,
     FetchOutput,
     FetchOutputValue,
-    GenerateInput,
+    ManagerRequirement,
+    Options,
     Product,
     ResolutionGraph,
-    ResolutionGraphNodeValue,
-    ResolveInput,
+    ResolutionGraphNode,
     model_dump_stream,
     model_validate_stream,
     models_dump_stream,
@@ -33,33 +33,37 @@ async def update_database(debug: bool, cache_path: Path) -> None:
 
 
 def check_requirements_list(
-    requirements_list: Iterable[Set[Hashable]],
-) -> Iterable[Set[str]]:
+    requirements_list: Iterable[Iterable[Any]],
+) -> Iterable[Iterable[str]]:
+    requirements_list = list(requirements_list)
+
     for requirements in requirements_list:
         for requirement in requirements:
             if not isinstance(requirement, str):
                 raise MyException("PPpackage: Requirements must be strings.")
 
-    return cast(Iterable[Set[str]], requirements_list)
+    return cast(Iterable[Iterable[str]], requirements_list)
 
 
 async def resolve(
     debug: bool,
     cache_path: Path,
-    input: ResolveInput[Any],
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
 ) -> Iterable[ResolutionGraph]:
-    requirements_list = check_requirements_list(input.requirements_list)
+    requirements_list = check_requirements_list(requirements_list)
 
-    requirements_merged = frozenset[str]().union(*requirements_list)
+    requirements_merged = set.union(set(), *requirements_list)
 
-    graph = frozendict(
-        {
-            name: ResolutionGraphNodeValue(
-                "1.0.0", frozenset(), frozendict({"arch": frozenset(["iana-etc"])})
-            )
-            for name in requirements_merged
-        }
-    )
+    graph = [
+        ResolutionGraphNode(
+            name,
+            "1.0.0",
+            [],
+            [ManagerRequirement(manager="arch", requirement="iana-etc")],
+        )
+        for name in requirements_merged
+    ]
 
     resolve_graph = ResolutionGraph(
         requirements_list,
@@ -127,16 +131,21 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    output = {
-        name: FetchOutputValue(product_id="id", product_info=None)
-        for name in input.packages.keys()
-    }
-
-    return output
+    return FetchOutput(
+        [
+            FetchOutputValue(name=package.name, product_id="id", product_info=None)
+            for package in input.packages
+        ]
+    )
 
 
 async def generate(
-    debug: bool, cache_path: Path, generators_path: Path, input: GenerateInput
+    debug: bool,
+    cache_path: Path,
+    generators_path: Path,
+    options: Options,
+    products: Iterable[Product],
+    generators: Iterable[str],
 ) -> None:
     pass
 
@@ -145,12 +154,12 @@ async def install(
     debug: bool,
     cache_path: Path,
     destination_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     products_path = destination_path / "PP"
 
     products_path.mkdir(exist_ok=True)
 
     for product in products:
-        product_path = products_path / product.package
+        product_path = products_path / product.name
         product_path.write_text(f"{product.version} {product.product_id}")

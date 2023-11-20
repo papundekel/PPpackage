@@ -5,7 +5,6 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
-    MutableSequence,
     MutableSet,
     Sequence,
     Set,
@@ -19,8 +18,9 @@ from typing import Any
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_utils.parse import (
+    ManagerRequirement,
+    Options,
     ResolutionGraph,
-    ResolutionGraphNodeValue,
     ResolveInput,
     model_dump,
     model_validate,
@@ -34,7 +34,8 @@ async def resolve_external_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    input: ResolveInput[Any],
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
 ) -> Iterable[ResolutionGraph]:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -46,7 +47,9 @@ async def resolve_external_manager(
         stderr=None,
     )
 
-    input_json_bytes = model_dump(debug, input)
+    input_json_bytes = model_dump(
+        debug, ResolveInput[Any](options=options, requirements_list=requirements_list)
+    )
 
     output_json_bytes = await asubprocess_communicate(
         process,
@@ -63,7 +66,8 @@ async def resolve_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
-    input: ResolveInput[Any],
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
 ) -> Iterable[ResolutionGraph]:
     if manager == "PP":
         resolver = PP_resolve
@@ -73,16 +77,24 @@ async def resolve_manager(
     resolutions = await resolver(
         debug=debug,
         cache_path=cache_path,
-        input=input,
+        options=options,
+        requirements_list=requirements_list,
     )
 
     return resolutions
 
 
 @dataclass(frozen=True)
+class WorkGraphNodeValue:
+    version: str
+    dependencies: Set[str]
+    requirements: Mapping[str, frozenset[Any]]
+
+
+@dataclass(frozen=True)
 class WorkGraph:
     roots: Mapping[frozenset[Hashable], Set[str]]
-    graph: Mapping[str, ResolutionGraphNodeValue]
+    graph: Mapping[str, WorkGraphNodeValue]
 
 
 def get_resolved_requirements(
@@ -107,17 +119,43 @@ def get_all_requirements(
     return frozendict(all_requirements)
 
 
+def process_manager_requirements(
+    manager_requirements: Iterable[ManagerRequirement],
+) -> Mapping[str, frozenset[Any]]:
+    result: MutableMapping[str, MutableSet[Any]] = {}
+
+    for manager_requirement in manager_requirements:
+        result.setdefault(manager_requirement.manager, set()).add(
+            manager_requirement.requirement
+        )
+
+    return {
+        manager: frozenset(requirements) for manager, requirements in result.items()
+    }
+
+
 def make_graph(
     requirements_list: Sequence[Set[Hashable]], resolution_graph: ResolutionGraph
 ) -> WorkGraph:
     roots = frozendict(
         {
-            frozenset(requirements): roots
+            frozenset(requirements): frozenset(roots)
             for requirements, roots in zip(requirements_list, resolution_graph.roots)
         }
     )
 
-    return WorkGraph(roots, resolution_graph.graph)
+    graph = frozendict(
+        {
+            node.name: WorkGraphNodeValue(
+                node.version,
+                frozenset(node.dependencies),
+                frozendict(process_manager_requirements(node.requirements)),
+            )
+            for node in resolution_graph.graph
+        }
+    )
+
+    return WorkGraph(roots, graph)
 
 
 async def resolve_iteration(
@@ -137,13 +175,11 @@ async def resolve_iteration(
                 requirements_list,
                 group.create_task(
                     resolve_manager(
-                        debug=debug,
-                        manager=manager,
-                        cache_path=cache_path,
-                        input=ResolveInput[Any](
-                            requirements_list=requirements_list,
-                            options=meta_options.get(manager),
-                        ),
+                        debug,
+                        manager,
+                        cache_path,
+                        meta_options.get(manager),
+                        requirements_list,
                     )
                 ),
             )

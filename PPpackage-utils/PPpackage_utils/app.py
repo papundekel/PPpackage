@@ -1,24 +1,27 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Mapping, Set
+from collections.abc import Awaitable, Callable, Iterable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import exit, stderr, stdin, stdout
 from typing import Any, TypeVar
 
-from PPpackage_utils.parse import (
+from pydantic import RootModel
+from typer import Typer
+
+from .parse import (
     FetchInput,
     FetchOutput,
+    FetchOutputValue,
     GenerateInput,
-    GenerateInputPackagesValue,
     InstallInput,
+    PackageWithDependencies,
+    Product,
+    ResolutionGraph,
     ResolveInput,
     model_dump,
     model_validate,
 )
-from typer import Typer
-
-from .parse import Product, ResolutionGraph
 from .utils import MyException, ensure_dir_exists
 
 
@@ -56,27 +59,33 @@ def callback(debug: bool = False) -> None:
     __debug = debug
 
 
-T = TypeVar("T")
+RequirementTypeType = TypeVar("RequirementTypeType")
 
 
 def init(
     update_database_callback: Callable[[Path], Awaitable[None]],
     resolve_callback: Callable[
-        [Path, ResolveInput[T]], Awaitable[Set[ResolutionGraph]]
+        [Path, Any, Iterable[Iterable[RequirementTypeType]]],
+        Awaitable[Iterable[ResolutionGraph]],
     ],
-    fetch_callback: Callable[[Path, FetchInput], Awaitable[FetchOutput]],
+    fetch_callback: Callable[
+        [Path, Any, Iterable[PackageWithDependencies]],
+        Awaitable[Iterable[FetchOutputValue]],
+    ],
     generate_callback: Callable[
         [
             Path,
-            Set[str],
             Path,
             Any,
-            Mapping[str, GenerateInputPackagesValue],
+            Iterable[Product],
+            Iterable[str],
         ],
         Awaitable[None],
     ],
-    install_callback: Callable[[Path, Path, Path, Path, Set[Product]], Awaitable[None]],
-    RequirementType: type[T],
+    install_callback: Callable[
+        [Path, Path, Path, Path, Iterable[Product]], Awaitable[None]
+    ],
+    RequirementType: type[RequirementTypeType],
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
@@ -88,7 +97,9 @@ def init(
 
         input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
 
-        output = await resolve_callback(cache_path, input)
+        output = await resolve_callback(
+            cache_path, input.options, input.requirements_list
+        )
 
         output_json_bytes = model_dump(__debug, output)
 
@@ -100,9 +111,9 @@ def init(
 
         input = model_validate(__debug, FetchInput, input_json_bytes)
 
-        output = await fetch_callback(cache_path, input)
+        output = await fetch_callback(cache_path, input.options, input.packages)
 
-        output_json_bytes = model_dump(__debug, output)
+        output_json_bytes = model_dump(__debug, FetchOutput(output))
 
         stdout.buffer.write(output_json_bytes)
 
@@ -114,10 +125,10 @@ def init(
 
         await generate_callback(
             cache_path,
-            input.generators,
             generators_path,
             input.options,
-            input.packages,
+            input.products,
+            input.generators,
         )
 
     @__app.command()

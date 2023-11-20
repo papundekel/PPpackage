@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, Set
+from collections.abc import Iterable, Mapping, Set
 from functools import partial
 from io import TextIOWrapper
 from os import listdir
@@ -79,7 +79,7 @@ async def install_external_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
         if debug:
@@ -152,7 +152,7 @@ async def install_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     if manager == "PP":
         installer = partial(
@@ -189,7 +189,7 @@ async def install(
     runner_path: Path,
     runner_workdir_path: Path,
     destination_path: Path,
-    meta_products: Mapping[str, Set[Product]],
+    meta_products: Mapping[str, Iterable[Product]],
 ) -> None:
     workdir_relative_path = Path("root")
 

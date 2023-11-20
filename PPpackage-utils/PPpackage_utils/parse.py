@@ -1,11 +1,11 @@
 from asyncio import StreamReader, StreamWriter
-from collections.abc import AsyncIterable, Generator, Hashable, Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from inspect import isclass
 from json import dumps as json_dumps
 from json import loads as json_loads
 from sys import stderr
-from typing import Annotated, Any, Generic, Sequence, TypeVar, get_args
+from typing import Annotated, Any, Generic, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
 from pydantic import (
@@ -106,62 +106,83 @@ def model_dump(debug: bool, output: BaseModel | Any) -> bytes:
 
 Requirement = TypeVar("Requirement")
 
+Options = Mapping[str, Any] | None
+
 
 class ResolveInput(BaseModel, Generic[Requirement]):
-    requirements_list: Sequence[Set[Requirement]]
-    options: Mapping[str, Any] | None
+    options: Options
+    requirements_list: Iterable[Iterable[Requirement]]
 
 
-class GenerateInputPackagesValue(BaseModel):
+@dataclass(frozen=True)
+class ProductBase:
     version: str
     product_id: str
 
 
+@dataclass(frozen=True)
+class Product(ProductBase):
+    name: str
+
+
 class GenerateInput(BaseModel):
-    generators: Set[str]
-    packages: Mapping[str, GenerateInputPackagesValue]
-    options: Mapping[str, Any] | None
+    options: Options
+    products: Iterable[Product]
+    generators: Iterable[str]
 
 
-class FetchOutputValue(BaseModel):
+@dataclass(frozen=True)
+class FetchOutputValueBase:
     product_id: str
     product_info: Any
 
 
-FetchOutput = Mapping[str, FetchOutputValue]
+@dataclass(frozen=True)
+class FetchOutputValue(FetchOutputValueBase):
+    name: str
 
 
-class FetchInputPackageValue(BaseModel):
+FetchOutput = RootModel[Iterable[FetchOutputValue]]
+
+
+@dataclass(frozen=True)
+class ManagerAndName:
+    manager: str
+    name: str
+
+
+@dataclass(frozen=True)
+class Dependency(ManagerAndName):
+    product_info: Any | None
+
+
+@dataclass(frozen=True)
+class PackageWithDependencies:
+    name: str
     version: str
-    dependencies: Mapping[str, Set[str]]
+    dependencies: Iterable[Dependency]
 
 
 class FetchInput(BaseModel):
-    packages: Mapping[str, FetchInputPackageValue]
-    product_infos: Mapping[str, Mapping[str, Any]]
-    options: Mapping[str, Any] | None
+    options: Options
+    packages: Iterable[PackageWithDependencies]
+
+
+InstallInput = RootModel[Iterable[Product]]
 
 
 @dataclass(frozen=True)
-class Product:
-    package: str
-    version: str
-    product_id: str
-
-
-InstallInput = Set[Product]
-
-
-FrozenDictAnnotated = Annotated[
-    frozendict[Key, Value], FrozenDictAnnotation[Key, Value]()
-]
+class ManagerRequirement:
+    manager: str
+    requirement: Any
 
 
 @dataclass(frozen=True)
-class ResolutionGraphNodeValue:
+class ResolutionGraphNode:
+    name: str
     version: str
-    dependencies: Set[str]
-    requirements: FrozenDictAnnotated[str, frozenset[Hashable]]
+    dependencies: Iterable[str]
+    requirements: Iterable[ManagerRequirement]
 
 
 @dataclass(frozen=True)

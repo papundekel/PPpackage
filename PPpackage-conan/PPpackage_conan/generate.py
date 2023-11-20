@@ -1,13 +1,13 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import GenerateInputPackagesValue
+from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import asubprocess_communicate
 
 from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment
@@ -54,10 +54,10 @@ async def generate(
     templates_path: Path,
     deployer_path: Path,
     cache_path: Path,
-    generators: Set[str],
     generators_path: Path,
     options: Any,
-    packages: Mapping[str, GenerateInputPackagesValue],
+    products: Iterable[Product],
+    generators: Iterable[str],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -78,10 +78,7 @@ async def generate(
         create_and_render_temp_file(
             conanfile_template,
             {
-                "packages": (
-                    (package, attribute.version, attribute.product_id)
-                    for package, attribute in packages.items()
-                ),
+                "packages": products,
                 "generators": generators,
             },
             ".py",

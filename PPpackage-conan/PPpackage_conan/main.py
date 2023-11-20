@@ -14,16 +14,20 @@ def main():
 
     app = init(
         anoop,
-        lambda cache_path, input: resolve(False, data_path, cache_path, input),
-        lambda cache_path, input: fetch(False, data_path, cache_path, input),
-        lambda cache_path, generators, generators_path, options, packages: generate(
+        lambda cache_path, options, requirements_list: resolve(
+            False, data_path, cache_path, options, requirements_list
+        ),
+        lambda cache_path, options, packages: fetch(
+            False, data_path, cache_path, options, packages
+        ),
+        lambda cache_path, generators_path, options, products, generators: generate(
             data_path,
             deployer_path,
             cache_path,
-            generators,
             generators_path,
             options,
-            packages,
+            products,
+            generators,
         ),
         install,
         Requirement,

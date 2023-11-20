@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, Set
+from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
 from shutil import copytree, rmtree
 
@@ -17,7 +17,7 @@ async def install_product(
         "conan",
         "cache",
         "path",
-        f"{product.package}/{product.version}:{product.product_id}",
+        f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
         stderr=None,
@@ -30,7 +30,7 @@ async def install_product(
 
     copytree(
         product_path,
-        destination_path / product.package,
+        destination_path / product.name,
         symlinks=True,
         dirs_exist_ok=True,
     )
@@ -41,7 +41,7 @@ async def install(
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
-    products: Set[Product],
+    products: Iterable[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 

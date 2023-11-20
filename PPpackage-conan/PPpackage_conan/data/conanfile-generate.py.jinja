@@ -8,6 +8,6 @@ class Conan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     def requirements(self):
-        {% for package, version, product_id in packages %}
-        self.requires("{{package}}/{{version}}")
+        {% for package in packages %}
+        self.requires("{{package.name}}/{{package.version}}")
         {% endfor %}
