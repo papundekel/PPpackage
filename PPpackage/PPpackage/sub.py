@@ -88,7 +88,7 @@ async def fetch(
         await dump_one(debug, runner_writer, ImageType.TAG)
         await dump_one(debug, runner_writer, "docker.io/archlinux:latest")
 
-        success = await load_one(runner_reader, bool)
+        success = await load_one(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
@@ -119,7 +119,7 @@ async def fetch(
             with stdout_pipe_path.open("r") as stdout_pipe:
                 print(stdout_pipe.read(), file=stderr)
 
-        success = await load_one(runner_reader, bool)
+        success = await load_one(debug, runner_reader, bool)
 
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")

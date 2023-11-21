@@ -27,6 +27,8 @@ from PPpackage_utils.utils import (
     RunnerRequestType,
     TemporaryDirectory,
     asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
 )
 from typer import Exit
 
@@ -63,16 +65,16 @@ async def handle_command(
     if not container_path.exists():
         return False
 
-    image_path = container_path / await load_one(reader, Path)
+    image_path = container_path / await load_one(debug, reader, Path)
 
-    command = await load_one(reader, str)
-    args = [arg async for arg in load_many(reader, str)]
+    command = await load_one(debug, reader, str)
+    args = [arg async for arg in load_many(debug, reader, str)]
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
-    pipe_path = container_path / await load_one(reader, Path)
+    pipe_path = container_path / await load_one(debug, reader, Path)
 
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
@@ -84,8 +86,8 @@ async def handle_command(
             str(bundle_path),
             "PPpackage-container",
             stdin=pipe,
-            stdout=DEVNULL,
-            stderr=None,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
         )
 
         return_code = await process.wait()
@@ -112,11 +114,11 @@ async def pull_image(
 ) -> Tuple[bool, str | None]:
     match image_type:
         case ImageType.TAG:
-            image = await load_one(reader, str)
+            image = await load_one(debug, reader, str)
             return True, image
 
         case ImageType.DOCKERFILE:
-            dockerfile = await load_one(reader, str)
+            dockerfile = await load_one(debug, reader, str)
 
             process = await create_subprocess_exec(
                 "podman",
@@ -125,8 +127,8 @@ async def pull_image(
                 "pppackage/runner-image",
                 "-",
                 stdin=PIPE,
-                stdout=DEVNULL,
-                stderr=None,
+                stdout=debug_redirect_stdout(debug),
+                stderr=debug_redirect_stderr(debug),
             )
 
             await process.communicate(dockerfile.encode("ascii"))
@@ -141,7 +143,7 @@ async def handle_run(
     writer: StreamWriter,
     container_workdir_path: Path,
 ) -> bool:
-    image_type = await load_one(reader, ImageType)
+    image_type = await load_one(debug, reader, ImageType)
 
     success, image = await pull_image(debug, reader, image_type)
 
@@ -152,20 +154,20 @@ async def handle_run(
 
     image = type_cast(str, image)
 
-    args = [arg async for arg in load_many(reader, str)]
+    args = [arg async for arg in load_many(debug, reader, str)]
 
-    stdin_pipe_path = container_workdir_path / await load_one(reader, Path)
+    stdin_pipe_path = container_workdir_path / await load_one(debug, reader, Path)
 
-    stdout_pipe_path = container_workdir_path / await load_one(reader, Path)
+    stdout_pipe_path = container_workdir_path / await load_one(debug, reader, Path)
 
     mount_source_paths = [
         container_workdir_path / mount_relative_path
-        async for mount_relative_path in load_many(reader, Path)
+        async for mount_relative_path in load_many(debug, reader, Path)
     ]
 
     mount_destination_paths = [
         Path(mount_destination_path_string)
-        async for mount_destination_path_string in load_many(reader, str)
+        async for mount_destination_path_string in load_many(debug, reader, str)
     ]
 
     with stdin_pipe_path.open("r") as stdin_pipe, stdout_pipe_path.open(
@@ -187,7 +189,7 @@ async def handle_run(
                 *args,
                 stdin=stdin_pipe,
                 stdout=stdout_pipe,
-                stderr=None,
+                stderr=debug_redirect_stderr(debug),
             )
         ).wait()
 
@@ -204,11 +206,11 @@ async def handle_connection(
     bundle_path: Path,
     root_path: Path,
 ):
-    container_id = await load_one(reader, str)
+    container_id = await load_one(debug, reader, str)
     container_workdir_path = workdirs_path / container_id
 
     while True:
-        request = await load_one(reader, RunnerRequestType)
+        request = await load_one(debug, reader, RunnerRequestType)
 
         if reader.at_eof():
             break
@@ -258,8 +260,8 @@ async def create_config(debug: bool, bundle_path: Path):
         "--bundle",
         str(bundle_path),
         stdin=DEVNULL,
-        stdout=DEVNULL,
-        stderr=None,
+        stdout=debug_redirect_stdout(debug),
+        stderr=debug_redirect_stderr(debug),
     )
 
     await asubprocess_wait(await process_creation, "Error in `runc spec`.")

@@ -21,6 +21,8 @@ from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import (
     asubprocess_communicate,
     asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
     ensure_dir_exists,
 )
 
@@ -35,6 +37,7 @@ from .utils import (
 
 
 async def export_package(
+    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     **template_context: Any,
@@ -45,8 +48,8 @@ async def export_package(
             "export",
             conanfile.name,
             stdin=DEVNULL,
-            stdout=DEVNULL,
-            stderr=PIPE,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
@@ -54,6 +57,7 @@ async def export_package(
 
 
 async def export_leaf(
+    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     requirement_index: int,
@@ -61,6 +65,7 @@ async def export_leaf(
     requirement_partition: Mapping[str, str],
 ) -> None:
     await export_package(
+        debug,
         environment,
         template,
         requirement_index=requirement_index,
@@ -70,12 +75,14 @@ async def export_leaf(
 
 
 async def export_requirement(
+    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     index: int,
     leaf_indices: Iterable[int],
 ) -> None:
     await export_package(
+        debug,
         environment,
         template,
         index=index,
@@ -84,6 +91,7 @@ async def export_requirement(
 
 
 async def export_leaves(
+    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     requirement_index: int,
@@ -91,31 +99,38 @@ async def export_leaves(
 ) -> None:
     for index, requirement_partition in enumerate(requirement_partitions):
         await export_leaf(
-            environment, template, requirement_index, index, requirement_partition
+            debug,
+            environment,
+            template,
+            requirement_index,
+            index,
+            requirement_partition,
         )
 
 
-async def remove_temporary_packages_from_cache(environment: Mapping[str, str]) -> None:
+async def remove_temporary_packages_from_cache(
+    debug: bool, environment: Mapping[str, str]
+) -> None:
     process = create_subprocess_exec(
         "conan",
         "remove",
         "--confirm",
         "*/1.0.0@pppackage",
         stdin=DEVNULL,
-        stdout=DEVNULL,
-        stderr=None,
+        stdout=debug_redirect_stdout(debug),
+        stderr=debug_redirect_stderr(debug),
         env=environment,
     )
 
     await asubprocess_wait(await process, "Error in `conan remove`")
 
 
-def create_requirement_partitions(
-    requirements: Iterable[Requirement],
+async def create_requirement_partitions(
+    requirements: AsyncIterable[Requirement],
 ) -> Sequence[Mapping[str, str]]:
     requirement_partitions: MutableSequence[MutableMapping[str, str]] = []
 
-    for requirement in requirements:
+    async for requirement in requirements:
         partition_available: Optional[MutableMapping[str, str]] = next(
             (
                 partition
@@ -214,7 +229,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
@@ -232,7 +247,7 @@ async def resolve(
     templates_path: Path,
     cache_path: Path,
     options: Options,
-    requirements_list: AsyncIterable[Iterable[Requirement]],
+    requirements_list: AsyncIterable[AsyncIterable[Requirement]],
 ) -> AsyncIterable[ResolutionGraph]:
     cache_path = get_cache_path(cache_path)
 
@@ -256,13 +271,14 @@ async def resolve(
     requirement_index = 0
 
     async for requirements in requirements_list:
-        requirement_partitions = create_requirement_partitions(requirements)
+        requirement_partitions = await create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
-            environment, leaf_template, requirement_index, requirement_partitions
+            debug, environment, leaf_template, requirement_index, requirement_partitions
         )
 
         requirement_task = export_requirement(
+            debug,
             environment,
             requirement_template,
             requirement_index,
@@ -286,6 +302,6 @@ async def resolve(
         requirements_length,
     )
 
-    await remove_temporary_packages_from_cache(environment)
+    await remove_temporary_packages_from_cache(debug, environment)
 
     yield graph

@@ -14,13 +14,14 @@ def main():
 
     app = init(
         anoop,
-        lambda cache_path, options, requirements_list: resolve(
-            False, data_path, cache_path, options, requirements_list
+        lambda debug, cache_path, options, requirements_list: resolve(
+            debug, data_path, cache_path, options, requirements_list
         ),
-        lambda cache_path, options, packages: fetch(
-            False, data_path, cache_path, options, packages
+        lambda debug, cache_path, options, packages: fetch(
+            debug, data_path, cache_path, options, packages
         ),
-        lambda cache_path, generators_path, options, products, generators: generate(
+        lambda debug, cache_path, generators_path, options, products, generators: generate(
+            debug,
             data_path,
             deployer_path,
             cache_path,

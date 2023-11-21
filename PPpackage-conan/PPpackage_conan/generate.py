@@ -8,7 +8,11 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import asubprocess_wait
+from PPpackage_utils.utils import (
+    asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
+)
 
 from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment
 
@@ -51,6 +55,7 @@ def patch_native_generators(
 
 
 async def generate(
+    debug: bool,
     templates_path: Path,
     deployer_path: Path,
     cache_path: Path,
@@ -103,8 +108,8 @@ async def generate(
             f"--profile:build={build_profile_path}",
             conanfile_file.name,
             stdin=DEVNULL,
-            stdout=DEVNULL,
-            stderr=None,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 

@@ -1,9 +1,10 @@
-from asyncio import StreamWriter
+from asyncio import StreamReader, StreamWriter
 from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from inspect import isclass
 from json import dumps as json_dumps
 from json import loads as json_loads
+from sys import stderr
 from typing import Annotated, Any, Generic, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
@@ -16,8 +17,6 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 from pydantic_core import CoreSchema, core_schema
-
-from .utils import StreamReader
 
 Key = TypeVar("Key")
 Value = TypeVar("Value")
@@ -69,8 +68,13 @@ def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
         raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
 
-def load_bytes(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
-    input_json_string = input_json_bytes.decode("utf-8")
+def load_bytes(
+    debug: bool, Model: type[ModelType], input_json_bytes: bytes
+) -> ModelType:
+    input_json_string = input_json_bytes.decode()
+
+    if False:
+        print(f"load:\n{input_json_string}", file=stderr)
 
     input_json = json_loads(input_json_string)
 
@@ -139,15 +143,31 @@ class ResolutionGraph:
     graph: Iterable[ResolutionGraphNode]
 
 
+def _dump_length(debug: bool, writer: StreamWriter, length: int) -> None:
+    writer.write(f"{length}\n".encode())
+
+    if False:
+        print(f"dump length: {length}", file=stderr)
+
+
 async def dump_one(debug: bool, writer: StreamWriter, output: BaseModel | Any) -> None:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
 
     output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
 
-    output_json_bytes = output_json_string.encode("utf-8")
+    output_json_bytes = output_json_string.encode()
 
-    writer.write(f"{len(output_json_bytes)}\n".encode("utf-8"))
+    _dump_length(debug, writer, len(output_json_bytes))
     writer.write(output_json_bytes)
+
+    if False:
+        print(f"dump:\n{output_json_string}", file=stderr)
+
+    await writer.drain()
+
+
+async def dump_none(debug: bool, writer: StreamWriter) -> None:
+    _dump_length(debug, writer, 0)
 
     await writer.drain()
 
@@ -157,7 +177,7 @@ def dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, Non
     try:
         yield
     finally:
-        writer.write("-1\n".encode("utf-8"))
+        _dump_length(debug, writer, -1)
 
 
 async def dump_many(
@@ -177,28 +197,38 @@ async def dump_many_async(
 
 
 async def load_impl(
-    reader: StreamReader, Model: type[ModelType], length: int
+    debug: bool, reader: StreamReader, Model: type[ModelType], length: int
 ) -> ModelType:
     input_json_bytes = await reader.readexactly(length)
 
-    return load_bytes(Model, input_json_bytes)
+    return load_bytes(debug, Model, input_json_bytes)
 
 
-async def _load_length(reader: StreamReader) -> int:
-    length = int((await reader.readline()).decode("utf-8"))
+async def _load_length(debug: bool, reader: StreamReader) -> int:
+    line_bytes = await reader.readline()
+
+    if len(line_bytes) == 0:
+        raise MyException("Unexpected EOF.")
+
+    length = int(line_bytes.decode().strip())
+
+    if False:
+        print(f"load length: {length}", file=stderr)
 
     return length
 
 
-async def load_one(reader: StreamReader, Model: type[ModelType]) -> ModelType:
-    length = await _load_length(reader)
+async def load_one(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> ModelType:
+    length = await _load_length(debug, reader)
 
-    return await load_impl(reader, Model, length)
+    return await load_impl(debug, reader, Model, length)
 
 
-async def load_many_helper(reader: StreamReader):
+async def load_many_helper(debug: bool, reader: StreamReader):
     while True:
-        length = await _load_length(reader)
+        length = await _load_length(debug, reader)
 
         if length < 0:
             break
@@ -207,7 +237,7 @@ async def load_many_helper(reader: StreamReader):
 
 
 async def load_many(
-    reader: StreamReader, Model: type[ModelType]
+    debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> AsyncIterable[ModelType]:
-    async for length in load_many_helper(reader):
-        yield await load_impl(reader, Model, length)
+    async for length in load_many_helper(debug, reader):
+        yield await load_impl(debug, reader, Model, length)

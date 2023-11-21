@@ -1,5 +1,5 @@
 from asyncio import StreamReader, StreamWriter, TaskGroup
-from asyncio.subprocess import PIPE, create_subprocess_exec
+from asyncio.subprocess import DEVNULL, PIPE, create_subprocess_exec
 from collections.abc import (
     Callable,
     Iterable,
@@ -25,7 +25,7 @@ from PPpackage_utils.parse import (
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import asubprocess_wait
+from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
 from .sub import fetch as PP_fetch
 
@@ -45,7 +45,7 @@ async def fetch_external_manager(
         str(cache_path),
         stdin=PIPE,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
     assert process.stdin is not None
@@ -53,7 +53,7 @@ async def fetch_external_manager(
 
     async with TaskGroup() as group:
         group.create_task(send(debug, process.stdin, options, packages))
-        group.create_task(receive(process.stdout, receiver))
+        group.create_task(receive(debug, process.stdout, receiver))
 
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
@@ -75,10 +75,11 @@ async def send(
 
 
 async def receive(
+    debug: bool,
     reader: StreamReader,
     receiver: Callable[[FetchOutputValue], None],
 ) -> None:
-    async for value in load_many(reader, FetchOutputValue):
+    async for value in load_many(debug, reader, FetchOutputValue):
         receiver(value)
 
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
 from pathlib import Path
+from sys import stderr
 from typing import Any
 
 from frozendict import frozendict
@@ -23,10 +24,12 @@ from PPpackage_utils.parse import (
     Options,
     ResolutionGraph,
     dump_many,
+    dump_many_end,
+    dump_none,
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import MyException, asubprocess_wait
+from PPpackage_utils.utils import MyException, asubprocess_wait, debug_redirect_stderr
 
 from .sub import resolve as PP_resolve
 
@@ -46,15 +49,19 @@ async def resolve_external_manager(
         str(cache_path),
         stdin=PIPE,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
     assert process.stdin is not None
     assert process.stdout is not None
 
-    async with TaskGroup() as group:
-        group.create_task(send(debug, process.stdin, options, requirements_list))
-        group.create_task(receive(process.stdout, receiver))
+    try:
+        async with TaskGroup() as group:
+            group.create_task(send(debug, process.stdin, options, requirements_list))
+            group.create_task(receive(debug, process.stdout, receiver))
+    except* MyException:
+        print(f"Error in {manager}'s resolve.", file=stderr)
+        raise
 
     await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
@@ -66,16 +73,21 @@ async def send(
     requirements_list: Iterable[Iterable[Any]],
 ) -> None:
     await dump_one(debug, writer, options)
-    await dump_many(debug, writer, requirements_list)
+
+    with dump_many_end(debug, writer):
+        for requirements in requirements_list:
+            await dump_none(debug, writer)
+            await dump_many(debug, writer, requirements)
 
     writer.close()
 
 
 async def receive(
+    debug: bool,
     reader: StreamReader,
     receiver: Callable[[ResolutionGraph], None],
 ) -> None:
-    async for value in load_many(reader, ResolutionGraph):
+    async for value in load_many(debug, reader, ResolutionGraph):
         receiver(value)
 
 

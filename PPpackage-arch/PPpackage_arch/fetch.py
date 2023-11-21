@@ -5,7 +5,13 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import Dependency, FetchOutputValue, Options, Package
-from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
+from PPpackage_utils.utils import (
+    asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
+    ensure_dir_exists,
+    fakeroot,
+)
 
 from .utils import get_cache_paths
 
@@ -19,6 +25,7 @@ def process_product_id(line: str):
 
 
 async def fetch(
+    debug: bool,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -35,7 +42,7 @@ async def fetch(
         async for _ in dependencies:
             pass
 
-    async with fakeroot() as environment:
+    async with fakeroot(debug) as environment:
         process = create_subprocess_exec(
             "pacman",
             "--dbpath",
@@ -49,8 +56,8 @@ async def fetch(
             "--nodeps",
             *package_names,
             stdin=DEVNULL,
-            stdout=stderr,
-            stderr=None,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
@@ -70,7 +77,7 @@ async def fetch(
         *package_names,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
     assert process.stdout is not None

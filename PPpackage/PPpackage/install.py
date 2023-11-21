@@ -23,6 +23,7 @@ from PPpackage_utils.utils import (
     RunnerRequestType,
     TemporaryPipe,
     asubprocess_wait,
+    debug_redirect_stderr,
 )
 
 from .sub import install as PP_install
@@ -57,7 +58,7 @@ async def install_manager_command(
             pipe_hook_path.relative_to(daemon_workdir_path),
         )
 
-        return_value = await load_one(daemon_reader, int)
+        return_value = await load_one(debug, daemon_reader, int)
 
         pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()
@@ -90,7 +91,7 @@ async def install_external_manager(
             str(pipe_to_sub_path),
             stdin=PIPE,
             stdout=DEVNULL,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
         )
 
         assert process.stdin is not None
