@@ -1,4 +1,9 @@
-from collections.abc import Iterable, Mapping
+from asyncio import StreamReader, StreamWriter
+from collections.abc import AsyncIterable, Generator, Iterable, Mapping
+from contextlib import contextmanager
+from inspect import isclass
+from json import dumps as json_dumps
+from json import loads as json_loads
 from sys import stderr
 from typing import Annotated, Any, Generic, TypeVar, get_args
 
@@ -41,57 +46,42 @@ def frozen_validator(value: Any) -> Any:
 
 FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
-ModelType = TypeVar("ModelType", bound=BaseModel)
+ModelType = TypeVar("ModelType")
 
 
-def model_validate_obj(Model: type[ModelType], obj: Any) -> ModelType:
+def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
+    ModelWrapped = (
+        Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
+    )
+
     try:
-        input = Model.model_validate(obj)
+        input = ModelWrapped.model_validate(input_json)
 
-        return input
+        if isinstance(input, RootModel):
+            return input.root
+        else:
+            return input  # type: ignore
+
     except ValidationError as e:
-        raise MyException(f"Invalid model format:\n{e}.")
+        input_json_string = json_dumps(input_json, indent=4)
+
+        raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
 
 
-def model_validate(
+def load_bytes(
     debug: bool, Model: type[ModelType], input_json_bytes: bytes
 ) -> ModelType:
-    input_json_string = input_json_bytes.decode("utf-8")
+    input_json_string = input_json_bytes.decode()
 
-    if debug:
-        print(
-            f"DEBUG model_validate {Model}:\n{input_json_string}",
-            file=stderr,
-            flush=True,
-        )
+    if False:
+        print(f"load:\n{input_json_string}", file=stderr)
 
-    try:
-        input = Model.model_validate_json(input_json_string)
+    input_json = json_loads(input_json_string)
 
-        return input
-    except ValidationError as e:
-        raise MyException(f"Invalid model format:\n{e}\n{input_json_string}.")
+    return load_object(Model, input_json)
 
-
-def model_dump(debug: bool, output: BaseModel) -> bytes:
-    output_json_string = output.model_dump_json(indent=4 if debug else None)
-
-    if debug:
-        print(f"DEBUG model_dump:\n{output_json_string}", file=stderr)
-
-    output_json_bytes = output_json_string.encode("utf-8")
-
-    return output_json_bytes
-
-
-Requirement = TypeVar("Requirement")
 
 Options = Mapping[str, Any] | None
-
-
-class ResolveInput(BaseModel, Generic[Requirement]):
-    options: Options
-    requirements_list: Iterable[Iterable[Requirement]]
 
 
 @dataclass(frozen=True)
@@ -105,12 +95,6 @@ class Product(ProductBase):
     name: str
 
 
-class GenerateInput(BaseModel):
-    options: Options
-    products: Iterable[Product]
-    generators: Iterable[str]
-
-
 @dataclass(frozen=True)
 class FetchOutputValueBase:
     product_id: str
@@ -120,9 +104,6 @@ class FetchOutputValueBase:
 @dataclass(frozen=True)
 class FetchOutputValue(FetchOutputValueBase):
     name: str
-
-
-FetchOutput = RootModel[Iterable[FetchOutputValue]]
 
 
 @dataclass(frozen=True)
@@ -137,18 +118,9 @@ class Dependency(ManagerAndName):
 
 
 @dataclass(frozen=True)
-class PackageWithDependencies:
+class Package:
     name: str
     version: str
-    dependencies: Iterable[Dependency]
-
-
-class FetchInput(BaseModel):
-    options: Options
-    packages: Iterable[PackageWithDependencies]
-
-
-InstallInput = RootModel[Iterable[Product]]
 
 
 @dataclass(frozen=True)
@@ -169,3 +141,103 @@ class ResolutionGraphNode:
 class ResolutionGraph:
     roots: Iterable[Iterable[str]]
     graph: Iterable[ResolutionGraphNode]
+
+
+def _dump_length(debug: bool, writer: StreamWriter, length: int) -> None:
+    writer.write(f"{length}\n".encode())
+
+    if False:
+        print(f"dump length: {length}", file=stderr)
+
+
+async def dump_one(debug: bool, writer: StreamWriter, output: BaseModel | Any) -> None:
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
+
+    output_json_bytes = output_json_string.encode()
+
+    _dump_length(debug, writer, len(output_json_bytes))
+    writer.write(output_json_bytes)
+
+    if False:
+        print(f"dump:\n{output_json_string}", file=stderr)
+
+    await writer.drain()
+
+
+async def dump_none(debug: bool, writer: StreamWriter) -> None:
+    _dump_length(debug, writer, 0)
+
+    await writer.drain()
+
+
+@contextmanager
+def dump_many_end(debug: bool, writer: StreamWriter) -> Generator[None, Any, None]:
+    try:
+        yield
+    finally:
+        _dump_length(debug, writer, -1)
+
+
+async def dump_many(
+    debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
+) -> None:
+    with dump_many_end(debug, writer):
+        for output in outputs:
+            await dump_one(debug, writer, output)
+
+
+async def dump_many_async(
+    debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
+) -> None:
+    with dump_many_end(debug, writer):
+        async for output in outputs:
+            await dump_one(debug, writer, output)
+
+
+async def load_impl(
+    debug: bool, reader: StreamReader, Model: type[ModelType], length: int
+) -> ModelType:
+    input_json_bytes = await reader.readexactly(length)
+
+    return load_bytes(debug, Model, input_json_bytes)
+
+
+async def _load_length(debug: bool, reader: StreamReader) -> int:
+    line_bytes = await reader.readline()
+
+    if len(line_bytes) == 0:
+        raise MyException("Unexpected EOF.")
+
+    length = int(line_bytes.decode().strip())
+
+    if False:
+        print(f"load length: {length}", file=stderr)
+
+    return length
+
+
+async def load_one(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> ModelType:
+    length = await _load_length(debug, reader)
+
+    return await load_impl(debug, reader, Model, length)
+
+
+async def load_many_helper(debug: bool, reader: StreamReader):
+    while True:
+        length = await _load_length(debug, reader)
+
+        if length < 0:
+            break
+
+        yield length
+
+
+async def load_many(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> AsyncIterable[ModelType]:
+    async for length in load_many_helper(debug, reader):
+        yield await load_impl(debug, reader, Model, length)

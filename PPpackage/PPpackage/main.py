@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import stderr, stdin
 
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, ProductBase, model_validate
+from PPpackage_utils.parse import Product, load_bytes
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -24,13 +24,15 @@ async def main_command(
     cache_path: Path,
     generators_path: Path,
     destination_path: Path,
-    do_update_database: Annotated[bool, TyperOption("--update-database")] = False,
+    do_update_database: Annotated[
+        bool, TyperOption("--update-database/--no-update-database")
+    ] = False,
     debug: bool = False,
     resolve_iteration_limit: int = 10,
 ) -> None:
     input_json_bytes = stdin.buffer.read()
 
-    input = model_validate(debug, Input, input_json_bytes)
+    input = load_bytes(debug, Input, input_json_bytes)
 
     if do_update_database:
         managers = input.requirements.keys()
@@ -77,9 +79,6 @@ async def main_command(
         destination_path,
         meta_products,
     )
-
-    if debug:
-        print("DEBUG PPpackage: after install", file=stderr)
 
 
 def main():

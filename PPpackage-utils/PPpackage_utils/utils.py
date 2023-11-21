@@ -1,11 +1,21 @@
-from asyncio import create_subprocess_exec
-from asyncio.subprocess import Process
+from asyncio import (
+    StreamReader,
+    StreamReaderProtocol,
+    StreamWriter,
+    create_subprocess_exec,
+    get_event_loop,
+)
+from asyncio.streams import FlowControlMixin
+from asyncio.subprocess import DEVNULL, PIPE, Process
 from collections.abc import AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
+from enum import Enum
+from enum import auto as enum_auto
+from enum import unique as enum_unique
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
-from subprocess import DEVNULL, PIPE
+from sys import stderr, stdin, stdout
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
 from typing import Optional
 
@@ -40,6 +50,13 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
+async def asubprocess_wait(process: Process, error_message: str) -> None:
+    return_code = await process.wait()
+
+    if return_code != 0:
+        raise MyException(error_message)
+
+
 async def asubprocess_communicate(
     process: Process,
     error_message: str,
@@ -65,7 +82,7 @@ class FakerootInfo:
 _fakeroot_info = None
 
 
-async def get_fakeroot_info():
+async def get_fakeroot_info(debug: bool):
     global _fakeroot_info
 
     if _fakeroot_info is None:
@@ -76,16 +93,16 @@ async def get_fakeroot_info():
             "LD_PRELOAD",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
         )
 
         fakeroot_stdout = await asubprocess_communicate(
             await process_creation, "Error in `fakeroot`."
         )
 
-        ld_library_path, ld_preload = tuple(
-            [line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()]
-        )
+        ld_library_path, ld_preload = [
+            line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()
+        ]
 
         _fakeroot_info = FakerootInfo(ld_library_path, ld_preload)
 
@@ -93,23 +110,23 @@ async def get_fakeroot_info():
 
 
 @asynccontextmanager
-async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
+async def fakeroot(debug: bool) -> AsyncIterator[MutableMapping[str, str]]:
     pid = None
     try:
-        fakeroot_info_task = get_fakeroot_info()
+        fakeroot_info_task = get_fakeroot_info(debug)
 
         process_creation = create_subprocess_exec(
             "faked",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
         )
 
         faked_stdout = await asubprocess_communicate(
             await process_creation, "Error in `faked`."
         )
 
-        key, pid_string = tuple(faked_stdout.decode("ascii").strip().split(":"))
+        key, pid_string = faked_stdout.decode("ascii").strip().split(":")
 
         pid = int(pid_string)
 
@@ -152,3 +169,35 @@ def noop(*args, **kwargs):
 
 async def anoop(*args, **kwargs):
     pass
+
+
+@enum_unique
+class ImageType(Enum):
+    TAG = enum_auto()
+    DOCKERFILE = enum_auto()
+
+
+@enum_unique
+class RunnerRequestType(Enum):
+    INIT = enum_auto()
+    COMMAND = enum_auto()
+    RUN = enum_auto()
+    END = enum_auto()
+
+
+async def get_standard_streams():
+    loop = get_event_loop()
+    reader = StreamReader()
+    protocol = StreamReaderProtocol(reader)
+    await loop.connect_read_pipe(lambda: protocol, stdin)
+    w_transport, w_protocol = await loop.connect_write_pipe(FlowControlMixin, stdout)
+    writer = StreamWriter(w_transport, w_protocol, reader, loop)
+    return reader, writer
+
+
+def debug_redirect_stderr(debug: bool):
+    return DEVNULL if not debug else None
+
+
+def debug_redirect_stdout(debug: bool):
+    return DEVNULL if not debug else stderr

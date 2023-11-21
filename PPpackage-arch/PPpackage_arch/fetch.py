@@ -1,11 +1,17 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import FetchOutputValue, Options, PackageWithDependencies
-from PPpackage_utils.utils import asubprocess_communicate, ensure_dir_exists, fakeroot
+from PPpackage_utils.parse import Dependency, FetchOutputValue, Options, Package
+from PPpackage_utils.utils import (
+    asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
+    ensure_dir_exists,
+    fakeroot,
+)
 
 from .utils import get_cache_paths
 
@@ -19,17 +25,24 @@ def process_product_id(line: str):
 
 
 async def fetch(
+    debug: bool,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
-) -> Iterable[FetchOutputValue]:
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+) -> AsyncIterable[FetchOutputValue]:
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
 
-    package_names = [package.name for package in packages]
+    package_names = []
 
-    async with fakeroot() as environment:
+    async for package, dependencies in packages:
+        package_names.append(package.name)
+
+        async for _ in dependencies:
+            pass
+
+    async with fakeroot(debug) as environment:
         process = create_subprocess_exec(
             "pacman",
             "--dbpath",
@@ -43,14 +56,14 @@ async def fetch(
             "--nodeps",
             *package_names,
             stdin=DEVNULL,
-            stdout=stderr,
-            stderr=None,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
-        await asubprocess_communicate(await process, "Error in `pacman -Sw`.")
+        await asubprocess_wait(await process, "Error in `pacman -Sw`.")
 
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         "pacman",
         "--dbpath",
         str(database_path),
@@ -64,18 +77,18 @@ async def fetch(
         *package_names,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
-    stdout = await asubprocess_communicate(await process, "Error in `pacman -Sddp`")
+    assert process.stdout is not None
 
-    return [
-        FetchOutputValue(
+    for package_name in package_names:
+        line = (await process.stdout.readline()).decode("utf-8").strip()
+
+        yield FetchOutputValue(
             name=package_name,
             product_id=process_product_id(line),
             product_info=None,
         )
-        for package_name, line in zip(
-            package_names, stdout.decode("ascii").splitlines()
-        )
-    ]
+
+    await asubprocess_wait(process, "Error in `pacman -Sddp`")

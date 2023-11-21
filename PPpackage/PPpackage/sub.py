@@ -1,27 +1,30 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from sys import stderr
-from typing import Any, cast
+from typing import Any, AsyncIterable, cast
 
-from PPpackage_utils.io import (
-    stream_read_line,
-    stream_write_line,
-    stream_write_string,
-    stream_write_strings,
-)
+from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
-    FetchInput,
-    FetchOutput,
+    Dependency,
     FetchOutputValue,
     ManagerRequirement,
     Options,
+    Package,
     Product,
     ResolutionGraph,
     ResolutionGraphNode,
+    dump_many,
+    dump_one,
+    load_one,
 )
-from PPpackage_utils.utils import MyException, TemporaryPipe
+from PPpackage_utils.utils import (
+    ImageType,
+    MyException,
+    RunnerRequestType,
+    TemporaryPipe,
+)
 
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
+from .utils import machine_id_relative_path, read_machine_id
 
 
 async def update_database(debug: bool, cache_path: Path) -> None:
@@ -46,10 +49,11 @@ async def resolve(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
-    requirements_list = check_requirements_list(requirements_list)
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
+    requirements_list_cast = check_requirements_list(requirements_list)
 
-    requirements_merged = set.union(set(), *requirements_list)
+    requirements_merged = set[str]().union(*requirements_list_cast)
 
     graph = [
         ResolutionGraphNode(
@@ -61,12 +65,7 @@ async def resolve(
         for name in requirements_merged
     ]
 
-    resolve_graph = ResolutionGraph(
-        requirements_list,
-        graph,
-    )
-
-    return [resolve_graph]
+    receiver(ResolutionGraph(requirements_list, graph))
 
 
 async def fetch(
@@ -74,50 +73,45 @@ async def fetch(
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
-    input: FetchInput,
-) -> FetchOutput:
+    options: Options,
+    packages: Iterable[tuple[Package, Iterable[Dependency]]],
+    receiver: Callable[[FetchOutputValue], None],
+) -> None:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
         runner_writer,
     ):
         machine_id = read_machine_id(Path("/") / machine_id_relative_path)
 
-        stream_write_string(debug, "PPpackage-sub", runner_writer, machine_id)
+        await dump_one(debug, runner_writer, machine_id)
+        await dump_one(debug, runner_writer, RunnerRequestType.RUN)
+        await dump_one(debug, runner_writer, ImageType.TAG)
+        await dump_one(debug, runner_writer, "docker.io/archlinux:latest")
 
-        stream_write_line(debug, "PPpackage-sub", runner_writer, "RUN")
-        stream_write_line(debug, "PPpackage-sub", runner_writer, "IMAGE")
-        stream_write_string(
-            debug, "PPpackage-sub", runner_writer, "docker.io/archlinux:latest"
-        )
+        success = await load_one(debug, runner_reader, bool)
 
-        await runner_writer.drain()
-
-        success = await stream_read_line(debug, "PPpackage-sub", runner_reader)
-
-        if success != "SUCCESS":
+        if not success:
             raise MyException("PPpackage-sub: Failed to pull the build image.")
 
-        stream_write_strings(debug, "PPpackage-sub", runner_writer, ["cat", "-"])
+        await dump_many(debug, runner_writer, ["cat", "-"])
 
         with TemporaryPipe(runner_workdir_path) as stdin_pipe_path, TemporaryPipe(
             runner_workdir_path
         ) as stdout_pipe_path:
-            stream_write_string(
+            await dump_one(
                 debug,
-                "PPpackage-sub",
                 runner_writer,
-                str(stdin_pipe_path.relative_to(runner_workdir_path)),
+                stdin_pipe_path.relative_to(runner_workdir_path),
             )
 
-            stream_write_string(
+            await dump_one(
                 debug,
-                "PPpackage-sub",
                 runner_writer,
-                str(stdout_pipe_path.relative_to(runner_workdir_path)),
+                stdout_pipe_path.relative_to(runner_workdir_path),
             )
 
-            stream_write_strings(debug, "PPpackage-sub", runner_writer, [])
-            stream_write_strings(debug, "PPpackage-sub", runner_writer, [])
+            await dump_many(debug, runner_writer, [])
+            await dump_many(debug, runner_writer, [])
 
             with stdin_pipe_path.open("w") as stdin_pipe:
                 stdin_pipe.write("ahoj!")
@@ -125,19 +119,15 @@ async def fetch(
             with stdout_pipe_path.open("r") as stdout_pipe:
                 print(stdout_pipe.read(), file=stderr)
 
-        await runner_writer.drain()
+        success = await load_one(debug, runner_reader, bool)
 
-        success = await stream_read_line(debug, "PPpackage-sub", runner_reader)
-
-        if success != "SUCCESS":
+        if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    return FetchOutput(
-        [
+    for package, _ in packages:
+        receiver(
             FetchOutputValue(name=package.name, product_id="id", product_info=None)
-            for package in input.packages
-        ]
-    )
+        )
 
 
 async def generate(

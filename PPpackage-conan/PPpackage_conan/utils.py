@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.parse import model_validate, model_validate_obj
+from PPpackage_utils.parse import load_bytes, load_object
 from pydantic import BaseModel
 
 
@@ -55,13 +55,14 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def parse_conan_graph_nodes(
+    debug: bool,
     NodeType: type[T],
     conan_graph_json_bytes: bytes,
 ) -> Mapping[str, T]:
-    conan_graph = model_validate(False, ConanGraph, conan_graph_json_bytes)
+    conan_graph = load_bytes(debug, ConanGraph, conan_graph_json_bytes)
 
     return {
-        node_id: model_validate_obj(NodeType, node_json)
+        node_id: load_object(NodeType, node_json)
         for node_id, node_json in conan_graph.graph.nodes.items()
         if node_id != "0"
     }

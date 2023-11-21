@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +8,11 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import (
+    asubprocess_wait,
+    debug_redirect_stderr,
+    debug_redirect_stdout,
+)
 
 from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment
 
@@ -51,13 +55,14 @@ def patch_native_generators(
 
 
 async def generate(
+    debug: bool,
     templates_path: Path,
     deployer_path: Path,
     cache_path: Path,
     generators_path: Path,
     options: Any,
-    products: Iterable[Product],
-    generators: Iterable[str],
+    products: AsyncIterable[Product],
+    generators: AsyncIterable[str],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -78,8 +83,8 @@ async def generate(
         create_and_render_temp_file(
             conanfile_template,
             {
-                "packages": products,
-                "generators": generators,
+                "packages": [product async for product in products],
+                "generators": [generator async for generator in generators],
             },
             ".py",
         ) as conanfile_file,
@@ -103,11 +108,11 @@ async def generate(
             f"--profile:build={build_profile_path}",
             conanfile_file.name,
             stdin=DEVNULL,
-            stdout=DEVNULL,
-            stderr=None,
+            stdout=debug_redirect_stdout(debug),
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
-        await asubprocess_communicate(await process, "Error in `conan install`")
+        await asubprocess_wait(await process, "Error in `conan install`")
 
     patch_native_generators(native_generators_path, native_generators_path_suffix)

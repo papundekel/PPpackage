@@ -1,28 +1,28 @@
 from asyncio import run as asyncio_run
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import AsyncIterable, Awaitable, Callable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
-from sys import exit, stderr, stdin, stdout
+from sys import stderr
+from traceback import print_exc
 from typing import Any, TypeVar
 
-from pydantic import RootModel
 from typer import Typer
 
 from .parse import (
-    FetchInput,
-    FetchOutput,
+    Dependency,
     FetchOutputValue,
-    GenerateInput,
-    InstallInput,
-    PackageWithDependencies,
+    Options,
+    Package,
     Product,
     ResolutionGraph,
-    ResolveInput,
-    model_dump,
-    model_validate,
+    dump_many_async,
+    load_impl,
+    load_many,
+    load_many_helper,
+    load_one,
 )
-from .utils import MyException, ensure_dir_exists
+from .utils import ensure_dir_exists, get_standard_streams
 
 
 class AsyncTyper(Typer):
@@ -63,74 +63,78 @@ RequirementTypeType = TypeVar("RequirementTypeType")
 
 
 def init(
-    update_database_callback: Callable[[Path], Awaitable[None]],
+    update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
-        [Path, Any, Iterable[Iterable[RequirementTypeType]]],
-        Awaitable[Iterable[ResolutionGraph]],
+        [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
+        AsyncIterable[ResolutionGraph],
     ],
     fetch_callback: Callable[
-        [Path, Any, Iterable[PackageWithDependencies]],
-        Awaitable[Iterable[FetchOutputValue]],
+        [bool, Path, Any, AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]],
+        AsyncIterable[FetchOutputValue],
     ],
     generate_callback: Callable[
         [
+            bool,
             Path,
             Path,
             Any,
-            Iterable[Product],
-            Iterable[str],
+            AsyncIterable[Product],
+            AsyncIterable[str],
         ],
         Awaitable[None],
     ],
     install_callback: Callable[
-        [Path, Path, Path, Path, Iterable[Product]], Awaitable[None]
+        [bool, Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
     ],
     RequirementType: type[RequirementTypeType],
 ) -> Typer:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
-        await update_database_callback(cache_path)
+        await update_database_callback(__debug, cache_path)
 
     @__app.command()
     async def resolve(cache_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, stdout = await get_standard_streams()
 
-        input = model_validate(__debug, ResolveInput[RequirementType], input_json_bytes)
+        options = await load_one(__debug, stdin, Options)
 
-        output = await resolve_callback(
-            cache_path, input.options, input.requirements_list
+        requirements_list = (
+            load_many(__debug, stdin, RequirementType)
+            async for _ in load_many_helper(__debug, stdin)
         )
 
-        output_json_bytes = model_dump(
-            __debug, RootModel[Iterable[ResolutionGraph]](output)
-        )
+        output = resolve_callback(__debug, cache_path, options, requirements_list)
 
-        stdout.buffer.write(output_json_bytes)
+        await dump_many_async(__debug, stdout, output)
 
     @__app.command()
     async def fetch(cache_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, stdout = await get_standard_streams()
 
-        input = model_validate(__debug, FetchInput, input_json_bytes)
+        options = await load_one(__debug, stdin, Options)
 
-        output = await fetch_callback(cache_path, input.options, input.packages)
+        packages = (
+            (
+                await load_impl(__debug, stdin, Package, length),
+                load_many(__debug, stdin, Dependency),
+            )
+            async for length in load_many_helper(__debug, stdin)
+        )
 
-        output_json_bytes = model_dump(__debug, FetchOutput(output))
+        output = fetch_callback(__debug, cache_path, options, packages)
 
-        stdout.buffer.write(output_json_bytes)
+        await dump_many_async(__debug, stdout, output)
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
-        input_json_bytes = stdin.buffer.read()
+        stdin, _ = await get_standard_streams()
 
-        input = model_validate(__debug, GenerateInput, input_json_bytes)
+        options = await load_one(__debug, stdin, Options)
+        products = load_many(__debug, stdin, Product)
+        generators = load_many(__debug, stdin, str)
 
         await generate_callback(
-            cache_path,
-            generators_path,
-            input.options,
-            input.products,
-            input.generators,
+            __debug, cache_path, generators_path, options, products, generators
         )
 
     @__app.command()
@@ -142,16 +146,17 @@ def init(
     ) -> None:
         ensure_dir_exists(destination_path)
 
-        input_json_bytes = stdin.buffer.read()
+        stdin, _ = await get_standard_streams()
 
-        input = model_validate(__debug, InstallInput, input_json_bytes)
+        products = load_many(__debug, stdin, Product)
 
         await install_callback(
+            __debug,
             cache_path,
             destination_path,
             pipe_from_sub_path,
             pipe_to_sub_path,
-            input.root,
+            products,
         )
 
     return __app
@@ -160,7 +165,10 @@ def init(
 def run(app: Typer, program_name: str) -> None:
     try:
         app()
-    except* MyException as eg:
-        for e in eg.exceptions:
-            print(f"{program_name}: {e}", file=stderr)
+    except Exception:
+        print(f"{program_name}:", file=stderr)
+        print_exc()
+        with open(f"/home/fackop/{program_name}.log", "w") as f:
+            print_exc(file=f)
+
         exit(1)

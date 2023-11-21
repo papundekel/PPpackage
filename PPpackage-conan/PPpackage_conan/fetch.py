@@ -1,18 +1,19 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
+    Dependency,
     FetchOutputValue,
     Options,
-    PackageWithDependencies,
-    model_validate_obj,
+    Package,
+    load_object,
 )
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_communicate, debug_redirect_stderr
 
 from .parse import FetchProductInfo
 from .utils import (
@@ -25,11 +26,12 @@ from .utils import (
 
 
 async def fetch(
+    debug: bool,
     templates_path: Path,
     cache_path: Path,
     options: Options,
-    packages: Iterable[PackageWithDependencies],
-) -> Iterable[FetchOutputValue]:
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+) -> AsyncIterable[FetchOutputValue]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -44,12 +46,12 @@ async def fetch(
 
     requirements = []
 
-    for package in packages:
+    async for package, dependencies in packages:
         requirements.append((package.name, package.version))
 
-        for dependency in package.dependencies:
+        async for dependency in dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
-                product_info_parsed = model_validate_obj(
+                product_info_parsed = load_object(
                     FetchProductInfo, dependency.product_info
                 )
                 requirements.append((dependency.name, product_info_parsed.version))
@@ -77,7 +79,7 @@ async def fetch(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
             env=environment,
         )
 
@@ -85,15 +87,13 @@ async def fetch(
             await process, "Error in `conan install`"
         )
 
-    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
+    nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
-    return [
-        FetchOutputValue(
+    for node in nodes.values():
+        yield FetchOutputValue(
             name=node.name,
             product_id=node.get_product_id(),
             product_info=FetchProductInfo(
                 version=node.get_version(), cpp_info=node.cpp_info
             ),
         )
-        for node in nodes.values()
-    ]

@@ -1,11 +1,15 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.utils import MyException, asubprocess_communicate
+from PPpackage_utils.utils import (
+    MyException,
+    asubprocess_communicate,
+    debug_redirect_stderr,
+)
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -13,7 +17,7 @@ from .utils import get_cache_paths
 
 
 async def resolve_pactree(
-    database_path: Path, requirement: str
+    debug: bool, database_path: Path, requirement: str
 ) -> tuple[MultiDiGraph, str]:
     process = await create_subprocess_exec(
         "pactree",
@@ -24,7 +28,7 @@ async def resolve_pactree(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
     graph_bytes = await asubprocess_communicate(process, "Error in `pactree`.")
@@ -70,7 +74,7 @@ def clean_graph(graph: MultiDiGraph) -> str:
 
 
 async def resolve_versions(
-    database_path: Path, packages: Set[str]
+    debug: bool, database_path: Path, packages: Set[str]
 ) -> Mapping[str, str]:
     process = create_subprocess_exec(
         "pacinfo",
@@ -80,7 +84,7 @@ async def resolve_versions(
         *packages,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
     stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
@@ -106,27 +110,31 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
 
 
 async def resolve(
-    cache_path: Path, options: Options, requirements_list: Iterable[Iterable[str]]
-) -> Iterable[ResolutionGraph]:
+    debug: bool,
+    cache_path: Path,
+    options: Options,
+    requirements_list: AsyncIterable[AsyncIterable[str]],
+) -> AsyncIterable[ResolutionGraph]:
     database_path, _ = get_cache_paths(cache_path)
 
     if not database_path.exists():
-        await update_database(cache_path)
+        await update_database(debug, cache_path)
 
     async with TaskGroup() as group:
         tasks_list = [
-            {
-                group.create_task(resolve_pactree(database_path, requirement))
-                for requirement in requirements
-            }
-            for requirements in requirements_list
+            [
+                group.create_task(resolve_pactree(debug, database_path, requirement))
+                async for requirement in requirements
+            ]
+            async for requirements in requirements_list
         ]
 
-    graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
+    graphs_list = [[task.result() for task in tasks] for tasks in tasks_list]
 
     roots = [[root for _, root in graphs] for graphs in graphs_list]
 
-    versions_task = resolve_versions(
+    versions = await resolve_versions(
+        debug,
         database_path,
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
@@ -135,19 +143,15 @@ async def resolve(
         graph for graphs in graphs_list for graph, _ in graphs
     )
 
-    versions = await versions_task
-
-    return [
-        ResolutionGraph(
-            roots,
-            [
-                ResolutionGraphNode(
-                    package_name,
-                    versions[package_name],
-                    dependencies[package_name],
-                    [],
-                )
-                for package_name in versions
-            ],
-        )
-    ]
+    yield ResolutionGraph(
+        roots,
+        [
+            ResolutionGraphNode(
+                package_name,
+                versions[package_name],
+                dependencies[package_name],
+                [],
+            )
+            for package_name in versions
+        ],
+    )

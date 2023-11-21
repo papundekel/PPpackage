@@ -1,18 +1,20 @@
-from asyncio import Task, TaskGroup, create_subprocess_exec
+from asyncio import StreamReader, StreamWriter, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
 from collections.abc import (
+    Callable,
     Hashable,
     Iterable,
     Mapping,
     MutableMapping,
+    MutableSequence,
     MutableSet,
-    Sequence,
     Set,
 )
 from dataclasses import dataclass
 from functools import partial
 from itertools import product as itertools_product
 from pathlib import Path
+from sys import stderr
 from typing import Any
 
 from frozendict import frozendict
@@ -21,12 +23,13 @@ from PPpackage_utils.parse import (
     ManagerRequirement,
     Options,
     ResolutionGraph,
-    ResolveInput,
-    model_dump,
-    model_validate,
+    dump_many,
+    dump_many_end,
+    dump_none,
+    dump_one,
+    load_many,
 )
-from PPpackage_utils.utils import MyException, asubprocess_communicate
-from pydantic import RootModel
+from PPpackage_utils.utils import MyException, asubprocess_wait, debug_redirect_stderr
 
 from .sub import resolve as PP_resolve
 
@@ -37,7 +40,8 @@ async def resolve_external_manager(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -45,24 +49,54 @@ async def resolve_external_manager(
         str(cache_path),
         stdin=PIPE,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
     )
 
-    input_json_bytes = model_dump(
-        debug, ResolveInput[Any](options=options, requirements_list=requirements_list)
-    )
+    assert process.stdin is not None
+    assert process.stdout is not None
 
-    output_json_bytes = await asubprocess_communicate(
-        process,
-        f"Error in {manager}'s resolve.",
-        input_json_bytes,
-    )
+    try:
+        async with TaskGroup() as group:
+            group.create_task(send(debug, process.stdin, options, requirements_list))
+            group.create_task(receive(debug, process.stdout, receiver))
+    except* MyException:
+        print(f"Error in {manager}'s resolve.", file=stderr)
+        raise
 
-    output = model_validate(
-        debug, RootModel[Iterable[ResolutionGraph]], output_json_bytes
-    )
+    await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
-    return output.root
+
+async def send(
+    debug: bool,
+    writer: StreamWriter,
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> None:
+    await dump_one(debug, writer, options)
+
+    with dump_many_end(debug, writer):
+        for requirements in requirements_list:
+            await dump_none(debug, writer)
+            await dump_many(debug, writer, requirements)
+
+    writer.close()
+
+
+async def receive(
+    debug: bool,
+    reader: StreamReader,
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
+    async for value in load_many(debug, reader, ResolutionGraph):
+        receiver(value)
+
+
+def receiver(
+    manager: str,
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+    graph: ResolutionGraph,
+) -> None:
+    resolution_graphs[manager].append(graph)
 
 
 async def resolve_manager(
@@ -71,20 +105,20 @@ async def resolve_manager(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+) -> None:
     if manager == "PP":
         resolver = PP_resolve
     else:
         resolver = partial(resolve_external_manager, manager=manager)
 
-    resolutions = await resolver(
+    await resolver(
         debug=debug,
         cache_path=cache_path,
         options=options,
         requirements_list=requirements_list,
+        receiver=partial(receiver, manager, resolution_graphs),
     )
-
-    return resolutions
 
 
 @dataclass(frozen=True)
@@ -138,7 +172,7 @@ def process_manager_requirements(
 
 
 def make_graph(
-    requirements_list: Sequence[Set[Hashable]], resolution_graph: ResolutionGraph
+    requirements_list: Iterable[Set[Hashable]], resolution_graph: ResolutionGraph
 ) -> WorkGraph:
     roots = frozendict(
         {
@@ -166,57 +200,50 @@ async def resolve_iteration(
     cache_path: Path,
     requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
-) -> Set[Mapping[str, WorkGraph]]:
+    initial: Mapping[str, Set[Hashable]],
+    new_choices: MutableSequence[Any],
+    results: MutableSequence[Mapping[str, WorkGraph]],
+) -> None:
+    requirements_lists = dict[str, Iterable[Set[Hashable]]]()
+
+    for manager, requirements_set in requirements.items():
+        requirements_lists[manager] = list(requirements_set)
+
+    resolution_graphs = dict[str, MutableSequence[ResolutionGraph]]()
+
     async with TaskGroup() as group:
-        lists_and_tasks: Mapping[
-            str, tuple[Sequence[Set[Hashable]], Task[Iterable[ResolutionGraph]]]
-        ] = {}
-        for manager, requirements_set in requirements.items():
-            requirements_list = tuple(requirements_set)
-            lists_and_tasks[manager] = (
-                requirements_list,
-                group.create_task(
-                    resolve_manager(
-                        debug,
-                        manager,
-                        cache_path,
-                        meta_options.get(manager),
-                        requirements_list,
-                    )
-                ),
+        for manager, requirements_list in requirements_lists.items():
+            resolution_graphs[manager] = []
+
+            group.create_task(
+                resolve_manager(
+                    debug,
+                    manager,
+                    cache_path,
+                    meta_options.get(manager),
+                    requirements_list,
+                    resolution_graphs,
+                )
             )
 
-    lists_and_graphs = {
-        manager: (requirements_list, task.result())
-        for manager, (requirements_list, task) in lists_and_tasks.items()
-    }
+    for managers_and_graphs in itertools_product(
+        *[
+            [(manager, graph) for graph in graphs]
+            for manager, graphs in resolution_graphs.items()
+        ]
+    ):
+        meta_graph = {
+            manager: make_graph(requirements_lists[manager], graph)
+            for manager, graph in managers_and_graphs
+        }
 
-    choices_resolution_graph = {
-        frozendict(
-            {manager: (lists_and_graphs[manager][0], graph) for manager, graph in i}
-        )
-        for i in itertools_product(
-            *[
-                [(manager, graph) for graph in graphs]
-                for manager, (_, graphs) in lists_and_graphs.items()
-            ]
-        )
-    }
+        resolved_requirements = get_resolved_requirements(meta_graph)
+        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
 
-    manager_graphs = {
-        frozendict(
-            {
-                manager: make_graph(requirements_list, graph)
-                for manager, (
-                    requirements_list,
-                    graph,
-                ) in choice_resolution_graph.items()
-            }
-        )
-        for choice_resolution_graph in choices_resolution_graph
-    }
-
-    return manager_graphs
+        if resolved_requirements == all_requirements:
+            results.append(meta_graph)
+        else:
+            new_choices.append(all_requirements)
 
 
 def merge_requirements(initial, new):
@@ -233,27 +260,6 @@ def merge_requirements(initial, new):
             for manager in initial.keys() | new.keys()
         }
     )
-
-
-async def resolve_iteration2(
-    debug: bool,
-    cache_path: Path,
-    initial: Mapping[str, Set[Hashable]],
-    requirements: Mapping[str, Set[Set[Hashable]]],
-    meta_options: Mapping[str, Any],
-    new_choices: MutableSet[Any],
-    results: MutableSet[Mapping[str, WorkGraph]],
-):
-    meta_graphs = await resolve_iteration(debug, cache_path, requirements, meta_options)
-
-    for meta_graph in meta_graphs:
-        resolved_requirements = get_resolved_requirements(meta_graph)
-        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
-
-        if resolved_requirements == all_requirements:
-            results.add(meta_graph)
-        else:
-            new_choices.add(all_requirements)
 
 
 def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
@@ -293,38 +299,36 @@ async def resolve(
 ) -> MultiDiGraph:
     iterations_done = 0
 
-    all_requirements_choices = {
-        frozendict(
-            {
-                manager: frozenset([requirements])
-                for manager, requirements in initial_requirements.items()
-            }
-        )
-    }
+    all_requirements_choices = [
+        {
+            manager: frozenset([requirements])
+            for manager, requirements in initial_requirements.items()
+        }
+    ]
 
-    results_work_graph: Set[Mapping[str, WorkGraph]] = set()
+    results_work_graph: MutableSequence[Mapping[str, WorkGraph]] = []
 
     while True:
         if iterations_done >= iteration_limit:
             raise MyException("Resolve iteration limit reached.")
 
-        new_choices = set()
+        new_choices = []
 
         async with TaskGroup() as group:
             for all_requirements in all_requirements_choices:
                 group.create_task(
-                    resolve_iteration2(
+                    resolve_iteration(
                         debug,
                         cache_path,
-                        initial_requirements,
                         all_requirements,
                         meta_options,
+                        initial_requirements,
                         new_choices,
                         results_work_graph,
                     )
                 )
 
-        if new_choices == set():
+        if len(new_choices) == 0:
             break
 
         all_requirements_choices = new_choices

@@ -17,4 +17,11 @@ docker run \
     --mount type=bind,source="$cache_path",destination="/workdir/cache" \
     --mount type=bind,source="$generators_path",destination="/workdir/generators" \
     --mount type=bind,source="$destination_path",destination="/workdir/root" \
-    fackop/pppackage PPpackage /run/PPpackage-runner.sock /mnt/PPpackage-runner /workdir/cache /workdir/generators /workdir/root $debug
+    fackop/pppackage \
+    PPpackage \
+        /run/PPpackage-runner.sock \
+        /mnt/PPpackage-runner \
+        /workdir/cache \
+        /workdir/generators \
+        /workdir/root \
+        $debug

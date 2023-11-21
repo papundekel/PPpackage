@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 if [ -z "$2" ]; then
-    echo "Usage: $0 [native|docker] <cache_path> <generators_path> <destination_path> [--debug] < <input>"
+    echo "Usage: $0 [native|docker] <cache_path> <generators_path> <destination_path> [--update-database|--no-update-database] [--debug|--no-debug] < <input>"
     exit 1
 fi
 
@@ -22,13 +22,11 @@ runner_workdirs_path="$(mktemp -d)" && \
 mkdir -p "$cache_path" "$generators_path" "$destination_path" && \
 \
 machine_id="$(./"run-$mode-machine-id.sh")" && \
-machine_id_length="$(printf "$machine_id" | wc --bytes)" && \
 \
 runc_id="$(./"run-$mode-runc.sh" "$run_path" "$runner_workdirs_path" "$debug")" && \
 \
 sleep 1 && \
-\
-container_workdir_path="$runner_workdirs_path/$(printf "$machine_id_length\n${machine_id}INIT\nEND\n" | netcat -U -q 0 "$runner_path" | tail --lines 1)" && \
+container_workdir_path="$runner_workdirs_path/$(./"run-$mode-init.sh" "$runner_path" "$machine_id" "$debug")" && \
 \
 ./"run-$mode-PPpackage.sh" "$runner_path" "$container_workdir_path" "$cache_path" "$generators_path" "$destination_path" "$update_database" "$debug"
 

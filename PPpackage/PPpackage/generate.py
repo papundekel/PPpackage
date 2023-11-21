@@ -1,12 +1,12 @@
 from asyncio import TaskGroup, create_subprocess_exec
-from asyncio.subprocess import PIPE
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping, Set
 from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
-from PPpackage_utils.parse import GenerateInput, Options, Product, model_dump
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.parse import Options, Product, dump_many, dump_one
+from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
 from .generators import builtin as builtin_generators
 from .sub import generate as PP_generate
@@ -21,27 +21,24 @@ async def generate_external_manager(
     generators: Set[str],
     manager: str,
 ) -> None:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
         "generate",
         str(cache_path),
         str(generators_path),
         stdin=PIPE,
-        stdout=PIPE,
-        stderr=None,
+        stdout=DEVNULL,
+        stderr=debug_redirect_stderr(debug),
     )
 
-    input_json_bytes = model_dump(
-        debug,
-        GenerateInput(options=options, products=products, generators=generators),
-    )
+    assert process.stdin is not None
 
-    await asubprocess_communicate(
-        await process,
-        f"Error in {manager}'s generate.",
-        input_json_bytes,
-    )
+    await dump_one(debug, process.stdin, options)
+    await dump_many(debug, process.stdin, products)
+    await dump_many(debug, process.stdin, generators)
+
+    await asubprocess_wait(process, f"Error in {manager}'s generate.")
 
 
 async def generate_manager(

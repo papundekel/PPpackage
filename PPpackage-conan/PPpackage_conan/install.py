@@ -1,17 +1,24 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 from shutil import copytree, rmtree
 
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import asubprocess_communicate, communicate_from_sub
+from PPpackage_utils.utils import (
+    asubprocess_communicate,
+    communicate_from_sub,
+    debug_redirect_stderr,
+)
 
 from .utils import get_cache_path, make_conan_environment
 
 
 async def install_product(
-    environment: Mapping[str, str], destination_path: Path, product: Product
+    debug: bool,
+    environment: Mapping[str, str],
+    destination_path: Path,
+    product: Product,
 ) -> None:
     process = await create_subprocess_exec(
         "conan",
@@ -20,7 +27,7 @@ async def install_product(
         f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=debug_redirect_stderr(debug),
         env=environment,
     )
 
@@ -37,11 +44,12 @@ async def install_product(
 
 
 async def install(
+    debug: bool,
     cache_path: Path,
     destination_path: Path,
     pipe_from_sub_path: Path,
     pipe_to_sub_path: Path,
-    products: Iterable[Product],
+    products: AsyncIterable[Product],
 ) -> None:
     cache_path = get_cache_path(cache_path)
 
@@ -53,8 +61,10 @@ async def install(
         rmtree(destination_path)
 
     async with TaskGroup() as group:
-        for product in products:
-            group.create_task(install_product(environment, destination_path, product))
+        async for product in products:
+            group.create_task(
+                install_product(debug, environment, destination_path, product)
+            )
 
     with communicate_from_sub(pipe_from_sub_path), open(pipe_to_sub_path, "r"):
         pass

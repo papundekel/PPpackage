@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable, Mapping
 from functools import partial
 from io import TextIOWrapper
 from os import listdir
@@ -10,21 +10,24 @@ from shutil import move
 from sys import stderr
 
 from PPpackage_utils.io import (
+    communicate_with_daemon,
     pipe_read_line,
     pipe_read_string,
     pipe_read_strings,
     pipe_write_int,
     pipe_write_string,
-    stream_read_int,
-    stream_write_line,
-    stream_write_string,
-    stream_write_strings,
 )
-from PPpackage_utils.parse import InstallInput, Product, model_dump
-from PPpackage_utils.utils import MyException, TemporaryPipe, asubprocess_communicate
+from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
+from PPpackage_utils.utils import (
+    MyException,
+    RunnerRequestType,
+    TemporaryPipe,
+    asubprocess_wait,
+    debug_redirect_stderr,
+)
 
 from .sub import install as PP_install
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
+from .utils import machine_id_relative_path, read_machine_id
 
 
 async def install_manager_command(
@@ -36,31 +39,26 @@ async def install_manager_command(
     daemon_workdir_path: Path,
     destination_relative_path: Path,
 ):
-    stream_write_line(debug, "PPpackage", daemon_writer, "COMMAND")
-    stream_write_string(
-        debug, "PPpackage", daemon_writer, str(destination_relative_path)
-    )
+    await dump_one(debug, daemon_writer, RunnerRequestType.COMMAND)
+    await dump_one(debug, daemon_writer, destination_relative_path)
 
     command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
-    stream_write_string(debug, "PPpackage", daemon_writer, command)
+    await dump_one(debug, daemon_writer, command)
 
     args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
-    stream_write_strings(debug, "PPpackage", daemon_writer, args)
+    await dump_many(debug, daemon_writer, args)
 
     with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
         pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
         pipe_to_sub.flush()
 
-        stream_write_string(
+        await dump_one(
             debug,
-            "PPpackage",
             daemon_writer,
-            str(pipe_hook_path.relative_to(daemon_workdir_path)),
+            pipe_hook_path.relative_to(daemon_workdir_path),
         )
 
-        await daemon_writer.drain()
-
-        return_value = await stream_read_int(debug, "PPpackage", daemon_reader)
+        return_value = await load_one(debug, daemon_reader, int)
 
         pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
         pipe_to_sub.flush()
@@ -83,7 +81,7 @@ async def install_external_manager(
                 file=stderr,
             )
 
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             f"PPpackage-{manager}",
             "--debug" if debug else "--no-debug",
             "install",
@@ -93,22 +91,15 @@ async def install_external_manager(
             str(pipe_to_sub_path),
             stdin=PIPE,
             stdout=DEVNULL,
-            stderr=None,
+            stderr=debug_redirect_stderr(debug),
         )
 
-        input_json_bytes = model_dump(debug, InstallInput(products))
+        assert process.stdin is not None
 
-        process = await process_creation
+        await dump_many(debug, process.stdin, products)
 
-        if process.stdin is None:
-            raise MyException(f"Error in {manager}'s install.")
-
-        process.stdin.write(input_json_bytes)
         process.stdin.close()
         await process.stdin.wait_closed()
-
-        if debug:
-            print(f"DEBUG PPpackage: closed sub's stdin", file=stderr)
 
         with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
             with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
@@ -132,11 +123,7 @@ async def install_external_manager(
                             f"Invalid hook header from {manager} `{header}`."
                         )
 
-        await asubprocess_communicate(
-            process,
-            f"Error in {manager}'s install.",
-            None,
-        )
+        await asubprocess_wait(process, f"Error in {manager}'s install.")
 
 
 async def install_manager(
@@ -209,7 +196,7 @@ async def install(
         daemon_reader,
         daemon_writer,
     ):
-        stream_write_string(debug, "PPpackage", daemon_writer, machine_id)
+        await dump_one(debug, daemon_writer, machine_id)
 
         for manager, products in meta_products.items():
             await install_manager(
