@@ -173,13 +173,8 @@ async def fetch(
                 (Package(name=name, version=version), dependencies)
             )
 
-        inputs = {
-            manager: (meta_options.get(manager), packages)
-            for manager, packages in manager_packages.items()
-        }
-
         async with TaskGroup() as group:
-            for manager, (options, packages) in inputs.items():
+            for manager, packages in manager_packages.items():
                 group.create_task(
                     fetch_manager(
                         debug,
@@ -187,7 +182,7 @@ async def fetch(
                         runner_workdir_path,
                         manager,
                         cache_path,
-                        options,
+                        meta_options.get(manager),
                         packages,
                         graph.nodes,
                     )
