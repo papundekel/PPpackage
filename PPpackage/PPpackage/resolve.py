@@ -166,7 +166,10 @@ async def resolve_iteration(
     cache_path: Path,
     requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
-) -> Iterable[Mapping[str, WorkGraph]]:
+    initial: Mapping[str, Set[Hashable]],
+    new_choices: MutableSequence[Any],
+    results: MutableSequence[Mapping[str, WorkGraph]],
+) -> None:
     async with TaskGroup() as group:
         lists_and_tasks = dict[
             str, tuple[Sequence[Set[Hashable]], Task[Iterable[ResolutionGraph]]]
@@ -187,33 +190,24 @@ async def resolve_iteration(
                 ),
             )
 
-    lists_and_graphs = {
-        manager: (requirements_list, task.result())
-        for manager, (requirements_list, task) in lists_and_tasks.items()
-    }
-
-    choices_resolution_graph = [
-        {manager: (lists_and_graphs[manager][0], graph) for manager, graph in i}
-        for i in itertools_product(
-            *[
-                [(manager, graph) for graph in graphs]
-                for manager, (_, graphs) in lists_and_graphs.items()
-            ]
-        )
-    ]
-
-    manager_graphs = [
-        {
-            manager: make_graph(requirements_list, graph)
-            for manager, (
-                requirements_list,
-                graph,
-            ) in choice_resolution_graph.items()
+    for managers_and_graphs in itertools_product(
+        *[
+            [(manager, graph) for graph in task.result()]
+            for manager, (_, task) in lists_and_tasks.items()
+        ]
+    ):
+        meta_graph = {
+            manager: make_graph(lists_and_tasks[manager][0], graph)
+            for manager, graph in managers_and_graphs
         }
-        for choice_resolution_graph in choices_resolution_graph
-    ]
 
-    return manager_graphs
+        resolved_requirements = get_resolved_requirements(meta_graph)
+        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
+
+        if resolved_requirements == all_requirements:
+            results.append(meta_graph)
+        else:
+            new_choices.append(all_requirements)
 
 
 def merge_requirements(initial, new):
@@ -230,27 +224,6 @@ def merge_requirements(initial, new):
             for manager in initial.keys() | new.keys()
         }
     )
-
-
-async def resolve_iteration2(
-    debug: bool,
-    cache_path: Path,
-    initial: Mapping[str, Set[Hashable]],
-    requirements: Mapping[str, Set[Set[Hashable]]],
-    meta_options: Mapping[str, Any],
-    new_choices: MutableSequence[Any],
-    results: MutableSequence[Mapping[str, WorkGraph]],
-):
-    meta_graphs = await resolve_iteration(debug, cache_path, requirements, meta_options)
-
-    for meta_graph in meta_graphs:
-        resolved_requirements = get_resolved_requirements(meta_graph)
-        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
-
-        if resolved_requirements == all_requirements:
-            results.append(meta_graph)
-        else:
-            new_choices.append(all_requirements)
 
 
 def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
@@ -308,12 +281,12 @@ async def resolve(
         async with TaskGroup() as group:
             for all_requirements in all_requirements_choices:
                 group.create_task(
-                    resolve_iteration2(
+                    resolve_iteration(
                         debug,
                         cache_path,
-                        initial_requirements,
                         all_requirements,
                         meta_options,
+                        initial_requirements,
                         new_choices,
                         results_work_graph,
                     )
