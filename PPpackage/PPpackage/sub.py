@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from sys import stderr
 from typing import Any, AsyncIterable, cast
@@ -79,7 +79,8 @@ async def fetch(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-) -> AsyncIterable[FetchOutputValue]:
+    receiver: Callable[[FetchOutputValue], None],
+) -> None:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
         runner_writer,
@@ -127,8 +128,10 @@ async def fetch(
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
-    for package, dependencies in packages:
-        yield FetchOutputValue(name=package.name, product_id="id", product_info=None)
+    for package, _ in packages:
+        receiver(
+            FetchOutputValue(name=package.name, product_id="id", product_info=None)
+        )
 
 
 async def generate(

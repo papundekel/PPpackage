@@ -1,8 +1,7 @@
-import asyncio
-from asyncio import StreamWriter, TaskGroup
+from asyncio import StreamReader, StreamWriter, TaskGroup
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import (
-    AsyncIterable,
+    Callable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -37,7 +36,8 @@ async def fetch_external_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-) -> AsyncIterable[FetchOutputValue]:
+    receiver: Callable[[FetchOutputValue], None],
+) -> None:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -51,17 +51,45 @@ async def fetch_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    await dump_one(debug, process.stdin, options)
-
-    with dump_many_end(debug, process.stdin):
-        for package, dependencies in packages:
-            await dump_one(debug, process.stdin, package)
-            await dump_many(debug, process.stdin, dependencies)
-
-    async for output in load_many(process.stdout, FetchOutputValue):
-        yield output
+    async with TaskGroup() as group:
+        group.create_task(send(debug, process.stdin, options, packages))
+        group.create_task(receive(process.stdout, receiver))
 
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
+
+
+async def send(
+    debug: bool,
+    writer: StreamWriter,
+    options: Options,
+    packages: Iterable[tuple[Package, Iterable[Dependency]]],
+) -> None:
+    await dump_one(debug, writer, options)
+
+    with dump_many_end(debug, writer):
+        for package, dependencies in packages:
+            await dump_one(debug, writer, package)
+            await dump_many(debug, writer, dependencies)
+
+    writer.close()
+
+
+async def receive(
+    reader: StreamReader,
+    receiver: Callable[[FetchOutputValue], None],
+) -> None:
+    async for value in load_many(reader, FetchOutputValue):
+        receiver(value)
+
+
+def receiver(
+    manager: str,
+    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+    product: FetchOutputValue,
+) -> None:
+    node = nodes[(manager, product.name)]
+    node["product_id"] = product.product_id
+    node["product_info"] = product.product_info
 
 
 async def fetch_manager(
@@ -72,7 +100,8 @@ async def fetch_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-) -> AsyncIterable[FetchOutputValue]:
+    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+) -> None:
     if manager == "PP":
         fetcher = partial(
             PP_fetch, runner_path=runner_path, runner_workdir_path=runner_workdir_path
@@ -80,11 +109,13 @@ async def fetch_manager(
     else:
         fetcher = partial(fetch_external_manager, manager=manager)
 
-    output = fetcher(
-        debug=debug, cache_path=cache_path, options=options, packages=packages
+    await fetcher(
+        debug=debug,
+        cache_path=cache_path,
+        options=options,
+        packages=packages,
+        receiver=partial(receiver, manager, nodes),
     )
-
-    return output
 
 
 def create_dependencies(
@@ -148,8 +179,8 @@ async def fetch(
         }
 
         async with TaskGroup() as group:
-            manager_tasks = {
-                manager: group.create_task(
+            for manager, (options, packages) in inputs.items():
+                group.create_task(
                     fetch_manager(
                         debug,
                         runner_path,
@@ -158,13 +189,6 @@ async def fetch(
                         cache_path,
                         options,
                         packages,
+                        graph.nodes,
                     )
                 )
-                for manager, (options, packages) in inputs.items()
-            }
-
-        for manager, task in manager_tasks.items():
-            async for package in task.result():
-                node = graph.nodes[(manager, package.name)]
-                node["product_id"] = package.product_id
-                node["product_info"] = package.product_info

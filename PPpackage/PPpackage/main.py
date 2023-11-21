@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import stderr, stdin
 
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, ProductBase, load_bytes
+from PPpackage_utils.parse import Product, load_bytes
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
