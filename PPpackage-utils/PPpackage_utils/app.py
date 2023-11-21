@@ -168,7 +168,5 @@ def run(app: Typer, program_name: str) -> None:
     except Exception:
         print(f"{program_name}:", file=stderr)
         print_exc()
-        with open(f"/home/fackop/{program_name}.log", "w") as f:
-            print_exc(file=f)
 
         exit(1)
