@@ -49,10 +49,11 @@ async def resolve(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
-    requirements_list = check_requirements_list(requirements_list)
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
+    requirements_list_cast = check_requirements_list(requirements_list)
 
-    requirements_merged = set.union(set(), *requirements_list)
+    requirements_merged = set[str]().union(*requirements_list_cast)
 
     graph = [
         ResolutionGraphNode(
@@ -64,12 +65,7 @@ async def resolve(
         for name in requirements_merged
     ]
 
-    resolve_graph = ResolutionGraph(
-        requirements_list,
-        graph,
-    )
-
-    return [resolve_graph]
+    receiver(ResolutionGraph(requirements_list, graph))
 
 
 async def fetch(

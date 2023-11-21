@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
@@ -106,8 +106,8 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
 
 
 async def resolve(
-    cache_path: Path, options: Options, requirements_list: Iterable[Iterable[str]]
-) -> Iterable[ResolutionGraph]:
+    cache_path: Path, options: Options, requirements_list: AsyncIterable[Iterable[str]]
+) -> AsyncIterable[ResolutionGraph]:
     database_path, _ = get_cache_paths(cache_path)
 
     if not database_path.exists():
@@ -115,18 +115,18 @@ async def resolve(
 
     async with TaskGroup() as group:
         tasks_list = [
-            {
+            [
                 group.create_task(resolve_pactree(database_path, requirement))
                 for requirement in requirements
-            }
-            for requirements in requirements_list
+            ]
+            async for requirements in requirements_list
         ]
 
-    graphs_list = [{task.result() for task in tasks} for tasks in tasks_list]
+    graphs_list = [[task.result() for task in tasks] for tasks in tasks_list]
 
     roots = [[root for _, root in graphs] for graphs in graphs_list]
 
-    versions_task = resolve_versions(
+    versions = await resolve_versions(
         database_path,
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
@@ -135,19 +135,15 @@ async def resolve(
         graph for graphs in graphs_list for graph, _ in graphs
     )
 
-    versions = await versions_task
-
-    return [
-        ResolutionGraph(
-            roots,
-            [
-                ResolutionGraphNode(
-                    package_name,
-                    versions[package_name],
-                    dependencies[package_name],
-                    [],
-                )
-                for package_name in versions
-            ],
-        )
-    ]
+    yield ResolutionGraph(
+        roots,
+        [
+            ResolutionGraphNode(
+                package_name,
+                versions[package_name],
+                dependencies[package_name],
+                [],
+            )
+            for package_name in versions
+        ],
+    )

@@ -1,13 +1,13 @@
-from asyncio import Task, TaskGroup, create_subprocess_exec
+from asyncio import StreamReader, StreamWriter, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
 from collections.abc import (
+    Callable,
     Hashable,
     Iterable,
     Mapping,
     MutableMapping,
     MutableSequence,
     MutableSet,
-    Sequence,
     Set,
 )
 from dataclasses import dataclass
@@ -22,9 +22,9 @@ from PPpackage_utils.parse import (
     ManagerRequirement,
     Options,
     ResolutionGraph,
-    ResolveInput,
+    dump_many,
     dump_one,
-    load_one,
+    load_many,
 )
 from PPpackage_utils.utils import MyException, asubprocess_wait
 
@@ -37,7 +37,8 @@ async def resolve_external_manager(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -51,18 +52,39 @@ async def resolve_external_manager(
     assert process.stdin is not None
     assert process.stdout is not None
 
-    input_task = dump_one(
-        debug,
-        process.stdin,
-        ResolveInput[Any](options=options, requirements_list=requirements_list),
-    )
+    async with TaskGroup() as group:
+        group.create_task(send(debug, process.stdin, options, requirements_list))
+        group.create_task(receive(process.stdout, receiver))
 
-    output_task = load_one(process.stdout, Iterable[ResolutionGraph])
-
-    await input_task
     await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
-    return await output_task
+
+async def send(
+    debug: bool,
+    writer: StreamWriter,
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> None:
+    await dump_one(debug, writer, options)
+    await dump_many(debug, writer, requirements_list)
+
+    writer.close()
+
+
+async def receive(
+    reader: StreamReader,
+    receiver: Callable[[ResolutionGraph], None],
+) -> None:
+    async for value in load_many(reader, ResolutionGraph):
+        receiver(value)
+
+
+def receiver(
+    manager: str,
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+    graph: ResolutionGraph,
+) -> None:
+    resolution_graphs[manager].append(graph)
 
 
 async def resolve_manager(
@@ -71,20 +93,20 @@ async def resolve_manager(
     cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
-) -> Iterable[ResolutionGraph]:
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+) -> None:
     if manager == "PP":
         resolver = PP_resolve
     else:
         resolver = partial(resolve_external_manager, manager=manager)
 
-    resolutions = await resolver(
+    await resolver(
         debug=debug,
         cache_path=cache_path,
         options=options,
         requirements_list=requirements_list,
+        receiver=partial(receiver, manager, resolution_graphs),
     )
-
-    return resolutions
 
 
 @dataclass(frozen=True)
@@ -138,7 +160,7 @@ def process_manager_requirements(
 
 
 def make_graph(
-    requirements_list: Sequence[Set[Hashable]], resolution_graph: ResolutionGraph
+    requirements_list: Iterable[Set[Hashable]], resolution_graph: ResolutionGraph
 ) -> WorkGraph:
     roots = frozendict(
         {
@@ -170,34 +192,36 @@ async def resolve_iteration(
     new_choices: MutableSequence[Any],
     results: MutableSequence[Mapping[str, WorkGraph]],
 ) -> None:
-    async with TaskGroup() as group:
-        lists_and_tasks = dict[
-            str, tuple[Sequence[Set[Hashable]], Task[Iterable[ResolutionGraph]]]
-        ]()
+    requirements_lists = dict[str, Iterable[Set[Hashable]]]()
 
-        for manager, requirements_set in requirements.items():
-            requirements_list = list(requirements_set)
-            lists_and_tasks[manager] = (
-                requirements_list,
-                group.create_task(
-                    resolve_manager(
-                        debug,
-                        manager,
-                        cache_path,
-                        meta_options.get(manager),
-                        requirements_list,
-                    )
-                ),
+    for manager, requirements_set in requirements.items():
+        requirements_lists[manager] = list(requirements_set)
+
+    resolution_graphs = dict[str, MutableSequence[ResolutionGraph]]()
+
+    async with TaskGroup() as group:
+        for manager, requirements_list in requirements_lists.items():
+            resolution_graphs[manager] = []
+
+            group.create_task(
+                resolve_manager(
+                    debug,
+                    manager,
+                    cache_path,
+                    meta_options.get(manager),
+                    requirements_list,
+                    resolution_graphs,
+                )
             )
 
     for managers_and_graphs in itertools_product(
         *[
-            [(manager, graph) for graph in task.result()]
-            for manager, (_, task) in lists_and_tasks.items()
+            [(manager, graph) for graph in graphs]
+            for manager, graphs in resolution_graphs.items()
         ]
     ):
         meta_graph = {
-            manager: make_graph(lists_and_tasks[manager][0], graph)
+            manager: make_graph(requirements_lists[manager], graph)
             for manager, graph in managers_and_graphs
         }
 

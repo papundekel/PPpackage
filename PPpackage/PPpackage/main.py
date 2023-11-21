@@ -80,9 +80,6 @@ async def main_command(
         meta_products,
     )
 
-    if debug:
-        print("DEBUG PPpackage: after install", file=stderr)
-
 
 def main():
     run(app, "PPpackage")

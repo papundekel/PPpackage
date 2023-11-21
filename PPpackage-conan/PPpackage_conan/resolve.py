@@ -1,6 +1,7 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import (
+    AsyncIterable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -231,8 +232,8 @@ async def resolve(
     templates_path: Path,
     cache_path: Path,
     options: Options,
-    requirements_list: Iterable[Iterable[Requirement]],
-) -> Iterable[ResolutionGraph]:
+    requirements_list: AsyncIterable[Iterable[Requirement]],
+) -> AsyncIterable[ResolutionGraph]:
     cache_path = get_cache_path(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -252,9 +253,9 @@ async def resolve(
 
     build_profile_path = templates_path / "profile"
 
-    requirements_list_length = 0
+    requirement_index = 0
 
-    for requirement_index, requirements in enumerate(requirements_list):
+    async for requirements in requirements_list:
         requirement_partitions = create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
@@ -271,7 +272,9 @@ async def resolve(
         await leaves_task
         await requirement_task
 
-        requirements_list_length += 1
+        requirement_index += 1
+
+    requirements_length = requirement_index
 
     graph = await create_graph(
         debug,
@@ -280,9 +283,9 @@ async def resolve(
         profile_template,
         build_profile_path,
         options,
-        requirements_list_length,
+        requirements_length,
     )
 
     await remove_temporary_packages_from_cache(environment)
 
-    return [graph]
+    yield graph

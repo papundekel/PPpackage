@@ -77,14 +77,7 @@ def load_bytes(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
     return load_object(Model, input_json)
 
 
-Requirement = TypeVar("Requirement")
-
 Options = Mapping[str, Any] | None
-
-
-class ResolveInput(BaseModel, Generic[Requirement]):
-    options: Options
-    requirements_list: Iterable[Iterable[Requirement]]
 
 
 @dataclass(frozen=True)
