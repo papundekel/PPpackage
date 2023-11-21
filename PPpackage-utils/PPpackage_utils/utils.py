@@ -7,7 +7,7 @@ from asyncio import (
 )
 from asyncio.streams import FlowControlMixin
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterator, MutableMapping
+from collections.abc import AsyncIterable, AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
 from enum import Enum
 from enum import auto as enum_auto
@@ -17,7 +17,7 @@ from pathlib import Path
 from signal import SIGTERM
 from sys import stderr, stdin, stdout
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Optional
+from typing import Optional, TypeVar
 
 from frozendict import frozendict
 

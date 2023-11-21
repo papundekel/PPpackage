@@ -23,9 +23,9 @@ from PPpackage_utils.parse import (
     ManagerRequirement,
     Options,
     ResolutionGraph,
+    dump_loop,
     dump_many,
     dump_many_end,
-    dump_none,
     dump_one,
     load_many,
 )
@@ -74,10 +74,8 @@ async def send(
 ) -> None:
     await dump_one(debug, writer, options)
 
-    with dump_many_end(debug, writer):
-        for requirements in requirements_list:
-            await dump_none(debug, writer)
-            await dump_many(debug, writer, requirements)
+    async for requirements in dump_loop(debug, writer, requirements_list):
+        await dump_many(debug, writer, requirements)
 
     writer.close()
 

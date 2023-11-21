@@ -17,9 +17,8 @@ from .parse import (
     Product,
     ResolutionGraph,
     dump_many_async,
-    load_impl,
     load_many,
-    load_many_helper,
+    load_many_loop,
     load_one,
 )
 from .utils import ensure_dir_exists, get_standard_streams
@@ -100,7 +99,7 @@ def init(
 
         requirements_list = (
             load_many(__debug, stdin, RequirementType)
-            async for _ in load_many_helper(__debug, stdin)
+            async for _ in load_many_loop(__debug, stdin)
         )
 
         output = resolve_callback(__debug, cache_path, options, requirements_list)
@@ -115,10 +114,10 @@ def init(
 
         packages = (
             (
-                await load_impl(__debug, stdin, Package, length),
+                await load_one(__debug, stdin, Package),
                 load_many(__debug, stdin, Dependency),
             )
-            async for length in load_many_helper(__debug, stdin)
+            async for _ in load_many_loop(__debug, stdin)
         )
 
         output = fetch_callback(__debug, cache_path, options, packages)

@@ -4,7 +4,14 @@ from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import Dependency, FetchOutputValue, Options, Package
+from PPpackage_utils.parse import (
+    Dependency,
+    FetchOutputValue,
+    Options,
+    Package,
+    dump_many_end,
+    dump_one,
+)
 from PPpackage_utils.utils import (
     asubprocess_wait,
     debug_redirect_stderr,

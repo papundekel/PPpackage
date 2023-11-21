@@ -1,5 +1,5 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup
-from asyncio.subprocess import DEVNULL, PIPE, create_subprocess_exec
+from asyncio import Event, StreamReader, StreamWriter, TaskGroup
+from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import (
     Callable,
     Iterable,
@@ -8,9 +8,12 @@ from collections.abc import (
     MutableSequence,
     MutableSet,
 )
+from contextlib import contextmanager
 from functools import partial
 from itertools import islice
 from pathlib import Path
+from re import S
+from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
@@ -20,6 +23,7 @@ from PPpackage_utils.parse import (
     ManagerAndName,
     Options,
     Package,
+    dump_loop,
     dump_many,
     dump_many_end,
     dump_one,
@@ -58,6 +62,28 @@ async def fetch_external_manager(
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
 
+class Synchronization:
+    receive_event = Event()
+    package_name: str
+
+    send_event = Event()
+
+    end = False
+
+
+@contextmanager
+def set_event(event: Event):
+    try:
+        yield
+    finally:
+        event.set()
+
+
+async def wait_and_clear(event: Event):
+    await event.wait()
+    event.clear()
+
+
 async def send(
     debug: bool,
     writer: StreamWriter,
@@ -66,10 +92,20 @@ async def send(
 ) -> None:
     await dump_one(debug, writer, options)
 
-    with dump_many_end(debug, writer):
-        for package, dependencies in packages:
-            await dump_one(debug, writer, package)
-            await dump_many(debug, writer, dependencies)
+    async for package, dependencies in dump_loop(debug, writer, packages):
+        await dump_one(debug, writer, package)
+        await dump_many(debug, writer, dependencies)
+
+    # while True:
+    #     with set_event(Synchronization.send_event):
+    #         await wait_and_clear(Synchronization.receive_event)
+
+    #         if Synchronization.end:
+    #             break
+
+    #         package_name = Synchronization.package_name
+
+    #         print(f"build response: {package_name}", file=stderr)
 
     writer.close()
 
@@ -79,6 +115,17 @@ async def receive(
     reader: StreamReader,
     receiver: Callable[[FetchOutputValue], None],
 ) -> None:
+    # async for package_name in load_many(debug, reader, str):
+    #     Synchronization.package_name = package_name
+    #     Synchronization.receive_event.set()
+
+    #     await wait_and_clear(Synchronization.send_event)
+
+    # Synchronization.end = True
+    # Synchronization.receive_event.set()
+
+    # await Synchronization.send_event.wait()
+
     async for value in load_many(debug, reader, FetchOutputValue):
         receiver(value)
 
