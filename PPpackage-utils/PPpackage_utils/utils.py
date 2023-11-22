@@ -201,3 +201,13 @@ def debug_redirect_stderr(debug: bool):
 
 def debug_redirect_stdout(debug: bool):
     return DEVNULL if not debug else stderr
+
+
+MACHINE_ID_RELATIVE_PATH = Path("etc") / "machine-id"
+
+
+def read_machine_id(machine_id_path: Path) -> str:
+    with machine_id_path.open("r") as machine_id_file:
+        machine_id = machine_id_file.readline().strip()
+
+        return machine_id

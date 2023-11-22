@@ -34,5 +34,8 @@ RUN pip install packages/PPpackage-conan/
 COPY PPpackage-arch/ /workdir/packages/PPpackage-arch/
 RUN pip install packages/PPpackage-arch/
 
+COPY PPpackage-PP/ /workdir/packages/PPpackage-PP/
+RUN pip install packages/PPpackage-PP/
+
 COPY PPpackage/ /workdir/packages/PPpackage/
 RUN pip install packages/PPpackage/

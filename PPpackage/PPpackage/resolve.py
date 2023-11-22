@@ -1,7 +1,6 @@
 from asyncio import StreamReader, StreamWriter, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import PIPE
 from collections.abc import (
-    Callable,
     Hashable,
     Iterable,
     Mapping,
@@ -11,7 +10,6 @@ from collections.abc import (
     Set,
 )
 from dataclasses import dataclass
-from functools import partial
 from itertools import product as itertools_product
 from pathlib import Path
 from sys import stderr
@@ -29,40 +27,6 @@ from PPpackage_utils.parse import (
     load_many,
 )
 from PPpackage_utils.utils import MyException, asubprocess_wait, debug_redirect_stderr
-
-from .sub import resolve as PP_resolve
-
-
-async def resolve_external_manager(
-    debug: bool,
-    manager: str,
-    cache_path: Path,
-    options: Options,
-    requirements_list: Iterable[Iterable[Any]],
-    receiver: Callable[[ResolutionGraph], None],
-) -> None:
-    process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
-        "--debug" if debug else "--no-debug",
-        "resolve",
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
-    )
-
-    assert process.stdin is not None
-    assert process.stdout is not None
-
-    try:
-        async with TaskGroup() as group:
-            group.create_task(send(debug, process.stdin, options, requirements_list))
-            group.create_task(receive(debug, process.stdout, receiver))
-    except* MyException:
-        print(f"Error in {manager}'s resolve.", file=stderr)
-        raise
-
-    await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
 
 async def send(
@@ -82,18 +46,11 @@ async def send(
 async def receive(
     debug: bool,
     reader: StreamReader,
-    receiver: Callable[[ResolutionGraph], None],
-) -> None:
-    async for value in load_many(debug, reader, ResolutionGraph):
-        receiver(value)
-
-
-def receiver(
     manager: str,
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
-    graph: ResolutionGraph,
 ) -> None:
-    resolution_graphs[manager].append(graph)
+    async for graph in load_many(debug, reader, ResolutionGraph):
+        resolution_graphs[manager].append(graph)
 
 
 async def resolve_manager(
@@ -104,18 +61,30 @@ async def resolve_manager(
     requirements_list: Iterable[Iterable[Any]],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ) -> None:
-    if manager == "PP":
-        resolver = PP_resolve
-    else:
-        resolver = partial(resolve_external_manager, manager=manager)
-
-    await resolver(
-        debug=debug,
-        cache_path=cache_path,
-        options=options,
-        requirements_list=requirements_list,
-        receiver=partial(receiver, manager, resolution_graphs),
+    process = await create_subprocess_exec(
+        f"PPpackage-{manager}",
+        "--debug" if debug else "--no-debug",
+        "resolve",
+        str(cache_path),
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=debug_redirect_stderr(debug),
     )
+
+    assert process.stdin is not None
+    assert process.stdout is not None
+
+    try:
+        async with TaskGroup() as group:
+            group.create_task(send(debug, process.stdin, options, requirements_list))
+            group.create_task(
+                receive(debug, process.stdout, manager, resolution_graphs)
+            )
+    except* MyException:
+        print(f"Error in {manager}'s resolve.", file=stderr)
+        raise
+
+    await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
 
 @dataclass(frozen=True)

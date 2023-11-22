@@ -1,7 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping, Set
-from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -9,10 +8,9 @@ from PPpackage_utils.parse import Options, Product, dump_many, dump_one
 from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
 from .generators import builtin as builtin_generators
-from .sub import generate as PP_generate
 
 
-async def generate_external_manager(
+async def generate_manager(
     debug: bool,
     cache_path: Path,
     generators_path: Path,
@@ -39,30 +37,6 @@ async def generate_external_manager(
     await dump_many(debug, process.stdin, generators)
 
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
-
-
-async def generate_manager(
-    debug: bool,
-    cache_path: Path,
-    generators_path: Path,
-    options: Options,
-    products: Iterable[Product],
-    generators: Set[str],
-    manager: str,
-) -> None:
-    if manager == "PP":
-        generate = PP_generate
-    else:
-        generate = partial(generate_external_manager, manager=manager)
-
-    await generate(
-        debug=debug,
-        cache_path=cache_path,
-        generators_path=generators_path,
-        options=options,
-        products=products,
-        generators=generators,
-    )
 
 
 async def generate(

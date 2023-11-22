@@ -1,7 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Iterable, Mapping
-from functools import partial
 from io import TextIOWrapper
 from os import listdir
 from pathlib import Path
@@ -19,15 +18,14 @@ from PPpackage_utils.io import (
 )
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
+    MACHINE_ID_RELATIVE_PATH,
     MyException,
     RunnerRequestType,
     TemporaryPipe,
     asubprocess_wait,
     debug_redirect_stderr,
+    read_machine_id,
 )
-
-from .sub import install as PP_install
-from .utils import machine_id_relative_path, read_machine_id
 
 
 async def install_manager_command(
@@ -64,7 +62,7 @@ async def install_manager_command(
         pipe_to_sub.flush()
 
 
-async def install_external_manager(
+async def install_manager(
     debug: bool,
     manager: str,
     cache_path: Path,
@@ -126,33 +124,6 @@ async def install_external_manager(
         await asubprocess_wait(process, f"Error in {manager}'s install.")
 
 
-async def install_manager(
-    debug: bool,
-    manager: str,
-    cache_path: Path,
-    daemon_reader: StreamReader,
-    daemon_writer: StreamWriter,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
-    products: Iterable[Product],
-) -> None:
-    if manager == "PP":
-        installer = partial(
-            PP_install, destination_path=daemon_workdir_path / destination_relative_path
-        )
-    else:
-        installer = partial(
-            install_external_manager,
-            manager=manager,
-            daemon_reader=daemon_reader,
-            daemon_writer=daemon_writer,
-            daemon_workdir_path=daemon_workdir_path,
-            destination_relative_path=destination_relative_path,
-        )
-
-    await installer(debug=debug, cache_path=cache_path, products=products)
-
-
 def generate_machine_id(machine_id_path: Path):
     if machine_id_path.exists():
         return
@@ -184,10 +155,10 @@ async def install(
         )
 
     generate_machine_id(
-        runner_workdir_path / workdir_relative_path / machine_id_relative_path
+        runner_workdir_path / workdir_relative_path / MACHINE_ID_RELATIVE_PATH
     )
 
-    machine_id = read_machine_id(Path("/") / machine_id_relative_path)
+    machine_id = read_machine_id(Path("/") / MACHINE_ID_RELATIVE_PATH)
 
     if debug:
         print(f"DEBUG PPpackage: {runner_path=}", file=stderr)

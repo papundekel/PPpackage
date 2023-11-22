@@ -69,16 +69,22 @@ async def fetch_send(
         [
             bool,
             Path,
+            Path,
+            Path,
             Any,
             AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
         ],
         AsyncIterable[PackageIDAndInfo],
     ],
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
 ):
-    output = fetch_send_callback(__debug, cache_path, options, packages)
+    output = fetch_send_callback(
+        __debug, runner_path, runner_workdir_path, cache_path, options, packages
+    )
 
     await dump_many_async(__debug, writer, output)
 
@@ -92,6 +98,8 @@ def init(
     fetch_send_callback: Callable[
         [
             bool,
+            Path,
+            Path,
             Path,
             Any,
             AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -137,7 +145,9 @@ def init(
         await dump_many_async(__debug, stdout, output)
 
     @__app.command()
-    async def fetch(cache_path: Path) -> None:
+    async def fetch(
+        runner_path: Path, runner_workdir_path: Path, cache_path: Path
+    ) -> None:
         stdin, stdout = await get_standard_streams()
 
         options = await load_one(__debug, stdin, Options)
@@ -154,7 +164,15 @@ def init(
 
         async with TaskGroup() as group:
             group.create_task(
-                fetch_send(stdout, fetch_send_callback, cache_path, options, packages)
+                fetch_send(
+                    stdout,
+                    fetch_send_callback,
+                    runner_path,
+                    runner_workdir_path,
+                    cache_path,
+                    options,
+                    packages,
+                )
             )
             group.create_task(fetch_receive_callback(build_results))
 

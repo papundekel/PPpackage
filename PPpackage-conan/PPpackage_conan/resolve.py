@@ -243,8 +243,8 @@ async def create_graph(
 
 
 async def resolve(
-    debug: bool,
     templates_path: Path,
+    debug: bool,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],
