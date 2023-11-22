@@ -43,12 +43,7 @@ async def main_command(
     )
 
     await fetch(
-        debug,
-        runner_path,
-        runner_workdir_path,
-        cache_path,
-        input.options,
-        graph,
+        debug, runner_path, runner_workdir_path, cache_path, input.options, graph
     )
 
     meta_products: MutableMapping[str, MutableSequence[Product]] = {}

@@ -15,23 +15,10 @@ def main():
 
     app = init(
         anoop,
-        lambda debug, cache_path, options, requirements_list: resolve(
-            debug, data_path, cache_path, options, requirements_list
-        ),
-        lambda debug, cache_path, options, packages: fetch_send(
-            debug, data_path, cache_path, options, packages
-        ),
+        lambda *args: resolve(data_path, *args),
+        lambda *args: fetch_send(data_path, *args),
         fetch_receive,
-        lambda debug, cache_path, generators_path, options, products, generators: generate(
-            debug,
-            data_path,
-            deployer_path,
-            cache_path,
-            generators_path,
-            options,
-            products,
-            generators,
-        ),
+        lambda *args: generate(data_path, deployer_path, *args),
         install,
         Requirement,
     )

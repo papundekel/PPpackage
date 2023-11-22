@@ -32,6 +32,8 @@ def process_product_id(line: str):
 
 async def send(
     debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

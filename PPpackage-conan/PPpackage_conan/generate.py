@@ -55,9 +55,9 @@ def patch_native_generators(
 
 
 async def generate(
-    debug: bool,
     templates_path: Path,
     deployer_path: Path,
+    debug: bool,
     cache_path: Path,
     generators_path: Path,
     options: Any,

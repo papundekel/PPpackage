@@ -10,7 +10,6 @@ from collections.abc import (
     MutableSet,
 )
 from contextlib import asynccontextmanager
-from functools import partial
 from itertools import islice
 from pathlib import Path
 from sys import stderr
@@ -32,54 +31,11 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
-from .sub import fetch as PP_fetch
-from .utils import register_product_id_and_info
-
 
 class NodeData(TypedDict):
     version: str
     product_id: str
     product_info: Any
-
-
-async def fetch_external_manager(
-    debug: bool,
-    manager: str,
-    cache_path: Path,
-    options: Options,
-    packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
-    packages_to_dependencies: Mapping[
-        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
-    ],
-) -> None:
-    process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
-        "--debug" if debug else "--no-debug",
-        "fetch",
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
-    )
-
-    assert process.stdin is not None
-    assert process.stdout is not None
-
-    async with TaskGroup() as group:
-        group.create_task(
-            send(
-                debug,
-                process.stdin,
-                manager,
-                options,
-                packages,
-                packages_to_dependencies,
-            )
-        )
-        group.create_task(receive(debug, process.stdout, manager, nodes))
-
-    await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
 
 T = TypeVar("T")
@@ -195,16 +151,18 @@ async def receive(
             id_and_info = package_id_and_info.id_and_info
 
             if id_and_info is not None:
-                register_product_id_and_info(manager, nodes, package_name, id_and_info)
+                node = nodes[(manager, package_name)]
+                node["product_id"] = id_and_info.product_id
+                node["product_info"] = id_and_info.product_info
             else:
                 Synchronization.package_names.put_nowait(package_name)
 
 
 async def fetch_manager(
     debug: bool,
+    manager: str,
     runner_path: Path,
     runner_workdir_path: Path,
-    manager: str,
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
@@ -213,24 +171,35 @@ async def fetch_manager(
         ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
     ],
 ) -> None:
-    if manager == "PP":
-        fetcher = partial(
-            PP_fetch, runner_path=runner_path, runner_workdir_path=runner_workdir_path
-        )
-    else:
-        fetcher = partial(
-            fetch_external_manager,
-            manager=manager,
-            packages_to_dependencies=packages_to_dependencies,
-        )
-
-    await fetcher(
-        debug=debug,
-        cache_path=cache_path,
-        options=options,
-        packages=packages,
-        nodes=nodes,
+    process = await create_subprocess_exec(
+        f"PPpackage-{manager}",
+        "--debug" if debug else "--no-debug",
+        "fetch",
+        str(runner_path),
+        str(runner_workdir_path),
+        str(cache_path),
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=debug_redirect_stderr(debug),
     )
+
+    assert process.stdin is not None
+    assert process.stdout is not None
+
+    async with TaskGroup() as group:
+        group.create_task(
+            send(
+                debug,
+                process.stdin,
+                manager,
+                options,
+                packages,
+                packages_to_dependencies,
+            )
+        )
+        group.create_task(receive(debug, process.stdout, manager, nodes))
+
+    await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
 
 def create_dependencies(
@@ -301,9 +270,9 @@ async def fetch(
                 group.create_task(
                     fetch_manager(
                         debug,
+                        manager,
                         runner_path,
                         runner_workdir_path,
-                        manager,
                         cache_path,
                         meta_options.get(manager),
                         packages,

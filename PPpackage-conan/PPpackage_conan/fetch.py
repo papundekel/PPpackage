@@ -28,8 +28,10 @@ from .utils import (
 
 
 async def send(
-    debug: bool,
     templates_path: Path,
+    debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
