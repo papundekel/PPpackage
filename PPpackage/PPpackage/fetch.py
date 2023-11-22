@@ -1,10 +1,8 @@
-from asyncio import Event
 from asyncio import Queue as BaseQueue
 from asyncio import StreamReader, StreamWriter, TaskGroup, as_completed
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import (
     AsyncIterable,
-    Callable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -16,13 +14,12 @@ from functools import partial
 from itertools import islice
 from pathlib import Path
 from sys import stderr
-from typing import Any, TypeVar
+from typing import Any, TypedDict, TypeVar
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
     BuildResult,
     Dependency,
-    IDAndInfo,
     ManagerAndName,
     Options,
     Package,
@@ -36,6 +33,13 @@ from PPpackage_utils.parse import (
 from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
 from .sub import fetch as PP_fetch
+from .utils import register_product_id_and_info
+
+
+class NodeData(TypedDict):
+    version: str
+    product_id: str
+    product_info: Any
 
 
 async def fetch_external_manager(
@@ -44,7 +48,10 @@ async def fetch_external_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    receiver: Callable[[str, IDAndInfo], None],
+    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+    packages_to_dependencies: Mapping[
+        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+    ],
 ) -> None:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -60,8 +67,17 @@ async def fetch_external_manager(
     assert process.stdout is not None
 
     async with TaskGroup() as group:
-        group.create_task(send(debug, process.stdin, options, packages))
-        group.create_task(receive(debug, process.stdout, receiver))
+        group.create_task(
+            send(
+                debug,
+                process.stdin,
+                manager,
+                options,
+                packages,
+                packages_to_dependencies,
+            )
+        )
+        group.create_task(receive(debug, process.stdout, manager, nodes))
 
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
@@ -93,19 +109,36 @@ class Synchronization:
     package_names = Queue[str]()
 
 
-async def process_build_root(package_name: str):
+async def process_build_root(
+    manager: str,
+    package_name: str,
+    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+):
     return True, bytes()  # TODO
 
 
-async def process_build_generate(package_name: str):
+async def process_build_generate(
+    manager: str,
+    package_name: str,
+    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+):
     return False, bytes()  # TODO
 
 
-async def process_build(debug: bool, writer: StreamWriter, package_name: str):
+async def process_build(
+    debug: bool,
+    writer: StreamWriter,
+    manager: str,
+    package_name: str,
+    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+):
     print(f"build response: {package_name}", file=stderr)
 
     for f in as_completed(
-        [process_build_root(package_name), process_build_generate(package_name)]
+        [
+            process_build_root(manager, package_name, dependencies),
+            process_build_generate(manager, package_name, dependencies),
+        ]
     ):
         is_root, directory = await f
 
@@ -122,8 +155,12 @@ async def process_build(debug: bool, writer: StreamWriter, package_name: str):
 async def send(
     debug: bool,
     writer: StreamWriter,
+    manager: str,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
+    packages_to_dependencies: Mapping[
+        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+    ],
 ) -> None:
     await dump_one(debug, writer, options)
 
@@ -133,7 +170,13 @@ async def send(
 
     async with TaskGroup() as group:
         async for package_name in queue_iterate(Synchronization.package_names):
-            group.create_task(process_build(debug, writer, package_name))
+            dependencies = packages_to_dependencies[
+                ManagerAndName(name=package_name, manager=manager)
+            ]
+
+            group.create_task(
+                process_build(debug, writer, manager, package_name, dependencies)
+            )
 
     await dump_loop_end(debug, writer)
 
@@ -143,7 +186,8 @@ async def send(
 async def receive(
     debug: bool,
     reader: StreamReader,
-    receiver: Callable[[str, IDAndInfo], None],
+    manager: str,
+    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
 ) -> None:
     async with queue_put_loop(Synchronization.package_names):
         async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
@@ -151,20 +195,9 @@ async def receive(
             id_and_info = package_id_and_info.id_and_info
 
             if id_and_info is not None:
-                receiver(package_name, id_and_info)
+                register_product_id_and_info(manager, nodes, package_name, id_and_info)
             else:
                 Synchronization.package_names.put_nowait(package_name)
-
-
-def receiver(
-    manager: str,
-    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
-    package_name: str,
-    id_and_info: IDAndInfo,
-) -> None:
-    node = nodes[(manager, package_name)]
-    node["product_id"] = id_and_info.product_id
-    node["product_info"] = id_and_info.product_info
 
 
 async def fetch_manager(
@@ -176,51 +209,56 @@ async def fetch_manager(
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
     nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+    packages_to_dependencies: Mapping[
+        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+    ],
 ) -> None:
     if manager == "PP":
         fetcher = partial(
             PP_fetch, runner_path=runner_path, runner_workdir_path=runner_workdir_path
         )
     else:
-        fetcher = partial(fetch_external_manager, manager=manager)
+        fetcher = partial(
+            fetch_external_manager,
+            manager=manager,
+            packages_to_dependencies=packages_to_dependencies,
+        )
 
     await fetcher(
         debug=debug,
         cache_path=cache_path,
         options=options,
         packages=packages,
-        receiver=partial(receiver, manager, nodes),
+        nodes=nodes,
     )
 
 
 def create_dependencies(
     sent_product_infos: MutableSet[ManagerAndName],
-    graph: MultiDiGraph,
-    manager: str,
-    package_name: str,
+    node_dependencies: Iterable[tuple[tuple[str, str], NodeData]],
 ):
     dependencies = []
 
-    node_dependencies = list(
-        islice(dfs_preorder_nodes(graph, source=(manager, package_name)), 1, None)
-    )
-
-    for dependency_manager, dependency_name in node_dependencies:
+    for (manager, name), data in node_dependencies:
         product_info = (
             None
-            if ManagerAndName(name=dependency_name, manager=dependency_manager)
-            in sent_product_infos
-            else graph.nodes[(dependency_manager, dependency_name)]["product_info"]
+            if ManagerAndName(name=name, manager=manager) in sent_product_infos
+            else data["product_info"]
         )
 
-        dependency = Dependency(
-            manager=dependency_manager, name=dependency_name, product_info=product_info
-        )
+        dependency = Dependency(manager=manager, name=name, product_info=product_info)
 
         dependencies.append(dependency)
         sent_product_infos.add(super(Dependency, dependency))
 
     return dependencies
+
+
+def graph_predecessors(
+    graph: MultiDiGraph, node: Any
+) -> Iterable[tuple[tuple[str, str], NodeData]]:
+    for node in islice(dfs_preorder_nodes(graph, source=node), 1, None):
+        yield node, graph.nodes[node]
 
 
 async def fetch(
@@ -233,19 +271,29 @@ async def fetch(
 ) -> None:
     reversed_graph = graph.reverse(copy=False)
 
+    packages_to_dependencies: MutableMapping[
+        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+    ] = {}
+
     for generation in topological_generations(reversed_graph):
         sent_product_infos: MutableSet[ManagerAndName] = set()
         manager_packages: MutableMapping[
             str, MutableSequence[tuple[Package, Iterable[Dependency]]]
         ] = {}
 
-        for manager, name in generation:
-            version = graph.nodes[(manager, name)]["version"]
+        for manager, package_name in generation:
+            version = graph.nodes[(manager, package_name)]["version"]
 
-            dependencies = create_dependencies(sent_product_infos, graph, manager, name)
+            node_dependencies = list(graph_predecessors(graph, (manager, package_name)))
+
+            dependencies = create_dependencies(sent_product_infos, node_dependencies)
+
+            packages_to_dependencies[
+                ManagerAndName(name=package_name, manager=manager)
+            ] = node_dependencies
 
             manager_packages.setdefault(manager, []).append(
-                (Package(name=name, version=version), dependencies)
+                (Package(name=package_name, version=version), dependencies)
             )
 
         async with TaskGroup() as group:
@@ -260,5 +308,6 @@ async def fetch(
                         meta_options.get(manager),
                         packages,
                         graph.nodes,
+                        packages_to_dependencies,
                     )
                 )
