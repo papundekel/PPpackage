@@ -1,6 +1,6 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
 from shutil import copytree, rmtree
 
@@ -36,10 +36,7 @@ async def install_product(
     product_path = stdout.decode("ascii").splitlines()[0]
 
     copytree(
-        product_path,
-        destination_path / product.name,
-        symlinks=True,
-        dirs_exist_ok=True,
+        product_path, destination_path / product.name, symlinks=True, dirs_exist_ok=True
     )
 
 

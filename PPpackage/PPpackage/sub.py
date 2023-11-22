@@ -1,12 +1,12 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from pathlib import Path
 from sys import stderr
-from typing import Any, AsyncIterable, cast
+from typing import Any, cast
 
 from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
     Dependency,
-    FetchOutputValue,
+    IDAndInfo,
     ManagerRequirement,
     Options,
     Package,
@@ -24,7 +24,11 @@ from PPpackage_utils.utils import (
     TemporaryPipe,
 )
 
-from .utils import machine_id_relative_path, read_machine_id
+from .utils import (
+    machine_id_relative_path,
+    read_machine_id,
+    register_product_id_and_info,
+)
 
 
 async def update_database(debug: bool, cache_path: Path) -> None:
@@ -75,7 +79,7 @@ async def fetch(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    receiver: Callable[[FetchOutputValue], None],
+    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
 ) -> None:
     async with communicate_with_daemon(debug, runner_path) as (
         runner_reader,
@@ -125,8 +129,8 @@ async def fetch(
             raise MyException("PPpackage-sub: Failed to run the build image.")
 
     for package, _ in packages:
-        receiver(
-            FetchOutputValue(name=package.name, product_id="id", product_info=None)
+        register_product_id_and_info(
+            "PP", nodes, package.name, IDAndInfo(product_id="id", product_info=None)
         )
 
 

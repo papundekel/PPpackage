@@ -1,16 +1,18 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable
 from pathlib import Path
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
+    BuildResult,
     Dependency,
-    FetchOutputValue,
+    IDAndInfo,
     Options,
     Package,
+    PackageIDAndInfo,
     load_object,
 )
 from PPpackage_utils.utils import asubprocess_communicate, debug_redirect_stderr
@@ -25,13 +27,13 @@ from .utils import (
 )
 
 
-async def fetch(
+async def send(
     debug: bool,
     templates_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-) -> AsyncIterable[FetchOutputValue]:
+) -> AsyncIterable[PackageIDAndInfo]:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -90,10 +92,17 @@ async def fetch(
     nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
     for node in nodes.values():
-        yield FetchOutputValue(
+        yield PackageIDAndInfo(
             name=node.name,
-            product_id=node.get_product_id(),
-            product_info=FetchProductInfo(
-                version=node.get_version(), cpp_info=node.cpp_info
+            id_and_info=IDAndInfo(
+                product_id=node.get_product_id(),
+                product_info=FetchProductInfo(
+                    version=node.get_version(), cpp_info=node.cpp_info
+                ),
             ),
         )
+
+
+async def receive(build_results: AsyncIterable[BuildResult]) -> None:
+    async for _ in build_results:
+        pass

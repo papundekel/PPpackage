@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.parse import load_bytes, load_object
+from PPpackage_utils.parse import load_from_bytes, load_object
 from pydantic import BaseModel
 
 
@@ -59,7 +59,7 @@ def parse_conan_graph_nodes(
     NodeType: type[T],
     conan_graph_json_bytes: bytes,
 ) -> Mapping[str, T]:
-    conan_graph = load_bytes(debug, ConanGraph, conan_graph_json_bytes)
+    conan_graph = load_from_bytes(debug, ConanGraph, conan_graph_json_bytes)
 
     return {
         node_id: load_object(NodeType, node_json)

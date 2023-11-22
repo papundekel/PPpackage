@@ -1,10 +1,16 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable
 from pathlib import Path
-from sys import stderr
 
-from PPpackage_utils.parse import Dependency, FetchOutputValue, Options, Package
+from PPpackage_utils.parse import (
+    BuildResult,
+    Dependency,
+    IDAndInfo,
+    Options,
+    Package,
+    PackageIDAndInfo,
+)
 from PPpackage_utils.utils import (
     asubprocess_wait,
     debug_redirect_stderr,
@@ -24,12 +30,12 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
-async def fetch(
+async def send(
     debug: bool,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-) -> AsyncIterable[FetchOutputValue]:
+) -> AsyncIterable[PackageIDAndInfo]:
     database_path, cache_path = get_cache_paths(cache_path)
 
     ensure_dir_exists(cache_path)
@@ -85,10 +91,16 @@ async def fetch(
     for package_name in package_names:
         line = (await process.stdout.readline()).decode("utf-8").strip()
 
-        yield FetchOutputValue(
+        yield PackageIDAndInfo(
             name=package_name,
-            product_id=process_product_id(line),
-            product_info=None,
+            id_and_info=IDAndInfo(
+                product_id=process_product_id(line), product_info=None
+            ),
         )
 
     await asubprocess_wait(process, "Error in `pacman -Sddp`")
+
+
+async def receive(build_results: AsyncIterable[BuildResult]):
+    async for _ in build_results:
+        pass
