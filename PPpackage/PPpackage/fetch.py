@@ -1,6 +1,9 @@
-from asyncio import Event, StreamReader, StreamWriter, TaskGroup
+from asyncio import Event
+from asyncio import Queue as BaseQueue
+from asyncio import StreamReader, StreamWriter, TaskGroup, as_completed
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import (
+    AsyncIterable,
     Callable,
     Iterable,
     Mapping,
@@ -8,24 +11,25 @@ from collections.abc import (
     MutableSequence,
     MutableSet,
 )
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from functools import partial
 from itertools import islice
 from pathlib import Path
-from re import S
 from sys import stderr
-from typing import Any
+from typing import Any, TypeVar
 
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage_utils.parse import (
+    BuildResult,
     Dependency,
-    FetchOutputValue,
+    IDAndInfo,
     ManagerAndName,
     Options,
     Package,
+    PackageIDAndInfo,
     dump_loop,
+    dump_loop_end,
     dump_many,
-    dump_many_end,
     dump_one,
     load_many,
 )
@@ -40,7 +44,7 @@ async def fetch_external_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    receiver: Callable[[FetchOutputValue], None],
+    receiver: Callable[[str, IDAndInfo], None],
 ) -> None:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
@@ -62,26 +66,57 @@ async def fetch_external_manager(
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
 
 
-class Synchronization:
-    receive_event = Event()
-    package_name: str
+T = TypeVar("T")
 
-    send_event = Event()
-
-    end = False
+Queue = BaseQueue[T | None]
 
 
-@contextmanager
-def set_event(event: Event):
+async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
+    while True:
+        value = await queue.get()
+
+        if value is None:
+            break
+
+        yield value
+
+
+@asynccontextmanager
+async def queue_put_loop(queue: Queue[T]):
     try:
         yield
     finally:
-        event.set()
+        queue.put_nowait(None)
 
 
-async def wait_and_clear(event: Event):
-    await event.wait()
-    event.clear()
+class Synchronization:
+    package_names = Queue[str]()
+
+
+async def process_build_root(package_name: str):
+    return True, bytes()  # TODO
+
+
+async def process_build_generate(package_name: str):
+    return False, bytes()  # TODO
+
+
+async def process_build(debug: bool, writer: StreamWriter, package_name: str):
+    print(f"build response: {package_name}", file=stderr)
+
+    for f in as_completed(
+        [process_build_root(package_name), process_build_generate(package_name)]
+    ):
+        is_root, directory = await f
+
+        await dump_one(
+            debug,
+            writer,
+            BuildResult(
+                name=package_name, is_root=is_root, directory=directory.decode("ascii")
+            ),
+            loop=True,
+        )
 
 
 async def send(
@@ -96,16 +131,11 @@ async def send(
         await dump_one(debug, writer, package)
         await dump_many(debug, writer, dependencies)
 
-    # while True:
-    #     with set_event(Synchronization.send_event):
-    #         await wait_and_clear(Synchronization.receive_event)
+    async with TaskGroup() as group:
+        async for package_name in queue_iterate(Synchronization.package_names):
+            group.create_task(process_build(debug, writer, package_name))
 
-    #         if Synchronization.end:
-    #             break
-
-    #         package_name = Synchronization.package_name
-
-    #         print(f"build response: {package_name}", file=stderr)
+    await dump_loop_end(debug, writer)
 
     writer.close()
 
@@ -113,31 +143,28 @@ async def send(
 async def receive(
     debug: bool,
     reader: StreamReader,
-    receiver: Callable[[FetchOutputValue], None],
+    receiver: Callable[[str, IDAndInfo], None],
 ) -> None:
-    # async for package_name in load_many(debug, reader, str):
-    #     Synchronization.package_name = package_name
-    #     Synchronization.receive_event.set()
+    async with queue_put_loop(Synchronization.package_names):
+        async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
+            package_name = package_id_and_info.name
+            id_and_info = package_id_and_info.id_and_info
 
-    #     await wait_and_clear(Synchronization.send_event)
-
-    # Synchronization.end = True
-    # Synchronization.receive_event.set()
-
-    # await Synchronization.send_event.wait()
-
-    async for value in load_many(debug, reader, FetchOutputValue):
-        receiver(value)
+            if id_and_info is not None:
+                receiver(package_name, id_and_info)
+            else:
+                Synchronization.package_names.put_nowait(package_name)
 
 
 def receiver(
     manager: str,
     nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
-    product: FetchOutputValue,
+    package_name: str,
+    id_and_info: IDAndInfo,
 ) -> None:
-    node = nodes[(manager, product.name)]
-    node["product_id"] = product.product_id
-    node["product_info"] = product.product_info
+    node = nodes[(manager, package_name)]
+    node["product_id"] = id_and_info.product_id
+    node["product_info"] = id_and_info.product_info
 
 
 async def fetch_manager(

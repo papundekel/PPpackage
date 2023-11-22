@@ -1,5 +1,6 @@
+from asyncio import StreamWriter, TaskGroup
 from asyncio import run as asyncio_run
-from collections.abc import AsyncIterable, Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable, Coroutine
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
@@ -10,10 +11,11 @@ from typing import Any, TypeVar
 from typer import Typer
 
 from .parse import (
+    BuildResult,
     Dependency,
-    FetchOutputValue,
     Options,
     Package,
+    PackageIDAndInfo,
     Product,
     ResolutionGraph,
     dump_many_async,
@@ -61,15 +63,43 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
+async def fetch_send(
+    writer: StreamWriter,
+    fetch_send_callback: Callable[
+        [
+            bool,
+            Path,
+            Any,
+            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+        ],
+        AsyncIterable[PackageIDAndInfo],
+    ],
+    cache_path: Path,
+    options: Options,
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+):
+    output = fetch_send_callback(__debug, cache_path, options, packages)
+
+    await dump_many_async(__debug, writer, output)
+
+
 def init(
     update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
         [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
         AsyncIterable[ResolutionGraph],
     ],
-    fetch_callback: Callable[
-        [bool, Path, Any, AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]],
-        AsyncIterable[FetchOutputValue],
+    fetch_send_callback: Callable[
+        [
+            bool,
+            Path,
+            Any,
+            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+        ],
+        AsyncIterable[PackageIDAndInfo],
+    ],
+    fetch_receive_callback: Callable[
+        [AsyncIterable[BuildResult]], Coroutine[Any, Any, None]
     ],
     generate_callback: Callable[
         [
@@ -120,9 +150,13 @@ def init(
             async for _ in load_many_loop(__debug, stdin)
         )
 
-        output = fetch_callback(__debug, cache_path, options, packages)
+        build_results = load_many(__debug, stdin, BuildResult)
 
-        await dump_many_async(__debug, stdout, output)
+        async with TaskGroup() as group:
+            group.create_task(
+                fetch_send(stdout, fetch_send_callback, cache_path, options, packages)
+            )
+            group.create_task(fetch_receive_callback(build_results))
 
     @__app.command()
     async def generate(cache_path: Path, generators_path: Path) -> None:
