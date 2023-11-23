@@ -6,6 +6,7 @@ from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.parse import load_from_bytes
+from PPpackage_utils.utils import TarFileInMemoryRead
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -73,14 +74,16 @@ async def main_command(
         generations,
     )
 
-    await generate(
+    generators_bytes = await generate(
         debug,
         cache_path,
-        generators_path,
         input.generators,
         graph.nodes(data=True),
         input.options,
     )
+
+    with TarFileInMemoryRead(generators_bytes) as tar:
+        tar.extractall(generators_path)
 
     await install(
         debug,

@@ -7,17 +7,19 @@ from asyncio import (
 )
 from asyncio.streams import FlowControlMixin
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterable, AsyncIterator, MutableMapping
+from collections.abc import AsyncIterator, Generator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
 from enum import Enum
 from enum import auto as enum_auto
 from enum import unique as enum_unique
+from io import BytesIO
 from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from sys import stderr, stdin, stdout
+from tarfile import TarFile, TarInfo
 from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
-from typing import Optional, TypeVar
+from typing import IO, Any, Optional, Protocol
 
 from frozendict import frozendict
 
@@ -211,3 +213,29 @@ def read_machine_id(machine_id_path: Path) -> str:
         machine_id = machine_id_file.readline().strip()
 
         return machine_id
+
+
+@contextmanager
+def TarFileInMemoryRead(data: bytes):
+    with BytesIO(data) as io:
+        with TarFile(fileobj=io, mode="r") as tar:
+            yield tar
+
+
+class TarFileWithBytes(Protocol):
+    data: bytes
+
+    def addfile(self, tarinfo: TarInfo, fileobj: IO[bytes] | None):
+        ...
+
+    def add(self, name: str, arcname: str):
+        ...
+
+
+@contextmanager
+def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
+    with BytesIO() as io:
+        with TarFile(fileobj=io, mode="w") as tar:
+            yield tar  # type: ignore
+
+        setattr(tar, "data", io.getvalue())

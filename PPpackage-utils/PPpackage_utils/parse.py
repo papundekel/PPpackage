@@ -171,6 +171,13 @@ def _dump_bool(debug: bool, writer: StreamWriter, value: bool) -> None:
         print(f"dump bool: {value}", file=stderr)
 
 
+async def dump_bytes(debug: bool, writer: StreamWriter, output_bytes: bytes) -> None:
+    _dump_int(debug, writer, len(output_bytes))
+    writer.write(output_bytes)
+
+    await writer.drain()
+
+
 async def dump_one(
     debug: bool, writer: StreamWriter, output: BaseModel | Any, loop=False
 ) -> None:
@@ -183,13 +190,10 @@ async def dump_one(
 
     output_json_bytes = output_json_string.encode()
 
-    _dump_int(debug, writer, len(output_json_bytes))
-    writer.write(output_json_bytes)
+    await dump_bytes(debug, writer, output_json_bytes)
 
     if _DEBUG:
         print(f"dump:\n{output_json_string}", file=stderr)
-
-    await writer.drain()
 
 
 async def dump_loop_end(debug: bool, writer: StreamWriter):

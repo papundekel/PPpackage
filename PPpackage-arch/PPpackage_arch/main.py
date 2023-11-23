@@ -1,5 +1,4 @@
-from PPpackage_utils.app import init, run
-from PPpackage_utils.utils import anoop
+from PPpackage_utils.app import generate_empty, init, run
 
 from .fetch import receive as fetch_receive
 from .fetch import send as fetch_send
@@ -14,7 +13,7 @@ def main():
         resolve,
         fetch_send,
         fetch_receive,
-        anoop,
+        generate_empty,
         install,
         str,
     )

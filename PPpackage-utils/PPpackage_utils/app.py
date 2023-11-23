@@ -18,12 +18,13 @@ from .parse import (
     PackageIDAndInfo,
     Product,
     ResolutionGraph,
+    dump_bytes,
     dump_many_async,
     load_many,
     load_many_loop,
     load_one,
 )
-from .utils import ensure_dir_exists, get_standard_streams
+from .utils import TarFileInMemoryWrite, ensure_dir_exists, get_standard_streams
 
 
 class AsyncTyper(Typer):
@@ -113,12 +114,11 @@ def init(
         [
             bool,
             Path,
-            Path,
             Any,
             AsyncIterable[Product],
             AsyncIterable[str],
         ],
-        Awaitable[None],
+        Awaitable[bytes],
     ],
     install_callback: Callable[
         [bool, Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
@@ -177,16 +177,18 @@ def init(
             group.create_task(fetch_receive_callback(build_results))
 
     @__app.command()
-    async def generate(cache_path: Path, generators_path: Path) -> None:
-        stdin, _ = await get_standard_streams()
+    async def generate(cache_path: Path) -> None:
+        stdin, stdout = await get_standard_streams()
 
         options = await load_one(__debug, stdin, Options)
         products = load_many(__debug, stdin, Product)
         generators = load_many(__debug, stdin, str)
 
-        await generate_callback(
-            __debug, cache_path, generators_path, options, products, generators
+        generators = await generate_callback(
+            __debug, cache_path, options, products, generators
         )
+
+        await dump_bytes(__debug, stdout, generators)
 
     @__app.command()
     async def install(
@@ -221,3 +223,22 @@ def run(app: Typer, program_name: str) -> None:
         print_exc()
 
         exit(1)
+
+
+async def generate_empty(
+    debug: bool,
+    cache_path: Path,
+    options: Any,
+    products: AsyncIterable[Product],
+    generators: AsyncIterable[str],
+) -> bytes:
+    async for _ in products:
+        pass
+
+    async for _ in generators:
+        pass
+
+    with TarFileInMemoryWrite() as tar:
+        pass
+
+    return tar.data

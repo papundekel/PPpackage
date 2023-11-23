@@ -7,7 +7,6 @@ from pathlib import Path
 from random import choices as random_choices
 from shutil import move
 from sys import stderr
-from xml.dom import Node
 
 from PPpackage_utils.io import (
     communicate_with_daemon,
@@ -17,7 +16,7 @@ from PPpackage_utils.io import (
     pipe_write_int,
     pipe_write_string,
 )
-from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
+from PPpackage_utils.parse import dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
     MACHINE_ID_RELATIVE_PATH,
     MyException,
