@@ -22,8 +22,6 @@ async def update_database_manager(debug: bool, manager: str, cache_path: Path):
 
     await asubprocess_wait(process, f"Error in {manager}'s update-database.")
 
-    stderr.write(f"{manager} database updated.\n")
-
 
 async def update_database(
     debug: bool, managers: Iterable[str], cache_path: Path
@@ -33,5 +31,3 @@ async def update_database(
     async with TaskGroup() as group:
         for manager in managers:
             group.create_task(update_database_manager(debug, manager, cache_path))
-
-    stderr.write("Databases updated.\n")

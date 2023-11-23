@@ -75,6 +75,10 @@ async def install_manager(
     destination_relative_path: Path,
     generation: Iterable[tuple[str, NodeData]],
 ) -> None:
+    stderr.write(f"{manager}:\n")
+    for package_name, _ in sorted(generation, key=lambda p: p[0]):
+        stderr.write(f"\t{package_name}\n")
+
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
         process = await create_subprocess_exec(
             f"PPpackage-{manager}",
@@ -145,6 +149,8 @@ async def install(
     destination_path: Path,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> None:
+    stderr.write(f"Installing packages into {destination_path}...\n")
+
     workdir_relative_path = Path("root")
 
     (runner_workdir_path / workdir_relative_path).mkdir(exist_ok=True, parents=True)
