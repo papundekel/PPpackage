@@ -13,9 +13,9 @@ from contextlib import asynccontextmanager
 from itertools import islice
 from pathlib import Path
 from sys import stderr
-from typing import Any, TypedDict, TypeVar
+from typing import Any, TypeVar
 
-from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from networkx import MultiDiGraph, dfs_preorder_nodes
 from PPpackage_utils.parse import (
     BuildResult,
     Dependency,
@@ -31,12 +31,7 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
 
-
-class NodeData(TypedDict):
-    version: str
-    product_id: str
-    product_info: Any
-
+from .utils import NodeData
 
 T = TypeVar("T")
 
@@ -68,7 +63,7 @@ class Synchronization:
 async def process_build_root(
     manager: str,
     package_name: str,
-    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     return True, bytes()  # TODO
 
@@ -76,7 +71,7 @@ async def process_build_root(
 async def process_build_generate(
     manager: str,
     package_name: str,
-    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     return False, bytes()  # TODO
 
@@ -86,7 +81,7 @@ async def process_build(
     writer: StreamWriter,
     manager: str,
     package_name: str,
-    dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     print(f"build response: {package_name}", file=stderr)
 
@@ -115,7 +110,7 @@ async def send(
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
     packages_to_dependencies: Mapping[
-        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
 ) -> None:
     await dump_one(debug, writer, options)
@@ -143,7 +138,7 @@ async def receive(
     debug: bool,
     reader: StreamReader,
     manager: str,
-    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+    nodes: Mapping[ManagerAndName, MutableMapping[str, Any]],
 ) -> None:
     async with queue_put_loop(Synchronization.package_names):
         async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
@@ -151,7 +146,7 @@ async def receive(
             id_and_info = package_id_and_info.id_and_info
 
             if id_and_info is not None:
-                node = nodes[(manager, package_name)]
+                node = nodes[ManagerAndName(manager, package_name)]
                 node["product_id"] = id_and_info.product_id
                 node["product_info"] = id_and_info.product_info
             else:
@@ -166,9 +161,9 @@ async def fetch_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    nodes: Mapping[tuple[str, str], MutableMapping[str, Any]],
+    nodes: Mapping[ManagerAndName, MutableMapping[str, Any]],
     packages_to_dependencies: Mapping[
-        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
 ) -> None:
     process = await create_subprocess_exec(
@@ -204,18 +199,20 @@ async def fetch_manager(
 
 def create_dependencies(
     sent_product_infos: MutableSet[ManagerAndName],
-    node_dependencies: Iterable[tuple[tuple[str, str], NodeData]],
+    node_dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     dependencies = []
 
-    for (manager, name), data in node_dependencies:
+    for manager_and_name, data in node_dependencies:
         product_info = (
-            None
-            if ManagerAndName(name=name, manager=manager) in sent_product_infos
-            else data["product_info"]
+            None if manager_and_name in sent_product_infos else data["product_info"]
         )
 
-        dependency = Dependency(manager=manager, name=name, product_info=product_info)
+        dependency = Dependency(
+            manager=manager_and_name.manager,
+            name=manager_and_name.name,
+            product_info=product_info,
+        )
 
         dependencies.append(dependency)
         sent_product_infos.add(super(Dependency, dependency))
@@ -225,7 +222,7 @@ def create_dependencies(
 
 def graph_predecessors(
     graph: MultiDiGraph, node: Any
-) -> Iterable[tuple[tuple[str, str], NodeData]]:
+) -> Iterable[tuple[ManagerAndName, NodeData]]:
     for node in islice(dfs_preorder_nodes(graph, source=node), 1, None):
         yield node, graph.nodes[node]
 
@@ -237,33 +234,33 @@ async def fetch(
     cache_path: Path,
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
+    generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> None:
-    reversed_graph = graph.reverse(copy=False)
-
     packages_to_dependencies: MutableMapping[
-        ManagerAndName, Iterable[tuple[tuple[str, str], NodeData]]
+        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ] = {}
 
-    for generation in topological_generations(reversed_graph):
+    for manager_to_generation in generations:
         sent_product_infos: MutableSet[ManagerAndName] = set()
         manager_packages: MutableMapping[
             str, MutableSequence[tuple[Package, Iterable[Dependency]]]
         ] = {}
 
-        for manager, package_name in generation:
-            version = graph.nodes[(manager, package_name)]["version"]
+        for manager, generation in manager_to_generation.items():
+            for package_name, data in generation:
+                manager_and_name = ManagerAndName(manager, package_name)
 
-            node_dependencies = list(graph_predecessors(graph, (manager, package_name)))
+                node_dependencies = list(graph_predecessors(graph, manager_and_name))
 
-            dependencies = create_dependencies(sent_product_infos, node_dependencies)
+                dependencies = create_dependencies(
+                    sent_product_infos, node_dependencies
+                )
 
-            packages_to_dependencies[
-                ManagerAndName(name=package_name, manager=manager)
-            ] = node_dependencies
+                packages_to_dependencies[manager_and_name] = node_dependencies
 
-            manager_packages.setdefault(manager, []).append(
-                (Package(name=package_name, version=version), dependencies)
-            )
+                manager_packages.setdefault(manager, []).append(
+                    (Package(name=package_name, version=data["version"]), dependencies)
+                )
 
         async with TaskGroup() as group:
             for manager, packages in manager_packages.items():
