@@ -11,6 +11,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass
 from itertools import product as itertools_product
+from json import dumps as json_dumps
 from pathlib import Path
 from sys import stderr
 from typing import Any
@@ -272,6 +273,15 @@ async def resolve(
     initial_requirements: Mapping[str, Set[Any]],
     meta_options: Mapping[str, Any],
 ) -> MultiDiGraph:
+    stderr.write("Resolving requirements...\n")
+
+    for manager, requirements in sorted(
+        initial_requirements.items(), key=lambda x: x[0]
+    ):
+        stderr.write(f"{manager}:\n")
+        for requirement in requirements:
+            stderr.write(f"\t{json_dumps(requirement)}\n")
+
     iterations_done = 0
 
     all_requirements_choices = [
@@ -284,6 +294,8 @@ async def resolve(
     results_work_graph: MutableSequence[Mapping[str, WorkGraph]] = []
 
     while True:
+        stderr.write(f"Resolution iteration {iterations_done + 1}...\n")
+
         if iterations_done >= iteration_limit:
             raise MyException("Resolve iteration limit reached.")
 
@@ -312,6 +324,13 @@ async def resolve(
 
     # TODO: model selection
     result_work_graph = results_work_graph.pop()
+
+    stderr.write("Resolution done.\n")
+
+    for manager, work_graph in sorted(result_work_graph.items(), key=lambda x: x[0]):
+        stderr.write(f"{manager}:\n")
+        for package_name, value in sorted(work_graph.graph.items(), key=lambda x: x[0]):
+            stderr.write(f"\t{package_name} -> {value.version}\n")
 
     graph = process_graph(result_work_graph)
 

@@ -5,11 +5,7 @@ from pathlib import Path
 from shutil import copytree, rmtree
 
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import (
-    asubprocess_communicate,
-    communicate_from_sub,
-    debug_redirect_stderr,
-)
+from PPpackage_utils.utils import asubprocess_communicate, communicate_from_sub
 
 from .utils import get_cache_path, make_conan_environment
 
@@ -27,7 +23,7 @@ async def install_product(
         f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
+        stderr=DEVNULL,
         env=environment,
     )
 

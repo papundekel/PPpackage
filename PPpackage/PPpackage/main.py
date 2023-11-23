@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
-from sys import stdin
+from sys import stderr, stdin
 
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
@@ -90,6 +90,8 @@ async def main_command(
         destination_path,
         generations,
     )
+
+    stderr.write("Done.\n")
 
 
 def main():

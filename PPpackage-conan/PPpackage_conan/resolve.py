@@ -21,8 +21,6 @@ from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import (
     asubprocess_communicate,
     asubprocess_wait,
-    debug_redirect_stderr,
-    debug_redirect_stdout,
     ensure_dir_exists,
 )
 
@@ -48,8 +46,8 @@ async def export_package(
             "export",
             conanfile.name,
             stdin=DEVNULL,
-            stdout=debug_redirect_stdout(debug),
-            stderr=debug_redirect_stderr(debug),
+            stdout=DEVNULL,
+            stderr=DEVNULL,
             env=environment,
         )
 
@@ -117,8 +115,8 @@ async def remove_temporary_packages_from_cache(
         "--confirm",
         "*/1.0.0@pppackage",
         stdin=DEVNULL,
-        stdout=debug_redirect_stdout(debug),
-        stderr=debug_redirect_stderr(debug),
+        stdout=DEVNULL,
+        stderr=DEVNULL,
         env=environment,
     )
 
@@ -229,7 +227,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=debug_redirect_stderr(debug),
+            stderr=DEVNULL,
             env=environment,
         )
 

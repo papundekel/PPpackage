@@ -5,11 +5,7 @@ from pathlib import Path
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.utils import (
-    MyException,
-    asubprocess_communicate,
-    debug_redirect_stderr,
-)
+from PPpackage_utils.utils import MyException, asubprocess_communicate
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -28,7 +24,7 @@ async def resolve_pactree(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
+        stderr=DEVNULL,
     )
 
     graph_bytes = await asubprocess_communicate(process, "Error in `pactree`.")
@@ -84,7 +80,7 @@ async def resolve_versions(
         *packages,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
+        stderr=DEVNULL,
     )
 
     stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")

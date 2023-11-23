@@ -83,8 +83,6 @@ async def process_build(
     package_name: str,
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
-    print(f"build response: {package_name}", file=stderr)
-
     for f in as_completed(
         [
             process_build_root(manager, package_name, dependencies),
@@ -138,7 +136,7 @@ async def receive(
     debug: bool,
     reader: StreamReader,
     manager: str,
-    nodes: Mapping[ManagerAndName, MutableMapping[str, Any]],
+    nodes: Mapping[ManagerAndName, NodeData],
 ) -> None:
     async with queue_put_loop(Synchronization.package_names):
         async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
@@ -161,7 +159,7 @@ async def fetch_manager(
     cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
-    nodes: Mapping[ManagerAndName, MutableMapping[str, Any]],
+    nodes: Mapping[ManagerAndName, NodeData],
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
@@ -195,6 +193,11 @@ async def fetch_manager(
         group.create_task(receive(debug, process.stdout, manager, nodes))
 
     await asubprocess_wait(process, f"Error in {manager}'s fetch.")
+
+    stderr.write(f"{manager}:\n")
+    for package, _ in sorted(packages, key=lambda p: p[0].name):
+        product_id = nodes[ManagerAndName(manager, package.name)]["product_id"]
+        stderr.write(f"\t{package.name} -> {product_id}\n")
 
 
 def create_dependencies(
@@ -236,6 +239,8 @@ async def fetch(
     graph: MultiDiGraph,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> None:
+    stderr.write("Fetching packages...\n")
+
     packages_to_dependencies: MutableMapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ] = {}

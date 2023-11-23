@@ -11,13 +11,7 @@ from PPpackage_utils.parse import (
     Package,
     PackageIDAndInfo,
 )
-from PPpackage_utils.utils import (
-    asubprocess_wait,
-    debug_redirect_stderr,
-    debug_redirect_stdout,
-    ensure_dir_exists,
-    fakeroot,
-)
+from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
 
@@ -64,8 +58,8 @@ async def send(
             "--nodeps",
             *package_names,
             stdin=DEVNULL,
-            stdout=debug_redirect_stdout(debug),
-            stderr=debug_redirect_stderr(debug),
+            stdout=DEVNULL,
+            stderr=DEVNULL,
             env=environment,
         )
 
@@ -85,7 +79,7 @@ async def send(
         *package_names,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
+        stderr=DEVNULL,
     )
 
     assert process.stdout is not None
