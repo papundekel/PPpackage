@@ -6,7 +6,7 @@ from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import stderr
 from traceback import print_exc
-from typing import Any, TypeVar
+from typing import Any, Iterable, TypeVar
 
 from typer import Typer
 
@@ -19,9 +19,10 @@ from .parse import (
     Product,
     ResolutionGraph,
     dump_bytes,
+    dump_loop,
     dump_many_async,
+    load_loop,
     load_many,
-    load_many_loop,
     load_one,
 )
 from .utils import TarFileInMemoryWrite, ensure_dir_exists, get_standard_streams
@@ -90,6 +91,13 @@ async def fetch_send(
     await dump_many_async(__debug, writer, output)
 
 
+def chunk_bytes(data: bytes, chunk_size: int) -> Iterable[memoryview]:
+    view = memoryview(data)
+
+    for i in range(0, len(data), chunk_size):
+        yield view[i : i + chunk_size]
+
+
 def init(
     update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
@@ -137,7 +145,7 @@ def init(
 
         requirements_list = (
             load_many(__debug, stdin, RequirementType)
-            async for _ in load_many_loop(__debug, stdin)
+            async for _ in load_loop(__debug, stdin)
         )
 
         output = resolve_callback(__debug, cache_path, options, requirements_list)
@@ -157,7 +165,7 @@ def init(
                 await load_one(__debug, stdin, Package),
                 load_many(__debug, stdin, Dependency),
             )
-            async for _ in load_many_loop(__debug, stdin)
+            async for _ in load_loop(__debug, stdin)
         )
 
         build_results = load_many(__debug, stdin, BuildResult)
@@ -188,7 +196,8 @@ def init(
             __debug, cache_path, options, products, generators
         )
 
-        await dump_bytes(__debug, stdout, generators)
+        async for chunk in dump_loop(__debug, stdout, chunk_bytes(generators, 2**15)):
+            await dump_bytes(__debug, stdout, chunk)
 
     @__app.command()
     async def install(

@@ -12,6 +12,7 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_bytes,
+    load_loop,
 )
 from PPpackage_utils.utils import (
     TarFileInMemoryRead,
@@ -49,7 +50,10 @@ async def generate_manager(
     await dump_many(debug, process.stdin, products)
     await dump_many(debug, process.stdin, generators)
 
-    generators_bytes = await load_bytes(debug, process.stdout)
+    generators_bytes = bytearray()
+
+    async for _ in load_loop(debug, process.stdout):
+        generators_bytes += await load_bytes(debug, process.stdout)
 
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
 

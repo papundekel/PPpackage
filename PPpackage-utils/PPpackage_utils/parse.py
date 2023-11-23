@@ -171,7 +171,9 @@ def _dump_bool(debug: bool, writer: StreamWriter, value: bool) -> None:
         print(f"dump bool: {value}", file=stderr)
 
 
-async def dump_bytes(debug: bool, writer: StreamWriter, output_bytes: bytes) -> None:
+async def dump_bytes(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
     _dump_int(debug, writer, len(output_bytes))
     writer.write(output_bytes)
 
@@ -190,7 +192,7 @@ async def dump_one(
 
     output_json_bytes = output_json_string.encode()
 
-    await dump_bytes(debug, writer, output_json_bytes)
+    await dump_bytes(debug, writer, memoryview(output_json_bytes))
 
     if _DEBUG:
         print(f"dump:\n{output_json_string}", file=stderr)
@@ -201,7 +203,10 @@ async def dump_loop_end(debug: bool, writer: StreamWriter):
     await writer.drain()
 
 
-async def dump_loop(debug: bool, writer: StreamWriter, iterable: Iterable):
+T = TypeVar("T")
+
+
+async def dump_loop(debug: bool, writer: StreamWriter, iterable: Iterable[T]):
     for obj in iterable:
         _dump_bool(debug, writer, True)
         yield obj
@@ -270,6 +275,8 @@ async def load_bytes(debug: bool, reader: StreamReader) -> bytes:
     if length == 0:
         raise MyException("Unexpected length 0.")
 
+    print(f"load_bytes: {length}", file=stderr)
+
     return await reader.readexactly(length)
 
 
@@ -281,7 +288,7 @@ async def load_one(
     return load_from_bytes(debug, Model, input_bytes)
 
 
-async def load_many_loop(debug: bool, reader: StreamReader):
+async def load_loop(debug: bool, reader: StreamReader):
     while True:
         do_continue = await _load_bool(debug, reader)
 
@@ -294,5 +301,5 @@ async def load_many_loop(debug: bool, reader: StreamReader):
 async def load_many(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> AsyncIterable[ModelType]:
-    async for _ in load_many_loop(debug, reader):
+    async for _ in load_loop(debug, reader):
         yield await load_one(debug, reader, Model)
