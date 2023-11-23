@@ -2,14 +2,11 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable
 from pathlib import Path
-from sys import stderr
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
     asubprocess_wait,
     communicate_from_sub,
-    debug_redirect_stderr,
-    debug_redirect_stdout,
     ensure_dir_exists,
     fakeroot,
 )
@@ -58,8 +55,8 @@ async def install(
                     async for product in products
                 ],
                 stdin=DEVNULL,
-                stdout=debug_redirect_stdout(debug),
-                stderr=debug_redirect_stderr(debug),
+                stdout=DEVNULL,
+                stderr=DEVNULL,
                 env=environment,
             )
 

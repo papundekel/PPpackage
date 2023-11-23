@@ -27,8 +27,6 @@ from PPpackage_utils.utils import (
     RunnerRequestType,
     TemporaryDirectory,
     asubprocess_wait,
-    debug_redirect_stderr,
-    debug_redirect_stdout,
 )
 from typer import Exit
 
@@ -86,8 +84,8 @@ async def handle_command(
             str(bundle_path),
             "PPpackage-container",
             stdin=pipe,
-            stdout=debug_redirect_stdout(debug),
-            stderr=debug_redirect_stderr(debug),
+            stdout=DEVNULL,
+            stderr=DEVNULL,
         )
 
         return_code = await process.wait()
@@ -127,8 +125,8 @@ async def pull_image(
                 "pppackage/runner-image",
                 "-",
                 stdin=PIPE,
-                stdout=debug_redirect_stdout(debug),
-                stderr=debug_redirect_stderr(debug),
+                stdout=DEVNULL,
+                stderr=DEVNULL,
             )
 
             await process.communicate(dockerfile.encode("ascii"))
@@ -189,7 +187,7 @@ async def handle_run(
                 *args,
                 stdin=stdin_pipe,
                 stdout=stdout_pipe,
-                stderr=debug_redirect_stderr(debug),
+                stderr=DEVNULL,
             )
         ).wait()
 
@@ -260,8 +258,8 @@ async def create_config(debug: bool, bundle_path: Path):
         "--bundle",
         str(bundle_path),
         stdin=DEVNULL,
-        stdout=debug_redirect_stdout(debug),
-        stderr=debug_redirect_stderr(debug),
+        stdout=DEVNULL,
+        stderr=DEVNULL,
     )
 
     await asubprocess_wait(await process_creation, "Error in `runc spec`.")

@@ -15,7 +15,7 @@ from PPpackage_utils.parse import (
     PackageIDAndInfo,
     load_object,
 )
-from PPpackage_utils.utils import asubprocess_communicate, debug_redirect_stderr
+from PPpackage_utils.utils import asubprocess_communicate
 
 from .parse import FetchProductInfo
 from .utils import (
@@ -83,7 +83,7 @@ async def send(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=debug_redirect_stderr(debug),
+            stderr=DEVNULL,
             env=environment,
         )
 
