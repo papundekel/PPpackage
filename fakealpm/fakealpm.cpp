@@ -54,6 +54,8 @@ std::string read_string() {
 extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
                                 char *const argv[], _alpm_cb_io stdin_cb,
                                 void *stdin_ctx) {
+  std::fprintf(stderr, "Executing command %s...", command);
+
   std::fprintf(pipe_from_sub, "COMMAND\n");
 
   write_string(command);
@@ -83,6 +85,10 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
   std::fclose(pipe_hook);
 
   const auto return_value = read_int();
+
+  const auto message = return_value == 0 ? "success" : "failure";
+
+  std::fprintf(stderr, " %s\n", message);
 
   return return_value;
 }

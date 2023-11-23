@@ -7,6 +7,7 @@ from pathlib import Path
 from random import choices as random_choices
 from shutil import move
 from sys import stderr
+from xml.dom import Node
 
 from PPpackage_utils.io import (
     communicate_with_daemon,
@@ -26,6 +27,8 @@ from PPpackage_utils.utils import (
     debug_redirect_stderr,
     read_machine_id,
 )
+
+from .utils import NodeData, data_to_product
 
 
 async def install_manager_command(
@@ -70,15 +73,9 @@ async def install_manager(
     daemon_writer: StreamWriter,
     daemon_workdir_path: Path,
     destination_relative_path: Path,
-    products: Iterable[Product],
+    generation: Iterable[tuple[str, NodeData]],
 ) -> None:
     with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
-        if debug:
-            print(
-                f"DEBUG PPpackage: {manager} pipe_from_sub_path: {pipe_from_sub_path}, pipe_to_sub_path: {pipe_to_sub_path}",
-                file=stderr,
-            )
-
         process = await create_subprocess_exec(
             f"PPpackage-{manager}",
             "--debug" if debug else "--no-debug",
@@ -94,7 +91,11 @@ async def install_manager(
 
         assert process.stdin is not None
 
-        await dump_many(debug, process.stdin, products)
+        await dump_many(
+            debug,
+            process.stdin,
+            (data_to_product(package_name, data) for package_name, data in generation),
+        )
 
         process.stdin.close()
         await process.stdin.wait_closed()
@@ -142,7 +143,7 @@ async def install(
     runner_path: Path,
     runner_workdir_path: Path,
     destination_path: Path,
-    meta_products: Mapping[str, Iterable[Product]],
+    generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> None:
     workdir_relative_path = Path("root")
 
@@ -160,26 +161,24 @@ async def install(
 
     machine_id = read_machine_id(Path("/") / MACHINE_ID_RELATIVE_PATH)
 
-    if debug:
-        print(f"DEBUG PPpackage: {runner_path=}", file=stderr)
-
     async with communicate_with_daemon(debug, runner_path) as (
         daemon_reader,
         daemon_writer,
     ):
         await dump_one(debug, daemon_writer, machine_id)
 
-        for manager, products in meta_products.items():
-            await install_manager(
-                debug,
-                manager,
-                cache_path,
-                daemon_reader,
-                daemon_writer,
-                runner_workdir_path,
-                workdir_relative_path,
-                products,
-            )
+        for manager_to_generation in generations:
+            for manager, generation in manager_to_generation.items():
+                await install_manager(
+                    debug,
+                    manager,
+                    cache_path,
+                    daemon_reader,
+                    daemon_writer,
+                    runner_workdir_path,
+                    workdir_relative_path,
+                    generation,
+                )
 
         for content in listdir(runner_workdir_path / workdir_relative_path):
             move(

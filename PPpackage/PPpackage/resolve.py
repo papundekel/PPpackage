@@ -18,6 +18,7 @@ from typing import Any
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_utils.parse import (
+    ManagerAndName,
     ManagerRequirement,
     Options,
     ResolutionGraph,
@@ -232,24 +233,32 @@ def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
     graph = MultiDiGraph()
 
     graph.add_nodes_from(
-        ((manager, package), {"version": value.version})
+        (ManagerAndName(manager, package_name), {"version": value.version})
         for manager, work_graph in manager_work_graph.items()
-        for package, value in work_graph.graph.items()
+        for package_name, value in work_graph.graph.items()
     )
 
     graph.add_edges_from(
         {
-            ((manager, package), (manager, dependency))
+            (
+                ManagerAndName(manager, package_name),
+                ManagerAndName(manager, dependency_name),
+            )
             for manager, work_graph in manager_work_graph.items()
-            for package, value in work_graph.graph.items()
-            for dependency in value.dependencies
+            for package_name, value in work_graph.graph.items()
+            for dependency_name in value.dependencies
         }
         | {
-            ((manager, package), (requirement_manager, dependency))
+            (
+                ManagerAndName(manager, package_name),
+                ManagerAndName(requirement_manager, dependency_name),
+            )
             for manager, work_graph in manager_work_graph.items()
-            for package, value in work_graph.graph.items()
+            for package_name, value in work_graph.graph.items()
             for requirement_manager, requirement in value.requirements.items()
-            for dependency in manager_work_graph[requirement_manager].roots[requirement]
+            for dependency_name in manager_work_graph[requirement_manager].roots[
+                requirement
+            ]
         }
     )
 

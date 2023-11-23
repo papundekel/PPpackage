@@ -1,9 +1,11 @@
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
-from sys import stderr, stdin
+from sys import stdin
 
+from networkx import MultiDiGraph
+from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.app import AsyncTyper, run
-from PPpackage_utils.parse import Product, load_from_bytes
+from PPpackage_utils.parse import load_from_bytes
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -13,8 +15,23 @@ from .install import install
 from .parse import Input
 from .resolve import resolve
 from .update_database import update_database
+from .utils import NodeData
 
 app = AsyncTyper()
+
+
+def topological_generations(
+    graph: MultiDiGraph,
+) -> Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]]:
+    for generation in base_topological_generations(graph):
+        manager_nodes: MutableMapping[str, MutableSequence[tuple[str, NodeData]]] = {}
+
+        for manager_and_name in generation:
+            manager_nodes.setdefault(manager_and_name.manager, []).append(
+                (manager_and_name.name, graph.nodes[manager_and_name])
+            )
+
+        yield manager_nodes
 
 
 @app.command()
@@ -42,27 +59,26 @@ async def main_command(
         debug, resolve_iteration_limit, cache_path, input.requirements, input.options
     )
 
+    reversed_graph = graph.reverse(copy=False)
+
+    generations = list(topological_generations(reversed_graph))
+
     await fetch(
-        debug, runner_path, runner_workdir_path, cache_path, input.options, graph
+        debug,
+        runner_path,
+        runner_workdir_path,
+        cache_path,
+        input.options,
+        graph,
+        generations,
     )
-
-    meta_products: MutableMapping[str, MutableSequence[Product]] = {}
-
-    for (manager, name), data in graph.nodes(data=True):
-        meta_products.setdefault(manager, []).append(
-            Product(
-                name=name,
-                version=data["version"],
-                product_id=data["product_id"],
-            )
-        )
 
     await generate(
         debug,
         cache_path,
         generators_path,
         input.generators,
-        meta_products,
+        graph.nodes(data=True),
         input.options,
     )
 
@@ -72,7 +88,7 @@ async def main_command(
         runner_path,
         runner_workdir_path,
         destination_path,
-        meta_products,
+        generations,
     )
 
 
