@@ -51,7 +51,7 @@ jobs:
       if: github.ref_name == 'main'
 
     - name: Try run.sh
-      run: ./run.sh docker ${{ github.workspace }}/cache "$(pwd)/generators" "$(pwd)/root" --debug <input/basic-no-conan.json
+      run: ./run.sh docker ${{ github.workspace }}/cache "$(pwd)/generators" "$(pwd)/root" --debug <input/basic.json
 
     - name: See if ldconfig ran
       run: ls -l root/etc/ld.so.cache

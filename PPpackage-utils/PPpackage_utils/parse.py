@@ -275,8 +275,6 @@ async def load_bytes(debug: bool, reader: StreamReader) -> bytes:
     if length == 0:
         raise MyException("Unexpected length 0.")
 
-    print(f"load_bytes: {length}", file=stderr)
-
     return await reader.readexactly(length)
 
 
