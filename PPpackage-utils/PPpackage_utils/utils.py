@@ -242,6 +242,5 @@ def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
 
 
 async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
-    print("X", file=stderr)
     async for _ in async_iterable:
         pass
