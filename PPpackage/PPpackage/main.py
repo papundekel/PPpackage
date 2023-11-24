@@ -91,7 +91,8 @@ async def main_command(
 
     old_installation = old_installation_tar.data
 
-    rmtree(destination_path)
+    for x in destination_path.iterdir():
+        rmtree(x)
 
     new_installation = await install(
         debug,
