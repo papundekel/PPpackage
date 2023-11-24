@@ -5,8 +5,7 @@ from pathlib import Path
 from tarfile import TarFile
 
 from PPpackage_utils.parse import Product
-
-from .utils import create_tar_directory, create_tar_file
+from PPpackage_utils.utils import create_tar_directory, create_tar_file
 
 
 def versions(
@@ -25,11 +24,10 @@ def versions(
             for product in products:
                 data = {"version": product.version, "product_id": product.product_id}
 
-                data_serialized = json_dumps(data, indent=4).encode()
-
-                create_tar_file(
-                    tar, manager_path / f"{product.name}.json", data_serialized
-                )
+                with create_tar_file(
+                    tar, manager_path / f"{product.name}.json"
+                ) as file:
+                    file.write(json_dumps(data, indent=4).encode())
 
     return io.getbuffer()
 

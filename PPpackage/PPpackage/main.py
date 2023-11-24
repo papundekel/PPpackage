@@ -1,12 +1,13 @@
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
+from shutil import rmtree
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.parse import load_from_bytes
-from PPpackage_utils.utils import TarFileInMemoryRead
+from PPpackage_utils.utils import TarFileInMemoryRead, TarFileInMemoryWrite
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -82,17 +83,27 @@ async def main_command(
         input.options,
     )
 
-    with TarFileInMemoryRead(generators_bytes) as tar:
-        tar.extractall(generators_path)
+    with TarFileInMemoryRead(generators_bytes) as generators_tar:
+        generators_tar.extractall(generators_path)
 
-    await install(
+    with TarFileInMemoryWrite() as old_installation_tar:
+        old_installation_tar.add(str(destination_path), "")
+
+    old_installation = old_installation_tar.data
+
+    rmtree(destination_path)
+
+    new_installation = await install(
         debug,
         cache_path,
         runner_path,
         runner_workdir_path,
-        destination_path,
+        old_installation,
         generations,
     )
+
+    with TarFileInMemoryRead(new_installation) as new_installation_tar:
+        new_installation_tar.extractall(destination_path)
 
     stderr.write("Done.\n")
 

@@ -130,6 +130,7 @@ async def send(
     await dump_loop_end(debug, writer)
 
     writer.close()
+    await writer.wait_closed()
 
 
 async def receive(

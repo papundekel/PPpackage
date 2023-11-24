@@ -22,12 +22,14 @@ from .parse import (
     dump_bytes_chunked,
     dump_loop,
     dump_many_async,
+    load_bytes_chunked,
     load_loop,
     load_many,
     load_one,
 )
 from .utils import (
     TarFileInMemoryWrite,
+    create_empty_tar,
     discard_async_iterable,
     ensure_dir_exists,
     get_standard_streams,
@@ -100,7 +102,8 @@ def init(
         Awaitable[memoryview],
     ],
     install_callback: Callable[
-        [bool, Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
+        [bool, Path, Path, Path, Path, memoryview, AsyncIterable[Product]],
+        Awaitable[memoryview],
     ],
     RequirementType: type[RequirementTypeType],
 ) -> Typer:
@@ -172,24 +175,26 @@ def init(
     @__app.command()
     async def install(
         cache_path: Path,
-        destination_path: Path,
         pipe_from_sub_path: Path,
         pipe_to_sub_path: Path,
+        runner_workdir_path: Path,
     ) -> None:
-        ensure_dir_exists(destination_path)
+        stdin, stdout = await get_standard_streams()
 
-        stdin, _ = await get_standard_streams()
-
+        old_directory = await load_bytes_chunked(__debug, stdin)
         products = load_many(__debug, stdin, Product)
 
-        await install_callback(
+        new_directory = await install_callback(
             __debug,
             cache_path,
-            destination_path,
             pipe_from_sub_path,
             pipe_to_sub_path,
+            runner_workdir_path,
+            old_directory,
             products,
         )
+
+        await dump_bytes_chunked(__debug, stdout, new_directory)
 
     return __app
 
@@ -217,10 +222,7 @@ async def generate_empty(
     async for _ in generators:
         pass
 
-    with TarFileInMemoryWrite() as tar:
-        pass
-
-    return tar.data
+    return create_empty_tar()
 
 
 def fetch_receive_discard(

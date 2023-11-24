@@ -1,3 +1,4 @@
+import tarfile
 from asyncio import (
     StreamReader,
     StreamReaderProtocol,
@@ -7,7 +8,13 @@ from asyncio import (
 )
 from asyncio.streams import FlowControlMixin
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterable, AsyncIterator, Generator, MutableMapping
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Generator,
+    Iterator,
+    MutableMapping,
+)
 from contextlib import asynccontextmanager, contextmanager
 from enum import Enum
 from enum import auto as enum_auto
@@ -17,8 +24,8 @@ from os import environ, kill, mkfifo
 from pathlib import Path
 from signal import SIGTERM
 from sys import stderr, stdin, stdout
-from tarfile import TarFile, TarInfo
-from tempfile import TemporaryDirectory as TempfileTemporaryDirectory
+from tarfile import DIRTYPE, TarFile, TarInfo
+from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import IO, Any, Optional, Protocol
 
 from frozendict import frozendict
@@ -46,7 +53,7 @@ def ensure_dir_exists(path: Path) -> None:
 
 @contextmanager
 def TemporaryDirectory(dir=None):
-    with TempfileTemporaryDirectory(dir=dir) as dir_path_string:
+    with BaseTemporaryDirectory(dir=dir) as dir_path_string:
         dir_path = Path(dir_path_string)
 
         yield dir_path
@@ -216,7 +223,7 @@ def read_machine_id(machine_id_path: Path) -> str:
 
 
 @contextmanager
-def TarFileInMemoryRead(data: memoryview):
+def TarFileInMemoryRead(data: memoryview) -> Iterator[TarFile]:
     with BytesIO(data) as io:
         with TarFile(fileobj=io, mode="r") as tar:
             yield tar
@@ -231,10 +238,35 @@ class TarFileWithBytes(Protocol):
     def add(self, name: str, arcname: str):
         ...
 
+    def getmembers(self) -> list[TarInfo]:
+        ...
+
+
+def tar_append(from_data: memoryview, to_tar: TarFileWithBytes) -> None:
+    with TarFileInMemoryRead(from_data) as from_tar:
+        from_members = from_tar.getmembers()
+        to_members = to_tar.getmembers()
+
+        append_members = (
+            from_member
+            for from_member in from_members
+            if all(from_member.name != to_member.name for to_member in to_members)
+        )
+
+        for member in append_members:
+            fileobj = (
+                from_tar.extractfile(member)
+                if not member.islnk() and not member.issym()
+                else None
+            )
+
+            to_tar.addfile(member, fileobj)
+
 
 @contextmanager
 def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
     io = BytesIO()
+
     with TarFile(fileobj=io, mode="w") as tar:
         yield tar  # type: ignore
 
@@ -244,3 +276,31 @@ def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
 async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
     async for _ in async_iterable:
         pass
+
+
+def create_tar_directory(tar, path: Path):
+    info = TarInfo(name=str(path))
+    info.mode = 0o755
+    info.type = DIRTYPE
+
+    tar.addfile(info)
+
+
+@contextmanager
+def create_tar_file(tar, path: Path):
+    with BytesIO() as io:
+        yield io
+
+        io.seek(0)
+
+        info = TarInfo(name=str(path))
+        info.size = len(io.getbuffer())
+
+        tar.addfile(info, io)
+
+
+def create_empty_tar() -> memoryview:
+    with TarFileInMemoryWrite() as tar:
+        pass
+
+    return tar.data

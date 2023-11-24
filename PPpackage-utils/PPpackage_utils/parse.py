@@ -292,6 +292,15 @@ async def load_bytes(debug: bool, reader: StreamReader) -> bytes:
     return await reader.readexactly(length)
 
 
+async def load_bytes_chunked(debug: bool, reader: StreamReader) -> memoryview:
+    buffer = bytearray()
+
+    async for _ in load_loop(debug, reader):
+        buffer += await load_bytes(debug, reader)
+
+    return memoryview(buffer)
+
+
 async def load_one(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> ModelType:

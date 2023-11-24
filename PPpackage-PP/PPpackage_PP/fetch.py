@@ -2,7 +2,7 @@ from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.io import communicate_with_daemon
+from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.parse import (
     Dependency,
     IDAndInfo,
@@ -39,7 +39,7 @@ async def fetch_send(
         async for _ in dependencies:
             pass
 
-    async with communicate_with_daemon(debug, runner_path) as (
+    async with communicate_with_runner(debug, runner_path) as (
         runner_reader,
         runner_writer,
     ):
