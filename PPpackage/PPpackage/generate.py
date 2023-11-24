@@ -32,7 +32,7 @@ async def generate_manager(
     products: Iterable[Product],
     generators: Set[str],
     manager: str,
-) -> bytes:
+) -> memoryview:
     process = await create_subprocess_exec(
         f"PPpackage-{manager}",
         "--debug" if debug else "--no-debug",
@@ -57,7 +57,7 @@ async def generate_manager(
 
     await asubprocess_wait(process, f"Error in {manager}'s generate.")
 
-    return generators_bytes
+    return memoryview(generators_bytes)
 
 
 async def generate(
@@ -66,7 +66,7 @@ async def generate(
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
-) -> bytes:
+) -> memoryview:
     meta_products: MutableMapping[str, MutableSequence[Product]] = {}
 
     for manager_and_package, data in nodes:
@@ -74,8 +74,8 @@ async def generate(
             data_to_product(manager_and_package.name, data)
         )
 
-    tasks: MutableSequence[Task[bytes]] = []
-    builtin_directories: MutableSequence[bytes] = []
+    tasks: MutableSequence[Task[memoryview]] = []
+    builtin_directories: MutableSequence[memoryview] = []
 
     async with TaskGroup() as group:
         for manager, products in meta_products.items():

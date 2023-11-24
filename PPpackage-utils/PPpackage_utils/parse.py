@@ -180,6 +180,18 @@ async def dump_bytes(
     await writer.drain()
 
 
+def chunk_bytes(data: memoryview, chunk_size: int) -> Iterable[memoryview]:
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
+
+async def dump_bytes_chunked(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
+    async for chunk in dump_loop(debug, writer, chunk_bytes(output_bytes, 2**15)):
+        await dump_bytes(debug, writer, chunk)
+
+
 async def dump_one(
     debug: bool, writer: StreamWriter, output: BaseModel | Any, loop=False
 ) -> None:

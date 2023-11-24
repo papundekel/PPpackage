@@ -65,7 +65,7 @@ async def generate(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> bytes:
+) -> memoryview:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)

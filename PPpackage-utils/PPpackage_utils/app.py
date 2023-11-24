@@ -19,6 +19,7 @@ from .parse import (
     Product,
     ResolutionGraph,
     dump_bytes,
+    dump_bytes_chunked,
     dump_loop,
     dump_many_async,
     load_loop,
@@ -70,13 +71,6 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
-def chunk_bytes(data: bytes, chunk_size: int) -> Iterable[memoryview]:
-    view = memoryview(data)
-
-    for i in range(0, len(data), chunk_size):
-        yield view[i : i + chunk_size]
-
-
 def init(
     update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
@@ -103,7 +97,7 @@ def init(
             AsyncIterable[Product],
             AsyncIterable[str],
         ],
-        Awaitable[bytes],
+        Awaitable[memoryview],
     ],
     install_callback: Callable[
         [bool, Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
@@ -173,8 +167,7 @@ def init(
             __debug, cache_path, options, products, generators
         )
 
-        async for chunk in dump_loop(__debug, stdout, chunk_bytes(generators, 2**15)):
-            await dump_bytes(__debug, stdout, chunk)
+        await dump_bytes_chunked(__debug, stdout, generators)
 
     @__app.command()
     async def install(
@@ -217,7 +210,7 @@ async def generate_empty(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> bytes:
+) -> memoryview:
     async for _ in products:
         pass
 

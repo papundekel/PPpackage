@@ -11,7 +11,7 @@ from .utils import create_tar_directory, create_tar_file
 
 def versions(
     meta_products: Mapping[str, Iterable[Product]],
-) -> bytes:
+) -> memoryview:
     io = BytesIO()
 
     versions_path = Path("versions")
@@ -31,9 +31,9 @@ def versions(
                     tar, manager_path / f"{product.name}.json", data_serialized
                 )
 
-    return io.getvalue()
+    return io.getbuffer()
 
 
-builtin: Mapping[str, Callable[[Mapping[str, Iterable[Product]]], bytes]] = {
+builtin: Mapping[str, Callable[[Mapping[str, Iterable[Product]]], memoryview]] = {
     "versions": versions
 }

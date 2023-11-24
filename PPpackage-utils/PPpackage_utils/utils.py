@@ -216,14 +216,14 @@ def read_machine_id(machine_id_path: Path) -> str:
 
 
 @contextmanager
-def TarFileInMemoryRead(data: bytes):
+def TarFileInMemoryRead(data: memoryview):
     with BytesIO(data) as io:
         with TarFile(fileobj=io, mode="r") as tar:
             yield tar
 
 
 class TarFileWithBytes(Protocol):
-    data: bytes
+    data: memoryview
 
     def addfile(self, tarinfo: TarInfo, fileobj: IO[bytes] | None):
         ...
@@ -234,11 +234,11 @@ class TarFileWithBytes(Protocol):
 
 @contextmanager
 def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
-    with BytesIO() as io:
-        with TarFile(fileobj=io, mode="w") as tar:
-            yield tar  # type: ignore
+    io = BytesIO()
+    with TarFile(fileobj=io, mode="w") as tar:
+        yield tar  # type: ignore
 
-        setattr(tar, "data", io.getvalue())
+    setattr(tar, "data", io.getbuffer())
 
 
 async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
