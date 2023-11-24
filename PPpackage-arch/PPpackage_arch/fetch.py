@@ -4,7 +4,6 @@ from collections.abc import AsyncIterable
 from pathlib import Path
 
 from PPpackage_utils.parse import (
-    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
@@ -24,7 +23,7 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
-async def send(
+async def fetch_send(
     debug: bool,
     runner_path: Path,
     runner_workdir_path: Path,
@@ -95,8 +94,3 @@ async def send(
         )
 
     await asubprocess_wait(process, "Error in `pacman -Sddp`")
-
-
-async def receive(build_results: AsyncIterable[BuildResult]):
-    async for _ in build_results:
-        pass

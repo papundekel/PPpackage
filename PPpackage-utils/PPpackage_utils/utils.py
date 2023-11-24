@@ -7,7 +7,7 @@ from asyncio import (
 )
 from asyncio.streams import FlowControlMixin
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterator, Generator, MutableMapping
+from collections.abc import AsyncIterable, AsyncIterator, Generator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
 from enum import Enum
 from enum import auto as enum_auto
@@ -239,3 +239,9 @@ def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
             yield tar  # type: ignore
 
         setattr(tar, "data", io.getvalue())
+
+
+async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
+    print("X", file=stderr)
+    async for _ in async_iterable:
+        pass

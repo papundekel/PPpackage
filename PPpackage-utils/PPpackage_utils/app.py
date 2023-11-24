@@ -25,7 +25,12 @@ from .parse import (
     load_many,
     load_one,
 )
-from .utils import TarFileInMemoryWrite, ensure_dir_exists, get_standard_streams
+from .utils import (
+    TarFileInMemoryWrite,
+    discard_async_iterable,
+    ensure_dir_exists,
+    get_standard_streams,
+)
 
 
 class AsyncTyper(Typer):
@@ -65,32 +70,6 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
-async def fetch_send(
-    writer: StreamWriter,
-    fetch_send_callback: Callable[
-        [
-            bool,
-            Path,
-            Path,
-            Path,
-            Any,
-            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-        ],
-        AsyncIterable[PackageIDAndInfo],
-    ],
-    runner_path: Path,
-    runner_workdir_path: Path,
-    cache_path: Path,
-    options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-):
-    output = fetch_send_callback(
-        __debug, runner_path, runner_workdir_path, cache_path, options, packages
-    )
-
-    await dump_many_async(__debug, writer, output)
-
-
 def chunk_bytes(data: bytes, chunk_size: int) -> Iterable[memoryview]:
     view = memoryview(data)
 
@@ -104,7 +83,7 @@ def init(
         [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
         AsyncIterable[ResolutionGraph],
     ],
-    fetch_send_callback: Callable[
+    fetch_callback: Callable[
         [
             bool,
             Path,
@@ -112,11 +91,9 @@ def init(
             Path,
             Any,
             AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+            AsyncIterable[BuildResult],
         ],
-        AsyncIterable[PackageIDAndInfo],
-    ],
-    fetch_receive_callback: Callable[
-        [AsyncIterable[BuildResult]], Coroutine[Any, Any, None]
+        tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]],
     ],
     generate_callback: Callable[
         [
@@ -170,19 +147,19 @@ def init(
 
         build_results = load_many(__debug, stdin, BuildResult)
 
-        async with TaskGroup() as group:
-            group.create_task(
-                fetch_send(
-                    stdout,
-                    fetch_send_callback,
-                    runner_path,
-                    runner_workdir_path,
-                    cache_path,
-                    options,
-                    packages,
-                )
-            )
-            group.create_task(fetch_receive_callback(build_results))
+        output, complete = fetch_callback(
+            __debug,
+            runner_path,
+            runner_workdir_path,
+            cache_path,
+            options,
+            packages,
+            build_results,
+        )
+
+        await dump_many_async(__debug, stdout, output)
+
+        await complete
 
     @__app.command()
     async def generate(cache_path: Path) -> None:
@@ -251,3 +228,31 @@ async def generate_empty(
         pass
 
     return tar.data
+
+
+def fetch_receive_discard(
+    send_callback: Callable[
+        [
+            bool,
+            Path,
+            Path,
+            Path,
+            Any,
+            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+        ],
+        AsyncIterable[PackageIDAndInfo],
+    ],
+    debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
+    cache_path: Path,
+    options: Options,
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+    build_results: AsyncIterable[BuildResult],
+) -> tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]]:
+    return (
+        output
+        async for output in send_callback(
+            debug, runner_path, runner_workdir_path, cache_path, options, packages
+        )
+    ), discard_async_iterable(build_results)

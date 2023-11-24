@@ -4,7 +4,6 @@ from sys import stderr
 
 from PPpackage_utils.io import communicate_with_daemon
 from PPpackage_utils.parse import (
-    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
@@ -24,14 +23,14 @@ from PPpackage_utils.utils import (
 )
 
 
-async def send(
+async def fetch_send(
     debug: bool,
     runner_path: Path,
     runner_workdir_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-) -> AsyncIterable[PackageIDAndInfo]:
+):
     async for package, dependencies in packages:
         yield PackageIDAndInfo(
             name=package.name, id_and_info=IDAndInfo(product_id="id", product_info=None)
@@ -86,8 +85,3 @@ async def send(
 
         if not success:
             raise MyException("PPpackage-sub: Failed to run the build image.")
-
-
-async def receive(build_results: AsyncIterable[BuildResult]):
-    async for _ in build_results:
-        pass

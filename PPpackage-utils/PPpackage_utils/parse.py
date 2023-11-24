@@ -206,7 +206,9 @@ async def dump_loop_end(debug: bool, writer: StreamWriter):
 T = TypeVar("T")
 
 
-async def dump_loop(debug: bool, writer: StreamWriter, iterable: Iterable[T]):
+async def dump_loop(
+    debug: bool, writer: StreamWriter, iterable: Iterable[T]
+) -> AsyncIterable[T]:
     for obj in iterable:
         _dump_bool(debug, writer, True)
         yield obj
