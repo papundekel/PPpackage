@@ -91,8 +91,11 @@ async def main_command(
 
     old_installation = old_installation_tar.data
 
-    for x in destination_path.iterdir():
-        rmtree(x)
+    for path in destination_path.iterdir():
+        if path.is_symlink():
+            path.unlink()
+        else:
+            rmtree(path)
 
     new_installation = await install(
         debug,
