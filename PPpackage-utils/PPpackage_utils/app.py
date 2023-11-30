@@ -6,7 +6,7 @@ from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import stderr
 from traceback import print_exc
-from typing import Any, TypeVar
+from typing import Any, Iterable, TypeVar
 
 from typer import Typer
 
@@ -18,12 +18,22 @@ from .parse import (
     PackageIDAndInfo,
     Product,
     ResolutionGraph,
+    dump_bytes,
+    dump_bytes_chunked,
+    dump_loop,
     dump_many_async,
+    load_bytes_chunked,
+    load_loop,
     load_many,
-    load_many_loop,
     load_one,
 )
-from .utils import ensure_dir_exists, get_standard_streams
+from .utils import (
+    TarFileInMemoryWrite,
+    create_empty_tar,
+    discard_async_iterable,
+    ensure_dir_exists,
+    get_standard_streams,
+)
 
 
 class AsyncTyper(Typer):
@@ -63,39 +73,13 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
-async def fetch_send(
-    writer: StreamWriter,
-    fetch_send_callback: Callable[
-        [
-            bool,
-            Path,
-            Path,
-            Path,
-            Any,
-            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-        ],
-        AsyncIterable[PackageIDAndInfo],
-    ],
-    runner_path: Path,
-    runner_workdir_path: Path,
-    cache_path: Path,
-    options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-):
-    output = fetch_send_callback(
-        __debug, runner_path, runner_workdir_path, cache_path, options, packages
-    )
-
-    await dump_many_async(__debug, writer, output)
-
-
 def init(
     update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
         [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
         AsyncIterable[ResolutionGraph],
     ],
-    fetch_send_callback: Callable[
+    fetch_callback: Callable[
         [
             bool,
             Path,
@@ -103,25 +87,23 @@ def init(
             Path,
             Any,
             AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+            AsyncIterable[BuildResult],
         ],
-        AsyncIterable[PackageIDAndInfo],
-    ],
-    fetch_receive_callback: Callable[
-        [AsyncIterable[BuildResult]], Coroutine[Any, Any, None]
+        tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]],
     ],
     generate_callback: Callable[
         [
             bool,
             Path,
-            Path,
             Any,
             AsyncIterable[Product],
             AsyncIterable[str],
         ],
-        Awaitable[None],
+        Awaitable[memoryview],
     ],
     install_callback: Callable[
-        [bool, Path, Path, Path, Path, AsyncIterable[Product]], Awaitable[None]
+        [bool, Path, Path, Path, Path, memoryview, AsyncIterable[Product]],
+        Awaitable[memoryview],
     ],
     RequirementType: type[RequirementTypeType],
 ) -> Typer:
@@ -137,7 +119,7 @@ def init(
 
         requirements_list = (
             load_many(__debug, stdin, RequirementType)
-            async for _ in load_many_loop(__debug, stdin)
+            async for _ in load_loop(__debug, stdin)
         )
 
         output = resolve_callback(__debug, cache_path, options, requirements_list)
@@ -157,58 +139,62 @@ def init(
                 await load_one(__debug, stdin, Package),
                 load_many(__debug, stdin, Dependency),
             )
-            async for _ in load_many_loop(__debug, stdin)
+            async for _ in load_loop(__debug, stdin)
         )
 
         build_results = load_many(__debug, stdin, BuildResult)
 
-        async with TaskGroup() as group:
-            group.create_task(
-                fetch_send(
-                    stdout,
-                    fetch_send_callback,
-                    runner_path,
-                    runner_workdir_path,
-                    cache_path,
-                    options,
-                    packages,
-                )
-            )
-            group.create_task(fetch_receive_callback(build_results))
+        output, complete = fetch_callback(
+            __debug,
+            runner_path,
+            runner_workdir_path,
+            cache_path,
+            options,
+            packages,
+            build_results,
+        )
+
+        await dump_many_async(__debug, stdout, output)
+
+        await complete
 
     @__app.command()
-    async def generate(cache_path: Path, generators_path: Path) -> None:
-        stdin, _ = await get_standard_streams()
+    async def generate(cache_path: Path) -> None:
+        stdin, stdout = await get_standard_streams()
 
         options = await load_one(__debug, stdin, Options)
         products = load_many(__debug, stdin, Product)
         generators = load_many(__debug, stdin, str)
 
-        await generate_callback(
-            __debug, cache_path, generators_path, options, products, generators
+        generators = await generate_callback(
+            __debug, cache_path, options, products, generators
         )
+
+        await dump_bytes_chunked(__debug, stdout, generators)
 
     @__app.command()
     async def install(
         cache_path: Path,
-        destination_path: Path,
         pipe_from_sub_path: Path,
         pipe_to_sub_path: Path,
+        runner_workdir_path: Path,
     ) -> None:
-        ensure_dir_exists(destination_path)
+        stdin, stdout = await get_standard_streams()
 
-        stdin, _ = await get_standard_streams()
-
+        old_directory = await load_bytes_chunked(__debug, stdin)
         products = load_many(__debug, stdin, Product)
 
-        await install_callback(
+        new_directory = await install_callback(
             __debug,
             cache_path,
-            destination_path,
             pipe_from_sub_path,
             pipe_to_sub_path,
+            runner_workdir_path,
+            old_directory,
             products,
         )
+
+        await dump_bytes_chunked(__debug, stdout, new_directory)
 
     return __app
 
@@ -221,3 +207,47 @@ def run(app: Typer, program_name: str) -> None:
         print_exc()
 
         exit(1)
+
+
+async def generate_empty(
+    debug: bool,
+    cache_path: Path,
+    options: Any,
+    products: AsyncIterable[Product],
+    generators: AsyncIterable[str],
+) -> memoryview:
+    async for _ in products:
+        pass
+
+    async for _ in generators:
+        pass
+
+    return create_empty_tar()
+
+
+def fetch_receive_discard(
+    send_callback: Callable[
+        [
+            bool,
+            Path,
+            Path,
+            Path,
+            Any,
+            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+        ],
+        AsyncIterable[PackageIDAndInfo],
+    ],
+    debug: bool,
+    runner_path: Path,
+    runner_workdir_path: Path,
+    cache_path: Path,
+    options: Options,
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+    build_results: AsyncIterable[BuildResult],
+) -> tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]]:
+    return (
+        output
+        async for output in send_callback(
+            debug, runner_path, runner_workdir_path, cache_path, options, packages
+        )
+    ), discard_async_iterable(build_results)

@@ -43,6 +43,7 @@ async def send(
         await dump_many(debug, writer, requirements)
 
     writer.close()
+    await writer.wait_closed()
 
 
 async def receive(

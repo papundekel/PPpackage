@@ -171,6 +171,27 @@ def _dump_bool(debug: bool, writer: StreamWriter, value: bool) -> None:
         print(f"dump bool: {value}", file=stderr)
 
 
+async def dump_bytes(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
+    _dump_int(debug, writer, len(output_bytes))
+    writer.write(output_bytes)
+
+    await writer.drain()
+
+
+def chunk_bytes(data: memoryview, chunk_size: int) -> Iterable[memoryview]:
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
+
+async def dump_bytes_chunked(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
+    async for chunk in dump_loop(debug, writer, chunk_bytes(output_bytes, 2**15)):
+        await dump_bytes(debug, writer, chunk)
+
+
 async def dump_one(
     debug: bool, writer: StreamWriter, output: BaseModel | Any, loop=False
 ) -> None:
@@ -183,13 +204,10 @@ async def dump_one(
 
     output_json_bytes = output_json_string.encode()
 
-    _dump_int(debug, writer, len(output_json_bytes))
-    writer.write(output_json_bytes)
+    await dump_bytes(debug, writer, memoryview(output_json_bytes))
 
     if _DEBUG:
         print(f"dump:\n{output_json_string}", file=stderr)
-
-    await writer.drain()
 
 
 async def dump_loop_end(debug: bool, writer: StreamWriter):
@@ -197,7 +215,12 @@ async def dump_loop_end(debug: bool, writer: StreamWriter):
     await writer.drain()
 
 
-async def dump_loop(debug: bool, writer: StreamWriter, iterable: Iterable):
+T = TypeVar("T")
+
+
+async def dump_loop(
+    debug: bool, writer: StreamWriter, iterable: Iterable[T]
+) -> AsyncIterable[T]:
     for obj in iterable:
         _dump_bool(debug, writer, True)
         yield obj
@@ -269,6 +292,15 @@ async def load_bytes(debug: bool, reader: StreamReader) -> bytes:
     return await reader.readexactly(length)
 
 
+async def load_bytes_chunked(debug: bool, reader: StreamReader) -> memoryview:
+    buffer = bytearray()
+
+    async for _ in load_loop(debug, reader):
+        buffer += await load_bytes(debug, reader)
+
+    return memoryview(buffer)
+
+
 async def load_one(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> ModelType:
@@ -277,7 +309,7 @@ async def load_one(
     return load_from_bytes(debug, Model, input_bytes)
 
 
-async def load_many_loop(debug: bool, reader: StreamReader):
+async def load_loop(debug: bool, reader: StreamReader):
     while True:
         do_continue = await _load_bool(debug, reader)
 
@@ -290,5 +322,5 @@ async def load_many_loop(debug: bool, reader: StreamReader):
 async def load_many(
     debug: bool, reader: StreamReader, Model: type[ModelType]
 ) -> AsyncIterable[ModelType]:
-    async for _ in load_many_loop(debug, reader):
+    async for _ in load_loop(debug, reader):
         yield await load_one(debug, reader, Model)

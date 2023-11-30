@@ -7,7 +7,6 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
-    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
@@ -27,7 +26,7 @@ from .utils import (
 )
 
 
-async def send(
+async def fetch_send(
     templates_path: Path,
     debug: bool,
     runner_path: Path,
@@ -103,8 +102,3 @@ async def send(
                 ),
             ),
         )
-
-
-async def receive(build_results: AsyncIterable[BuildResult]) -> None:
-    async for _ in build_results:
-        pass

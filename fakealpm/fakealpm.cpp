@@ -15,10 +15,12 @@
 
 static FILE *pipe_from_sub;
 static FILE *pipe_to_sub;
+static const char *runner_workdir_relative_path;
 
 __attribute__((constructor)) static void pipes_ctr() {
   const auto pipe_from_sub_path = std::getenv("PP_PIPE_FROM_SUB_PATH");
   const auto pipe_to_sub_path = std::getenv("PP_PIPE_TO_SUB_PATH");
+  runner_workdir_relative_path = std::getenv("PP_RUNNER_WORKDIR_RELATIVE_PATH");
 
   pipe_from_sub = std::fopen(pipe_from_sub_path, "w");
   pipe_to_sub = std::fopen(pipe_to_sub_path, "r");
@@ -57,6 +59,8 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
   std::fprintf(stderr, "Executing command %s...", command);
 
   std::fprintf(pipe_from_sub, "COMMAND\n");
+
+  write_string(runner_workdir_relative_path);
 
   write_string(command);
 

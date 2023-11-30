@@ -1,11 +1,13 @@
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
+from shutil import rmtree
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.parse import load_from_bytes
+from PPpackage_utils.utils import TarFileInMemoryRead, TarFileInMemoryWrite
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -73,23 +75,39 @@ async def main_command(
         generations,
     )
 
-    await generate(
+    generators_bytes = await generate(
         debug,
         cache_path,
-        generators_path,
         input.generators,
         graph.nodes(data=True),
         input.options,
     )
 
-    await install(
+    with TarFileInMemoryRead(generators_bytes) as generators_tar:
+        generators_tar.extractall(generators_path)
+
+    with TarFileInMemoryWrite() as old_installation_tar:
+        old_installation_tar.add(str(destination_path), "")
+
+    old_installation = old_installation_tar.data
+
+    for path in destination_path.iterdir():
+        if path.is_symlink():
+            path.unlink()
+        else:
+            rmtree(path)
+
+    new_installation = await install(
         debug,
         cache_path,
         runner_path,
         runner_workdir_path,
-        destination_path,
+        old_installation,
         generations,
     )
+
+    with TarFileInMemoryRead(new_installation) as new_installation_tar:
+        new_installation_tar.extractall(destination_path)
 
     stderr.write("Done.\n")
 

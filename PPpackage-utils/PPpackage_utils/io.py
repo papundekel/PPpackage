@@ -102,7 +102,7 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
 
 
 @asynccontextmanager
-async def communicate_with_daemon(
+async def communicate_with_runner(
     debug: bool,
     daemon_path: Path,
 ):

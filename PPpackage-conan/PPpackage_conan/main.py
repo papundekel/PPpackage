@@ -1,8 +1,9 @@
-from PPpackage_utils.app import init, run
+from functools import partial
+
+from PPpackage_utils.app import fetch_receive_discard, init, run
 from PPpackage_utils.utils import anoop
 
-from .fetch import receive as fetch_receive
-from .fetch import send as fetch_send
+from .fetch import fetch_send
 from .generate import generate
 from .install import install
 from .parse import Requirement
@@ -15,10 +16,9 @@ def main():
 
     app = init(
         anoop,
-        lambda *args: resolve(data_path, *args),
-        lambda *args: fetch_send(data_path, *args),
-        fetch_receive,
-        lambda *args: generate(data_path, deployer_path, *args),
+        partial(resolve, data_path),
+        partial(fetch_receive_discard, partial(fetch_send, data_path)),
+        partial(generate, data_path, deployer_path),
         install,
         Requirement,
     )
