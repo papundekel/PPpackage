@@ -2,14 +2,12 @@ from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
-from sys import stderr
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
     TarFileInMemoryWrite,
     TarFileWithBytes,
     asubprocess_communicate,
-    communicate_from_sub,
     tar_append,
 )
 
@@ -44,8 +42,7 @@ async def install_product(
 async def install(
     debug: bool,
     cache_path: Path,
-    pipe_from_sub_path: Path,
-    pipe_to_sub_path: Path,
+    runner_path: Path,
     runner_workdir_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
@@ -70,8 +67,5 @@ async def install(
                 )
 
         tar_append(old_directory, new_tar)
-
-    with communicate_from_sub(pipe_from_sub_path), open(pipe_to_sub_path, "r"):
-        pass
 
     return new_tar.data

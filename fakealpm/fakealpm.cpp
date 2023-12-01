@@ -13,31 +13,33 @@
 #include <string_view>
 #include <unistd.h>
 
-static FILE *pipe_from_sub;
-static FILE *pipe_to_sub;
+static FILE *pipe_from_fakealpm;
+static FILE *pipe_to_fakealpm;
 static const char *runner_workdir_relative_path;
 
 __attribute__((constructor)) static void pipes_ctr() {
-  const auto pipe_from_sub_path = std::getenv("PP_PIPE_FROM_SUB_PATH");
-  const auto pipe_to_sub_path = std::getenv("PP_PIPE_TO_SUB_PATH");
+  const auto pipe_from_fakealpm_path =
+      std::getenv("PP_PIPE_FROM_FAKEALPM_PATH");
+  const auto pipe_to_fakealpm_path =
+      std::getenv("PP_PIPE_TO_FAKEALPM_SUB_PATH");
   runner_workdir_relative_path = std::getenv("PP_RUNNER_WORKDIR_RELATIVE_PATH");
 
-  pipe_from_sub = std::fopen(pipe_from_sub_path, "w");
-  pipe_to_sub = std::fopen(pipe_to_sub_path, "r");
+  pipe_from_fakealpm = std::fopen(pipe_from_fakealpm_path, "w");
+  pipe_to_fakealpm = std::fopen(pipe_to_fakealpm_path, "r");
 }
 
 __attribute__((destructor)) static void pipes_dtr() {
-  std::fclose(pipe_from_sub);
-  std::fclose(pipe_to_sub);
+  std::fclose(pipe_from_fakealpm);
+  std::fclose(pipe_to_fakealpm);
 }
 
 void write_string(const char *str) {
-  std::fprintf(pipe_from_sub, "%zu\n%s", std::strlen(str), str);
+  std::fprintf(pipe_from_fakealpm, "%zu\n%s", std::strlen(str), str);
 }
 
 auto read_int() {
   char buffer[64] = {0};
-  std::fgets(buffer, sizeof(buffer), pipe_to_sub);
+  std::fgets(buffer, sizeof(buffer), pipe_to_fakealpm);
 
   int value = 0;
   std::from_chars(buffer, buffer + sizeof(buffer), value, 10);
@@ -48,7 +50,7 @@ std::string read_string() {
   const auto length = read_int();
 
   std::string str(length, '\0');
-  std::fread(str.data(), 1, length, pipe_to_sub);
+  std::fread(str.data(), 1, length, pipe_to_fakealpm);
 
   return str;
 }
@@ -58,7 +60,7 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *, const char *command,
                                 void *stdin_ctx) {
   std::fprintf(stderr, "Executing command %s...", command);
 
-  std::fprintf(pipe_from_sub, "COMMAND\n");
+  std::fprintf(pipe_from_fakealpm, "COMMAND\n");
 
   write_string(runner_workdir_relative_path);
 
@@ -67,8 +69,8 @@ extern "C" int _alpm_run_chroot(alpm_handle_t *, const char *command,
   for (const auto *arg = argv; *arg != nullptr; ++arg) {
     write_string(*arg);
   }
-  std::fprintf(pipe_from_sub, "-1\n");
-  std::fflush(pipe_from_sub);
+  std::fprintf(pipe_from_fakealpm, "-1\n");
+  std::fflush(pipe_from_fakealpm);
 
   const auto pipe_hook_path = read_string();
 

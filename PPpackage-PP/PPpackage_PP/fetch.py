@@ -39,13 +39,12 @@ async def fetch_send(
         async for _ in dependencies:
             pass
 
-    async with communicate_with_runner(debug, runner_path) as (
+    machine_id = read_machine_id(Path("/"))
+
+    async with communicate_with_runner(debug, runner_path, machine_id) as (
         runner_reader,
         runner_writer,
     ):
-        machine_id = read_machine_id(Path("/") / MACHINE_ID_RELATIVE_PATH)
-
-        await dump_one(debug, runner_writer, machine_id)
         await dump_one(debug, runner_writer, RunnerRequestType.RUN)
         await dump_one(debug, runner_writer, ImageType.TAG)
         await dump_one(debug, runner_writer, "docker.io/archlinux:latest")

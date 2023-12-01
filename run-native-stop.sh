@@ -1,3 +1,3 @@
-runc_id="$1"
+runner_id="$1"
 
-kill -s TERM "$runc_id"
+kill -s TERM "$runner_id"

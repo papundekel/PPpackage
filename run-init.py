@@ -14,8 +14,10 @@ async def main():
     machine_id = argv[2]
     debug = argv[3] == "--debug"
 
-    async with communicate_with_runner(debug, runner_path) as (reader, writer):
-        await dump_one(debug, writer, machine_id)
+    async with communicate_with_runner(debug, runner_path, machine_id) as (
+        reader,
+        writer,
+    ):
         await dump_one(debug, writer, RunnerRequestType.INIT)
 
         workdir_relative_path = await load_one(debug, reader, Path)
