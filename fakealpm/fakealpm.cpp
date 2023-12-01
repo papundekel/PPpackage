@@ -39,7 +39,7 @@ auto read_int() {
   char buffer[64] = {0};
   std::fgets(buffer, sizeof(buffer), pipe_to_sub);
 
-  int value;
+  int value = 0;
   std::from_chars(buffer, buffer + sizeof(buffer), value, 10);
   return value;
 }
@@ -53,7 +53,7 @@ std::string read_string() {
   return str;
 }
 
-extern "C" int _alpm_run_chroot(alpm_handle_t *handle, const char *command,
+extern "C" int _alpm_run_chroot(alpm_handle_t *, const char *command,
                                 char *const argv[], _alpm_cb_io stdin_cb,
                                 void *stdin_ctx) {
   std::fprintf(stderr, "Executing command %s...", command);

@@ -41,7 +41,9 @@ async def install(
         with communicate_from_sub(pipe_from_sub_path):
             async with fakeroot(debug) as environment:
                 environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-                environment["LD_PRELOAD"] += ":fakealpm/build/fakealpm.so"
+                environment[
+                    "LD_PRELOAD"
+                ] += f":fakealpm/build/install/lib/libfakealpm.so"
                 environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
                 environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
                 environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
