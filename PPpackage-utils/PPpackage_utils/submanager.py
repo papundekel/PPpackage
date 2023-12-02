@@ -1,13 +1,18 @@
+from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
+from asyncio import start_unix_server
 from collections.abc import AsyncIterable, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
+from signal import SIGTERM
 from sys import stderr
 from traceback import print_exc
 from typing import Any, TypeVar
 
-from typer import Typer
+from pid import PidFile, PidFileAlreadyLockedError
+from typer import Exit, Typer
 
 from .parse import (
     BuildResult,
@@ -241,3 +246,55 @@ def fetch_receive_discard(
             debug, runner_path, runner_workdir_path, cache_path, options, packages
         )
     ), discard_async_iterable(build_results)
+
+
+async def run_server(
+    debug: bool,
+    program_name: str,
+    run_path: Path,
+    connection_handler: Callable[[bool, StreamReader, StreamWriter], Awaitable[None]],
+):
+    socket_path = run_path / f"{program_name}.sock"
+
+    try:
+        async with await start_unix_server(
+            partial(connection_handler, debug), socket_path
+        ) as server:
+            await server.start_serving()
+
+            loop = get_running_loop()
+
+            future = loop.create_future()
+
+            loop.add_signal_handler(SIGTERM, lambda: future.cancel())
+
+            await future
+    except CancelledError:
+        pass
+    finally:
+        socket_path.unlink()
+
+
+async def main_server(
+    debug: bool,
+    program_name: str,
+    run_path: Path,
+    connection_handler_context: Callable[
+        [bool],
+        AbstractAsyncContextManager[
+            Callable[[bool, StreamReader, StreamWriter], Awaitable[None]]
+        ],
+    ],
+):
+    try:
+        with PidFile(program_name, piddir=run_path):
+            async with connection_handler_context(debug) as connection_handler:
+                await run_server(
+                    debug,
+                    program_name,
+                    run_path,
+                    connection_handler,
+                )
+    except PidFileAlreadyLockedError:
+        print(f"{program_name} is already running.", file=stderr)
+        raise Exit(1)

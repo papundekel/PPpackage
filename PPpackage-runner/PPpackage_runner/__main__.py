@@ -1,26 +1,17 @@
-from asyncio import (
-    CancelledError,
-    StreamReader,
-    StreamWriter,
-    create_subprocess_exec,
-    get_running_loop,
-    start_unix_server,
-)
+from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import PIPE
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
+from functools import partial
 from json import dump as json_dump
 from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
-from signal import SIGTERM
 from subprocess import DEVNULL
-from sys import stderr
 from typing import Tuple
 from typing import cast as type_cast
 
-from pid import PidFile, PidFileAlreadyLockedError
 from PPpackage_utils.parse import dump_one, load_many, load_one
-from PPpackage_utils.submanager import AsyncTyper, run
+from PPpackage_utils.submanager import AsyncTyper, main_server, run, run_server
 from PPpackage_utils.utils import (
     ImageType,
     RunnerRequestType,
@@ -28,7 +19,6 @@ from PPpackage_utils.utils import (
     asubprocess_wait,
     wipe_directory,
 )
-from typer import Exit
 
 
 @contextmanager
@@ -197,12 +187,12 @@ async def handle_run(
 
 
 async def handle_connection(
-    debug: bool,
-    reader: StreamReader,
-    writer: StreamWriter,
     workdirs_path: Path,
     bundle_path: Path,
     root_path: Path,
+    debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
 ):
     container_id = await load_one(debug, reader, str)
     container_workdir_path = workdirs_path / container_id
@@ -270,67 +260,28 @@ async def create_config(debug: bool, bundle_path: Path):
         config["linux"]["gidMappings"][0]["hostID"] = getgid()
 
 
-async def run_server(
-    debug: bool,
-    workdirs_path: Path,
-    bundle_path: Path,
-    socket_path: Path,
-    root_path: Path,
-):
-    try:
-        async with await start_unix_server(
-            lambda reader, writer: handle_connection(
-                debug,
-                reader,
-                writer,
-                workdirs_path,
-                bundle_path,
-                root_path,
-            ),
-            socket_path,
-        ) as server:
-            await server.start_serving()
-
-            loop = get_running_loop()
-
-            future = loop.create_future()
-
-            loop.add_signal_handler(SIGTERM, lambda: future.cancel())
-
-            await future
-    except CancelledError:
-        pass
-    finally:
-        socket_path.unlink()
-
-
-app_name = "PPpackage-runner"
-
 app = AsyncTyper()
+
+
+program_name = "PPpackage-runner"
+
+
+@asynccontextmanager
+async def connection_handler_context(workdirs_path: Path, debug: bool):
+    with TemporaryDirectory() as bundle_path, TemporaryDirectory() as root_path:
+        await create_config(debug, bundle_path)
+
+        yield partial(handle_connection, workdirs_path, bundle_path, root_path)
 
 
 @app.command()
 async def main_command(run_path: Path, workdirs_path: Path, debug: bool = False):
-    socket_path = run_path / f"{app_name}.sock"
-
-    try:
-        with (
-            PidFile(app_name, piddir=run_path),
-            TemporaryDirectory() as bundle_path,
-            TemporaryDirectory() as runc_root_path,
-        ):
-            await create_config(debug, bundle_path)
-
-            await run_server(
-                debug,
-                workdirs_path,
-                bundle_path,
-                socket_path,
-                runc_root_path,
-            )
-    except PidFileAlreadyLockedError:
-        print(f"{app_name} is already running.", file=stderr)
-        raise Exit(1)
+    await main_server(
+        debug,
+        program_name,
+        run_path,
+        partial(connection_handler_context, workdirs_path),
+    )
 
 
-run(app, app_name)
+run(app, program_name)
