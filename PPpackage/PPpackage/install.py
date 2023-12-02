@@ -34,7 +34,9 @@ async def install_manager(
         stderr.write(f"\t{package_name}\n")
 
     process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
+        "python",
+        "-m",
+        f"PPpackage_{manager}",
         "--debug" if debug else "--no-debug",
         "install",
         str(cache_path),

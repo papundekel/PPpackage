@@ -166,7 +166,9 @@ async def fetch_manager(
     ],
 ) -> None:
     process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
+        "python",
+        "-m",
+        f"PPpackage_{manager}",
         "--debug" if debug else "--no-debug",
         "fetch",
         str(runner_path),

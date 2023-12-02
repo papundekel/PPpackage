@@ -1,4 +1,3 @@
-import tarfile
 from asyncio import (
     StreamReader,
     StreamReaderProtocol,

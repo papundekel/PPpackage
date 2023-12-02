@@ -4,8 +4,8 @@ from sys import stderr, stdin
 
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
-from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.parse import load_from_bytes
+from PPpackage_utils.submanager import AsyncTyper, run
 from PPpackage_utils.utils import (
     TarFileInMemoryRead,
     TarFileInMemoryWrite,
@@ -111,5 +111,4 @@ async def main_command(
     stderr.write("Done.\n")
 
 
-def main():
-    run(app, "PPpackage")
+run(app, "PPpackage")

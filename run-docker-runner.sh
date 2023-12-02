@@ -13,7 +13,7 @@ podman run \
     --mount type=bind,source="$workdirs_path",destination="/root/workdirs" \
     --mount type=volume,source=podman-store,destination=/var/lib/containers \
     docker-daemon:docker.io/fackop/pppackage-runner:latest \
-    PPpackage-runner \
+    python -m PPpackage_runner \
         /run \
         /root/workdirs \
         $debug > /dev/null

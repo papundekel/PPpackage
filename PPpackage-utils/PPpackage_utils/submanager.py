@@ -1,12 +1,11 @@
-from asyncio import StreamWriter, TaskGroup
 from asyncio import run as asyncio_run
-from collections.abc import AsyncIterable, Awaitable, Callable, Coroutine
+from collections.abc import AsyncIterable, Awaitable, Callable
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from sys import stderr
 from traceback import print_exc
-from typing import Any, Iterable, TypeVar
+from typing import Any, TypeVar
 
 from typer import Typer
 
@@ -18,22 +17,14 @@ from .parse import (
     PackageIDAndInfo,
     Product,
     ResolutionGraph,
-    dump_bytes,
     dump_bytes_chunked,
-    dump_loop,
     dump_many_async,
     load_bytes_chunked,
     load_loop,
     load_many,
     load_one,
 )
-from .utils import (
-    TarFileInMemoryWrite,
-    create_empty_tar,
-    discard_async_iterable,
-    ensure_dir_exists,
-    get_standard_streams,
-)
+from .utils import create_empty_tar, discard_async_iterable, get_standard_streams
 
 
 class AsyncTyper(Typer):
@@ -73,7 +64,18 @@ def callback(debug: bool = False) -> None:
 RequirementTypeType = TypeVar("RequirementTypeType")
 
 
-def init(
+def run(app: AsyncTyper, program_name: str) -> None:
+    try:
+        app()
+    except Exception:
+        print(f"{program_name}:", file=stderr)
+        print_exc()
+
+        exit(1)
+
+
+def main(
+    program_name: str,
     update_database_callback: Callable[[bool, Path], Awaitable[None]],
     resolve_callback: Callable[
         [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
@@ -106,7 +108,7 @@ def init(
         Awaitable[memoryview],
     ],
     RequirementType: type[RequirementTypeType],
-) -> Typer:
+) -> None:
     @__app.command("update-database")
     async def update_database(cache_path: Path) -> None:
         await update_database_callback(__debug, cache_path)
@@ -194,17 +196,7 @@ def init(
 
         await dump_bytes_chunked(__debug, stdout, new_directory)
 
-    return __app
-
-
-def run(app: Typer, program_name: str) -> None:
-    try:
-        app()
-    except Exception:
-        print(f"{program_name}:", file=stderr)
-        print_exc()
-
-        exit(1)
+    run(__app, program_name)
 
 
 async def generate_empty(

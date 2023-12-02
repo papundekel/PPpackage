@@ -11,7 +11,9 @@ async def update_database_manager(debug: bool, manager: str, cache_path: Path):
     stderr.write(f"Updating {manager} database...\n")
 
     process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
+        "python",
+        "-m",
+        f"PPpackage_{manager}",
         "--debug" if debug else "--no-debug",
         "update-database",
         str(cache_path),
