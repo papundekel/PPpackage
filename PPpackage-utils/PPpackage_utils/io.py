@@ -114,20 +114,13 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
 
 
 @asynccontextmanager
-async def communicate_with_runner(
-    debug: bool,
-    daemon_path: Path,
-    machine_id: str,
-):
-    (
-        daemon_reader,
-        daemon_writer,
-    ) = await open_unix_connection(daemon_path)
+async def communicate_with_runner(debug: bool, socket_path: Path, machine_id: str):
+    reader, writer = await open_unix_connection(socket_path)
 
     try:
-        await dump_one(debug, daemon_writer, machine_id)
-        yield daemon_reader, daemon_writer
+        await dump_one(debug, writer, machine_id)
+        yield reader, writer
     finally:
-        await dump_one(debug, daemon_writer, RunnerRequestType.END)
-        daemon_writer.close()
-        await daemon_writer.wait_closed()
+        await dump_one(debug, writer, RunnerRequestType.END)
+        writer.close()
+        await writer.wait_closed()
