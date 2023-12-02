@@ -6,13 +6,25 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one
-from PPpackage_utils.utils import RunnerRequestType
+from PPpackage_utils.utils import MyException, RunnerRequestType
 
 _DEBUG = False
 
 
+def pipe_read_line_maybe(debug, prefix, input: TextIOBase) -> str | None:
+    line = input.readline()
+
+    if len(line) == 0:
+        return None
+
+    return line.strip()
+
+
 def pipe_read_line(debug, prefix, input: TextIOBase) -> str:
-    line = input.readline().strip()
+    line = pipe_read_line_maybe(debug, prefix, input)
+
+    if line is None:
+        raise MyException(f"Unexpected EOF.")
 
     if _DEBUG:
         print(f"DEBUG {prefix}: pipe read line: {line}", file=stderr)

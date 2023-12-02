@@ -58,7 +58,7 @@ async def fetch_send(
             *package_names,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=None,
+            stderr=DEVNULL,
             env=environment,
         )
 

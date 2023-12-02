@@ -1,6 +1,6 @@
 from asyncio import StreamReader, StreamWriter, create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, MutableMapping
 from io import TextIOWrapper
 from pathlib import Path
 from sys import stderr
@@ -8,6 +8,7 @@ from sys import stderr
 from PPpackage_utils.io import (
     communicate_with_runner,
     pipe_read_line,
+    pipe_read_line_maybe,
     pipe_read_string,
     pipe_read_strings,
     pipe_write_int,
@@ -15,6 +16,7 @@ from PPpackage_utils.io import (
 )
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
+    MyException,
     RunnerRequestType,
     TarFileInMemoryRead,
     TarFileInMemoryWrite,
@@ -64,6 +66,25 @@ async def install_manager_command(
         pipe_to_sub.flush()
 
 
+def create_environment(
+    environment: MutableMapping[str, str],
+    pipe_from_fakealpm_path: Path,
+    pipe_to_fakealpm_path: Path,
+    runner_workdir_path: Path,
+    destination_path: Path,
+):
+    environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
+    environment["LD_PRELOAD"] += f":fakealpm/build/install/lib/libfakealpm.so"
+    environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
+    environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
+    environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
+        destination_path.relative_to(runner_workdir_path)
+    )
+
+
+DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
+
+
 async def install(
     debug: bool,
     cache_path: Path,
@@ -73,15 +94,12 @@ async def install(
     products: AsyncIterable[Product],
 ) -> memoryview:
     _, cache_path = get_cache_paths(cache_path)
-    database_path_relative = Path("var") / "lib" / "pacman"
-
-    print("X", file=stderr)
 
     with TemporaryDirectory(runner_workdir_path) as destination_path:
         with TarFileInMemoryRead(old_directory) as old_tar:
             old_tar.extractall(destination_path)
 
-        database_path = destination_path / database_path_relative
+        database_path = destination_path / DATABASE_PATH_RELATIVE
 
         ensure_dir_exists(database_path)
 
@@ -96,16 +114,12 @@ async def install(
                 TemporaryPipe() as pipe_to_fakealpm_path,
             ):
                 async with fakeroot(debug) as environment:
-                    environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-                    environment[
-                        "LD_PRELOAD"
-                    ] += f":fakealpm/build/install/lib/libfakealpm.so"
-                    environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(
-                        pipe_from_fakealpm_path
-                    )
-                    environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
-                    environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
-                        destination_path.relative_to(runner_workdir_path)
+                    create_environment(
+                        environment,
+                        pipe_from_fakealpm_path,
+                        pipe_to_fakealpm_path,
+                        runner_workdir_path,
+                        destination_path,
                     )
 
                     process = await create_subprocess_exec(
@@ -130,24 +144,22 @@ async def install(
                         ],
                         stdin=DEVNULL,
                         stdout=DEVNULL,
-                        stderr=None,
+                        stderr=DEVNULL,
                         env=environment,
                     )
-
-                    print(pipe_from_fakealpm_path, pipe_to_fakealpm_path, file=stderr)
 
                     with (
                         open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
                         open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
                     ):
-                        print("XXX", file=stderr)
-
                         while True:
-                            header = pipe_read_line(
+                            header = pipe_read_line_maybe(
                                 debug, "PPpackage-arch", pipe_from_fakealpm
                             )
 
-                            if header == "COMMAND":
+                            if header is None:
+                                break
+                            elif header == "COMMAND":
                                 await install_manager_command(
                                     debug,
                                     pipe_to_fakealpm,
@@ -157,12 +169,15 @@ async def install(
                                     runner_workdir_path,
                                 )
                             else:
-                                print(f"header: {header}", file=stderr)
-                                break
+                                raise MyException(
+                                    f"Unknown header: {header}",
+                                    "PPpackage-arch",
+                                    stderr,
+                                )
 
-                    await asubprocess_wait(process, "Error in `pacman -Udd`")
+                await asubprocess_wait(process, "Error in `pacman -Udd`")
 
-        with TarFileInMemoryWrite() as new_tar:
-            new_tar.add(str(destination_path), "")
+            with TarFileInMemoryWrite() as new_tar:
+                new_tar.add(str(destination_path), "")
 
-        return new_tar.data
+    return new_tar.data

@@ -1,13 +1,16 @@
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
-from shutil import rmtree
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.app import AsyncTyper, run
 from PPpackage_utils.parse import load_from_bytes
-from PPpackage_utils.utils import TarFileInMemoryRead, TarFileInMemoryWrite
+from PPpackage_utils.utils import (
+    TarFileInMemoryRead,
+    TarFileInMemoryWrite,
+    wipe_directory,
+)
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
@@ -91,11 +94,7 @@ async def main_command(
 
     old_installation = old_installation_tar.data
 
-    for path in destination_path.iterdir():
-        if path.is_symlink():
-            path.unlink()
-        else:
-            rmtree(path)
+    wipe_directory(destination_path)
 
     new_installation = await install(
         debug,

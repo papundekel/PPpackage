@@ -22,6 +22,7 @@ from enum import unique as enum_unique
 from io import BytesIO
 from os import environ, kill, mkfifo
 from pathlib import Path
+from shutil import rmtree
 from signal import SIGTERM
 from sys import stderr, stdin, stdout
 from tarfile import DIRTYPE, TarFile, TarInfo
@@ -297,3 +298,18 @@ def create_empty_tar() -> memoryview:
         pass
 
     return tar.data
+
+
+def wipe_directory_onerror(_, __, excinfo):
+    _, exc, _ = excinfo
+
+    if not isinstance(exc, FileNotFoundError):
+        raise exc
+
+
+def wipe_directory(directory: Path) -> None:
+    for path in directory.iterdir():
+        if path.is_symlink():
+            path.unlink()
+        else:
+            rmtree(path, onerror=wipe_directory_onerror)

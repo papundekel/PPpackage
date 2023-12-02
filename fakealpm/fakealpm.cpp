@@ -20,8 +20,7 @@ static const char *runner_workdir_relative_path;
 __attribute__((constructor)) static void pipes_ctr() {
   const auto pipe_from_fakealpm_path =
       std::getenv("PP_PIPE_FROM_FAKEALPM_PATH");
-  const auto pipe_to_fakealpm_path =
-      std::getenv("PP_PIPE_TO_FAKEALPM_SUB_PATH");
+  const auto pipe_to_fakealpm_path = std::getenv("PP_PIPE_TO_FAKEALPM_PATH");
   runner_workdir_relative_path = std::getenv("PP_RUNNER_WORKDIR_RELATIVE_PATH");
 
   pipe_from_fakealpm = std::fopen(pipe_from_fakealpm_path, "w");
@@ -33,11 +32,11 @@ __attribute__((destructor)) static void pipes_dtr() {
   std::fclose(pipe_to_fakealpm);
 }
 
-void write_string(const char *str) {
+static void write_string(const char *str) {
   std::fprintf(pipe_from_fakealpm, "%zu\n%s", std::strlen(str), str);
 }
 
-auto read_int() {
+static auto read_int() {
   char buffer[64] = {0};
   std::fgets(buffer, sizeof(buffer), pipe_to_fakealpm);
 
@@ -46,7 +45,7 @@ auto read_int() {
   return value;
 }
 
-std::string read_string() {
+static std::string read_string() {
   const auto length = read_int();
 
   std::string str(length, '\0');
