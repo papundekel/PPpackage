@@ -10,9 +10,8 @@ from asyncio.subprocess import PIPE
 from contextlib import contextmanager
 from json import dump as json_dump
 from json import load as json_load
-from os import getgid, getuid, listdir
+from os import getgid, getuid
 from pathlib import Path
-from shutil import rmtree
 from signal import SIGTERM
 from subprocess import DEVNULL
 from sys import stderr
@@ -27,6 +26,7 @@ from PPpackage_utils.utils import (
     RunnerRequestType,
     TemporaryDirectory,
     asubprocess_wait,
+    wipe_directory,
 )
 from typer import Exit
 
@@ -246,8 +246,7 @@ async def handle_connection(
     writer.close()
     await writer.wait_closed()
 
-    for content in listdir(container_workdir_path):
-        rmtree(container_workdir_path / content)
+    wipe_directory(container_workdir_path)
 
 
 async def create_config(debug: bool, bundle_path: Path):

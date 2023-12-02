@@ -22,6 +22,7 @@ from enum import unique as enum_unique
 from io import BytesIO
 from os import environ, kill, mkfifo
 from pathlib import Path
+from shutil import rmtree
 from signal import SIGTERM
 from sys import stderr, stdin, stdout
 from tarfile import DIRTYPE, TarFile, TarInfo
@@ -154,15 +155,6 @@ async def fakeroot(debug: bool) -> AsyncIterator[MutableMapping[str, str]]:
 
 
 @contextmanager
-def communicate_from_sub(pipe_from_sub_path):
-    with open(pipe_from_sub_path, "w") as pipe_from_sub:
-        try:
-            yield pipe_from_sub
-        finally:
-            pipe_from_sub.write("END\n")
-
-
-@contextmanager
 def TemporaryPipe(dir=None):
     with TemporaryDirectory(dir) as dir_path:
         pipe_path = dir_path / "pipe"
@@ -215,8 +207,10 @@ def debug_redirect_stdout(debug: bool):
 MACHINE_ID_RELATIVE_PATH = Path("etc") / "machine-id"
 
 
-def read_machine_id(machine_id_path: Path) -> str:
-    with machine_id_path.open("r") as machine_id_file:
+def read_machine_id(machine_id_prefix_path: Path) -> str:
+    with (machine_id_prefix_path / MACHINE_ID_RELATIVE_PATH).open(
+        "r"
+    ) as machine_id_file:
         machine_id = machine_id_file.readline().strip()
 
         return machine_id
@@ -304,3 +298,18 @@ def create_empty_tar() -> memoryview:
         pass
 
     return tar.data
+
+
+def wipe_directory_onerror(_, __, excinfo):
+    _, exc, _ = excinfo
+
+    if not isinstance(exc, FileNotFoundError):
+        raise exc
+
+
+def wipe_directory(directory: Path) -> None:
+    for path in directory.iterdir():
+        if path.is_symlink():
+            path.unlink()
+        else:
+            rmtree(path, onerror=wipe_directory_onerror)

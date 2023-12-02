@@ -102,7 +102,7 @@ def init(
         Awaitable[memoryview],
     ],
     install_callback: Callable[
-        [bool, Path, Path, Path, Path, memoryview, AsyncIterable[Product]],
+        [bool, Path, Path, Path, memoryview, AsyncIterable[Product]],
         Awaitable[memoryview],
     ],
     RequirementType: type[RequirementTypeType],
@@ -175,8 +175,7 @@ def init(
     @__app.command()
     async def install(
         cache_path: Path,
-        pipe_from_sub_path: Path,
-        pipe_to_sub_path: Path,
+        runner_path: Path,
         runner_workdir_path: Path,
     ) -> None:
         stdin, stdout = await get_standard_streams()
@@ -187,8 +186,7 @@ def init(
         new_directory = await install_callback(
             __debug,
             cache_path,
-            pipe_from_sub_path,
-            pipe_to_sub_path,
+            runner_path,
             runner_workdir_path,
             old_directory,
             products,

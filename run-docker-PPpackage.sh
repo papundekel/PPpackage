@@ -3,7 +3,8 @@ container_workdir_path="$2"
 cache_path="$3"
 generators_path="$4"
 destination_path="$5"
-debug="$6"
+update_database="$6"
+debug="$7"
 
 docker run \
     --rm \
@@ -24,4 +25,5 @@ docker run \
         /workdir/cache \
         /workdir/generators \
         /workdir/root \
+        $update_database \
         $debug

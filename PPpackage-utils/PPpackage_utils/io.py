@@ -6,13 +6,25 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one
-from PPpackage_utils.utils import RunnerRequestType
+from PPpackage_utils.utils import MyException, RunnerRequestType
 
 _DEBUG = False
 
 
+def pipe_read_line_maybe(debug, prefix, input: TextIOBase) -> str | None:
+    line = input.readline()
+
+    if len(line) == 0:
+        return None
+
+    return line.strip()
+
+
 def pipe_read_line(debug, prefix, input: TextIOBase) -> str:
-    line = input.readline().strip()
+    line = pipe_read_line_maybe(debug, prefix, input)
+
+    if line is None:
+        raise MyException(f"Unexpected EOF.")
 
     if _DEBUG:
         print(f"DEBUG {prefix}: pipe read line: {line}", file=stderr)
@@ -105,6 +117,7 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
 async def communicate_with_runner(
     debug: bool,
     daemon_path: Path,
+    machine_id: str,
 ):
     (
         daemon_reader,
@@ -112,6 +125,7 @@ async def communicate_with_runner(
     ) = await open_unix_connection(daemon_path)
 
     try:
+        await dump_one(debug, daemon_writer, machine_id)
         yield daemon_reader, daemon_writer
     finally:
         await dump_one(debug, daemon_writer, RunnerRequestType.END)

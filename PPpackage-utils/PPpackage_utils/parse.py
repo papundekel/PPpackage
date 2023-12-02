@@ -86,14 +86,10 @@ Options = Mapping[str, Any] | None
 
 
 @dataclass(frozen=True)
-class ProductBase:
+class Product:
+    name: str
     version: str
     product_id: str
-
-
-@dataclass(frozen=True)
-class Product(ProductBase):
-    name: str
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,7 @@ COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp
 RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
 COPY fakealpm/ /workdir/fakealpm
-RUN cd fakealpm/ && ./build.sh
+RUN ./fakealpm/build.sh
 
 ENV VIRTUAL_ENV=/workdir/.venv/
 RUN python -m venv $VIRTUAL_ENV

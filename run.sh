@@ -23,7 +23,7 @@ mkdir -p "$cache_path" "$generators_path" "$destination_path" && \
 \
 machine_id="$(./"run-$mode-machine-id.sh")" && \
 \
-runc_id="$(./"run-$mode-runc.sh" "$run_path" "$runner_workdirs_path" "$debug")" && \
+runner_id="$(./"run-$mode-runner.sh" "$run_path" "$runner_workdirs_path" "$debug")" && \
 \
 sleep 1 && \
 container_workdir_path="$runner_workdirs_path/$(./"run-$mode-init.sh" "$runner_path" "$machine_id" "$debug")" && \
@@ -31,4 +31,4 @@ container_workdir_path="$runner_workdirs_path/$(./"run-$mode-init.sh" "$runner_p
 ./"run-$mode-PPpackage.sh" "$runner_path" "$container_workdir_path" "$cache_path" "$generators_path" "$destination_path" "$update_database" "$debug"
 
 rm -rf "$runner_workdirs_path" && \
-./"run-$mode-stop.sh" "$runc_id"
+./"run-$mode-stop.sh" "$runner_id"

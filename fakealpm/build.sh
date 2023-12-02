@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
-mkdir -p build && \
-\
-g++ -Wall -shared -fPIC -o build/fakealpm.so -I /usr/share/libalpm-pp/usr/include/ fakealpm.cpp
+BUILD_DIR="fakealpm/build"
+
+cmake -G "Ninja Multi-Config" -S fakealpm/ -B "$BUILD_DIR" && \
+cmake --build "$BUILD_DIR" --config Release && \
+cmake --install "$BUILD_DIR" --config Release --prefix "$BUILD_DIR/install"
