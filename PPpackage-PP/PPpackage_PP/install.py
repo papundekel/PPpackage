@@ -14,7 +14,7 @@ async def install(
     debug: bool,
     cache_path: Path,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
 ) -> memoryview:

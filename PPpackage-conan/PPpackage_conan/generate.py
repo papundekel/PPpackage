@@ -1,9 +1,7 @@
-import os
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
@@ -14,7 +12,6 @@ from PPpackage_utils.utils import (
     TarFileInMemoryWrite,
     TemporaryDirectory,
     asubprocess_wait,
-    ensure_dir_exists,
 )
 
 from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment

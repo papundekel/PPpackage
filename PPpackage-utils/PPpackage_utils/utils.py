@@ -1,4 +1,3 @@
-import tarfile
 from asyncio import (
     StreamReader,
     StreamReaderProtocol,
@@ -204,18 +203,6 @@ def debug_redirect_stdout(debug: bool):
     return DEVNULL if not debug else stderr
 
 
-MACHINE_ID_RELATIVE_PATH = Path("etc") / "machine-id"
-
-
-def read_machine_id(machine_id_prefix_path: Path) -> str:
-    with (machine_id_prefix_path / MACHINE_ID_RELATIVE_PATH).open(
-        "r"
-    ) as machine_id_file:
-        machine_id = machine_id_file.readline().strip()
-
-        return machine_id
-
-
 @contextmanager
 def TarFileInMemoryRead(data: memoryview) -> Iterator[TarFile]:
     with BytesIO(data) as io:
@@ -313,3 +300,12 @@ def wipe_directory(directory: Path) -> None:
             path.unlink()
         else:
             rmtree(path, onerror=wipe_directory_onerror)
+
+
+class Phase(Enum):
+    UPDATE_DATABASE = enum_auto()
+    RESOLVE = enum_auto()
+    FETCH = enum_auto()
+    GENERATE = enum_auto()
+    INSTALL = enum_auto()
+    END = enum_auto()

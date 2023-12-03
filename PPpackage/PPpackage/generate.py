@@ -1,8 +1,6 @@
-from asyncio import Task, TaskGroup, create_subprocess_exec
-from asyncio.subprocess import PIPE
+from asyncio import StreamReader, StreamWriter, Task, TaskGroup
 from collections.abc import Mapping, MutableMapping, MutableSequence, Set
 from itertools import chain
-from pathlib import Path
 from typing import Any, Iterable
 
 from PPpackage_utils.parse import (
@@ -11,15 +9,9 @@ from PPpackage_utils.parse import (
     Product,
     dump_many,
     dump_one,
-    load_bytes,
-    load_loop,
+    load_bytes_chunked,
 )
-from PPpackage_utils.utils import (
-    TarFileInMemoryRead,
-    TarFileInMemoryWrite,
-    asubprocess_wait,
-    debug_redirect_stderr,
-)
+from PPpackage_utils.utils import Phase, TarFileInMemoryRead, TarFileInMemoryWrite
 
 from .generators import builtin as builtin_generators
 from .utils import NodeData, data_to_product
@@ -27,42 +19,27 @@ from .utils import NodeData, data_to_product
 
 async def generate_manager(
     debug: bool,
-    cache_path: Path,
+    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     options: Options,
     products: Iterable[Product],
     generators: Set[str],
     manager: str,
 ) -> memoryview:
-    process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
-        "--debug" if debug else "--no-debug",
-        "generate",
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
-    )
+    reader, writer = connections[manager]
 
-    assert process.stdin is not None
-    assert process.stdout is not None
+    await dump_one(debug, writer, Phase.GENERATE)
+    await dump_one(debug, writer, options)
+    await dump_many(debug, writer, products)
+    await dump_many(debug, writer, generators)
 
-    await dump_one(debug, process.stdin, options)
-    await dump_many(debug, process.stdin, products)
-    await dump_many(debug, process.stdin, generators)
+    generators_directory = await load_bytes_chunked(debug, reader)
 
-    generators_bytes = bytearray()
-
-    async for _ in load_loop(debug, process.stdout):
-        generators_bytes += await load_bytes(debug, process.stdout)
-
-    await asubprocess_wait(process, f"Error in {manager}'s generate.")
-
-    return memoryview(generators_bytes)
+    return generators_directory
 
 
 async def generate(
     debug: bool,
-    cache_path: Path,
+    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
@@ -83,7 +60,7 @@ async def generate(
                 group.create_task(
                     generate_manager(
                         debug,
-                        cache_path,
+                        connections,
                         meta_options.get(manager),
                         products,
                         generators - builtin_generators.keys(),
