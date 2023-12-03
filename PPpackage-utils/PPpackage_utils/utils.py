@@ -302,10 +302,12 @@ def wipe_directory(directory: Path) -> None:
             rmtree(path, onerror=wipe_directory_onerror)
 
 
-class Phase(Enum):
+class SubmanagerCommand(Enum):
     UPDATE_DATABASE = enum_auto()
     RESOLVE = enum_auto()
     FETCH = enum_auto()
     GENERATE = enum_auto()
     INSTALL = enum_auto()
+    INSTALL_UPLOAD = enum_auto()
+    INSTALL_DOWNLOAD = enum_auto()
     END = enum_auto()

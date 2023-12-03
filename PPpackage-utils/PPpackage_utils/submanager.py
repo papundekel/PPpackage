@@ -24,12 +24,19 @@ from .parse import (
     ResolutionGraph,
     dump_bytes_chunked,
     dump_many_async,
+    dump_one,
     load_bytes_chunked,
     load_loop,
     load_many,
     load_one,
 )
-from .utils import Phase, create_empty_tar, discard_async_iterable, get_standard_streams
+from .utils import (
+    MyException,
+    SubmanagerCommand,
+    create_empty_tar,
+    discard_async_iterable,
+    get_standard_streams,
+)
 
 
 class AsyncTyper(Typer):
@@ -179,15 +186,25 @@ async def install(
     cache_path: Path,
     runner_path: Path,
     runner_workdirs_path: Path,
-):
-    old_directory = await load_bytes_chunked(debug, reader)
+    old_directory: memoryview,
+) -> memoryview:
     products = load_many(debug, reader, Product)
 
     new_directory = await callback(
         debug, cache_path, runner_path, runner_workdirs_path, old_directory, products
     )
 
-    await dump_bytes_chunked(debug, writer, new_directory)
+    await dump_one(debug, writer, None)
+
+    return new_directory
+
+
+async def install_upload(debug: bool, reader: StreamReader):
+    return await load_bytes_chunked(debug, reader)
+
+
+async def install_download(debug: bool, writer: StreamWriter, installation: memoryview):
+    await dump_bytes_chunked(debug, writer, installation)
 
 
 async def handle_connection(
@@ -204,17 +221,19 @@ async def handle_connection(
     reader: StreamReader,
     writer: StreamWriter,
 ):
+    installation: memoryview | None = None
+
     while True:
-        phase = await load_one(debug, reader, Phase)
+        phase = await load_one(debug, reader, SubmanagerCommand)
 
         match phase:
-            case Phase.UPDATE_DATABASE:
+            case SubmanagerCommand.UPDATE_DATABASE:
                 await update_database(update_database_callback, debug, cache_path)
-            case Phase.RESOLVE:
+            case SubmanagerCommand.RESOLVE:
                 await resolve(
                     reader, writer, resolve_callback, RequirementType, debug, cache_path
                 )
-            case Phase.FETCH:
+            case SubmanagerCommand.FETCH:
                 await fetch(
                     reader,
                     writer,
@@ -224,10 +243,13 @@ async def handle_connection(
                     runner_path,
                     runner_workdirs_path,
                 )
-            case Phase.GENERATE:
+            case SubmanagerCommand.GENERATE:
                 await generate(reader, writer, generate_callback, debug, cache_path)
-            case Phase.INSTALL:
-                await install(
+            case SubmanagerCommand.INSTALL:
+                if installation is None:
+                    raise MyException("Installation not initialized. First upload one.")
+
+                installation = await install(
                     reader,
                     writer,
                     install_callback,
@@ -235,8 +257,17 @@ async def handle_connection(
                     cache_path,
                     runner_path,
                     runner_workdirs_path,
+                    installation,
                 )
-            case Phase.END:
+
+            case SubmanagerCommand.INSTALL_UPLOAD:
+                installation = await install_upload(debug, reader)
+            case SubmanagerCommand.INSTALL_DOWNLOAD:
+                if installation is None:
+                    raise MyException("Installation not initialized. First upload one.")
+
+                await install_download(debug, writer, installation)
+            case SubmanagerCommand.END:
                 break
 
 
