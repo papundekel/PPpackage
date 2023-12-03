@@ -1,6 +1,5 @@
 from asyncio import Queue as BaseQueue
 from asyncio import StreamReader, StreamWriter, TaskGroup, as_completed
-from asyncio.subprocess import PIPE, create_subprocess_exec
 from collections.abc import (
     AsyncIterable,
     Iterable,
@@ -11,7 +10,6 @@ from collections.abc import (
 )
 from contextlib import asynccontextmanager
 from itertools import islice
-from pathlib import Path
 from sys import stderr
 from typing import Any, TypeVar
 
@@ -29,7 +27,7 @@ from PPpackage_utils.parse import (
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
+from PPpackage_utils.utils import Phase
 
 from .utils import NodeData
 
@@ -111,6 +109,8 @@ async def send(
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
 ) -> None:
+    await dump_one(debug, writer, Phase.FETCH)
+
     await dump_one(debug, writer, options)
 
     async for package, dependencies in dump_loop(debug, writer, packages):
@@ -128,9 +128,6 @@ async def send(
             )
 
     await dump_loop_end(debug, writer)
-
-    writer.close()
-    await writer.wait_closed()
 
 
 async def receive(
@@ -154,10 +151,8 @@ async def receive(
 
 async def fetch_manager(
     debug: bool,
+    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     manager: str,
-    runner_path: Path,
-    runner_workdirs_path: Path,
-    cache_path: Path,
     options: Options,
     packages: Iterable[tuple[Package, Iterable[Dependency]]],
     nodes: Mapping[ManagerAndName, NodeData],
@@ -165,37 +160,20 @@ async def fetch_manager(
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
 ) -> None:
-    process = await create_subprocess_exec(
-        "python",
-        "-m",
-        f"PPpackage_{manager}",
-        "--debug" if debug else "--no-debug",
-        "fetch",
-        str(runner_path),
-        str(runner_workdirs_path),
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
-    )
-
-    assert process.stdin is not None
-    assert process.stdout is not None
+    reader, writer = connections[manager]
 
     async with TaskGroup() as group:
         group.create_task(
             send(
                 debug,
-                process.stdin,
+                writer,
                 manager,
                 options,
                 packages,
                 packages_to_dependencies,
             )
         )
-        group.create_task(receive(debug, process.stdout, manager, nodes))
-
-    await asubprocess_wait(process, f"Error in {manager}'s fetch.")
+        group.create_task(receive(debug, reader, manager, nodes))
 
     stderr.write(f"{manager}:\n")
     for package, _ in sorted(packages, key=lambda p: p[0].name):
@@ -235,9 +213,7 @@ def graph_predecessors(
 
 async def fetch(
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
-    cache_path: Path,
+    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
@@ -275,10 +251,8 @@ async def fetch(
                 group.create_task(
                     fetch_manager(
                         debug,
+                        connections,
                         manager,
-                        runner_path,
-                        runner_workdirs_path,
-                        cache_path,
                         meta_options.get(manager),
                         packages,
                         graph.nodes,

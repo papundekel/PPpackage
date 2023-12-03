@@ -11,7 +11,7 @@ from typing import Tuple
 from typing import cast as type_cast
 
 from PPpackage_utils.parse import dump_one, load_many, load_one
-from PPpackage_utils.submanager import main_server
+from PPpackage_utils.submanager import run_server
 from PPpackage_utils.utils import (
     ImageType,
     RunnerRequestType,
@@ -244,7 +244,7 @@ async def connection_handler_context(workdirs_path: Path, debug: bool):
 
 
 async def main(debug: bool, run_path: Path, workdirs_path: Path):
-    await main_server(
+    await run_server(
         debug,
         program_name,
         run_path,

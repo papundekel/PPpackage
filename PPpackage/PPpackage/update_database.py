@@ -1,35 +1,46 @@
-from asyncio import TaskGroup, create_subprocess_exec
-from asyncio.subprocess import DEVNULL
-from collections.abc import Iterable
+from asyncio import StreamReader, StreamWriter, TaskGroup
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.utils import asubprocess_wait, debug_redirect_stderr
+from PPpackage_utils.parse import dump_one, load_one
+from PPpackage_utils.utils import MyException, Phase
+
+from PPpackage.utils import open_submanager
 
 
-async def update_database_manager(debug: bool, manager: str, cache_path: Path):
+async def update_database_manager(
+    debug: bool,
+    submanager_socket_paths: Mapping[str, Path],
+    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    manager: str,
+):
     stderr.write(f"Updating {manager} database...\n")
 
-    process = await create_subprocess_exec(
-        "python",
-        "-m",
-        f"PPpackage_{manager}",
-        "--debug" if debug else "--no-debug",
-        "update-database",
-        str(cache_path),
-        stdin=DEVNULL,
-        stdout=DEVNULL,
-        stderr=debug_redirect_stderr(debug),
+    reader, writer = await open_submanager(
+        manager, submanager_socket_paths, connections
     )
 
-    await asubprocess_wait(process, f"Error in {manager}'s update-database.")
+    await dump_one(debug, writer, Phase.UPDATE_DATABASE)
+
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise MyException(f"Error in {manager}'s update-database.")
 
 
 async def update_database(
-    debug: bool, managers: Iterable[str], cache_path: Path
+    debug: bool,
+    submanager_socket_paths: Mapping[str, Path],
+    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    managers: Iterable[str],
 ) -> None:
     stderr.write("Updating databases...\n")
 
     async with TaskGroup() as group:
         for manager in managers:
-            group.create_task(update_database_manager(debug, manager, cache_path))
+            group.create_task(
+                update_database_manager(
+                    debug, submanager_socket_paths, connections, manager
+                )
+            )

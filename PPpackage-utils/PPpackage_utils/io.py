@@ -1,4 +1,4 @@
-from asyncio import open_unix_connection
+from asyncio import StreamWriter, open_unix_connection
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 from io import TextIOBase
@@ -113,6 +113,12 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
         print(f"DEBUG {prefix}: pipe write string string: {string}", file=stderr)
 
 
+async def close_writer(writer: StreamWriter):
+    await writer.drain()
+    writer.close()
+    await writer.wait_closed()
+
+
 @asynccontextmanager
 async def communicate_with_runner(debug: bool, socket_path: Path, workdirs_path: Path):
     reader, writer = await open_unix_connection(socket_path)
@@ -125,5 +131,5 @@ async def communicate_with_runner(debug: bool, socket_path: Path, workdirs_path:
         yield reader, writer, workdir_path
     finally:
         await dump_one(debug, writer, RunnerRequestType.END)
-        writer.close()
-        await writer.wait_closed()
+
+        await close_writer(writer)

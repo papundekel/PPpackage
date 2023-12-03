@@ -1,5 +1,4 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup, create_subprocess_exec
-from asyncio.subprocess import PIPE
+from asyncio import StreamReader, StreamWriter, TaskGroup
 from collections.abc import (
     Hashable,
     Iterable,
@@ -28,7 +27,9 @@ from PPpackage_utils.parse import (
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import MyException, asubprocess_wait, debug_redirect_stderr
+from PPpackage_utils.utils import MyException, Phase
+
+from PPpackage.utils import open_submanager
 
 
 async def send(
@@ -37,13 +38,12 @@ async def send(
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
 ) -> None:
+    await dump_one(debug, writer, Phase.RESOLVE)
+
     await dump_one(debug, writer, options)
 
     async for requirements in dump_loop(debug, writer, requirements_list):
         await dump_many(debug, writer, requirements)
-
-    writer.close()
-    await writer.wait_closed()
 
 
 async def receive(
@@ -58,38 +58,24 @@ async def receive(
 
 async def resolve_manager(
     debug: bool,
+    submanager_socket_paths: Mapping[str, Path],
+    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
     manager: str,
-    cache_path: Path,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ) -> None:
-    process = await create_subprocess_exec(
-        "python",
-        "-m",
-        f"PPpackage_{manager}",
-        "--debug" if debug else "--no-debug",
-        "resolve",
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=debug_redirect_stderr(debug),
+    reader, writer = await open_submanager(
+        manager, submanager_socket_paths, connections
     )
-
-    assert process.stdin is not None
-    assert process.stdout is not None
 
     try:
         async with TaskGroup() as group:
-            group.create_task(send(debug, process.stdin, options, requirements_list))
-            group.create_task(
-                receive(debug, process.stdout, manager, resolution_graphs)
-            )
+            group.create_task(send(debug, writer, options, requirements_list))
+            group.create_task(receive(debug, reader, manager, resolution_graphs))
     except* MyException:
         print(f"Error in {manager}'s resolve.", file=stderr)
         raise
-
-    await asubprocess_wait(process, f"Error in {manager}'s resolve.")
 
 
 @dataclass(frozen=True)
@@ -168,7 +154,8 @@ def make_graph(
 
 async def resolve_iteration(
     debug: bool,
-    cache_path: Path,
+    submanager_socket_paths: Mapping[str, Path],
+    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
     requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
     initial: Mapping[str, Set[Hashable]],
@@ -189,8 +176,9 @@ async def resolve_iteration(
             group.create_task(
                 resolve_manager(
                     debug,
+                    submanager_socket_paths,
+                    connections,
                     manager,
-                    cache_path,
                     meta_options.get(manager),
                     requirements_list,
                     resolution_graphs,
@@ -272,7 +260,8 @@ def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
 async def resolve(
     debug: bool,
     iteration_limit: int,
-    cache_path: Path,
+    submanager_socket_paths: Mapping[str, Path],
+    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
     initial_requirements: Mapping[str, Set[Any]],
     meta_options: Mapping[str, Any],
 ) -> MultiDiGraph:
@@ -309,7 +298,8 @@ async def resolve(
                 group.create_task(
                     resolve_iteration(
                         debug,
-                        cache_path,
+                        submanager_socket_paths,
+                        connections,
                         all_requirements,
                         meta_options,
                         initial_requirements,
