@@ -1,8 +1,11 @@
 -e ./PPpackage-utils/
--e ./PPpackage/
+
 -e ./PPpackage-runner/
--e ./PPpackage-run/
 
 -e ./PPpackage-conan/
 -e ./PPpackage-arch/
 -e ./PPpackage-PP/
+
+-e ./PPpackage/
+
+-e ./PPpackage-run/
