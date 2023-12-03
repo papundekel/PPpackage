@@ -14,19 +14,17 @@ from PPpackage_utils.parse import (
     load_one,
 )
 from PPpackage_utils.utils import (
-    MACHINE_ID_RELATIVE_PATH,
     ImageType,
     MyException,
     RunnerRequestType,
     TemporaryPipe,
-    read_machine_id,
 )
 
 
 async def fetch_send(
     debug: bool,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -39,11 +37,10 @@ async def fetch_send(
         async for _ in dependencies:
             pass
 
-    machine_id = read_machine_id(Path("/"))
-
-    async with communicate_with_runner(debug, runner_path, machine_id) as (
+    async with communicate_with_runner(debug, runner_path, runner_workdirs_path) as (
         runner_reader,
         runner_writer,
+        runner_workdir_path,
     ):
         await dump_one(debug, runner_writer, RunnerRequestType.RUN)
         await dump_one(debug, runner_writer, ImageType.TAG)

@@ -99,13 +99,7 @@ def main(
         tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]],
     ],
     generate_callback: Callable[
-        [
-            bool,
-            Path,
-            Any,
-            AsyncIterable[Product],
-            AsyncIterable[str],
-        ],
+        [bool, Path, Any, AsyncIterable[Product], AsyncIterable[str]],
         Awaitable[memoryview],
     ],
     install_callback: Callable[
@@ -135,7 +129,7 @@ def main(
 
     @__app.command()
     async def fetch(
-        runner_path: Path, runner_workdir_path: Path, cache_path: Path
+        runner_path: Path, runner_workdirs_path: Path, cache_path: Path
     ) -> None:
         stdin, stdout = await get_standard_streams()
 
@@ -154,7 +148,7 @@ def main(
         output, complete = fetch_callback(
             __debug,
             runner_path,
-            runner_workdir_path,
+            runner_workdirs_path,
             cache_path,
             options,
             packages,
@@ -181,9 +175,7 @@ def main(
 
     @__app.command()
     async def install(
-        cache_path: Path,
-        runner_path: Path,
-        runner_workdir_path: Path,
+        cache_path: Path, runner_path: Path, runner_workdirs_path: Path
     ) -> None:
         stdin, stdout = await get_standard_streams()
 
@@ -194,7 +186,7 @@ def main(
             __debug,
             cache_path,
             runner_path,
-            runner_workdir_path,
+            runner_workdirs_path,
             old_directory,
             products,
         )
@@ -234,7 +226,7 @@ def fetch_receive_discard(
     ],
     debug: bool,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -243,19 +235,16 @@ def fetch_receive_discard(
     return (
         output
         async for output in send_callback(
-            debug, runner_path, runner_workdir_path, cache_path, options, packages
+            debug, runner_path, runner_workdirs_path, cache_path, options, packages
         )
     ), discard_async_iterable(build_results)
 
 
 async def run_server(
     debug: bool,
-    program_name: str,
-    run_path: Path,
+    socket_path: Path,
     connection_handler: Callable[[bool, StreamReader, StreamWriter], Awaitable[None]],
 ):
-    socket_path = run_path / f"{program_name}.sock"
-
     try:
         async with await start_unix_server(
             partial(connection_handler, debug), socket_path
@@ -286,15 +275,12 @@ async def main_server(
         ],
     ],
 ):
+    socket_path = run_path / f"{program_name}.sock"
+
     try:
-        with PidFile(program_name, piddir=run_path):
+        with PidFile(program_name, run_path):
             async with connection_handler_context(debug) as connection_handler:
-                await run_server(
-                    debug,
-                    program_name,
-                    run_path,
-                    connection_handler,
-                )
+                await run_server(debug, socket_path, connection_handler)
     except PidFileAlreadyLockedError:
         print(f"{program_name} is already running.", file=stderr)
         raise Exit(1)

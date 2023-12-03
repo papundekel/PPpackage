@@ -5,7 +5,7 @@ from io import TextIOBase
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import dump_one
+from PPpackage_utils.parse import dump_one, load_one
 from PPpackage_utils.utils import MyException, RunnerRequestType
 
 _DEBUG = False
@@ -114,12 +114,15 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
 
 
 @asynccontextmanager
-async def communicate_with_runner(debug: bool, socket_path: Path, machine_id: str):
+async def communicate_with_runner(debug: bool, socket_path: Path, workdirs_path: Path):
     reader, writer = await open_unix_connection(socket_path)
 
     try:
-        await dump_one(debug, writer, machine_id)
-        yield reader, writer
+        workdir_path_relative = await load_one(debug, reader, Path)
+
+        workdir_path = workdirs_path / workdir_path_relative
+
+        yield reader, writer, workdir_path
     finally:
         await dump_one(debug, writer, RunnerRequestType.END)
         writer.close()

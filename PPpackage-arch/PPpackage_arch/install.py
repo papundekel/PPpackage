@@ -7,7 +7,6 @@ from sys import stderr
 
 from PPpackage_utils.io import (
     communicate_with_runner,
-    pipe_read_line,
     pipe_read_line_maybe,
     pipe_read_string,
     pipe_read_strings,
@@ -25,7 +24,6 @@ from PPpackage_utils.utils import (
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
-    read_machine_id,
 )
 
 from .utils import get_cache_paths
@@ -89,26 +87,25 @@ async def install(
     debug: bool,
     cache_path: Path,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
 ) -> memoryview:
     _, cache_path = get_cache_paths(cache_path)
 
-    with TemporaryDirectory(runner_workdir_path) as destination_path:
-        with TarFileInMemoryRead(old_directory) as old_tar:
-            old_tar.extractall(destination_path)
+    async with communicate_with_runner(debug, runner_path, runner_workdirs_path) as (
+        runner_reader,
+        runner_writer,
+        runner_workdir_path,
+    ):
+        with TemporaryDirectory(runner_workdir_path) as destination_path:
+            with TarFileInMemoryRead(old_directory) as old_tar:
+                old_tar.extractall(destination_path)
 
-        database_path = destination_path / DATABASE_PATH_RELATIVE
+            database_path = destination_path / DATABASE_PATH_RELATIVE
 
-        ensure_dir_exists(database_path)
+            ensure_dir_exists(database_path)
 
-        machine_id = read_machine_id(Path("/"))
-
-        async with communicate_with_runner(debug, runner_path, machine_id) as (
-            runner_reader,
-            runner_writer,
-        ):
             with (
                 TemporaryPipe() as pipe_from_fakealpm_path,
                 TemporaryPipe() as pipe_to_fakealpm_path,

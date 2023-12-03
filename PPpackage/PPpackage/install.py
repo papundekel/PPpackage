@@ -25,7 +25,7 @@ async def install_manager(
     manager: str,
     cache_path: Path,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     generation: Iterable[tuple[str, NodeData]],
     old_installation: memoryview,
 ) -> memoryview:
@@ -41,7 +41,7 @@ async def install_manager(
         "install",
         str(cache_path),
         str(runner_path),
-        str(runner_workdir_path),
+        str(runner_workdirs_path),
         stdin=PIPE,
         stdout=PIPE,
         stderr=debug_redirect_stderr(debug),
@@ -80,7 +80,7 @@ async def install(
     debug: bool,
     cache_path: Path,
     runner_path: Path,
-    runner_workdir_path: Path,
+    runner_workdirs_path: Path,
     installation: memoryview,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> memoryview:
@@ -93,7 +93,7 @@ async def install(
                 manager,
                 cache_path,
                 runner_path,
-                runner_workdir_path,
+                runner_workdirs_path,
                 generation,
                 installation,
             )
