@@ -103,11 +103,11 @@ def process_lifetime(main: Callable, *args):
         process.join()
 
 
-async def wait_for_sockets(*socket_paths: Path):
+async def wait_for_sockets(max_retries: int, *socket_paths: Path):
     tried_count = 0
 
     while any(not socket_path.exists() for socket_path in socket_paths):
-        if tried_count >= 10:
+        if tried_count >= max_retries:
             raise MyException("Timeout while waiting for sockets.")
 
         await sleep(0.1)
@@ -127,6 +127,7 @@ async def main_command(
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
     debug: bool = False,
+    wait_max_retries: int = 10,
 ):
     if mode == "native":
         from PPpackage_arch.main import main as PPpackage_arch
@@ -155,7 +156,7 @@ async def main_command(
         with process_lifetime(runner, debug, run_path, runner_workdirs_path):
             runner_path = run_path / "PPpackage-runner.sock"
 
-            await wait_for_sockets(runner_path)
+            await wait_for_sockets(wait_max_retries, runner_path)
 
             with ExitStack() as exit_stack:
                 submanager_socket_paths = {}
@@ -179,7 +180,9 @@ async def main_command(
                         submanager_run_path / f"PPpackage-{manager}.sock"
                     )
 
-                await wait_for_sockets(*submanager_socket_paths.values())
+                await wait_for_sockets(
+                    wait_max_retries, *submanager_socket_paths.values()
+                )
 
                 await PPpackage(
                     debug,
