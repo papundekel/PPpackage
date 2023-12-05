@@ -23,15 +23,36 @@ from typer import Option as TyperOption
 
 from PPpackage.main import main as PPpackage
 
+RUNNER_MANAGERS = {"arch", "PP"}
+
 
 async def docker(
     manager: str,
     debug: bool,
     run_path: Path,
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    runner_info: RunnerInfo,
 ):
+    additional_mounts = (
+        [
+            "--mount",
+            f"type=bind,source={runner_info.socket_path},destination=/run/PPpackage-runner.sock",
+            "--mount",
+            f"type=bind,source={runner_info.workdirs_path},destination=/mnt/PPpackage-runner-workdirs/",
+        ]
+        if manager in RUNNER_MANAGERS
+        else []
+    )
+
+    additional_args = (
+        [
+            "/run/PPpackage-runner.sock",
+            "/mnt/PPpackage-runner-workdirs/",
+        ]
+        if manager in RUNNER_MANAGERS
+        else []
+    )
+
     process = await create_subprocess_exec(
         "docker",
         "run",
@@ -48,10 +69,7 @@ async def docker(
         f"type=bind,source={run_path},destination=/run/",
         "--mount",
         f"type=bind,source={cache_path},destination=/workdir/cache/",
-        "--mount",
-        f"type=bind,source={runner_path},destination=/run/PPpackage-runner.sock",
-        "--mount",
-        f"type=bind,source={runner_workdirs_path},destination=/mnt/PPpackage-runner-workdirs/",
+        *additional_mounts,
         f"fackop/pppackage-{manager.lower()}",
         "python",
         "-m",
@@ -59,8 +77,7 @@ async def docker(
         "--debug" if debug else "--no-debug",
         f"/run/",
         "/workdir/cache/",
-        "/run/PPpackage-runner.sock",
-        "/mnt/PPpackage-runner-workdirs/",
+        *additional_args,
         stdin=DEVNULL,
         stdout=stderr,
         stderr=None,
