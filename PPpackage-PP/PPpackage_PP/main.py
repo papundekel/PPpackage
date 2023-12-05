@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from functools import partial
 from pathlib import Path
 
@@ -7,6 +7,7 @@ from PPpackage_utils.submanager import (
     fetch_receive_discard,
     generate_empty,
     handle_connection,
+    noop_session_lifetime,
     run_server,
 )
 from PPpackage_utils.utils import RunnerInfo, anoop
@@ -33,7 +34,9 @@ async def lifetime(
     cache_path: Path,
     debug: bool,
 ):
-    yield partial(handle_connection, cache_path, CALLBACKS, runner_info)
+    yield partial(
+        handle_connection, cache_path, CALLBACKS, runner_info, noop_session_lifetime
+    )
 
 
 async def main(

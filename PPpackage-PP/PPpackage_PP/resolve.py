@@ -13,6 +13,7 @@ from PPpackage_utils.parse import (
 async def resolve(
     debug: bool,
     data: Any,
+    session_data: None,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],

@@ -11,7 +11,7 @@ from PPpackage_utils.submanager import (
     handle_connection,
     run_server,
 )
-from PPpackage_utils.utils import RunnerInfo
+from PPpackage_utils.utils import RunnerInfo, TemporaryDirectory
 
 from .fetch import fetch_send
 from .install import install
@@ -30,6 +30,10 @@ CALLBACKS = SubmanagerCallbacks(
 )
 
 
+def session_lifetime(debug: bool, runner_connection: RunnerConnection):
+    return TemporaryDirectory(runner_connection.workdir_path)
+
+
 @asynccontextmanager
 async def lifetime(
     runner_info: RunnerInfo,
@@ -46,6 +50,7 @@ async def lifetime(
             cache_path,
             CALLBACKS,
             RunnerConnection(runner_reader, runner_writer, runner_workdir_path),
+            session_lifetime,
         )
 
 

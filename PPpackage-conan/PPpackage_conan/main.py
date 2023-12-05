@@ -6,6 +6,7 @@ from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
     fetch_receive_discard,
     handle_connection,
+    noop_session_lifetime,
     run_server,
 )
 from PPpackage_utils.utils import anoop
@@ -35,7 +36,9 @@ async def lifetime(
 ):
     package_paths = get_package_paths()
 
-    yield partial(handle_connection, cache_path, CALLBACKS, package_paths)
+    yield partial(
+        handle_connection, cache_path, CALLBACKS, package_paths, noop_session_lifetime
+    )
 
 
 async def main(

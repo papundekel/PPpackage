@@ -30,6 +30,7 @@ from .utils import (
 async def fetch_send(
     debug: bool,
     package_paths: PackagePaths,
+    session_data: None,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

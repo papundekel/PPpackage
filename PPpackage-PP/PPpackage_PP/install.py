@@ -14,6 +14,7 @@ from PPpackage_utils.utils import (
 async def install(
     debug: bool,
     data: Any,
+    session_data: None,
     cache_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],

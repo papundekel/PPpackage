@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
+from typing import Any
 
 from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.parse import (
@@ -25,6 +26,7 @@ from PPpackage_utils.utils import (
 async def fetch_send(
     debug: bool,
     runner_info: RunnerInfo,
+    session_data: None,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

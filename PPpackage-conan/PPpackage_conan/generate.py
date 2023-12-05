@@ -63,6 +63,7 @@ def patch_native_generators(
 async def generate(
     debug: bool,
     package_paths: PackagePaths,
+    session_data: None,
     cache_path: Path,
     options: Any,
     products: AsyncIterable[Product],

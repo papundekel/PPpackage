@@ -23,6 +23,7 @@ from PPpackage_utils.utils import (
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
+    wipe_directory,
 )
 
 from .utils import RunnerConnection, get_cache_paths
@@ -83,87 +84,89 @@ DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
 async def install(
     debug: bool,
     runner_connection: RunnerConnection,
+    destination_path: Path,
     cache_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
 ) -> memoryview:
     _, cache_path = get_cache_paths(cache_path)
 
-    with TemporaryDirectory(runner_connection.workdir_path) as destination_path:
-        with TarFileInMemoryRead(old_directory) as old_tar:
-            old_tar.extractall(destination_path)
+    wipe_directory(destination_path)
 
-        database_path = destination_path / DATABASE_PATH_RELATIVE
+    with TarFileInMemoryRead(old_directory) as old_tar:
+        old_tar.extractall(destination_path)
 
-        ensure_dir_exists(database_path)
+    database_path = destination_path / DATABASE_PATH_RELATIVE
 
-        with (
-            TemporaryPipe() as pipe_from_fakealpm_path,
-            TemporaryPipe() as pipe_to_fakealpm_path,
-        ):
-            async with fakeroot(debug) as environment:
-                create_environment(
-                    environment,
-                    pipe_from_fakealpm_path,
-                    pipe_to_fakealpm_path,
-                    runner_connection.workdir_path,
-                    destination_path,
-                )
+    ensure_dir_exists(database_path)
 
-                process = await create_subprocess_exec(
-                    "pacman",
-                    "--noconfirm",
-                    "--needed",
-                    "--dbpath",
-                    str(database_path),
-                    "--cachedir",
-                    str(cache_path),
-                    "--root",
-                    str(destination_path),
-                    "--upgrade",
-                    "--nodeps",
-                    "--nodeps",
-                    *[
-                        str(
-                            cache_path
-                            / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
+    with (
+        TemporaryPipe() as pipe_from_fakealpm_path,
+        TemporaryPipe() as pipe_to_fakealpm_path,
+    ):
+        async with fakeroot(debug) as environment:
+            create_environment(
+                environment,
+                pipe_from_fakealpm_path,
+                pipe_to_fakealpm_path,
+                runner_connection.workdir_path,
+                destination_path,
+            )
+
+            process = await create_subprocess_exec(
+                "pacman",
+                "--noconfirm",
+                "--needed",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--root",
+                str(destination_path),
+                "--upgrade",
+                "--nodeps",
+                "--nodeps",
+                *[
+                    str(
+                        cache_path
+                        / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
+                    )
+                    async for product in products
+                ],
+                stdin=DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                env=environment,
+            )
+
+            with (
+                open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
+                open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
+            ):
+                while True:
+                    header = pipe_read_line_maybe(
+                        debug, "PPpackage-arch", pipe_from_fakealpm
+                    )
+
+                    if header is None:
+                        break
+                    elif header == "COMMAND":
+                        await install_manager_command(
+                            debug,
+                            pipe_to_fakealpm,
+                            pipe_from_fakealpm,
+                            runner_connection,
                         )
-                        async for product in products
-                    ],
-                    stdin=DEVNULL,
-                    stdout=DEVNULL,
-                    stderr=DEVNULL,
-                    env=environment,
-                )
-
-                with (
-                    open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
-                    open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
-                ):
-                    while True:
-                        header = pipe_read_line_maybe(
-                            debug, "PPpackage-arch", pipe_from_fakealpm
+                    else:
+                        raise MyException(
+                            f"Unknown header: {header}",
+                            "PPpackage-arch",
+                            stderr,
                         )
 
-                        if header is None:
-                            break
-                        elif header == "COMMAND":
-                            await install_manager_command(
-                                debug,
-                                pipe_to_fakealpm,
-                                pipe_from_fakealpm,
-                                runner_connection,
-                            )
-                        else:
-                            raise MyException(
-                                f"Unknown header: {header}",
-                                "PPpackage-arch",
-                                stderr,
-                            )
+        await asubprocess_wait(process, "Error in `pacman -Udd`")
 
-            await asubprocess_wait(process, "Error in `pacman -Udd`")
-
-        with TarFileInMemoryWrite() as new_tar:
-            new_tar.add(str(destination_path), "")
+    with TarFileInMemoryWrite() as new_tar:
+        new_tar.add(str(destination_path), "")
 
     return new_tar.data
