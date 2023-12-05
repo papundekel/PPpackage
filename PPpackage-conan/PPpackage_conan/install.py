@@ -2,6 +2,7 @@ from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
@@ -41,9 +42,8 @@ async def install_product(
 
 async def install(
     debug: bool,
+    data: Any,
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
 ) -> memoryview:

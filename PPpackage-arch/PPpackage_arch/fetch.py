@@ -25,8 +25,7 @@ def process_product_id(line: str):
 
 async def fetch_send(
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    data: None,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

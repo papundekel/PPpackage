@@ -45,20 +45,20 @@ def generate_machine_id(file: IO[bytes]):
     file.write(content_string.encode())
 
 
-async def get_last_installation(
+async def get_previous_installation(
     debug: bool,
     connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     initial_installation: memoryview,
-    last_manager: str | None,
+    previous_manager: str | None,
 ):
-    if last_manager is None:
+    if previous_manager is None:
         return initial_installation
 
-    last_reader, last_writer = connections[last_manager]
+    previous_reader, previous_writer = connections[previous_manager]
 
-    await dump_one(debug, last_writer, SubmanagerCommand.INSTALL_DOWNLOAD)
+    await dump_one(debug, previous_writer, SubmanagerCommand.INSTALL_DOWNLOAD)
 
-    installation = await load_bytes_chunked(debug, last_reader)
+    installation = await load_bytes_chunked(debug, previous_reader)
 
     return installation
 
@@ -71,15 +71,15 @@ async def install(
 ) -> memoryview:
     stderr.write(f"Installing packages...\n")
 
-    last_manager: str | None = None
+    previous_manager: str | None = None
 
     for generation in generations:
         for manager, packages in generation.items():
             reader, writer = connections[manager]
 
-            if last_manager != manager:
-                installation = await get_last_installation(
-                    debug, connections, initial_installation, last_manager
+            if previous_manager != manager:
+                installation = await get_previous_installation(
+                    debug, connections, initial_installation, previous_manager
                 )
 
                 await dump_one(debug, writer, SubmanagerCommand.INSTALL_UPLOAD)
@@ -87,10 +87,10 @@ async def install(
 
             await install_manager(debug, reader, writer, manager, packages)
 
-            last_manager = manager
+            previous_manager = manager
 
-    installation = await get_last_installation(
-        debug, connections, initial_installation, last_manager
+    installation = await get_previous_installation(
+        debug, connections, initial_installation, previous_manager
     )
 
     return installation

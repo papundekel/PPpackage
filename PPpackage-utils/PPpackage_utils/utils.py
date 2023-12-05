@@ -15,6 +15,7 @@ from collections.abc import (
     MutableMapping,
 )
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from enum import Enum
 from enum import auto as enum_auto
 from enum import unique as enum_unique
@@ -311,3 +312,9 @@ class SubmanagerCommand(Enum):
     INSTALL_UPLOAD = enum_auto()
     INSTALL_DOWNLOAD = enum_auto()
     END = enum_auto()
+
+
+@dataclass(frozen=True)
+class RunnerInfo:
+    socket_path: Path
+    workdirs_path: Path

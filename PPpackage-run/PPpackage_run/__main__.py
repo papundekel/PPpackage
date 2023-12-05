@@ -14,6 +14,7 @@ from typing import Annotated
 from PPpackage_runner.main import main as runner
 from PPpackage_utils.submanager import AsyncTyper, run
 from PPpackage_utils.utils import (
+    RunnerInfo,
     TemporaryDirectory,
     asubprocess_wait,
     ensure_dir_exists,
@@ -84,6 +85,11 @@ def process_lifetime(main: Callable, *args):
         process.join()
 
 
+async def wait_for_sockets(*socket_paths: Path):
+    while any(not socket_path.exists() for socket_path in socket_paths):
+        await sleep(0.1)
+
+
 app = AsyncTyper()
 
 
@@ -100,8 +106,14 @@ async def main_command(
 ):
     if mode == "native":
         from PPpackage_arch.main import main as PPpackage_arch
-        from PPpackage_conan.main import main as PPpackage_conan
+        from PPpackage_conan.main import main as base_PPpackage_conan
         from PPpackage_PP.main import main as PPpackage_PP
+
+        PPpackage_conan = (
+            lambda debug, run_path, cache_path, *args: base_PPpackage_conan(
+                debug, run_path, cache_path
+            )
+        )
     else:
         PPpackage_arch = partial(docker, "arch")
         PPpackage_conan = partial(docker, "conan")
@@ -119,6 +131,8 @@ async def main_command(
         with process_lifetime(runner, debug, run_path, runner_workdirs_path):
             runner_path = run_path / "PPpackage-runner.sock"
 
+            await wait_for_sockets(runner_path)
+
             with ExitStack() as exit_stack:
                 submanager_socket_paths = {}
 
@@ -133,8 +147,7 @@ async def main_command(
                             debug,
                             submanager_run_path,
                             cache_path,
-                            runner_path,
-                            runner_workdirs_path,
+                            RunnerInfo(runner_path, runner_workdirs_path),
                         ),
                     )
 
@@ -142,14 +155,7 @@ async def main_command(
                         submanager_run_path / f"PPpackage-{manager}.sock"
                     )
 
-                while True:
-                    await sleep(0.1)
-
-                    if all(
-                        socket_path.exists()
-                        for socket_path in submanager_socket_paths.values()
-                    ):
-                        break
+                await wait_for_sockets(*submanager_socket_paths.values())
 
                 await PPpackage(
                     debug,

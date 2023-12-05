@@ -1,5 +1,6 @@
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from os import environ
 from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
@@ -94,6 +95,12 @@ def get_path(module) -> Path:
     return Path(module.__file__)
 
 
+@dataclass(frozen=True)
+class PackagePaths:
+    data_path: Path
+    deployer_path: Path
+
+
 def get_package_paths():
     import PPpackage_conan
 
@@ -102,4 +109,4 @@ def get_package_paths():
     data_path = get_path(PPpackage_conan).parent / "data"
     deployer_path = get_path(deployer)
 
-    return data_path, deployer_path
+    return PackagePaths(data_path, deployer_path)

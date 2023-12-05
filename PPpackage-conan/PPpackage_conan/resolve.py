@@ -26,6 +26,7 @@ from PPpackage_utils.utils import (
 
 from .parse import Requirement
 from .utils import (
+    PackagePaths,
     ResolveNode,
     create_and_render_temp_file,
     get_cache_path,
@@ -241,8 +242,8 @@ async def create_graph(
 
 
 async def resolve(
-    templates_path: Path,
     debug: bool,
+    package_paths: PackagePaths,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],
@@ -255,7 +256,7 @@ async def resolve(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(templates_path),
+        loader=Jinja2FileSystemLoader(package_paths.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -264,7 +265,7 @@ async def resolve(
     root_template = jinja_loader.get_template("conanfile-root.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    build_profile_path = templates_path / "profile"
+    build_profile_path = package_paths.data_path / "profile"
 
     requirement_index = 0
 

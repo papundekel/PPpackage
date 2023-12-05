@@ -7,7 +7,7 @@ from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 from .utils import get_cache_paths
 
 
-async def update_database(debug: bool, cache_path: Path) -> None:
+async def update_database(debug: bool, data: None, cache_path: Path) -> None:
     database_path, _ = get_cache_paths(cache_path)
 
     ensure_dir_exists(database_path)

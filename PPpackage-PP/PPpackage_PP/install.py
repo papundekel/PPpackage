@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
@@ -12,9 +13,8 @@ from PPpackage_utils.utils import (
 
 async def install(
     debug: bool,
+    data: Any,
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
     old_directory: memoryview,
     products: AsyncIterable[Product],
 ) -> memoryview:

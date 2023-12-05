@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterable, MutableSequence
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.parse import (
     ManagerRequirement,
@@ -11,6 +12,7 @@ from PPpackage_utils.parse import (
 
 async def resolve(
     debug: bool,
+    data: Any,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
