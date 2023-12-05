@@ -15,6 +15,7 @@ from collections.abc import (
     MutableMapping,
 )
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from enum import Enum
 from enum import auto as enum_auto
 from enum import unique as enum_unique
@@ -302,10 +303,18 @@ def wipe_directory(directory: Path) -> None:
             rmtree(path, onerror=wipe_directory_onerror)
 
 
-class Phase(Enum):
+class SubmanagerCommand(Enum):
     UPDATE_DATABASE = enum_auto()
     RESOLVE = enum_auto()
     FETCH = enum_auto()
     GENERATE = enum_auto()
     INSTALL = enum_auto()
+    INSTALL_UPLOAD = enum_auto()
+    INSTALL_DOWNLOAD = enum_auto()
     END = enum_auto()
+
+
+@dataclass(frozen=True)
+class RunnerInfo:
+    socket_path: Path
+    workdirs_path: Path

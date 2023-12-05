@@ -1,6 +1,7 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
+from importlib.resources import Package
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,12 @@ from PPpackage_utils.utils import (
     asubprocess_wait,
 )
 
-from .utils import create_and_render_temp_file, get_cache_path, make_conan_environment
+from .utils import (
+    PackagePaths,
+    create_and_render_temp_file,
+    get_cache_path,
+    make_conan_environment,
+)
 
 
 def patch_native_generators_paths(
@@ -55,9 +61,9 @@ def patch_native_generators(
 
 
 async def generate(
-    templates_path: Path,
-    deployer_path: Path,
     debug: bool,
+    package_paths: PackagePaths,
+    session_data: Any,
     cache_path: Path,
     options: Any,
     products: AsyncIterable[Product],
@@ -68,7 +74,7 @@ async def generate(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(templates_path),
+        loader=Jinja2FileSystemLoader(package_paths.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -94,7 +100,7 @@ async def generate(
             ) as host_profile_file,
         ):
             host_profile_path = Path(host_profile_file.name)
-            build_profile_path = templates_path / "profile"
+            build_profile_path = package_paths.data_path / "profile"
 
             process = create_subprocess_exec(
                 "conan",
@@ -102,7 +108,7 @@ async def generate(
                 "--output-folder",
                 str(native_generators_path),
                 "--deployer",
-                deployer_path,
+                package_paths.deployer_path,
                 "--build",
                 "never",
                 f"--profile:host={host_profile_path}",

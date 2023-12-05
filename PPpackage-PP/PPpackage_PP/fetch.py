@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
+from typing import Any
 
 from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.parse import (
@@ -16,6 +17,7 @@ from PPpackage_utils.parse import (
 from PPpackage_utils.utils import (
     ImageType,
     MyException,
+    RunnerInfo,
     RunnerRequestType,
     TemporaryPipe,
 )
@@ -23,8 +25,8 @@ from PPpackage_utils.utils import (
 
 async def fetch_send(
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    runner_info: RunnerInfo,
+    session_data: None,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -37,7 +39,7 @@ async def fetch_send(
         async for _ in dependencies:
             pass
 
-    async with communicate_with_runner(debug, runner_path, runner_workdirs_path) as (
+    async with communicate_with_runner(debug, runner_info) as (
         runner_reader,
         runner_writer,
         runner_workdir_path,

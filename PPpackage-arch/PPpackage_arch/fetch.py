@@ -2,6 +2,7 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.parse import (
     Dependency,
@@ -25,8 +26,8 @@ def process_product_id(line: str):
 
 async def fetch_send(
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    data: None,
+    session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

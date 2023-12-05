@@ -2,6 +2,7 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
@@ -19,6 +20,7 @@ from PPpackage_utils.utils import asubprocess_communicate
 from .parse import FetchProductInfo
 from .utils import (
     FetchNode,
+    PackagePaths,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -27,10 +29,9 @@ from .utils import (
 
 
 async def fetch_send(
-    templates_path: Path,
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    package_paths: PackagePaths,
+    session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -40,7 +41,7 @@ async def fetch_send(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(templates_path),
+        loader=Jinja2FileSystemLoader(package_paths.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -68,7 +69,7 @@ async def fetch_send(
         ) as host_profile_file,
     ):
         host_profile_path = Path(host_profile_file.name)
-        build_profile_path = templates_path / "profile"
+        build_profile_path = package_paths.data_path / "profile"
 
         process = create_subprocess_exec(
             "conan",

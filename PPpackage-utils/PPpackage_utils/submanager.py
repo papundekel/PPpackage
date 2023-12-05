@@ -1,15 +1,17 @@
+from ast import Call
 from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
 from collections.abc import AsyncIterable, Awaitable, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from functools import partial, wraps
 from inspect import iscoroutinefunction
 from pathlib import Path
 from signal import SIGTERM
 from sys import stderr
 from traceback import print_exc
-from typing import Any, TypeVar
+from typing import Any, ContextManager, Generic, TypeVar
 
 from pid import PidFile, PidFileAlreadyLockedError
 from typer import Exit, Typer
@@ -24,12 +26,19 @@ from .parse import (
     ResolutionGraph,
     dump_bytes_chunked,
     dump_many_async,
+    dump_one,
     load_bytes_chunked,
     load_loop,
     load_many,
     load_one,
 )
-from .utils import Phase, create_empty_tar, discard_async_iterable, get_standard_streams
+from .utils import (
+    MyException,
+    RunnerInfo,
+    SubmanagerCommand,
+    create_empty_tar,
+    discard_async_iterable,
+)
 
 
 class AsyncTyper(Typer):
@@ -58,16 +67,28 @@ class AsyncTyper(Typer):
 __app = AsyncTyper()
 
 RequirementTypeType = TypeVar("RequirementTypeType")
-UpdateDatabaseCallbackType = Callable[[bool, Path], Awaitable[None]]
+DataTypeType = TypeVar("DataTypeType")
+SessionDataTypeType = TypeVar("SessionDataTypeType")
+
+UpdateDatabaseCallbackType = Callable[
+    [bool, DataTypeType, SessionDataTypeType, Path], Awaitable[None]
+]
 ResolveCallbackType = Callable[
-    [bool, Path, Any, AsyncIterable[AsyncIterable[RequirementTypeType]]],
+    [
+        bool,
+        DataTypeType,
+        SessionDataTypeType,
+        Path,
+        Any,
+        AsyncIterable[AsyncIterable[RequirementTypeType]],
+    ],
     AsyncIterable[ResolutionGraph],
 ]
 FetchCallbackType = Callable[
     [
         bool,
-        Path,
-        Path,
+        DataTypeType,
+        SessionDataTypeType,
         Path,
         Any,
         AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -76,10 +97,45 @@ FetchCallbackType = Callable[
     tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]],
 ]
 GenerateCallbackType = Callable[
-    [bool, Path, Any, AsyncIterable[Product], AsyncIterable[str]], Awaitable[memoryview]
+    [
+        bool,
+        DataTypeType,
+        SessionDataTypeType,
+        Path,
+        Any,
+        AsyncIterable[Product],
+        AsyncIterable[str],
+    ],
+    Awaitable[memoryview],
 ]
 InstallCallbackType = Callable[
-    [bool, Path, Path, Path, memoryview, AsyncIterable[Product]], Awaitable[memoryview]
+    [bool, DataTypeType, SessionDataTypeType, Path, AsyncIterable[Product]],
+    Awaitable[None],
+]
+InstallUploadCallbackType = Callable[
+    [bool, DataTypeType, SessionDataTypeType, memoryview], Awaitable[None]
+]
+InstallDownloadCallbackType = Callable[
+    [bool, DataTypeType, SessionDataTypeType], Awaitable[memoryview]
+]
+
+
+@dataclass(frozen=True)
+class SubmanagerCallbacks(
+    Generic[RequirementTypeType, DataTypeType, SessionDataTypeType]
+):
+    update_database: UpdateDatabaseCallbackType[DataTypeType, SessionDataTypeType]
+    resolve: ResolveCallbackType[DataTypeType, SessionDataTypeType, RequirementTypeType]
+    fetch: FetchCallbackType[DataTypeType, SessionDataTypeType]
+    generate: GenerateCallbackType[DataTypeType, SessionDataTypeType]
+    install: InstallCallbackType[DataTypeType, SessionDataTypeType]
+    install_upload: InstallUploadCallbackType[DataTypeType, SessionDataTypeType]
+    install_download: InstallDownloadCallbackType[DataTypeType, SessionDataTypeType]
+    RequirementType: type[RequirementTypeType]
+
+
+LifetimeReturnType = AbstractAsyncContextManager[
+    Callable[[bool, StreamReader, StreamWriter], Awaitable[None]]
 ]
 
 
@@ -94,17 +150,27 @@ def run(app: AsyncTyper, program_name: str) -> None:
 
 
 async def update_database(
-    update_database_callback: UpdateDatabaseCallbackType, debug: bool, cache_path: Path
+    update_database_callback: UpdateDatabaseCallbackType[
+        DataTypeType, SessionDataTypeType
+    ],
+    debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
+    cache_path: Path,
 ) -> None:
-    await update_database_callback(debug, cache_path)
+    await update_database_callback(debug, data, session_data, cache_path)
 
 
 async def resolve(
     reader: StreamReader,
     writer: StreamWriter,
-    callback: ResolveCallbackType[RequirementTypeType],
+    callback: ResolveCallbackType[
+        DataTypeType, SessionDataTypeType, RequirementTypeType
+    ],
     RequirementType: type[RequirementTypeType],
     debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
     cache_path: Path,
 ):
     options = await load_one(debug, reader, Options)
@@ -114,7 +180,7 @@ async def resolve(
         async for _ in load_loop(debug, reader)
     )
 
-    output = callback(debug, cache_path, options, requirements_list)
+    output = callback(debug, data, session_data, cache_path, options, requirements_list)
 
     await dump_many_async(debug, writer, output)
 
@@ -122,11 +188,11 @@ async def resolve(
 async def fetch(
     reader: StreamReader,
     writer: StreamWriter,
-    callback: FetchCallbackType,
+    callback: FetchCallbackType[DataTypeType, SessionDataTypeType],
     debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
 ):
     options = await load_one(debug, reader, Options)
 
@@ -141,13 +207,7 @@ async def fetch(
     build_results = load_many(debug, reader, BuildResult)
 
     output, complete = callback(
-        debug,
-        runner_path,
-        runner_workdirs_path,
-        cache_path,
-        options,
-        packages,
-        build_results,
+        debug, data, session_data, cache_path, options, packages, build_results
     )
 
     await dump_many_async(debug, writer, output)
@@ -158,15 +218,19 @@ async def fetch(
 async def generate(
     reader: StreamReader,
     writer: StreamWriter,
-    callback: GenerateCallbackType,
+    callback: GenerateCallbackType[DataTypeType, SessionDataTypeType],
     debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
     cache_path: Path,
 ):
     options = await load_one(debug, reader, Options)
     products = load_many(debug, reader, Product)
     generators = load_many(debug, reader, str)
 
-    generators = await callback(debug, cache_path, options, products, generators)
+    generators = await callback(
+        debug, data, session_data, cache_path, options, products, generators
+    )
 
     await dump_bytes_chunked(debug, writer, generators)
 
@@ -174,100 +238,116 @@ async def generate(
 async def install(
     reader: StreamReader,
     writer: StreamWriter,
-    callback: InstallCallbackType,
+    callback: InstallCallbackType[DataTypeType, SessionDataTypeType],
     debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
 ):
-    old_directory = await load_bytes_chunked(debug, reader)
     products = load_many(debug, reader, Product)
 
-    new_directory = await callback(
-        debug, cache_path, runner_path, runner_workdirs_path, old_directory, products
-    )
+    await callback(debug, data, session_data, cache_path, products)
 
-    await dump_bytes_chunked(debug, writer, new_directory)
+    await dump_one(debug, writer, None)
+
+
+async def install_upload(
+    reader: StreamReader,
+    callback: InstallUploadCallbackType[DataTypeType, SessionDataTypeType],
+    debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
+):
+    installation = await load_bytes_chunked(debug, reader)
+
+    await callback(debug, data, session_data, installation)
+
+
+async def install_download(
+    writer: StreamWriter,
+    callback: InstallDownloadCallbackType[DataTypeType, SessionDataTypeType],
+    debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
+):
+    installation = await callback(debug, data, session_data)
+
+    await dump_bytes_chunked(debug, writer, installation)
 
 
 async def handle_connection(
     cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
-    update_database_callback: UpdateDatabaseCallbackType,
-    resolve_callback: ResolveCallbackType[RequirementTypeType],
-    fetch_callback: FetchCallbackType,
-    generate_callback: GenerateCallbackType,
-    install_callback: InstallCallbackType,
-    RequirementType: type[RequirementTypeType],
+    callbacks: SubmanagerCallbacks,
+    data: DataTypeType,
+    SessionLifetime: Callable[[bool, DataTypeType], ContextManager],
     debug: bool,
     reader: StreamReader,
     writer: StreamWriter,
 ):
-    while True:
-        phase = await load_one(debug, reader, Phase)
+    with SessionLifetime(debug, data) as session_data:
+        while True:
+            phase = await load_one(debug, reader, SubmanagerCommand)
 
-        match phase:
-            case Phase.UPDATE_DATABASE:
-                await update_database(update_database_callback, debug, cache_path)
-            case Phase.RESOLVE:
-                await resolve(
-                    reader, writer, resolve_callback, RequirementType, debug, cache_path
-                )
-            case Phase.FETCH:
-                await fetch(
-                    reader,
-                    writer,
-                    fetch_callback,
-                    debug,
-                    cache_path,
-                    runner_path,
-                    runner_workdirs_path,
-                )
-            case Phase.GENERATE:
-                await generate(reader, writer, generate_callback, debug, cache_path)
-            case Phase.INSTALL:
-                await install(
-                    reader,
-                    writer,
-                    install_callback,
-                    debug,
-                    cache_path,
-                    runner_path,
-                    runner_workdirs_path,
-                )
-            case Phase.END:
-                break
+            match phase:
+                case SubmanagerCommand.UPDATE_DATABASE:
+                    await update_database(
+                        callbacks.update_database, debug, data, session_data, cache_path
+                    )
+                case SubmanagerCommand.RESOLVE:
+                    await resolve(
+                        reader,
+                        writer,
+                        callbacks.resolve,
+                        callbacks.RequirementType,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
+                    )
+                case SubmanagerCommand.FETCH:
+                    await fetch(
+                        reader,
+                        writer,
+                        callbacks.fetch,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
+                    )
+                case SubmanagerCommand.GENERATE:
+                    await generate(
+                        reader,
+                        writer,
+                        callbacks.generate,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
+                    )
+                case SubmanagerCommand.INSTALL:
+                    await install(
+                        reader,
+                        writer,
+                        callbacks.install,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
+                    )
+
+                case SubmanagerCommand.INSTALL_UPLOAD:
+                    await install_upload(
+                        reader, callbacks.install_upload, debug, data, session_data
+                    )
+                case SubmanagerCommand.INSTALL_DOWNLOAD:
+                    await install_download(
+                        writer, callbacks.install_download, debug, data, session_data
+                    )
+                case SubmanagerCommand.END:
+                    break
 
 
-@asynccontextmanager
-async def submanager_context(
-    cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
-    update_database_callback: UpdateDatabaseCallbackType,
-    resolve_callback: ResolveCallbackType[RequirementTypeType],
-    fetch_callback: FetchCallbackType,
-    generate_callback: GenerateCallbackType,
-    install_callback: InstallCallbackType,
-    RequirementType: type[RequirementTypeType],
-    debug: bool,
-):
-    yield partial(
-        handle_connection,
-        cache_path,
-        runner_path,
-        runner_workdirs_path,
-        update_database_callback,
-        resolve_callback,
-        fetch_callback,
-        generate_callback,
-        install_callback,
-        RequirementType,
-    )
-
-
-def submanager__main__(program_name: str, main_f) -> None:
+def submanager__main__runner(program_name: str, main_f: Callable) -> None:
     @__app.command()
     async def main_commmand(
         run_path: Path,
@@ -276,46 +356,17 @@ def submanager__main__(program_name: str, main_f) -> None:
         runner_workdirs_path: Path,
         debug: bool = False,
     ):
-        await main_f(debug, run_path, cache_path, runner_path, runner_workdirs_path)
+        await main_f(
+            debug, run_path, cache_path, RunnerInfo(runner_path, runner_workdirs_path)
+        )
 
     run(__app, program_name)
 
 
-async def submanager_main(
-    update_database_callback: UpdateDatabaseCallbackType,
-    resolve_callback: ResolveCallbackType[RequirementTypeType],
-    fetch_callback: FetchCallbackType,
-    generate_callback: GenerateCallbackType,
-    install_callback: InstallCallbackType,
-    RequirementType: type[RequirementTypeType],
-    program_name: str,
-    debug: bool,
-    run_path: Path,
-    cache_path: Path,
-    runner_path: Path,
-    runner_workdirs_path: Path,
-):
-    await run_server(
-        debug,
-        program_name,
-        run_path,
-        partial(
-            submanager_context,
-            cache_path,
-            runner_path,
-            runner_workdirs_path,
-            update_database_callback,
-            resolve_callback,
-            fetch_callback,
-            generate_callback,
-            install_callback,
-            RequirementType,
-        ),
-    )
-
-
 async def generate_empty(
     debug: bool,
+    data: Any,
+    session_data: Any,
     cache_path: Path,
     options: Any,
     products: AsyncIterable[Product],
@@ -334,8 +385,8 @@ def fetch_receive_discard(
     send_callback: Callable[
         [
             bool,
-            Path,
-            Path,
+            DataTypeType,
+            SessionDataTypeType,
             Path,
             Any,
             AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -343,8 +394,8 @@ def fetch_receive_discard(
         AsyncIterable[PackageIDAndInfo],
     ],
     debug: bool,
-    runner_path: Path,
-    runner_workdirs_path: Path,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -353,7 +404,12 @@ def fetch_receive_discard(
     return (
         output
         async for output in send_callback(
-            debug, runner_path, runner_workdirs_path, cache_path, options, packages
+            debug,
+            data,
+            session_data,
+            cache_path,
+            options,
+            packages,
         )
     ), discard_async_iterable(build_results)
 
@@ -362,18 +418,13 @@ async def run_server(
     debug: bool,
     program_name: str,
     run_path: Path,
-    connection_handler_context: Callable[
-        [bool],
-        AbstractAsyncContextManager[
-            Callable[[bool, StreamReader, StreamWriter], Awaitable[None]]
-        ],
-    ],
+    lifetime: Callable[[bool], LifetimeReturnType],
 ):
     socket_path = run_path / f"{program_name}.sock"
 
     try:
         with PidFile(program_name, run_path):
-            async with connection_handler_context(debug) as connection_handler:
+            async with lifetime(debug) as connection_handler:
                 try:
                     async with await start_unix_server(
                         partial(connection_handler, debug), socket_path
@@ -394,3 +445,8 @@ async def run_server(
     except PidFileAlreadyLockedError:
         print(f"{program_name} is already running.", file=stderr)
         raise Exit(1)
+
+
+@contextmanager
+def noop_session_lifetime(debug: bool, data: Any):
+    yield None

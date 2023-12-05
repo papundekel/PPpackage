@@ -11,7 +11,11 @@ from PPpackage_utils.parse import (
     dump_one,
     load_bytes_chunked,
 )
-from PPpackage_utils.utils import Phase, TarFileInMemoryRead, TarFileInMemoryWrite
+from PPpackage_utils.utils import (
+    SubmanagerCommand,
+    TarFileInMemoryRead,
+    TarFileInMemoryWrite,
+)
 
 from .generators import builtin as builtin_generators
 from .utils import NodeData, data_to_product
@@ -27,7 +31,7 @@ async def generate_manager(
 ) -> memoryview:
     reader, writer = connections[manager]
 
-    await dump_one(debug, writer, Phase.GENERATE)
+    await dump_one(debug, writer, SubmanagerCommand.GENERATE)
     await dump_one(debug, writer, options)
     await dump_many(debug, writer, products)
     await dump_many(debug, writer, generators)

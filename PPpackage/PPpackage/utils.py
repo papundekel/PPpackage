@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 
 from PPpackage_utils.io import close_writer
 from PPpackage_utils.parse import Product, dump_one
-from PPpackage_utils.utils import Phase
+from PPpackage_utils.utils import SubmanagerCommand
 
 
 class NodeData(TypedDict):
@@ -22,7 +22,7 @@ def data_to_product(name: str, node_data: NodeData) -> Product:
 
 
 async def close_submanager(debug: bool, writer: StreamWriter):
-    await dump_one(debug, writer, Phase.END)
+    await dump_one(debug, writer, SubmanagerCommand.END)
     await close_writer(writer)
 
 

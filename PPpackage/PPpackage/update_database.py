@@ -4,7 +4,7 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one, load_one
-from PPpackage_utils.utils import MyException, Phase
+from PPpackage_utils.utils import MyException, SubmanagerCommand
 
 from PPpackage.utils import open_submanager
 
@@ -21,7 +21,7 @@ async def update_database_manager(
         manager, submanager_socket_paths, connections
     )
 
-    await dump_one(debug, writer, Phase.UPDATE_DATABASE)
+    await dump_one(debug, writer, SubmanagerCommand.UPDATE_DATABASE)
 
     success = await load_one(debug, reader, bool)
 

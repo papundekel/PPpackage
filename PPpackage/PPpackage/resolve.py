@@ -27,7 +27,7 @@ from PPpackage_utils.parse import (
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import MyException, Phase
+from PPpackage_utils.utils import MyException, SubmanagerCommand
 
 from PPpackage.utils import open_submanager
 
@@ -38,7 +38,7 @@ async def send(
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
 ) -> None:
-    await dump_one(debug, writer, Phase.RESOLVE)
+    await dump_one(debug, writer, SubmanagerCommand.RESOLVE)
 
     await dump_one(debug, writer, options)
 

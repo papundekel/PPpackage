@@ -6,7 +6,7 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one, load_one
-from PPpackage_utils.utils import MyException, RunnerRequestType
+from PPpackage_utils.utils import MyException, RunnerInfo, RunnerRequestType
 
 _DEBUG = False
 
@@ -120,13 +120,13 @@ async def close_writer(writer: StreamWriter):
 
 
 @asynccontextmanager
-async def communicate_with_runner(debug: bool, socket_path: Path, workdirs_path: Path):
-    reader, writer = await open_unix_connection(socket_path)
+async def communicate_with_runner(debug: bool, runner_info: RunnerInfo):
+    reader, writer = await open_unix_connection(runner_info.socket_path)
 
     try:
         workdir_path_relative = await load_one(debug, reader, Path)
 
-        workdir_path = workdirs_path / workdir_path_relative
+        workdir_path = runner_info.workdirs_path / workdir_path_relative
 
         yield reader, writer, workdir_path
     finally:

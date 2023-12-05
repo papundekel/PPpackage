@@ -27,7 +27,7 @@ from PPpackage_utils.parse import (
     dump_one,
     load_many,
 )
-from PPpackage_utils.utils import Phase
+from PPpackage_utils.utils import SubmanagerCommand
 
 from .utils import NodeData
 
@@ -109,7 +109,7 @@ async def send(
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
 ) -> None:
-    await dump_one(debug, writer, Phase.FETCH)
+    await dump_one(debug, writer, SubmanagerCommand.FETCH)
 
     await dump_one(debug, writer, options)
 

@@ -81,11 +81,11 @@ async def main(
 
         old_installation = old_installation_tar.data
 
-        wipe_directory(destination_path)
-
         new_installation = await install(
             debug, connections, old_installation, generations
         )
+
+        wipe_directory(destination_path)
 
         with TarFileInMemoryRead(new_installation) as new_installation_tar:
             new_installation_tar.extractall(destination_path)

@@ -159,7 +159,7 @@ async def handle_run(
                 *args,
                 stdin=stdin_pipe,
                 stdout=stdout_pipe,
-                stderr=DEVNULL,
+                stderr=None,
             )
         ).wait()
 
@@ -236,7 +236,7 @@ program_name = "PPpackage-runner"
 
 
 @asynccontextmanager
-async def connection_handler_context(workdirs_path: Path, debug: bool):
+async def lifetime(workdirs_path: Path, debug: bool):
     with TemporaryDirectory() as bundle_path, TemporaryDirectory() as root_path:
         await create_config(debug, bundle_path)
 
@@ -248,5 +248,5 @@ async def main(debug: bool, run_path: Path, workdirs_path: Path):
         debug,
         program_name,
         run_path,
-        partial(connection_handler_context, workdirs_path),
+        partial(lifetime, workdirs_path),
     )

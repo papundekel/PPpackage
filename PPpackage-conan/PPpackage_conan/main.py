@@ -1,26 +1,56 @@
+from contextlib import asynccontextmanager, contextmanager
 from functools import partial
+from pathlib import Path
+from typing import Any
 
-from PPpackage_utils.submanager import fetch_receive_discard, submanager_main
+from PPpackage_utils.submanager import (
+    SubmanagerCallbacks,
+    fetch_receive_discard,
+    handle_connection,
+    run_server,
+)
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch_send
 from .generate import generate
-from .install import install
+from .install import install, install_download, install_upload
 from .parse import Requirement
 from .resolve import resolve
-from .utils import get_package_paths
-
-data_path, deployer_path = get_package_paths()
+from .utils import Installation, get_package_paths
 
 PROGRAM_NAME = "PPpackage-conan"
-
-main = partial(
-    submanager_main,
+CALLBACKS = SubmanagerCallbacks(
     anoop,
-    partial(resolve, data_path),
-    partial(fetch_receive_discard, partial(fetch_send, data_path)),
-    partial(generate, data_path, deployer_path),
+    resolve,
+    partial(fetch_receive_discard, fetch_send),
+    generate,
     install,
+    install_upload,
+    install_download,
     Requirement,
-    PROGRAM_NAME,
 )
+
+
+@contextmanager
+def session_lifetime(debug: bool, data: Any):
+    yield Installation(memoryview(bytes()))
+
+
+@asynccontextmanager
+async def lifetime(
+    cache_path: Path,
+    debug: bool,
+):
+    package_paths = get_package_paths()
+
+    yield partial(
+        handle_connection, cache_path, CALLBACKS, package_paths, session_lifetime
+    )
+
+
+async def main(
+    debug: bool,
+    run_path: Path,
+    cache_path: Path,
+):
+    await run_server(debug, PROGRAM_NAME, run_path, partial(lifetime, cache_path))

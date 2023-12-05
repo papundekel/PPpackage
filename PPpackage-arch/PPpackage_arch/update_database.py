@@ -1,13 +1,16 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
 
 
-async def update_database(debug: bool, cache_path: Path) -> None:
+async def update_database(
+    debug: bool, data: None, session_data: Any, cache_path: Path
+) -> None:
     database_path, _ = get_cache_paths(cache_path)
 
     ensure_dir_exists(database_path)
