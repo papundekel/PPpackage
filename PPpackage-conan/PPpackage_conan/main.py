@@ -1,22 +1,22 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
     fetch_receive_discard,
     handle_connection,
-    noop_session_lifetime,
     run_server,
 )
 from PPpackage_utils.utils import anoop
 
 from .fetch import fetch_send
 from .generate import generate
-from .install import install
+from .install import install, install_download, install_upload
 from .parse import Requirement
 from .resolve import resolve
-from .utils import get_package_paths
+from .utils import Installation, get_package_paths
 
 PROGRAM_NAME = "PPpackage-conan"
 CALLBACKS = SubmanagerCallbacks(
@@ -25,8 +25,15 @@ CALLBACKS = SubmanagerCallbacks(
     partial(fetch_receive_discard, fetch_send),
     generate,
     install,
+    install_upload,
+    install_download,
     Requirement,
 )
+
+
+@contextmanager
+def session_lifetime(debug: bool, data: Any):
+    yield Installation(memoryview(bytes()))
 
 
 @asynccontextmanager
@@ -37,7 +44,7 @@ async def lifetime(
     package_paths = get_package_paths()
 
     yield partial(
-        handle_connection, cache_path, CALLBACKS, package_paths, noop_session_lifetime
+        handle_connection, cache_path, CALLBACKS, package_paths, session_lifetime
     )
 
 

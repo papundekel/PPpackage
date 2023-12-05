@@ -110,3 +110,8 @@ def get_package_paths():
     deployer_path = get_path(deployer)
 
     return PackagePaths(data_path, deployer_path)
+
+
+@dataclass
+class Installation:
+    data: memoryview

@@ -12,7 +12,7 @@ from PPpackage_utils.utils import (
     tar_append,
 )
 
-from .utils import get_cache_path, make_conan_environment
+from .utils import Installation, get_cache_path, make_conan_environment
 
 
 async def install_product(
@@ -43,11 +43,10 @@ async def install_product(
 async def install(
     debug: bool,
     data: Any,
-    session_data: None,
+    session_directory: Installation,
     cache_path: Path,
-    old_directory: memoryview,
     products: AsyncIterable[Product],
-) -> memoryview:
+):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -67,6 +66,23 @@ async def install(
                     )
                 )
 
-        tar_append(old_directory, new_tar)
+        tar_append(session_directory.data, new_tar)
 
-    return new_tar.data
+    session_directory.data = new_tar.data
+
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+    new_directory: memoryview,
+):
+    session_directory.data = new_directory
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+) -> memoryview:
+    return session_directory.data

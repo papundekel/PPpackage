@@ -109,8 +109,14 @@ GenerateCallbackType = Callable[
     Awaitable[memoryview],
 ]
 InstallCallbackType = Callable[
-    [bool, DataTypeType, SessionDataTypeType, Path, memoryview, AsyncIterable[Product]],
-    Awaitable[memoryview],
+    [bool, DataTypeType, SessionDataTypeType, Path, AsyncIterable[Product]],
+    Awaitable[None],
+]
+InstallUploadCallbackType = Callable[
+    [bool, DataTypeType, SessionDataTypeType, memoryview], Awaitable[None]
+]
+InstallDownloadCallbackType = Callable[
+    [bool, DataTypeType, SessionDataTypeType], Awaitable[memoryview]
 ]
 
 
@@ -123,6 +129,8 @@ class SubmanagerCallbacks(
     fetch: FetchCallbackType[DataTypeType, SessionDataTypeType]
     generate: GenerateCallbackType[DataTypeType, SessionDataTypeType]
     install: InstallCallbackType[DataTypeType, SessionDataTypeType]
+    install_upload: InstallUploadCallbackType[DataTypeType, SessionDataTypeType]
+    install_download: InstallDownloadCallbackType[DataTypeType, SessionDataTypeType]
     RequirementType: type[RequirementTypeType]
 
 
@@ -235,24 +243,35 @@ async def install(
     data: DataTypeType,
     session_data: SessionDataTypeType,
     cache_path: Path,
-    old_directory: memoryview,
-) -> memoryview:
+):
     products = load_many(debug, reader, Product)
 
-    new_directory = await callback(
-        debug, data, session_data, cache_path, old_directory, products
-    )
+    await callback(debug, data, session_data, cache_path, products)
 
     await dump_one(debug, writer, None)
 
-    return new_directory
+
+async def install_upload(
+    reader: StreamReader,
+    callback: InstallUploadCallbackType[DataTypeType, SessionDataTypeType],
+    debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
+):
+    installation = await load_bytes_chunked(debug, reader)
+
+    await callback(debug, data, session_data, installation)
 
 
-async def install_upload(debug: bool, reader: StreamReader):
-    return await load_bytes_chunked(debug, reader)
+async def install_download(
+    writer: StreamWriter,
+    callback: InstallDownloadCallbackType[DataTypeType, SessionDataTypeType],
+    debug: bool,
+    data: DataTypeType,
+    session_data: SessionDataTypeType,
+):
+    installation = await callback(debug, data, session_data)
 
-
-async def install_download(debug: bool, writer: StreamWriter, installation: memoryview):
     await dump_bytes_chunked(debug, writer, installation)
 
 
@@ -266,8 +285,6 @@ async def handle_connection(
     writer: StreamWriter,
 ):
     with SessionLifetime(debug, data) as session_data:
-        installation: memoryview | None = None
-
         while True:
             phase = await load_one(debug, reader, SubmanagerCommand)
 
@@ -308,12 +325,7 @@ async def handle_connection(
                         cache_path,
                     )
                 case SubmanagerCommand.INSTALL:
-                    if installation is None:
-                        raise MyException(
-                            "Installation not initialized. First upload one."
-                        )
-
-                    installation = await install(
+                    await install(
                         reader,
                         writer,
                         callbacks.install,
@@ -321,18 +333,16 @@ async def handle_connection(
                         data,
                         session_data,
                         cache_path,
-                        installation,
                     )
 
                 case SubmanagerCommand.INSTALL_UPLOAD:
-                    installation = await install_upload(debug, reader)
+                    await install_upload(
+                        reader, callbacks.install_upload, debug, data, session_data
+                    )
                 case SubmanagerCommand.INSTALL_DOWNLOAD:
-                    if installation is None:
-                        raise MyException(
-                            "Installation not initialized. First upload one."
-                        )
-
-                    await install_download(debug, writer, installation)
+                    await install_download(
+                        writer, callbacks.install_download, debug, data, session_data
+                    )
                 case SubmanagerCommand.END:
                     break
 

@@ -1,20 +1,21 @@
 from contextlib import asynccontextmanager, contextmanager
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
     fetch_receive_discard,
     generate_empty,
     handle_connection,
-    noop_session_lifetime,
     run_server,
 )
 from PPpackage_utils.utils import RunnerInfo, anoop
 
 from .fetch import fetch_send
-from .install import install
+from .install import install, install_download, install_upload
 from .resolve import resolve
+from .utils import Installation
 
 PROGRAM_NAME = "PPpackage-PP"
 
@@ -24,8 +25,15 @@ CALLBACKS = SubmanagerCallbacks(
     partial(fetch_receive_discard, fetch_send),
     generate_empty,
     install,
+    install_upload,
+    install_download,
     str,
 )
+
+
+@contextmanager
+def session_lifetime(debug: bool, data: Any):
+    yield Installation(memoryview(bytes()))
 
 
 @asynccontextmanager
@@ -35,7 +43,7 @@ async def lifetime(
     debug: bool,
 ):
     yield partial(
-        handle_connection, cache_path, CALLBACKS, runner_info, noop_session_lifetime
+        handle_connection, cache_path, CALLBACKS, runner_info, session_lifetime
     )
 
 

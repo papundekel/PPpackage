@@ -244,7 +244,7 @@ async def create_graph(
 async def resolve(
     debug: bool,
     package_paths: PackagePaths,
-    session_data: None,
+    session_data: Any,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],

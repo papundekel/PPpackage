@@ -4,6 +4,7 @@ from collections.abc import AsyncIterable, MutableMapping
 from io import TextIOWrapper
 from pathlib import Path
 from sys import stderr
+from typing import Any
 
 from PPpackage_utils.io import (
     pipe_read_line_maybe,
@@ -86,15 +87,9 @@ async def install(
     runner_connection: RunnerConnection,
     destination_path: Path,
     cache_path: Path,
-    old_directory: memoryview,
     products: AsyncIterable[Product],
-) -> memoryview:
+):
     _, cache_path = get_cache_paths(cache_path)
-
-    wipe_directory(destination_path)
-
-    with TarFileInMemoryRead(old_directory) as old_tar:
-        old_tar.extractall(destination_path)
 
     database_path = destination_path / DATABASE_PATH_RELATIVE
 
@@ -166,6 +161,24 @@ async def install(
 
         await asubprocess_wait(process, "Error in `pacman -Udd`")
 
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    destination_path: Path,
+    new_directory: memoryview,
+):
+    wipe_directory(destination_path)
+
+    with TarFileInMemoryRead(new_directory) as old_tar:
+        old_tar.extractall(destination_path)
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    destination_path: Path,
+) -> memoryview:
     with TarFileInMemoryWrite() as new_tar:
         new_tar.add(str(destination_path), "")
 

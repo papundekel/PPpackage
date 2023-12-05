@@ -2,6 +2,7 @@ from collections.abc import AsyncIterable
 from pathlib import Path
 from typing import Any
 
+from PPpackage_PP.utils import Installation
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
     TarFileInMemoryWrite,
@@ -14,11 +15,10 @@ from PPpackage_utils.utils import (
 async def install(
     debug: bool,
     data: Any,
-    session_data: None,
+    session_directory: Installation,
     cache_path: Path,
-    old_directory: memoryview,
     products: AsyncIterable[Product],
-) -> memoryview:
+):
     prefix = Path("PP")
 
     with TarFileInMemoryWrite() as new_tar:
@@ -30,6 +30,23 @@ async def install(
             with create_tar_file(new_tar, product_path) as file:
                 file.write(f"{product.version} {product.product_id}".encode())
 
-        tar_append(old_directory, new_tar)
+        tar_append(session_directory.data, new_tar)
 
-    return new_tar.data
+    session_directory.data = new_tar.data
+
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+    new_directory: memoryview,
+):
+    session_directory.data = new_directory
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+) -> memoryview:
+    return session_directory.data

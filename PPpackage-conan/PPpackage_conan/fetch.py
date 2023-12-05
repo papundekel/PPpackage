@@ -2,6 +2,7 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
@@ -30,7 +31,7 @@ from .utils import (
 async def fetch_send(
     debug: bool,
     package_paths: PackagePaths,
-    session_data: None,
+    session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

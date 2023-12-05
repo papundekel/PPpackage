@@ -14,7 +14,7 @@ from PPpackage_utils.submanager import (
 from PPpackage_utils.utils import RunnerInfo, TemporaryDirectory
 
 from .fetch import fetch_send
-from .install import install
+from .install import install, install_download, install_upload
 from .resolve import resolve
 from .update_database import update_database
 
@@ -26,6 +26,8 @@ CALLBACKS = SubmanagerCallbacks(
     partial(fetch_receive_discard, fetch_send),
     generate_empty,
     install,
+    install_upload,
+    install_download,
     str,
 )
 
