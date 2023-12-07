@@ -1,4 +1,4 @@
-#include "alpm.h"
+#include <alpm.h>
 
 #include <charconv>
 #include <climits>
@@ -17,7 +17,7 @@ static FILE *pipe_from_fakealpm;
 static FILE *pipe_to_fakealpm;
 static const char *runner_workdir_relative_path;
 
-__attribute__((constructor)) static void pipes_ctr() {
+[[gnu::constructor]] static void pipes_ctr() {
   const auto pipe_from_fakealpm_path =
       std::getenv("PP_PIPE_FROM_FAKEALPM_PATH");
   const auto pipe_to_fakealpm_path = std::getenv("PP_PIPE_TO_FAKEALPM_PATH");
@@ -27,7 +27,7 @@ __attribute__((constructor)) static void pipes_ctr() {
   pipe_to_fakealpm = std::fopen(pipe_to_fakealpm_path, "r");
 }
 
-__attribute__((destructor)) static void pipes_dtr() {
+[[gnu::destructor]] static void pipes_dtr() {
   std::fclose(pipe_from_fakealpm);
   std::fclose(pipe_to_fakealpm);
 }

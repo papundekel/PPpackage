@@ -12,18 +12,19 @@ RUN pacman --noconfirm -S fakeroot
 RUN pacman --noconfirm -S cmake
 RUN pacman --noconfirm -S meson
 
-COPY --chown=ab:ab ./libalpm-pp /workdir/libalpm-pp 
+COPY --chown=ab:ab PPpackage-arch/libalpm-pp/ /workdir/libalpm-pp
 RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
-COPY fakealpm/ /workdir/fakealpm
-RUN ./fakealpm/build.sh
+COPY PPpackage-arch/fakealpm/ /workdir/PPpackage-arch/fakealpm
+RUN ./PPpackage-arch/fakealpm/build.sh
 
 ENV VIRTUAL_ENV=/workdir/.venv/
 RUN python -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-COPY PPpackage-utils/ /workdir/packages/PPpackage-utils/
-RUN pip install packages/PPpackage-utils/
+COPY PPpackage-utils/ /workdir/PPpackage-utils
+RUN pip install PPpackage-utils/
 
-COPY PPpackage-arch/ /workdir/packages/PPpackage-arch/
-RUN pip install packages/PPpackage-arch/
+COPY PPpackage-arch/PPpackage_arch/ /workdir/PPpackage-arch/PPpackage_arch
+COPY PPpackage-arch/setup.py /workdir/PPpackage-arch/setup.py
+RUN pip install PPpackage-arch/

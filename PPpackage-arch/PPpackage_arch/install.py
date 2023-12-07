@@ -71,7 +71,9 @@ def create_environment(
     destination_path: Path,
 ):
     environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-    environment["LD_PRELOAD"] += f":fakealpm/build/install/lib/libfakealpm.so"
+    environment[
+        "LD_PRELOAD"
+    ] += f":PPpackage-arch/fakealpm/build/install/lib/libfakealpm.so"
     environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
     environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
     environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
@@ -154,9 +156,7 @@ async def install(
                         )
                     else:
                         raise MyException(
-                            f"Unknown header: {header}",
-                            "PPpackage-arch",
-                            stderr,
+                            f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 
         await asubprocess_wait(process, "Error in `pacman -Udd`")
