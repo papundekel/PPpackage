@@ -2,11 +2,14 @@ from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr, stdin
+from textwrap import fill
 
-from networkx import MultiDiGraph
+from networkx import MultiDiGraph, convert_node_labels_to_integers, relabel_nodes
 from networkx import topological_generations as base_topological_generations
-from PPpackage_utils.parse import load_from_bytes
+from networkx.drawing.nx_pydot import to_pydot
+from PPpackage_utils.parse import ManagerAndName, load_from_bytes
 from PPpackage_utils.utils import tar_archive, tar_extract
+from pydot import Dot
 
 from .fetch import fetch
 from .generate import generate
@@ -31,13 +34,49 @@ def topological_generations(
         yield manager_nodes
 
 
+def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
+    manager_to_color = {}
+
+    for node in graph.nodes():
+        if node.manager not in manager_to_color:
+            manager_to_color[node.manager] = len(manager_to_color) + 1
+
+    graph_presentation: MultiDiGraph = convert_node_labels_to_integers(
+        graph, label_attribute="node"
+    )
+
+    for _, data in graph_presentation.nodes(data=True):
+        node: ManagerAndName = data["node"]
+        version: str = data["version"]
+
+        data.clear()
+
+        data["label"] = f'"{node.manager}\n{node.name}\n{version}"'
+        data["fillcolor"] = manager_to_color[node.manager]
+
+    graph_presentation.graph.update(
+        {
+            "node": {
+                "colorscheme": "accent8",
+                "style": "filled",
+                "shape": "box",
+            }
+        }
+    )
+
+    dot: Dot = to_pydot(graph_presentation)
+
+    dot.write(path)
+
+
 async def main(
     debug: bool,
     do_update_database: bool,
     submanager_socket_paths: Mapping[str, Path],
     generators_path: Path,
     destination_path: Path,
-    resolve_iteration_limit: int = 10,
+    graph_path: Path | None,
+    resolve_iteration_limit: int,
 ) -> None:
     connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
 
@@ -58,6 +97,9 @@ async def main(
             input.requirements,
             input.options,
         )
+
+        if graph_path is not None:
+            graph_to_dot(graph, graph_path)
 
         reversed_graph = graph.reverse(copy=False)
 

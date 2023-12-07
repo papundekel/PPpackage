@@ -9,7 +9,7 @@ from os import environ, getgid, getuid
 from pathlib import Path
 from subprocess import DEVNULL
 from sys import stderr
-from typing import Annotated
+from typing import Annotated, Optional
 
 from PPpackage_runner.main import main as runner
 from PPpackage_utils.submanager import AsyncTyper, run
@@ -134,6 +134,7 @@ async def main_command(
     cache_path: Path,
     generators_path: Path,
     destination_path: Path,
+    graph_path: Optional[Path] = None,
     do_update_database: Annotated[
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
@@ -201,6 +202,8 @@ async def main_command(
                     submanager_socket_paths,
                     generators_path,
                     destination_path,
+                    graph_path,
+                    10,
                 )
 
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from PPpackage_utils.parse import load_from_bytes
 from PPpackage_utils.submanager import AsyncTyper, run
@@ -16,6 +17,7 @@ async def main_command(
     config_path: Path,
     generators_path: Path,
     destination_path: Path,
+    graph_path: Optional[Path] = None,
     do_update_database: Annotated[
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
@@ -33,6 +35,7 @@ async def main_command(
             config.submanager_socket_paths,
             generators_path,
             destination_path,
+            graph_path,
             resolve_iteration_limit,
         )
 
