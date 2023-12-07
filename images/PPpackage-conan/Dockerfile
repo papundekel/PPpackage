@@ -1,4 +1,4 @@
-FROM greyltc/archlinux-aur:paru-20231203.0.298
+FROM docker.io/greyltc/archlinux-aur:paru-20231203.0.298
 
 RUN mkdir -p /workdir
 WORKDIR /workdir

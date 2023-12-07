@@ -101,7 +101,7 @@ async def pull_image(
                 stderr=DEVNULL,
             )
 
-            await process.communicate(dockerfile.encode("ascii"))
+            await process.communicate(dockerfile.encode("utf-8"))
             return_code = await process.wait()
 
             return return_code == 0, "pppackage/runner-image"

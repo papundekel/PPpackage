@@ -20,7 +20,7 @@ from enum import Enum
 from enum import auto as enum_auto
 from enum import unique as enum_unique
 from io import BytesIO
-from os import environ, kill, mkfifo
+from os import environ, getgid, getuid, kill, mkfifo
 from pathlib import Path
 from shutil import rmtree
 from signal import SIGTERM
@@ -76,7 +76,7 @@ async def asubprocess_communicate(
 
     if process.returncode != 0:
         if stderr is not None:
-            raise STDERRException(error_message, stderr.decode("ascii"))
+            raise STDERRException(error_message, stderr.decode())
         else:
             raise MyException(error_message)
 
@@ -111,7 +111,7 @@ async def get_fakeroot_info(debug: bool):
         )
 
         ld_library_path, ld_preload = [
-            line.strip() for line in fakeroot_stdout.decode("ascii").splitlines()
+            line.strip() for line in fakeroot_stdout.decode().splitlines()
         ]
 
         _fakeroot_info = FakerootInfo(ld_library_path, ld_preload)
@@ -136,7 +136,7 @@ async def fakeroot(debug: bool) -> AsyncIterator[MutableMapping[str, str]]:
             await process_creation, "Error in `faked`."
         )
 
-        key, pid_string = faked_stdout.decode("ascii").strip().split(":")
+        key, pid_string = faked_stdout.decode().strip().split(":")
 
         pid = int(pid_string)
 
@@ -324,7 +324,10 @@ def tar_extract(tar_bytes: memoryview, destination_path: Path):
     wipe_directory(destination_path)
 
     with TarFileInMemoryRead(tar_bytes) as tar:
-        tar.extractall(destination_path)
+        tar.extractall(
+            destination_path,
+            filter=lambda info, path: info.replace(uid=getuid(), gid=getgid()),
+        )
 
 
 def tar_archive(source_path: Path) -> memoryview:

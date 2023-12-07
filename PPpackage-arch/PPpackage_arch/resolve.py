@@ -30,7 +30,7 @@ async def resolve_pactree(
 
     graph_bytes = await asubprocess_communicate(process, "Error in `pactree`.")
 
-    graph_string = graph_bytes.decode("ascii")
+    graph_string = graph_bytes.decode()
 
     dot = graph_from_dot_data(graph_string)
 
@@ -88,7 +88,7 @@ async def resolve_versions(
 
     lockfile = {
         (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]
-        for line in stdout.decode("ascii").splitlines()
+        for line in stdout.decode().splitlines()
         if not line.startswith(" ")
     }
 
