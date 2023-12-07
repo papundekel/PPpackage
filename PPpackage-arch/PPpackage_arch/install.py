@@ -17,14 +17,12 @@ from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
-    TarFileInMemoryRead,
-    TarFileInMemoryWrite,
-    TemporaryDirectory,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
-    wipe_directory,
+    tar_archive,
+    tar_extract,
 )
 
 from .utils import RunnerConnection, get_cache_paths
@@ -168,10 +166,7 @@ async def install_upload(
     destination_path: Path,
     new_directory: memoryview,
 ):
-    wipe_directory(destination_path)
-
-    with TarFileInMemoryRead(new_directory) as old_tar:
-        old_tar.extractall(destination_path)
+    tar_extract(new_directory, destination_path)
 
 
 async def install_download(
@@ -179,7 +174,4 @@ async def install_download(
     data: Any,
     destination_path: Path,
 ) -> memoryview:
-    with TarFileInMemoryWrite() as new_tar:
-        new_tar.add(str(destination_path), "")
-
-    return new_tar.data
+    return tar_archive(destination_path)

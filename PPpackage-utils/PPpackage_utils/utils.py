@@ -318,3 +318,17 @@ class SubmanagerCommand(Enum):
 class RunnerInfo:
     socket_path: Path
     workdirs_path: Path
+
+
+def tar_extract(tar_bytes: memoryview, destination_path: Path):
+    wipe_directory(destination_path)
+
+    with TarFileInMemoryRead(tar_bytes) as tar:
+        tar.extractall(destination_path)
+
+
+def tar_archive(source_path: Path) -> memoryview:
+    with TarFileInMemoryWrite() as tar:
+        tar.add(str(source_path), "")
+
+    return tar.data

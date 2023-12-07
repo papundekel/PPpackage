@@ -6,11 +6,7 @@ from sys import stderr, stdin
 from networkx import MultiDiGraph
 from networkx import topological_generations as base_topological_generations
 from PPpackage_utils.parse import load_from_bytes
-from PPpackage_utils.utils import (
-    TarFileInMemoryRead,
-    TarFileInMemoryWrite,
-    wipe_directory,
-)
+from PPpackage_utils.utils import tar_archive, tar_extract
 
 from .fetch import fetch
 from .generate import generate
@@ -69,25 +65,17 @@ async def main(
 
         await fetch(debug, connections, input.options, graph, generations)
 
-        generators_bytes = await generate(
+        generators = await generate(
             debug, connections, input.generators, graph.nodes(data=True), input.options
         )
 
-        with TarFileInMemoryRead(generators_bytes) as generators_tar:
-            generators_tar.extractall(generators_path)
-
-        with TarFileInMemoryWrite() as old_installation_tar:
-            old_installation_tar.add(str(destination_path), "")
-
-        old_installation = old_installation_tar.data
+        old_installation = tar_archive(destination_path)
 
         new_installation = await install(
             debug, connections, old_installation, generations
         )
 
-        wipe_directory(destination_path)
-
-        with TarFileInMemoryRead(new_installation) as new_installation_tar:
-            new_installation_tar.extractall(destination_path)
+        tar_extract(generators, generators_path)
+        tar_extract(new_installation, destination_path)
 
         stderr.write("Done.\n")
