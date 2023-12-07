@@ -35,7 +35,7 @@ async def install_product(
 
     stdout = await asubprocess_communicate(process, "Error in `conan cache path`")
 
-    product_path = stdout.decode("ascii").splitlines()[0]
+    product_path = stdout.decode().splitlines()[0]
 
     tar.add(product_path, str(prefix / product.name))
 

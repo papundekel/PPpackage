@@ -85,7 +85,7 @@ async def fetch_send(
     assert process.stdout is not None
 
     for package_name in package_names:
-        line = (await process.stdout.readline()).decode("utf-8").strip()
+        line = (await process.stdout.readline()).decode().strip()
 
         yield PackageIDAndInfo(
             name=package_name,

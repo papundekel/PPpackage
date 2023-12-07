@@ -25,15 +25,33 @@ from typer import Option as TyperOption
 from PPpackage.main import main as PPpackage
 
 RUNNER_MANAGERS = {"arch", "PP"}
+CONTAINER_RUN_PATH = "/mnt/PPpackage-run/"
+CONTAINER_CACHE_PATH = "/workdir/cache/"
 
 
-async def docker(
+async def container(
+    containerizer: str,
     manager: str,
     debug: bool,
     run_path: Path,
     cache_path: Path,
     runner_info: RunnerInfo,
 ):
+    additional_options = (
+        [
+            "--ulimit",
+            "nofile=1024:1048576",
+            "--mount",
+            "type=bind,readonly,source=/etc/passwd,destination=/etc/passwd",
+            "--mount",
+            "type=bind,readonly,source=/etc/group,destination=/etc/group",
+            "--user",
+            f"{getuid()}:{getgid()}",
+        ]
+        if containerizer == "docker"
+        else []
+    )
+
     additional_mounts = (
         [
             "--mount",
@@ -45,7 +63,7 @@ async def docker(
         else []
     )
 
-    additional_args = (
+    additional_command_args = (
         [
             "/run/PPpackage-runner.sock",
             "/mnt/PPpackage-runner-workdirs/",
@@ -55,36 +73,29 @@ async def docker(
     )
 
     process = await create_subprocess_exec(
-        "docker",
+        containerizer,
         "run",
         "--rm",
-        "--ulimit",
-        "nofile=1024:1048576",
+        *additional_options,
         "--mount",
-        "type=bind,readonly,source=/etc/passwd,destination=/etc/passwd",
+        f"type=bind,source={run_path},destination={CONTAINER_RUN_PATH}",
         "--mount",
-        "type=bind,readonly,source=/etc/group,destination=/etc/group",
-        "--user",
-        f"{getuid()}:{getgid()}",
-        "--mount",
-        f"type=bind,source={run_path},destination=/run/",
-        "--mount",
-        f"type=bind,source={cache_path},destination=/workdir/cache/",
+        f"type=bind,source={cache_path},destination={CONTAINER_CACHE_PATH}",
         *additional_mounts,
         f"fackop/pppackage-{manager.lower()}",
         "python",
         "-m",
         f"PPpackage_{manager}",
         "--debug" if debug else "--no-debug",
-        f"/run/",
-        "/workdir/cache/",
-        *additional_args,
+        CONTAINER_RUN_PATH,
+        CONTAINER_CACHE_PATH,
+        *additional_command_args,
         stdin=DEVNULL,
         stdout=stderr,
         stderr=None,
     )
 
-    await asubprocess_wait(process, f"Error while running {manager} in docker.")
+    await asubprocess_wait(process, f"Error while running {manager} in a container.")
 
 
 def process_main(main: Callable, *args):
@@ -119,7 +130,7 @@ app = AsyncTyper()
 
 @app.command()
 async def main_command(
-    mode: str,
+    containerizer: str,
     cache_path: Path,
     generators_path: Path,
     destination_path: Path,
@@ -129,7 +140,7 @@ async def main_command(
     debug: bool = False,
     wait_max_retries: int = 10,
 ):
-    if mode == "native":
+    if containerizer == "native":
         from PPpackage_arch.main import main as PPpackage_arch
         from PPpackage_conan.main import main as base_PPpackage_conan
         from PPpackage_PP.main import main as PPpackage_PP
@@ -140,9 +151,9 @@ async def main_command(
             )
         )
     else:
-        PPpackage_arch = partial(docker, "arch")
-        PPpackage_conan = partial(docker, "conan")
-        PPpackage_PP = partial(docker, "PP")
+        PPpackage_arch = partial(container, containerizer, "arch")
+        PPpackage_conan = partial(container, containerizer, "conan")
+        PPpackage_PP = partial(container, containerizer, "PP")
 
     SUBMANAGERS = {"arch": PPpackage_arch, "conan": PPpackage_conan, "PP": PPpackage_PP}
 
