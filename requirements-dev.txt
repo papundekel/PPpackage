@@ -9,3 +9,5 @@
 -e ./PPpackage/
 
 -e ./PPpackage-run/
+
+pre-commit
