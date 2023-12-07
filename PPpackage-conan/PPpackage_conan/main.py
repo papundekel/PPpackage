@@ -8,8 +8,8 @@ from PPpackage_utils.submanager import (
     fetch_receive_discard,
     handle_connection,
     run_server,
+    update_database_noop,
 )
-from PPpackage_utils.utils import anoop
 
 from .fetch import fetch_send
 from .generate import generate
@@ -20,7 +20,7 @@ from .utils import Installation, get_package_paths
 
 PROGRAM_NAME = "PPpackage-conan"
 CALLBACKS = SubmanagerCallbacks(
-    anoop,
+    update_database_noop,
     resolve,
     partial(fetch_receive_discard, fetch_send),
     generate,

@@ -164,14 +164,6 @@ def TemporaryPipe(dir=None):
         yield pipe_path
 
 
-def noop(*args, **kwargs):
-    pass
-
-
-async def anoop(*args, **kwargs):
-    pass
-
-
 @enum_unique
 class ImageType(Enum):
     TAG = enum_auto()

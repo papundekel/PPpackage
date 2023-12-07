@@ -244,9 +244,4 @@ async def lifetime(workdirs_path: Path, debug: bool):
 
 
 async def main(debug: bool, run_path: Path, workdirs_path: Path):
-    await run_server(
-        debug,
-        program_name,
-        run_path,
-        partial(lifetime, workdirs_path),
-    )
+    await run_server(debug, program_name, run_path, partial(lifetime, workdirs_path))

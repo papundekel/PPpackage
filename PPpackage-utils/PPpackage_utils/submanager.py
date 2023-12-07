@@ -3,7 +3,7 @@ from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
 from collections.abc import AsyncIterable, Awaitable, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from contextlib import AbstractAsyncContextManager, contextmanager
 from dataclasses import dataclass
 from functools import partial, wraps
 from inspect import iscoroutinefunction
@@ -71,7 +71,7 @@ DataTypeType = TypeVar("DataTypeType")
 SessionDataTypeType = TypeVar("SessionDataTypeType")
 
 UpdateDatabaseCallbackType = Callable[
-    [bool, DataTypeType, SessionDataTypeType, Path], Awaitable[None]
+    [bool, DataTypeType, SessionDataTypeType, Path], Awaitable[bool]
 ]
 ResolveCallbackType = Callable[
     [
@@ -150,6 +150,7 @@ def run(app: AsyncTyper, program_name: str) -> None:
 
 
 async def update_database(
+    writer: StreamWriter,
     update_database_callback: UpdateDatabaseCallbackType[
         DataTypeType, SessionDataTypeType
     ],
@@ -158,7 +159,9 @@ async def update_database(
     session_data: SessionDataTypeType,
     cache_path: Path,
 ) -> None:
-    await update_database_callback(debug, data, session_data, cache_path)
+    success = await update_database_callback(debug, data, session_data, cache_path)
+
+    await dump_one(debug, writer, success)
 
 
 async def resolve(
@@ -291,7 +294,12 @@ async def handle_connection(
             match phase:
                 case SubmanagerCommand.UPDATE_DATABASE:
                     await update_database(
-                        callbacks.update_database, debug, data, session_data, cache_path
+                        writer,
+                        callbacks.update_database,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
                     )
                 case SubmanagerCommand.RESOLVE:
                     await resolve(
@@ -450,3 +458,9 @@ async def run_server(
 @contextmanager
 def noop_session_lifetime(debug: bool, data: Any):
     yield None
+
+
+async def update_database_noop(
+    debug: bool, data: Any, session_data: Any, cache_path: Path
+) -> bool:
+    return True
