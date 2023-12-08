@@ -88,7 +88,7 @@ async def install(
     destination_path: Path,
     cache_path: Path,
     products: AsyncIterable[Product],
-):
+) -> bool:
     _, cache_path = get_cache_paths(cache_path)
 
     database_path = destination_path / DATABASE_PATH_RELATIVE
@@ -157,7 +157,12 @@ async def install(
                             f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 
-        await asubprocess_wait(process, "Error in `pacman -Udd`")
+        success = await process.wait() == 0
+
+        if not success:
+            return False
+
+    return True
 
 
 async def install_upload(

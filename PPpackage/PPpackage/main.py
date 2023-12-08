@@ -2,9 +2,8 @@ from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr, stdin
-from textwrap import fill
 
-from networkx import MultiDiGraph, convert_node_labels_to_integers, relabel_nodes
+from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.parse import ManagerAndName, load_from_bytes
@@ -119,6 +118,9 @@ async def main(
         new_installation = await install(
             debug, connections, old_installation, generations
         )
+
+        if new_installation is None:
+            return
 
         tar_extract(generators, generators_path)
         tar_extract(new_installation, destination_path)

@@ -12,7 +12,6 @@ from PPpackage_utils.parse import (
     load_one,
 )
 from PPpackage_utils.utils import SubmanagerCommand
-from pydantic import RootModel
 
 from .utils import NodeData, data_to_product
 
@@ -23,10 +22,8 @@ async def install_manager(
     writer: StreamWriter,
     manager: str,
     packages: Iterable[tuple[str, NodeData]],
-):
+) -> bool:
     stderr.write(f"{manager}:\n")
-    for package_name, _ in sorted(packages, key=lambda p: p[0]):
-        stderr.write(f"\t{package_name}\n")
 
     await dump_one(debug, writer, SubmanagerCommand.INSTALL)
 
@@ -34,7 +31,15 @@ async def install_manager(
 
     await dump_many(debug, writer, products)
 
-    await load_one(debug, reader, RootModel[None])
+    success = await load_one(debug, reader, bool)
+
+    if success:
+        for package_name, _ in sorted(packages, key=lambda p: p[0]):
+            stderr.write(f"\t{package_name}\n")
+    else:
+        stderr.write("Failure\n")
+
+    return success
 
 
 def generate_machine_id(file: IO[bytes]):
@@ -68,7 +73,7 @@ async def install(
     connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     initial_installation: memoryview,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
-) -> memoryview:
+) -> memoryview | None:
     stderr.write(f"Installing packages...\n")
 
     previous_manager: str | None = None
@@ -85,7 +90,11 @@ async def install(
                 await dump_one(debug, writer, SubmanagerCommand.INSTALL_UPLOAD)
                 await dump_bytes_chunked(debug, writer, installation)
 
-            await install_manager(debug, reader, writer, manager, packages)
+            success = await install_manager(debug, reader, writer, manager, packages)
+
+            if not success:
+                stderr.write(f"Installation failed. Aborting.\n")
+                return None
 
             previous_manager = manager
 

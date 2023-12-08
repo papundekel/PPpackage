@@ -18,7 +18,7 @@ async def install(
     session_directory: Installation,
     cache_path: Path,
     products: AsyncIterable[Product],
-):
+) -> bool:
     prefix = Path("PP")
 
     with TarFileInMemoryWrite() as new_tar:
@@ -33,6 +33,8 @@ async def install(
         tar_append(session_directory.data, new_tar)
 
     session_directory.data = new_tar.data
+
+    return True
 
 
 async def install_upload(

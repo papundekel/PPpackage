@@ -116,7 +116,7 @@ GenerateCallbackType = Callable[
 ]
 InstallCallbackType = Callable[
     [bool, DataTypeType, SessionDataTypeType, Path, AsyncIterable[Product]],
-    Awaitable[None],
+    Awaitable[bool],
 ]
 InstallUploadCallbackType = Callable[
     [bool, DataTypeType, SessionDataTypeType, memoryview], Awaitable[None]
@@ -281,9 +281,9 @@ async def install(
 ):
     products = load_many(debug, reader, Product)
 
-    await callback(debug, data, session_data, cache_path, products)
+    success = await callback(debug, data, session_data, cache_path, products)
 
-    await dump_one(debug, writer, None)
+    await dump_one(debug, writer, success)
 
 
 async def install_upload(
