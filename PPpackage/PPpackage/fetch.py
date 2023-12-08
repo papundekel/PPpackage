@@ -25,10 +25,9 @@ from PPpackage_utils.parse import (
     load_many,
     load_one,
 )
-from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import Queue, SubmanagerCommand, queue_iterate
 
-from .utils import NodeData
+from .utils import NodeData, SubmanagerCommandFailure
 
 
 class Synchronization:
@@ -121,7 +120,7 @@ async def receive(
         package_name = package_id_and_info.name
 
         if end:
-            raise MetamanagerCommandFailure(
+            raise SubmanagerCommandFailure(
                 f"FETCH: Too many packages received. Got {package_name}."
             )
 
@@ -131,7 +130,7 @@ async def receive(
             node = nodes[ManagerAndName(manager, package_name)]
 
             if package_name not in packages_unfetched:
-                raise MetamanagerCommandFailure(
+                raise SubmanagerCommandFailure(
                     "FETCH: Duplicate or unrequested package received."
                 )
 
@@ -149,7 +148,7 @@ async def receive(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise MetamanagerCommandFailure("FETCH: Submanager failed to fetch packages.")
+        raise SubmanagerCommandFailure("FETCH: Submanager failed to fetch packages.")
 
 
 async def fetch_manager(

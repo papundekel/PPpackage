@@ -11,10 +11,9 @@ from PPpackage_utils.parse import (
     load_bytes_chunked,
     load_one,
 )
-from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import NodeData, data_to_product
+from .utils import NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def install_manager(
@@ -35,7 +34,7 @@ async def install_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise MetamanagerCommandFailure(
+        raise SubmanagerCommandFailure(
             "INSTALL: Submanager failed to install packages."
         )
 

@@ -7,7 +7,6 @@ from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.parse import ManagerAndName, load_from_bytes
-from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import tar_archive, tar_extract
 from pydot import Dot
 
@@ -17,7 +16,7 @@ from .install import install
 from .parse import Input
 from .resolve import resolve
 from .update_database import update_database
-from .utils import NodeData, communicate_with_submanagers
+from .utils import NodeData, SubmanagerCommandFailure, communicate_with_submanagers
 
 
 def topological_generations(
@@ -136,6 +135,6 @@ async def main(
             tar_extract(new_installation, destination_path)
 
             stderr.write("Done.\n")
-    except* MetamanagerCommandFailure as e_group:
+    except* SubmanagerCommandFailure as e_group:
         log_exception(e_group)
         stderr.write("Aborting.\n")

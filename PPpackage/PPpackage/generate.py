@@ -12,7 +12,6 @@ from PPpackage_utils.parse import (
     load_bytes_chunked,
     load_one,
 )
-from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import (
     SubmanagerCommand,
     TarFileInMemoryRead,
@@ -20,7 +19,7 @@ from PPpackage_utils.utils import (
 )
 
 from .generators import builtin as builtin_generators
-from .utils import NodeData, data_to_product
+from .utils import NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def generate_manager(
@@ -41,7 +40,9 @@ async def generate_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise MetamanagerCommandFailure("")
+        raise SubmanagerCommandFailure(
+            "GENERATE: Submanager failed to create generators."
+        )
 
     generators_directory = await load_bytes_chunked(debug, reader)
 

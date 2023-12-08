@@ -29,7 +29,7 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import MyException, SubmanagerCommand
 
-from PPpackage.utils import open_submanager
+from .utils import SubmanagerCommandFailure, open_submanager
 
 
 async def send(
@@ -69,13 +69,9 @@ async def resolve_manager(
         manager, submanager_socket_paths, connections
     )
 
-    try:
-        async with TaskGroup() as group:
-            group.create_task(send(debug, writer, options, requirements_list))
-            group.create_task(receive(debug, reader, manager, resolution_graphs))
-    except* MyException:
-        print(f"Error in {manager}'s resolve.", file=stderr)
-        raise
+    async with TaskGroup() as group:
+        group.create_task(send(debug, writer, options, requirements_list))
+        group.create_task(receive(debug, reader, manager, resolution_graphs))
 
 
 @dataclass(frozen=True)
@@ -289,7 +285,7 @@ async def resolve(
         stderr.write(f"Resolution iteration {iterations_done + 1}...\n")
 
         if iterations_done >= iteration_limit:
-            raise MyException("Resolve iteration limit reached.")
+            raise SubmanagerCommandFailure("Resolve iteration limit reached.")
 
         new_choices = []
 

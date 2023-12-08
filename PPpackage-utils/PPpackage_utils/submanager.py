@@ -1,21 +1,16 @@
-from ast import dump
-from asyncio import CancelledError
-from asyncio import Queue as SimpleQueue
-from asyncio import StreamReader, StreamWriter, TaskGroup, get_running_loop
+from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
-from collections.abc import AsyncIterable, Awaitable, Callable, Coroutine
+from collections.abc import AsyncIterable, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import partial, wraps
 from inspect import iscoroutinefunction
-from operator import call
 from pathlib import Path
 from signal import SIGTERM
-from sre_constants import SUCCESS
 from sys import stderr
 from traceback import print_exc
-from typing import Any, ContextManager, Generic, TypeVar, final
+from typing import Any, ContextManager, Generic, TypeVar
 
 from pid import PidFile, PidFileAlreadyLockedError
 from typer import Exit, Typer
@@ -37,12 +32,10 @@ from .parse import (
     load_one,
 )
 from .utils import (
-    Queue,
     RunnerInfo,
     SubmanagerCommand,
     create_empty_tar,
     discard_async_iterable,
-    queue_iterate,
 )
 
 
@@ -157,13 +150,6 @@ def run(app: AsyncTyper, program_name: str) -> None:
 
 class SubmanagerCommandFailure(Exception):
     pass
-
-
-class MetamanagerCommandFailure(Exception):
-    def __init__(self, message: str):
-        super().__init__()
-
-        self.message = message
 
 
 @asynccontextmanager
