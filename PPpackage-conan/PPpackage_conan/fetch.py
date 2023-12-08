@@ -118,7 +118,7 @@ async def fetch(
         nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
         for node in nodes.values():
-            results.put_nowait(
+            await results.put(
                 PackageIDAndInfo(
                     name=node.name,
                     id_and_info=IDAndInfo(

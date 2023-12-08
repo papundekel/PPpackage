@@ -106,7 +106,7 @@ async def fetch(
 
                 line = line.strip()
 
-                results.put_nowait(
+                await results.put(
                     PackageIDAndInfo(
                         name=package_name,
                         id_and_info=IDAndInfo(

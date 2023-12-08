@@ -130,7 +130,7 @@ async def receive(
                 node["product_id"] = id_and_info.product_id
                 node["product_info"] = id_and_info.product_info
             else:
-                Synchronization.package_names.put_nowait(package_name)
+                await Synchronization.package_names.put(package_name)
 
         success = await load_one(debug, reader, bool)
 

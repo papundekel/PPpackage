@@ -350,4 +350,4 @@ async def queue_put_loop(queue: Queue[T]):
     try:
         yield
     finally:
-        queue.put_nowait(None)
+        await queue.put(None)

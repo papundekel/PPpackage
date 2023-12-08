@@ -90,7 +90,7 @@ async def fetch(
                 return
 
             async for package, dependencies in packages:
-                results.put_nowait(
+                await results.put(
                     PackageIDAndInfo(
                         name=package.name,
                         id_and_info=IDAndInfo(product_id="id", product_info=None),
