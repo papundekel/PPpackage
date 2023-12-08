@@ -5,13 +5,12 @@ from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
-    fetch_receive_discard,
     handle_connection,
     run_server,
     update_database_noop,
 )
 
-from .fetch import fetch_send
+from .fetch import fetch
 from .generate import generate
 from .install import install, install_download, install_upload
 from .parse import Requirement
@@ -22,7 +21,7 @@ PROGRAM_NAME = "PPpackage-conan"
 CALLBACKS = SubmanagerCallbacks(
     update_database_noop,
     resolve,
-    partial(fetch_receive_discard, fetch_send),
+    fetch,
     generate,
     install,
     install_upload,

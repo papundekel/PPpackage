@@ -5,7 +5,6 @@ from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
-    fetch_receive_discard,
     generate_empty,
     handle_connection,
     run_server,
@@ -13,7 +12,7 @@ from PPpackage_utils.submanager import (
 )
 from PPpackage_utils.utils import RunnerInfo
 
-from .fetch import fetch_send
+from .fetch import fetch
 from .install import install, install_download, install_upload
 from .resolve import resolve
 from .utils import Installation
@@ -23,7 +22,7 @@ PROGRAM_NAME = "PPpackage-PP"
 CALLBACKS = SubmanagerCallbacks(
     update_database_noop,
     resolve,
-    partial(fetch_receive_discard, fetch_send),
+    fetch,
     generate_empty,
     install,
     install_upload,

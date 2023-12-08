@@ -1,3 +1,4 @@
+from asyncio import Queue as SimpleQueue
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
@@ -5,13 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from PPpackage_utils.parse import (
+    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
     Package,
     PackageIDAndInfo,
 )
-from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
+from PPpackage_utils.submanager import discard_build_results_context
+from PPpackage_utils.utils import Queue, ensure_dir_exists, fakeroot, queue_put_loop
 
 from .utils import get_cache_paths
 
@@ -24,28 +27,57 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
-async def fetch_send(
+async def fetch(
     debug: bool,
     data: None,
     session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-) -> AsyncIterable[PackageIDAndInfo]:
-    database_path, cache_path = get_cache_paths(cache_path)
+    build_results: AsyncIterable[BuildResult],
+    success: SimpleQueue[bool],
+    results: Queue[PackageIDAndInfo],
+) -> None:
+    async with discard_build_results_context(build_results):
+        database_path, cache_path = get_cache_paths(cache_path)
 
-    ensure_dir_exists(cache_path)
+        ensure_dir_exists(cache_path)
 
-    package_names = []
+        package_names = []
 
-    async for package, dependencies in packages:
-        package_names.append(package.name)
+        async for package, dependencies in packages:
+            package_names.append(package.name)
 
-        async for _ in dependencies:
-            pass
+            async for _ in dependencies:
+                pass
 
-    async with fakeroot(debug) as environment:
-        process = create_subprocess_exec(
+        async with fakeroot(debug) as environment:
+            process = await create_subprocess_exec(
+                "pacman",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--noconfirm",
+                "--sync",
+                "--downloadonly",
+                "--nodeps",
+                "--nodeps",
+                *package_names,
+                stdin=DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                env=environment,
+            )
+
+            return_code = await process.wait()
+
+            if return_code != 0:
+                results.put_nowait(None)
+                success.put_nowait(False)
+                return
+
+        process = await create_subprocess_exec(
             "pacman",
             "--dbpath",
             str(database_path),
@@ -53,45 +85,40 @@ async def fetch_send(
             str(cache_path),
             "--noconfirm",
             "--sync",
-            "--downloadonly",
             "--nodeps",
             "--nodeps",
+            "--print",
             *package_names,
             stdin=DEVNULL,
-            stdout=DEVNULL,
+            stdout=PIPE,
             stderr=DEVNULL,
-            env=environment,
         )
 
-        await asubprocess_wait(await process, "Error in `pacman -Sw`.")
+        assert process.stdout is not None
 
-    process = await create_subprocess_exec(
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--noconfirm",
-        "--sync",
-        "--nodeps",
-        "--nodeps",
-        "--print",
-        *package_names,
-        stdin=DEVNULL,
-        stdout=PIPE,
-        stderr=DEVNULL,
-    )
+        async with queue_put_loop(results):
+            for package_name in package_names:
+                line = (await process.stdout.readline()).decode()
 
-    assert process.stdout is not None
+                if line == "":
+                    success.put_nowait(False)
+                    return
 
-    for package_name in package_names:
-        line = (await process.stdout.readline()).decode().strip()
+                line = line.strip()
 
-        yield PackageIDAndInfo(
-            name=package_name,
-            id_and_info=IDAndInfo(
-                product_id=process_product_id(line), product_info=None
-            ),
-        )
+                results.put_nowait(
+                    PackageIDAndInfo(
+                        name=package_name,
+                        id_and_info=IDAndInfo(
+                            product_id=process_product_id(line), product_info=None
+                        ),
+                    )
+                )
 
-    await asubprocess_wait(process, "Error in `pacman -Sddp`")
+        return_code = await process.wait()
+
+        if return_code != 0:
+            success.put_nowait(False)
+            return
+
+        success.put_nowait(True)

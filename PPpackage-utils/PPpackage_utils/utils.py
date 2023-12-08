@@ -1,3 +1,4 @@
+from asyncio import Queue as BaseQueue
 from asyncio import (
     StreamReader,
     StreamReaderProtocol,
@@ -27,7 +28,7 @@ from signal import SIGTERM
 from sys import stderr, stdin, stdout
 from tarfile import DIRTYPE, TarFile, TarInfo
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import IO, Any, Optional, Protocol
+from typing import IO, Any, Optional, Protocol, TypeVar
 
 from frozendict import frozendict
 
@@ -327,3 +328,26 @@ def tar_archive(source_path: Path) -> memoryview:
         tar.add(str(source_path), "")
 
     return tar.data
+
+
+T = TypeVar("T")
+
+Queue = BaseQueue[T | None]
+
+
+async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
+    while True:
+        value = await queue.get()
+
+        if value is None:
+            break
+
+        yield value
+
+
+@asynccontextmanager
+async def queue_put_loop(queue: Queue[T]):
+    try:
+        yield
+    finally:
+        queue.put_nowait(None)

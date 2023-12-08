@@ -6,14 +6,13 @@ from PPpackage_arch.utils import RunnerConnection
 from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
-    fetch_receive_discard,
     generate_empty,
     handle_connection,
     run_server,
 )
 from PPpackage_utils.utils import RunnerInfo, TemporaryDirectory
 
-from .fetch import fetch_send
+from .fetch import fetch
 from .install import install, install_download, install_upload
 from .resolve import resolve
 from .update_database import update_database
@@ -23,7 +22,7 @@ PROGRAM_NAME = "PPpackage-arch"
 CALLBACKS = SubmanagerCallbacks(
     update_database,
     resolve,
-    partial(fetch_receive_discard, fetch_send),
+    fetch,
     generate_empty,
     install,
     install_upload,

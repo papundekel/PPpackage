@@ -1,13 +1,16 @@
+from asyncio import Queue as SimpleQueue
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
+from sys import stderr
 from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
+    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
@@ -15,7 +18,8 @@ from PPpackage_utils.parse import (
     PackageIDAndInfo,
     load_object,
 )
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.submanager import discard_build_results_context
+from PPpackage_utils.utils import Queue, queue_put_loop
 
 from .parse import FetchProductInfo
 from .utils import (
@@ -28,26 +32,9 @@ from .utils import (
 )
 
 
-async def fetch_send(
-    debug: bool,
-    package_paths: PackagePaths,
-    session_data: Any,
-    cache_path: Path,
-    options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-) -> AsyncIterable[PackageIDAndInfo]:
-    cache_path = get_cache_path(cache_path)
-
-    environment = make_conan_environment(cache_path)
-
-    jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(package_paths.data_path),
-        autoescape=jinja2_select_autoescape(),
-    )
-
-    conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
-    profile_template = jinja_loader.get_template("profile.jinja")
-
+async def create_requirements(
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]
+) -> Iterable[tuple[str, str]]:
     requirements = []
 
     async for package, dependencies in packages:
@@ -60,46 +47,87 @@ async def fetch_send(
                 )
                 requirements.append((dependency.name, product_info_parsed.version))
 
-    with (
-        create_and_render_temp_file(
-            conanfile_template, {"requirements": requirements}, ".py"
-        ) as conanfile_file,
-        create_and_render_temp_file(
-            profile_template, {"options": options}
-        ) as host_profile_file,
+    return requirements
+
+
+async def fetch(
+    debug: bool,
+    package_paths: PackagePaths,
+    session_data: Any,
+    cache_path: Path,
+    options: Options,
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+    build_results: AsyncIterable[BuildResult],
+    success: SimpleQueue[bool],
+    results: Queue[PackageIDAndInfo],
+) -> None:
+    async with (
+        discard_build_results_context(build_results),
+        queue_put_loop(results),
     ):
-        host_profile_path = Path(host_profile_file.name)
-        build_profile_path = package_paths.data_path / "profile"
+        cache_path = get_cache_path(cache_path)
 
-        process = create_subprocess_exec(
-            "conan",
-            "install",
-            "--build",
-            "missing",
-            "--format",
-            "json",
-            f"--profile:host={host_profile_path}",
-            f"--profile:build={build_profile_path}",
-            conanfile_file.name,
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=DEVNULL,
-            env=environment,
+        environment = make_conan_environment(cache_path)
+
+        jinja_loader = Jinja2Environment(
+            loader=Jinja2FileSystemLoader(package_paths.data_path),
+            autoescape=jinja2_select_autoescape(),
         )
 
-        graph_json_bytes = await asubprocess_communicate(
-            await process, "Error in `conan install`"
-        )
+        conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
+        profile_template = jinja_loader.get_template("profile.jinja")
 
-    nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
+        requirements = await create_requirements(packages)
 
-    for node in nodes.values():
-        yield PackageIDAndInfo(
-            name=node.name,
-            id_and_info=IDAndInfo(
-                product_id=node.get_product_id(),
-                product_info=FetchProductInfo(
-                    version=node.get_version(), cpp_info=node.cpp_info
-                ),
-            ),
-        )
+        with (
+            create_and_render_temp_file(
+                conanfile_template, {"requirements": requirements}, ".py"
+            ) as conanfile_file,
+            create_and_render_temp_file(
+                profile_template, {"options": options}
+            ) as host_profile_file,
+        ):
+            host_profile_path = Path(host_profile_file.name)
+            build_profile_path = package_paths.data_path / "profile"
+
+            process = await create_subprocess_exec(
+                "conan",
+                "install",
+                "--build",
+                "missing",
+                "--format",
+                "json",
+                f"--profile:host={host_profile_path}",
+                f"--profile:build={build_profile_path}",
+                conanfile_file.name,
+                stdin=DEVNULL,
+                stdout=PIPE,
+                stderr=DEVNULL,
+                env=environment,
+            )
+
+            assert process.stdout is not None
+            graph_json_bytes = await process.stdout.read()
+
+            return_code = await process.wait()
+
+            if return_code != 0:
+                success.put_nowait(False)
+                return
+
+        nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
+
+        for node in nodes.values():
+            results.put_nowait(
+                PackageIDAndInfo(
+                    name=node.name,
+                    id_and_info=IDAndInfo(
+                        product_id=node.get_product_id(),
+                        product_info=FetchProductInfo(
+                            version=node.get_version(), cpp_info=node.cpp_info
+                        ),
+                    ),
+                )
+            )
+
+        success.put_nowait(True)

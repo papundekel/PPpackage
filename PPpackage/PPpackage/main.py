@@ -105,7 +105,10 @@ async def main(
 
         generations = list(topological_generations(reversed_graph))
 
-        await fetch(debug, connections, input.options, graph, generations)
+        success = await fetch(debug, connections, input.options, graph, generations)
+
+        if not success:
+            return
 
         generators = await generate(
             debug, connections, input.generators, graph.nodes(data=True), input.options

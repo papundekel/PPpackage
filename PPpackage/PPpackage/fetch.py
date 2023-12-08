@@ -26,32 +26,16 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_many,
+    load_one,
 )
-from PPpackage_utils.utils import SubmanagerCommand
+from PPpackage_utils.utils import (
+    Queue,
+    SubmanagerCommand,
+    queue_iterate,
+    queue_put_loop,
+)
 
 from .utils import NodeData
-
-T = TypeVar("T")
-
-Queue = BaseQueue[T | None]
-
-
-async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
-    while True:
-        value = await queue.get()
-
-        if value is None:
-            break
-
-        yield value
-
-
-@asynccontextmanager
-async def queue_put_loop(queue: Queue[T]):
-    try:
-        yield
-    finally:
-        queue.put_nowait(None)
 
 
 class Synchronization:
@@ -135,7 +119,7 @@ async def receive(
     reader: StreamReader,
     manager: str,
     nodes: Mapping[ManagerAndName, NodeData],
-) -> None:
+) -> bool:
     async with queue_put_loop(Synchronization.package_names):
         async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
             package_name = package_id_and_info.name
@@ -148,6 +132,25 @@ async def receive(
             else:
                 Synchronization.package_names.put_nowait(package_name)
 
+        success = await load_one(debug, reader, bool)
+
+        return success
+
+
+def log(
+    manager: str,
+    success: bool,
+    packages: Iterable[tuple[Package, Any]],
+    nodes: Mapping[ManagerAndName, NodeData],
+):
+    stderr.write(f"{manager}:\n")
+    if success:
+        for package, _ in sorted(packages, key=lambda p: p[0].name):
+            product_id = nodes[ManagerAndName(manager, package.name)]["product_id"]
+            stderr.write(f"\t{package.name} -> {product_id}\n")
+    else:
+        stderr.write("\tFailed.\n")
+
 
 async def fetch_manager(
     debug: bool,
@@ -159,7 +162,7 @@ async def fetch_manager(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
-) -> None:
+) -> bool:
     reader, writer = connections[manager]
 
     async with TaskGroup() as group:
@@ -173,12 +176,13 @@ async def fetch_manager(
                 packages_to_dependencies,
             )
         )
-        group.create_task(receive(debug, reader, manager, nodes))
+        success_task = group.create_task(receive(debug, reader, manager, nodes))
 
-    stderr.write(f"{manager}:\n")
-    for package, _ in sorted(packages, key=lambda p: p[0].name):
-        product_id = nodes[ManagerAndName(manager, package.name)]["product_id"]
-        stderr.write(f"\t{package.name} -> {product_id}\n")
+    success = success_task.result()
+
+    log(manager, success, packages, nodes)
+
+    return success
 
 
 def create_dependencies(
@@ -217,7 +221,7 @@ async def fetch(
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
-) -> None:
+) -> bool:
     stderr.write("Fetching packages...\n")
 
     packages_to_dependencies: MutableMapping[
@@ -247,15 +251,25 @@ async def fetch(
                 )
 
         async with TaskGroup() as group:
+            success_tasks = []
+
             for manager, packages in manager_packages.items():
-                group.create_task(
-                    fetch_manager(
-                        debug,
-                        connections,
-                        manager,
-                        meta_options.get(manager),
-                        packages,
-                        graph.nodes,
-                        packages_to_dependencies,
+                success_tasks.append(
+                    group.create_task(
+                        fetch_manager(
+                            debug,
+                            connections,
+                            manager,
+                            meta_options.get(manager),
+                            packages,
+                            graph.nodes,
+                            packages_to_dependencies,
+                        )
                     )
                 )
+
+        if any(not success_task.result() for success_task in success_tasks):
+            stderr.write("Fetching failed. Aborting.\n")
+            return False
+
+    return True
