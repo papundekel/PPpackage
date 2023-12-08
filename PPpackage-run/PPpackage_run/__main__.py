@@ -208,7 +208,5 @@ async def main_command(
                     10,
                 )
 
-            await sleep(1)  # wait for submanagers to disconnect from the runner
-
 
 run(app, "PPpackage-run")
