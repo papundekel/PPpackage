@@ -18,7 +18,6 @@ from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
     TemporaryPipe,
-    asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
     tar_archive,

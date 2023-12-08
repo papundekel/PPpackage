@@ -113,6 +113,9 @@ async def main(
             debug, connections, input.generators, graph.nodes(data=True), input.options
         )
 
+        if generators is None:
+            return
+
         old_installation = tar_archive(destination_path)
 
         new_installation = await install(

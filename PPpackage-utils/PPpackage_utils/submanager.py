@@ -112,7 +112,7 @@ GenerateCallbackType = Callable[
         AsyncIterable[Product],
         AsyncIterable[str],
     ],
-    Awaitable[memoryview],
+    Awaitable[memoryview | None],
 ]
 InstallCallbackType = Callable[
     [bool, DataTypeType, SessionDataTypeType, Path, AsyncIterable[Product]],
@@ -267,7 +267,12 @@ async def generate(
         debug, data, session_data, cache_path, options, products, generators
     )
 
-    await dump_bytes_chunked(debug, writer, generators)
+    success = generators is not None
+
+    await dump_one(debug, writer, success)
+
+    if success:
+        await dump_bytes_chunked(debug, writer, generators)
 
 
 async def install(

@@ -1,7 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
-from importlib.resources import Package
 from pathlib import Path
 from typing import Any
 
@@ -9,11 +8,7 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import (
-    TarFileInMemoryWrite,
-    TemporaryDirectory,
-    asubprocess_wait,
-)
+from PPpackage_utils.utils import TarFileInMemoryWrite, TemporaryDirectory
 
 from .utils import (
     PackagePaths,
@@ -68,7 +63,7 @@ async def generate(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> memoryview:
+) -> memoryview | None:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -102,7 +97,7 @@ async def generate(
             host_profile_path = Path(host_profile_file.name)
             build_profile_path = package_paths.data_path / "profile"
 
-            process = create_subprocess_exec(
+            process = await create_subprocess_exec(
                 "conan",
                 "install",
                 "--output-folder",
@@ -120,7 +115,10 @@ async def generate(
                 env=environment,
             )
 
-            await asubprocess_wait(await process, "Error in `conan install`")
+            success = await process.wait() == 0
+
+            if not success:
+                return None
 
         patch_native_generators(native_generators_path, native_generators_path_suffix)
 
