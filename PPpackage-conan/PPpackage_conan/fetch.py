@@ -1,7 +1,7 @@
 from asyncio import Queue as SimpleQueue
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable, Iterable, Set
 from pathlib import Path
 from typing import Any
 
@@ -36,11 +36,13 @@ from .utils import (
 
 async def create_requirements(
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]
-) -> Iterable[tuple[str, str]]:
+) -> tuple[Iterable[tuple[str, str]], Set[str]]:
     requirements = []
+    package_names = set()
 
     async for package, dependencies in packages:
         requirements.append((package.name, package.version))
+        package_names.add(package.name)
 
         async for dependency in dependencies:
             if dependency.manager == "conan" and dependency.product_info is not None:
@@ -49,7 +51,7 @@ async def create_requirements(
                 )
                 requirements.append((dependency.name, product_info_parsed.version))
 
-    return requirements
+    return requirements, package_names
 
 
 async def fetch(
@@ -74,7 +76,7 @@ async def fetch(
         conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
         profile_template = jinja_loader.get_template("profile.jinja")
 
-        requirements = await create_requirements(packages)
+        requirements, package_names = await create_requirements(packages)
 
         with (
             create_and_render_temp_file(
@@ -111,12 +113,15 @@ async def fetch(
         nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
         for node in nodes.values():
-            yield PackageIDAndInfo(
-                name=node.name,
-                id_and_info=IDAndInfo(
-                    product_id=node.get_product_id(),
-                    product_info=FetchProductInfo(
-                        version=node.get_version(), cpp_info=node.cpp_info
+            package_name = node.name
+
+            if package_name in package_names:
+                yield PackageIDAndInfo(
+                    name=package_name,
+                    id_and_info=IDAndInfo(
+                        product_id=node.get_product_id(),
+                        product_info=FetchProductInfo(
+                            version=node.get_version(), cpp_info=node.cpp_info
+                        ),
                     ),
-                ),
-            )
+                )

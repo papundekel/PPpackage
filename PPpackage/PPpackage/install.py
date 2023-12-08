@@ -11,6 +11,7 @@ from PPpackage_utils.parse import (
     load_bytes_chunked,
     load_one,
 )
+from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import SubmanagerCommand
 
 from .utils import NodeData, data_to_product
@@ -22,7 +23,7 @@ async def install_manager(
     writer: StreamWriter,
     manager: str,
     packages: Iterable[tuple[str, NodeData]],
-) -> bool:
+) -> None:
     stderr.write(f"{manager}:\n")
 
     await dump_one(debug, writer, SubmanagerCommand.INSTALL)
@@ -33,13 +34,13 @@ async def install_manager(
 
     success = await load_one(debug, reader, bool)
 
-    if success:
-        for package_name, _ in sorted(packages, key=lambda p: p[0]):
-            stderr.write(f"\t{package_name}\n")
-    else:
-        stderr.write("Failure\n")
+    if not success:
+        raise MetamanagerCommandFailure(
+            "INSTALL: Submanager failed to install packages."
+        )
 
-    return success
+    for package_name, _ in sorted(packages, key=lambda p: p[0]):
+        stderr.write(f"\t{package_name}\n")
 
 
 def generate_machine_id(file: IO[bytes]):
@@ -73,7 +74,7 @@ async def install(
     connections: Mapping[str, tuple[StreamReader, StreamWriter]],
     initial_installation: memoryview,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
-) -> memoryview | None:
+) -> memoryview:
     stderr.write(f"Installing packages...\n")
 
     previous_manager: str | None = None
@@ -90,11 +91,7 @@ async def install(
                 await dump_one(debug, writer, SubmanagerCommand.INSTALL_UPLOAD)
                 await dump_bytes_chunked(debug, writer, installation)
 
-            success = await install_manager(debug, reader, writer, manager, packages)
-
-            if not success:
-                stderr.write(f"Installation failed. Aborting.\n")
-                return None
+            await install_manager(debug, reader, writer, manager, packages)
 
             previous_manager = manager
 

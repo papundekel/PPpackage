@@ -159,6 +159,13 @@ class SubmanagerCommandFailure(Exception):
     pass
 
 
+class MetamanagerCommandFailure(Exception):
+    def __init__(self, message: str):
+        super().__init__()
+
+        self.message = message
+
+
 @asynccontextmanager
 async def write_success(debug: bool, writer: StreamWriter):
     try:

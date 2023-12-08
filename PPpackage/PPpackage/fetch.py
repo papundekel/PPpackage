@@ -1,17 +1,14 @@
-from asyncio import Queue as BaseQueue
 from asyncio import StreamReader, StreamWriter, TaskGroup, as_completed
 from collections.abc import (
-    AsyncIterable,
     Iterable,
     Mapping,
     MutableMapping,
     MutableSequence,
     MutableSet,
 )
-from contextlib import asynccontextmanager
 from itertools import islice
 from sys import stderr
-from typing import Any, TypeVar
+from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes
 from PPpackage_utils.parse import (
@@ -28,12 +25,8 @@ from PPpackage_utils.parse import (
     load_many,
     load_one,
 )
-from PPpackage_utils.utils import (
-    Queue,
-    SubmanagerCommand,
-    queue_iterate,
-    queue_put_loop,
-)
+from PPpackage_utils.submanager import MetamanagerCommandFailure
+from PPpackage_utils.utils import Queue, SubmanagerCommand, queue_iterate
 
 from .utils import NodeData
 
@@ -120,22 +113,27 @@ async def receive(
     manager: str,
     nodes: Mapping[ManagerAndName, NodeData],
     package_names: Iterable[str],
-) -> bool:
+):
     packages_unfetched = set(package_names)
     end = False
 
     async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
-        if end:
-            return False
-
         package_name = package_id_and_info.name
+
+        if end:
+            raise MetamanagerCommandFailure(
+                f"FETCH: Too many packages received. Got {package_name}."
+            )
+
         id_and_info = package_id_and_info.id_and_info
 
         if id_and_info is not None:
             node = nodes[ManagerAndName(manager, package_name)]
 
             if package_name not in packages_unfetched:
-                return False
+                raise MetamanagerCommandFailure(
+                    "FETCH: Duplicate or unrequested package received."
+                )
 
             node["product_id"] = id_and_info.product_id
             node["product_info"] = id_and_info.product_info
@@ -150,22 +148,8 @@ async def receive(
 
     success = await load_one(debug, reader, bool)
 
-    return success
-
-
-def log(
-    manager: str,
-    success: bool,
-    packages: Iterable[tuple[Package, Any]],
-    nodes: Mapping[ManagerAndName, NodeData],
-):
-    stderr.write(f"{manager}:\n")
-    if success:
-        for package, _ in sorted(packages, key=lambda p: p[0].name):
-            product_id = nodes[ManagerAndName(manager, package.name)]["product_id"]
-            stderr.write(f"\t{package.name} -> {product_id}\n")
-    else:
-        stderr.write("\tFailed.\n")
+    if not success:
+        raise MetamanagerCommandFailure("FETCH: Submanager failed to fetch packages.")
 
 
 async def fetch_manager(
@@ -178,7 +162,7 @@ async def fetch_manager(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
-) -> bool:
+):
     reader, writer = connections[manager]
 
     async with TaskGroup() as group:
@@ -192,17 +176,16 @@ async def fetch_manager(
                 packages_to_dependencies,
             )
         )
-        success_task = group.create_task(
+        group.create_task(
             receive(
                 debug, reader, manager, nodes, (package.name for package, _ in packages)
             )
         )
 
-    success = success_task.result()
-
-    log(manager, success, packages, nodes)
-
-    return success
+    stderr.write(f"{manager}:\n")
+    for package, _ in sorted(packages, key=lambda p: p[0].name):
+        product_id = nodes[ManagerAndName(manager, package.name)]["product_id"]
+        stderr.write(f"\t{package.name} -> {product_id}\n")
 
 
 def create_dependencies(
@@ -241,7 +224,7 @@ async def fetch(
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
-) -> bool:
+):
     stderr.write("Fetching packages...\n")
 
     packages_to_dependencies: MutableMapping[
@@ -271,25 +254,15 @@ async def fetch(
                 )
 
         async with TaskGroup() as group:
-            success_tasks = []
-
             for manager, packages in manager_packages.items():
-                success_tasks.append(
-                    group.create_task(
-                        fetch_manager(
-                            debug,
-                            connections,
-                            manager,
-                            meta_options.get(manager),
-                            packages,
-                            graph.nodes,
-                            packages_to_dependencies,
-                        )
+                group.create_task(
+                    fetch_manager(
+                        debug,
+                        connections,
+                        manager,
+                        meta_options.get(manager),
+                        packages,
+                        graph.nodes,
+                        packages_to_dependencies,
                     )
                 )
-
-        if any(not success_task.result() for success_task in success_tasks):
-            stderr.write("Fetching failed. Aborting.\n")
-            return False
-
-    return True

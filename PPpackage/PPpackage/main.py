@@ -7,6 +7,7 @@ from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.parse import ManagerAndName, load_from_bytes
+from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import tar_archive, tar_extract
 from pydot import Dot
 
@@ -68,6 +69,14 @@ def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
     dot.write(path)
 
 
+def log_exception(e: BaseExceptionGroup) -> None:
+    for e in e.exceptions:
+        if isinstance(e, ExceptionGroup):
+            log_exception(e)
+        else:
+            stderr.write(f"{e.message}\n")
+
+
 async def main(
     debug: bool,
     do_update_database: bool,
@@ -77,55 +86,56 @@ async def main(
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
+    try:
+        connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
 
-    async with communicate_with_submanagers(debug, connections):
-        input_json_bytes = stdin.buffer.read()
+        async with communicate_with_submanagers(debug, connections):
+            input_json_bytes = stdin.buffer.read()
 
-        input = load_from_bytes(debug, Input, input_json_bytes)
+            input = load_from_bytes(debug, Input, input_json_bytes)
 
-        if do_update_database:
-            managers = input.requirements.keys()
-            await update_database(debug, submanager_socket_paths, connections, managers)
+            if do_update_database:
+                managers = input.requirements.keys()
+                await update_database(
+                    debug, submanager_socket_paths, connections, managers
+                )
 
-        graph = await resolve(
-            debug,
-            resolve_iteration_limit,
-            submanager_socket_paths,
-            connections,
-            input.requirements,
-            input.options,
-        )
+            graph = await resolve(
+                debug,
+                resolve_iteration_limit,
+                submanager_socket_paths,
+                connections,
+                input.requirements,
+                input.options,
+            )
 
-        if graph_path is not None:
-            graph_to_dot(graph, graph_path)
+            if graph_path is not None:
+                graph_to_dot(graph, graph_path)
 
-        reversed_graph = graph.reverse(copy=False)
+            reversed_graph = graph.reverse(copy=False)
 
-        generations = list(topological_generations(reversed_graph))
+            generations = list(topological_generations(reversed_graph))
 
-        success = await fetch(debug, connections, input.options, graph, generations)
+            await fetch(debug, connections, input.options, graph, generations)
 
-        if not success:
-            return
+            generators = await generate(
+                debug,
+                connections,
+                input.generators,
+                graph.nodes(data=True),
+                input.options,
+            )
 
-        generators = await generate(
-            debug, connections, input.generators, graph.nodes(data=True), input.options
-        )
+            old_installation = tar_archive(destination_path)
 
-        if generators is None:
-            return
+            new_installation = await install(
+                debug, connections, old_installation, generations
+            )
 
-        old_installation = tar_archive(destination_path)
+            tar_extract(generators, generators_path)
+            tar_extract(new_installation, destination_path)
 
-        new_installation = await install(
-            debug, connections, old_installation, generations
-        )
-
-        if new_installation is None:
-            return
-
-        tar_extract(generators, generators_path)
-        tar_extract(new_installation, destination_path)
-
-        stderr.write("Done.\n")
+            stderr.write("Done.\n")
+    except* MetamanagerCommandFailure as e_group:
+        log_exception(e_group)
+        stderr.write("Aborting.\n")

@@ -12,6 +12,7 @@ from PPpackage_utils.parse import (
     load_bytes_chunked,
     load_one,
 )
+from PPpackage_utils.submanager import MetamanagerCommandFailure
 from PPpackage_utils.utils import (
     SubmanagerCommand,
     TarFileInMemoryRead,
@@ -29,7 +30,7 @@ async def generate_manager(
     products: Iterable[Product],
     generators: Set[str],
     manager: str,
-) -> memoryview | None:
+) -> memoryview:
     reader, writer = connections[manager]
 
     await dump_one(debug, writer, SubmanagerCommand.GENERATE)
@@ -40,7 +41,7 @@ async def generate_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        return None
+        raise MetamanagerCommandFailure("")
 
     generators_directory = await load_bytes_chunked(debug, reader)
 
@@ -69,7 +70,7 @@ async def generate(
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
-) -> memoryview | None:
+) -> memoryview:
     meta_products: MutableMapping[str, MutableSequence[Product]] = {}
 
     for manager_and_package, data in nodes:
@@ -77,7 +78,7 @@ async def generate(
             data_to_product(manager_and_package.name, data)
         )
 
-    tasks: MutableSequence[Task[memoryview | None]] = []
+    tasks: MutableSequence[Task[memoryview]] = []
     builtin_directories: MutableSequence[memoryview] = []
 
     async with TaskGroup() as group:
@@ -98,13 +99,10 @@ async def generate(
         for generator in generators & builtin_generators.keys():
             builtin_directories.append(builtin_generators[generator](meta_products))
 
-    generators_directories = check_results(tasks)
-
-    if generators_directories is None:
-        return None
-
     with TarFileInMemoryWrite() as merged_tar:
-        for generators_directory in chain(builtin_directories, generators_directories):
+        for generators_directory in chain(
+            builtin_directories, (task.result() for task in tasks)
+        ):
             with TarFileInMemoryRead(generators_directory) as tar:
                 for member in tar:
                     merged_tar.addfile(
