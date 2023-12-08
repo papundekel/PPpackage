@@ -121,7 +121,7 @@ async def receive(
 
         if end:
             raise SubmanagerCommandFailure(
-                f"FETCH: Too many packages received. Got {package_name}."
+                f"Too many packages received from {manager}. Got {package_name}."
             )
 
         id_and_info = package_id_and_info.id_and_info
@@ -131,7 +131,7 @@ async def receive(
 
             if package_name not in packages_unfetched:
                 raise SubmanagerCommandFailure(
-                    "FETCH: Duplicate or unrequested package received."
+                    f"Duplicate or unrequested package received from {manager}: {package_name}."
                 )
 
             node["product_id"] = id_and_info.product_id
@@ -148,7 +148,7 @@ async def receive(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise SubmanagerCommandFailure("FETCH: Submanager failed to fetch packages.")
+        raise SubmanagerCommandFailure(f"{manager} failed to fetch packages.")
 
 
 async def fetch_manager(

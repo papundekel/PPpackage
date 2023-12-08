@@ -73,7 +73,7 @@ def log_exception(e: BaseExceptionGroup) -> None:
         if isinstance(e, ExceptionGroup):
             log_exception(e)
         else:
-            stderr.write(f"{e.message}\n")
+            stderr.write(f"ERROR: {e.message}\n")
 
 
 async def main(

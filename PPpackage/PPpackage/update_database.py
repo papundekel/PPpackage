@@ -4,9 +4,9 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one, load_one
-from PPpackage_utils.utils import MyException, SubmanagerCommand
+from PPpackage_utils.utils import SubmanagerCommand
 
-from PPpackage.utils import open_submanager
+from .utils import SubmanagerCommandFailure, open_submanager
 
 
 async def update_database_manager(
@@ -26,7 +26,7 @@ async def update_database_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise MyException(f"Error in {manager}'s update-database.")
+        raise SubmanagerCommandFailure(f"{manager} failed to update its database.")
 
 
 async def update_database(

@@ -16,7 +16,6 @@ from PPpackage_utils.io import (
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
-    MyException,
     RunnerRequestType,
     TemporaryPipe,
     asubprocess_wait,
@@ -154,7 +153,7 @@ async def install(
                             runner_connection,
                         )
                     else:
-                        raise MyException(
+                        raise Exception(
                             f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 

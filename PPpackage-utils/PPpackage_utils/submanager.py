@@ -196,9 +196,12 @@ async def resolve(
         async for _ in load_loop(debug, reader)
     )
 
-    output = callback(debug, data, session_data, cache_path, options, requirements_list)
+    async with write_success(debug, writer):
+        output = callback(
+            debug, data, session_data, cache_path, options, requirements_list
+        )
 
-    await dump_many_async(debug, writer, output)
+        await dump_many_async(debug, writer, output)
 
 
 async def fetch(
@@ -223,19 +226,16 @@ async def fetch(
     build_results = load_many(debug, reader, BuildResult)
 
     async with write_success(debug, writer):
-        await dump_many_async(
+        output = callback(
             debug,
-            writer,
-            callback(
-                debug,
-                data,
-                session_data,
-                cache_path,
-                options,
-                packages,
-                build_results,
-            ),
+            data,
+            session_data,
+            cache_path,
+            options,
+            packages,
+            build_results,
         )
+        await dump_many_async(debug, writer, output)
 
 
 async def generate(

@@ -40,9 +40,7 @@ async def generate_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise SubmanagerCommandFailure(
-            "GENERATE: Submanager failed to create generators."
-        )
+        raise SubmanagerCommandFailure(f"{manager} failed to create generators.")
 
     generators_directory = await load_bytes_chunked(debug, reader)
 

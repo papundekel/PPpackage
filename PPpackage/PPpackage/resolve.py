@@ -26,8 +26,9 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_many,
+    load_one,
 )
-from PPpackage_utils.utils import MyException, SubmanagerCommand
+from PPpackage_utils.utils import SubmanagerCommand
 
 from .utils import SubmanagerCommandFailure, open_submanager
 
@@ -54,6 +55,11 @@ async def receive(
 ) -> None:
     async for graph in load_many(debug, reader, ResolutionGraph):
         resolution_graphs[manager].append(graph)
+
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager}'s resolve failed.")
 
 
 async def resolve_manager(
@@ -324,6 +330,6 @@ async def resolve(
     graph = process_graph(result_work_graph)
 
     if not is_directed_acyclic_graph(graph):
-        raise MyException("Cycle found in the resolution graph.")
+        raise SubmanagerCommandFailure("Cycle found in the resolution graph.")
 
     return graph

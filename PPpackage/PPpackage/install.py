@@ -34,9 +34,7 @@ async def install_manager(
     success = await load_one(debug, reader, bool)
 
     if not success:
-        raise SubmanagerCommandFailure(
-            "INSTALL: Submanager failed to install packages."
-        )
+        raise SubmanagerCommandFailure(f"{manager} failed to install packages.")
 
     for package_name, _ in sorted(packages, key=lambda p: p[0]):
         stderr.write(f"\t{package_name}\n")
