@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from PPpackage_utils.parse import Product
+from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
     TarFileInMemoryWrite,
     TarFileWithBytes,
-    asubprocess_communicate,
+    asubprocess_wait,
     tar_append,
 )
 
@@ -21,7 +22,7 @@ async def install_product(
     prefix: Path,
     tar: TarFileWithBytes,
     product: Product,
-) -> None:
+):
     process = await create_subprocess_exec(
         "conan",
         "cache",
@@ -33,9 +34,13 @@ async def install_product(
         env=environment,
     )
 
-    stdout = await asubprocess_communicate(process, "Error in `conan cache path`")
+    assert process.stdout is not None
 
-    product_path = stdout.decode().splitlines()[0]
+    output_bytes = await process.stdout.read()
+
+    await asubprocess_wait(process, SubmanagerCommandFailure())
+
+    product_path = output_bytes.decode().splitlines()[0]
 
     tar.add(product_path, str(prefix / product.name))
 
@@ -55,14 +60,17 @@ async def install(
 
     with TarFileInMemoryWrite() as new_tar:
         async with TaskGroup() as group:
+            success_tasks = []
             async for product in products:
-                group.create_task(
-                    install_product(
-                        debug,
-                        environment,
-                        prefix,
-                        new_tar,
-                        product,
+                success_tasks.append(
+                    group.create_task(
+                        install_product(
+                            debug,
+                            environment,
+                            prefix,
+                            new_tar,
+                            product,
+                        )
                     )
                 )
 

@@ -6,7 +6,8 @@ from typing import Any
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.utils import MyException, asubprocess_communicate
+from PPpackage_utils.submanager import SubmanagerCommandFailure
+from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -28,18 +29,21 @@ async def resolve_pactree(
         stderr=DEVNULL,
     )
 
-    graph_bytes = await asubprocess_communicate(process, "Error in `pactree`.")
+    assert process.stdout is not None
+    graph_bytes = await process.stdout.read()
 
     graph_string = graph_bytes.decode()
 
     dot = graph_from_dot_data(graph_string)
 
     if dot is None:
-        raise MyException("Error in `pactree`. Output is not a graph.")
+        raise SubmanagerCommandFailure
 
     graph: MultiDiGraph = nx_pydot.from_pydot(dot[0])
 
     root = clean_graph(graph)
+
+    await asubprocess_wait(process, SubmanagerCommandFailure())
 
     return graph, root
 
@@ -48,7 +52,7 @@ def get_graph_root(graph: MultiDiGraph) -> str:
     for edge in graph.out_edges("START"):
         return edge[1]
 
-    raise MyException("Error in `pactree`. Graph has no root.")
+    raise SubmanagerCommandFailure
 
 
 def clean_graph(graph: MultiDiGraph) -> str:

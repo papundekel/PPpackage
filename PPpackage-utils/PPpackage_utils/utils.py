@@ -1,3 +1,4 @@
+from asyncio import Queue as BaseQueue
 from asyncio import (
     StreamReader,
     StreamReaderProtocol,
@@ -27,7 +28,7 @@ from signal import SIGTERM
 from sys import stderr, stdin, stdout
 from tarfile import DIRTYPE, TarFile, TarInfo
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import IO, Any, Optional, Protocol
+from typing import IO, Any, Optional, Protocol, TypeVar
 
 from frozendict import frozendict
 
@@ -60,11 +61,11 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
-async def asubprocess_wait(process: Process, error_message: str) -> None:
+async def asubprocess_wait(process: Process, exception: Exception) -> None:
     return_code = await process.wait()
 
     if return_code != 0:
-        raise MyException(error_message)
+        raise exception
 
 
 async def asubprocess_communicate(
@@ -162,14 +163,6 @@ def TemporaryPipe(dir=None):
         mkfifo(pipe_path)
 
         yield pipe_path
-
-
-def noop(*args, **kwargs):
-    pass
-
-
-async def anoop(*args, **kwargs):
-    pass
 
 
 @enum_unique
@@ -335,3 +328,26 @@ def tar_archive(source_path: Path) -> memoryview:
         tar.add(str(source_path), "")
 
     return tar.data
+
+
+T = TypeVar("T")
+
+Queue = BaseQueue[T | None]
+
+
+async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
+    while True:
+        value = await queue.get()
+
+        if value is None:
+            break
+
+        yield value
+
+
+@asynccontextmanager
+async def queue_put_loop(queue: Queue[T]):
+    try:
+        yield
+    finally:
+        await queue.put(None)

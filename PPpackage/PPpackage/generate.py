@@ -10,6 +10,7 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_bytes_chunked,
+    load_one,
 )
 from PPpackage_utils.utils import (
     SubmanagerCommand,
@@ -18,7 +19,7 @@ from PPpackage_utils.utils import (
 )
 
 from .generators import builtin as builtin_generators
-from .utils import NodeData, data_to_product
+from .utils import NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def generate_manager(
@@ -36,9 +37,30 @@ async def generate_manager(
     await dump_many(debug, writer, products)
     await dump_many(debug, writer, generators)
 
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager} failed to create generators.")
+
     generators_directory = await load_bytes_chunked(debug, reader)
 
     return generators_directory
+
+
+def check_results(
+    tasks: Iterable[Task[memoryview | None]],
+) -> Iterable[memoryview] | None:
+    generators_directories: MutableSequence[memoryview] = []
+
+    for task in tasks:
+        generators_directory = task.result()
+
+        if generators_directory is None:
+            return None
+
+        generators_directories.append(generators_directory)
+
+    return generators_directories
 
 
 async def generate(

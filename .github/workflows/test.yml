@@ -72,7 +72,7 @@ jobs:
                   python -m venv .venv/
                   source .venv/bin/activate
                   pip install -r requirements.txt
-                  python -m PPpackage_run docker --debug --wait-max-retries ${{ github.ref_name == 'main' && 1000 || 10 }} ${{ github.workspace }}/cache "$(pwd)/generators" "$(pwd)/root" < input/basic.json
+                  python -m PPpackage_run docker --debug --wait-max-retries 1000 ${{ github.workspace }}/cache "$(pwd)/generators" "$(pwd)/root" < input/basic.json
 
             - name: See if ldconfig ran
               run: ls -l root/etc/ld.so.cache

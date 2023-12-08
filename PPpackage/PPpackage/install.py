@@ -12,9 +12,8 @@ from PPpackage_utils.parse import (
     load_one,
 )
 from PPpackage_utils.utils import SubmanagerCommand
-from pydantic import RootModel
 
-from .utils import NodeData, data_to_product
+from .utils import NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def install_manager(
@@ -23,10 +22,8 @@ async def install_manager(
     writer: StreamWriter,
     manager: str,
     packages: Iterable[tuple[str, NodeData]],
-):
+) -> None:
     stderr.write(f"{manager}:\n")
-    for package_name, _ in sorted(packages, key=lambda p: p[0]):
-        stderr.write(f"\t{package_name}\n")
 
     await dump_one(debug, writer, SubmanagerCommand.INSTALL)
 
@@ -34,7 +31,13 @@ async def install_manager(
 
     await dump_many(debug, writer, products)
 
-    await load_one(debug, reader, RootModel[None])
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager} failed to install packages.")
+
+    for package_name, _ in sorted(packages, key=lambda p: p[0]):
+        stderr.write(f"\t{package_name}\n")
 
 
 def generate_machine_id(file: IO[bytes]):

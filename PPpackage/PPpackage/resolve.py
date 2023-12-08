@@ -26,10 +26,11 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_many,
+    load_one,
 )
-from PPpackage_utils.utils import MyException, SubmanagerCommand
+from PPpackage_utils.utils import SubmanagerCommand
 
-from PPpackage.utils import open_submanager
+from .utils import SubmanagerCommandFailure, open_submanager
 
 
 async def send(
@@ -55,6 +56,11 @@ async def receive(
     async for graph in load_many(debug, reader, ResolutionGraph):
         resolution_graphs[manager].append(graph)
 
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager}'s resolve failed.")
+
 
 async def resolve_manager(
     debug: bool,
@@ -69,13 +75,9 @@ async def resolve_manager(
         manager, submanager_socket_paths, connections
     )
 
-    try:
-        async with TaskGroup() as group:
-            group.create_task(send(debug, writer, options, requirements_list))
-            group.create_task(receive(debug, reader, manager, resolution_graphs))
-    except* MyException:
-        print(f"Error in {manager}'s resolve.", file=stderr)
-        raise
+    async with TaskGroup() as group:
+        group.create_task(send(debug, writer, options, requirements_list))
+        group.create_task(receive(debug, reader, manager, resolution_graphs))
 
 
 @dataclass(frozen=True)
@@ -289,7 +291,7 @@ async def resolve(
         stderr.write(f"Resolution iteration {iterations_done + 1}...\n")
 
         if iterations_done >= iteration_limit:
-            raise MyException("Resolve iteration limit reached.")
+            raise SubmanagerCommandFailure("Resolve iteration limit reached.")
 
         new_choices = []
 
@@ -328,6 +330,6 @@ async def resolve(
     graph = process_graph(result_work_graph)
 
     if not is_directed_acyclic_graph(graph):
-        raise MyException("Cycle found in the resolution graph.")
+        raise SubmanagerCommandFailure("Cycle found in the resolution graph.")
 
     return graph

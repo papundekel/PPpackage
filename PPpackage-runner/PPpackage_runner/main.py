@@ -14,6 +14,7 @@ from PPpackage_utils.parse import dump_one, load_many, load_one
 from PPpackage_utils.submanager import run_server
 from PPpackage_utils.utils import (
     ImageType,
+    MyException,
     RunnerRequestType,
     TemporaryDirectory,
     asubprocess_wait,
@@ -223,7 +224,7 @@ async def create_config(debug: bool, bundle_path: Path):
         stderr=DEVNULL,
     )
 
-    await asubprocess_wait(await process_creation, "Error in `runc spec`.")
+    await asubprocess_wait(await process_creation, MyException("Error in `runc spec`."))
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["terminal"] = False
@@ -244,9 +245,4 @@ async def lifetime(workdirs_path: Path, debug: bool):
 
 
 async def main(debug: bool, run_path: Path, workdirs_path: Path):
-    await run_server(
-        debug,
-        program_name,
-        run_path,
-        partial(lifetime, workdirs_path),
-    )
+    await run_server(debug, program_name, run_path, partial(lifetime, workdirs_path))

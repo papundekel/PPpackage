@@ -1,17 +1,14 @@
-from asyncio import Queue as BaseQueue
 from asyncio import StreamReader, StreamWriter, TaskGroup, as_completed
 from collections.abc import (
-    AsyncIterable,
     Iterable,
     Mapping,
     MutableMapping,
     MutableSequence,
     MutableSet,
 )
-from contextlib import asynccontextmanager
 from itertools import islice
 from sys import stderr
-from typing import Any, TypeVar
+from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes
 from PPpackage_utils.parse import (
@@ -26,32 +23,11 @@ from PPpackage_utils.parse import (
     dump_many,
     dump_one,
     load_many,
+    load_one,
 )
-from PPpackage_utils.utils import SubmanagerCommand
+from PPpackage_utils.utils import Queue, SubmanagerCommand, queue_iterate
 
-from .utils import NodeData
-
-T = TypeVar("T")
-
-Queue = BaseQueue[T | None]
-
-
-async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
-    while True:
-        value = await queue.get()
-
-        if value is None:
-            break
-
-        yield value
-
-
-@asynccontextmanager
-async def queue_put_loop(queue: Queue[T]):
-    try:
-        yield
-    finally:
-        queue.put_nowait(None)
+from .utils import NodeData, SubmanagerCommandFailure
 
 
 class Synchronization:
@@ -135,18 +111,44 @@ async def receive(
     reader: StreamReader,
     manager: str,
     nodes: Mapping[ManagerAndName, NodeData],
-) -> None:
-    async with queue_put_loop(Synchronization.package_names):
-        async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
-            package_name = package_id_and_info.name
-            id_and_info = package_id_and_info.id_and_info
+    package_names: Iterable[str],
+):
+    packages_unfetched = set(package_names)
+    end = False
 
-            if id_and_info is not None:
-                node = nodes[ManagerAndName(manager, package_name)]
-                node["product_id"] = id_and_info.product_id
-                node["product_info"] = id_and_info.product_info
-            else:
-                Synchronization.package_names.put_nowait(package_name)
+    async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
+        package_name = package_id_and_info.name
+
+        if end:
+            raise SubmanagerCommandFailure(
+                f"Too many packages received from {manager}. Got {package_name}."
+            )
+
+        id_and_info = package_id_and_info.id_and_info
+
+        if id_and_info is not None:
+            node = nodes[ManagerAndName(manager, package_name)]
+
+            if package_name not in packages_unfetched:
+                raise SubmanagerCommandFailure(
+                    f"Duplicate or unrequested package received from {manager}: {package_name}."
+                )
+
+            node["product_id"] = id_and_info.product_id
+            node["product_info"] = id_and_info.product_info
+
+            packages_unfetched.remove(package_name)
+
+            if len(packages_unfetched) == 0:
+                await Synchronization.package_names.put(None)
+                end = True
+        else:
+            await Synchronization.package_names.put(package_name)
+
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager} failed to fetch packages.")
 
 
 async def fetch_manager(
@@ -159,7 +161,7 @@ async def fetch_manager(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
-) -> None:
+):
     reader, writer = connections[manager]
 
     async with TaskGroup() as group:
@@ -173,7 +175,11 @@ async def fetch_manager(
                 packages_to_dependencies,
             )
         )
-        group.create_task(receive(debug, reader, manager, nodes))
+        group.create_task(
+            receive(
+                debug, reader, manager, nodes, (package.name for package, _ in packages)
+            )
+        )
 
     stderr.write(f"{manager}:\n")
     for package, _ in sorted(packages, key=lambda p: p[0].name):
@@ -217,7 +223,7 @@ async def fetch(
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
-) -> None:
+):
     stderr.write("Fetching packages...\n")
 
     packages_to_dependencies: MutableMapping[

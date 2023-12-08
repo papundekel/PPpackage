@@ -5,14 +5,14 @@ from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
-    fetch_receive_discard,
     generate_empty,
     handle_connection,
     run_server,
+    update_database_noop,
 )
-from PPpackage_utils.utils import RunnerInfo, anoop
+from PPpackage_utils.utils import RunnerInfo
 
-from .fetch import fetch_send
+from .fetch import fetch
 from .install import install, install_download, install_upload
 from .resolve import resolve
 from .utils import Installation
@@ -20,9 +20,9 @@ from .utils import Installation
 PROGRAM_NAME = "PPpackage-PP"
 
 CALLBACKS = SubmanagerCallbacks(
-    anoop,
+    update_database_noop,
     resolve,
-    partial(fetch_receive_discard, fetch_send),
+    fetch,
     generate_empty,
     install,
     install_upload,
@@ -54,8 +54,5 @@ async def main(
     runner_info: RunnerInfo,
 ):
     await run_server(
-        debug,
-        PROGRAM_NAME,
-        run_path,
-        partial(lifetime, runner_info, cache_path),
+        debug, PROGRAM_NAME, run_path, partial(lifetime, runner_info, cache_path)
     )

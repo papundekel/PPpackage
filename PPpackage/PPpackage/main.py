@@ -2,9 +2,8 @@ from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr, stdin
-from textwrap import fill
 
-from networkx import MultiDiGraph, convert_node_labels_to_integers, relabel_nodes
+from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.parse import ManagerAndName, load_from_bytes
@@ -17,7 +16,7 @@ from .install import install
 from .parse import Input
 from .resolve import resolve
 from .update_database import update_database
-from .utils import NodeData, communicate_with_submanagers
+from .utils import NodeData, SubmanagerCommandFailure, communicate_with_submanagers
 
 
 def topological_generations(
@@ -69,6 +68,14 @@ def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
     dot.write(path)
 
 
+def log_exception(e: BaseExceptionGroup) -> None:
+    for e in e.exceptions:
+        if isinstance(e, ExceptionGroup):
+            log_exception(e)
+        else:
+            stderr.write(f"ERROR: {e.message}\n")
+
+
 async def main(
     debug: bool,
     do_update_database: bool,
@@ -78,46 +85,56 @@ async def main(
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
+    try:
+        connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
 
-    async with communicate_with_submanagers(debug, connections):
-        input_json_bytes = stdin.buffer.read()
+        async with communicate_with_submanagers(debug, connections):
+            input_json_bytes = stdin.buffer.read()
 
-        input = load_from_bytes(debug, Input, input_json_bytes)
+            input = load_from_bytes(debug, Input, input_json_bytes)
 
-        if do_update_database:
-            managers = input.requirements.keys()
-            await update_database(debug, submanager_socket_paths, connections, managers)
+            if do_update_database:
+                managers = input.requirements.keys()
+                await update_database(
+                    debug, submanager_socket_paths, connections, managers
+                )
 
-        graph = await resolve(
-            debug,
-            resolve_iteration_limit,
-            submanager_socket_paths,
-            connections,
-            input.requirements,
-            input.options,
-        )
+            graph = await resolve(
+                debug,
+                resolve_iteration_limit,
+                submanager_socket_paths,
+                connections,
+                input.requirements,
+                input.options,
+            )
 
-        if graph_path is not None:
-            graph_to_dot(graph, graph_path)
+            if graph_path is not None:
+                graph_to_dot(graph, graph_path)
 
-        reversed_graph = graph.reverse(copy=False)
+            reversed_graph = graph.reverse(copy=False)
 
-        generations = list(topological_generations(reversed_graph))
+            generations = list(topological_generations(reversed_graph))
 
-        await fetch(debug, connections, input.options, graph, generations)
+            await fetch(debug, connections, input.options, graph, generations)
 
-        generators = await generate(
-            debug, connections, input.generators, graph.nodes(data=True), input.options
-        )
+            generators = await generate(
+                debug,
+                connections,
+                input.generators,
+                graph.nodes(data=True),
+                input.options,
+            )
 
-        old_installation = tar_archive(destination_path)
+            old_installation = tar_archive(destination_path)
 
-        new_installation = await install(
-            debug, connections, old_installation, generations
-        )
+            new_installation = await install(
+                debug, connections, old_installation, generations
+            )
 
-        tar_extract(generators, generators_path)
-        tar_extract(new_installation, destination_path)
+            tar_extract(generators, generators_path)
+            tar_extract(new_installation, destination_path)
 
-        stderr.write("Done.\n")
+            stderr.write("Done.\n")
+    except* SubmanagerCommandFailure as e_group:
+        log_exception(e_group)
+        stderr.write("Aborting.\n")

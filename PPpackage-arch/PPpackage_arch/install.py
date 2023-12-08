@@ -14,8 +14,8 @@ from PPpackage_utils.io import (
     pipe_write_string,
 )
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
+from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
-    MyException,
     RunnerRequestType,
     TemporaryPipe,
     asubprocess_wait,
@@ -153,11 +153,11 @@ async def install(
                             runner_connection,
                         )
                     else:
-                        raise MyException(
+                        raise Exception(
                             f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 
-        await asubprocess_wait(process, "Error in `pacman -Udd`")
+        await asubprocess_wait(process, SubmanagerCommandFailure())
 
 
 async def install_upload(

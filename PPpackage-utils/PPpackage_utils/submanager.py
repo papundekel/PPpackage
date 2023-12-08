@@ -1,4 +1,3 @@
-from ast import Call
 from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
@@ -33,7 +32,6 @@ from .parse import (
     load_one,
 )
 from .utils import (
-    MyException,
     RunnerInfo,
     SubmanagerCommand,
     create_empty_tar,
@@ -94,8 +92,9 @@ FetchCallbackType = Callable[
         AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
         AsyncIterable[BuildResult],
     ],
-    tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]],
+    AsyncIterable[PackageIDAndInfo],
 ]
+
 GenerateCallbackType = Callable[
     [
         bool,
@@ -149,7 +148,23 @@ def run(app: AsyncTyper, program_name: str) -> None:
         exit(1)
 
 
+class SubmanagerCommandFailure(Exception):
+    pass
+
+
+@asynccontextmanager
+async def write_success(debug: bool, writer: StreamWriter):
+    try:
+        yield
+        success = True
+    except SubmanagerCommandFailure:
+        success = False
+
+    await dump_one(debug, writer, success)
+
+
 async def update_database(
+    writer: StreamWriter,
     update_database_callback: UpdateDatabaseCallbackType[
         DataTypeType, SessionDataTypeType
     ],
@@ -158,7 +173,8 @@ async def update_database(
     session_data: SessionDataTypeType,
     cache_path: Path,
 ) -> None:
-    await update_database_callback(debug, data, session_data, cache_path)
+    async with write_success(debug, writer):
+        await update_database_callback(debug, data, session_data, cache_path)
 
 
 async def resolve(
@@ -180,9 +196,12 @@ async def resolve(
         async for _ in load_loop(debug, reader)
     )
 
-    output = callback(debug, data, session_data, cache_path, options, requirements_list)
+    async with write_success(debug, writer):
+        output = callback(
+            debug, data, session_data, cache_path, options, requirements_list
+        )
 
-    await dump_many_async(debug, writer, output)
+        await dump_many_async(debug, writer, output)
 
 
 async def fetch(
@@ -206,13 +225,17 @@ async def fetch(
 
     build_results = load_many(debug, reader, BuildResult)
 
-    output, complete = callback(
-        debug, data, session_data, cache_path, options, packages, build_results
-    )
-
-    await dump_many_async(debug, writer, output)
-
-    await complete
+    async with write_success(debug, writer):
+        output = callback(
+            debug,
+            data,
+            session_data,
+            cache_path,
+            options,
+            packages,
+            build_results,
+        )
+        await dump_many_async(debug, writer, output)
 
 
 async def generate(
@@ -228,9 +251,10 @@ async def generate(
     products = load_many(debug, reader, Product)
     generators = load_many(debug, reader, str)
 
-    generators = await callback(
-        debug, data, session_data, cache_path, options, products, generators
-    )
+    async with write_success(debug, writer):
+        generators = await callback(
+            debug, data, session_data, cache_path, options, products, generators
+        )
 
     await dump_bytes_chunked(debug, writer, generators)
 
@@ -246,9 +270,8 @@ async def install(
 ):
     products = load_many(debug, reader, Product)
 
-    await callback(debug, data, session_data, cache_path, products)
-
-    await dump_one(debug, writer, None)
+    async with write_success(debug, writer):
+        await callback(debug, data, session_data, cache_path, products)
 
 
 async def install_upload(
@@ -291,7 +314,12 @@ async def handle_connection(
             match phase:
                 case SubmanagerCommand.UPDATE_DATABASE:
                     await update_database(
-                        callbacks.update_database, debug, data, session_data, cache_path
+                        writer,
+                        callbacks.update_database,
+                        debug,
+                        data,
+                        session_data,
+                        cache_path,
                     )
                 case SubmanagerCommand.RESOLVE:
                     await resolve(
@@ -381,39 +409,6 @@ async def generate_empty(
     return create_empty_tar()
 
 
-def fetch_receive_discard(
-    send_callback: Callable[
-        [
-            bool,
-            DataTypeType,
-            SessionDataTypeType,
-            Path,
-            Any,
-            AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-        ],
-        AsyncIterable[PackageIDAndInfo],
-    ],
-    debug: bool,
-    data: DataTypeType,
-    session_data: SessionDataTypeType,
-    cache_path: Path,
-    options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-    build_results: AsyncIterable[BuildResult],
-) -> tuple[AsyncIterable[PackageIDAndInfo], Awaitable[None]]:
-    return (
-        output
-        async for output in send_callback(
-            debug,
-            data,
-            session_data,
-            cache_path,
-            options,
-            packages,
-        )
-    ), discard_async_iterable(build_results)
-
-
 async def run_server(
     debug: bool,
     program_name: str,
@@ -450,3 +445,17 @@ async def run_server(
 @contextmanager
 def noop_session_lifetime(debug: bool, data: Any):
     yield None
+
+
+async def update_database_noop(
+    debug: bool, data: Any, session_data: Any, cache_path: Path
+) -> None:
+    pass
+
+
+@asynccontextmanager
+async def discard_build_results_context(build_results: AsyncIterable[BuildResult]):
+    try:
+        yield
+    finally:
+        await discard_async_iterable(build_results)

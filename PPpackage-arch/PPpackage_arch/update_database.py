@@ -3,20 +3,19 @@ from asyncio.subprocess import DEVNULL
 from pathlib import Path
 from typing import Any
 
+from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
 
 
-async def update_database(
-    debug: bool, data: None, session_data: Any, cache_path: Path
-) -> None:
+async def update_database(debug: bool, data: None, session_data: Any, cache_path: Path):
     database_path, _ = get_cache_paths(cache_path)
 
     ensure_dir_exists(database_path)
 
     async with fakeroot(debug) as environment:
-        process = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "pacman",
             "--dbpath",
             str(database_path),
@@ -28,4 +27,4 @@ async def update_database(
             env=environment,
         )
 
-        await asubprocess_wait(await process, "Error in `pacman -Sy`")
+        await asubprocess_wait(process, SubmanagerCommandFailure())

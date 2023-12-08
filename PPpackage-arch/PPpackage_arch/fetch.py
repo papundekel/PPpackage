@@ -5,11 +5,16 @@ from pathlib import Path
 from typing import Any
 
 from PPpackage_utils.parse import (
+    BuildResult,
     Dependency,
     IDAndInfo,
     Options,
     Package,
     PackageIDAndInfo,
+)
+from PPpackage_utils.submanager import (
+    SubmanagerCommandFailure,
+    discard_build_results_context,
 )
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
@@ -24,28 +29,50 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
-async def fetch_send(
+async def fetch(
     debug: bool,
     data: None,
     session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+    build_results: AsyncIterable[BuildResult],
 ) -> AsyncIterable[PackageIDAndInfo]:
-    database_path, cache_path = get_cache_paths(cache_path)
+    async with discard_build_results_context(build_results):
+        database_path, cache_path = get_cache_paths(cache_path)
 
-    ensure_dir_exists(cache_path)
+        ensure_dir_exists(cache_path)
 
-    package_names = []
+        package_names = []
 
-    async for package, dependencies in packages:
-        package_names.append(package.name)
+        async for package, dependencies in packages:
+            package_names.append(package.name)
 
-        async for _ in dependencies:
-            pass
+            async for _ in dependencies:
+                pass
 
-    async with fakeroot(debug) as environment:
-        process = create_subprocess_exec(
+        async with fakeroot(debug) as environment:
+            process = await create_subprocess_exec(
+                "pacman",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--noconfirm",
+                "--sync",
+                "--downloadonly",
+                "--nodeps",
+                "--nodeps",
+                *package_names,
+                stdin=DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                env=environment,
+            )
+
+            await asubprocess_wait(process, SubmanagerCommandFailure())
+
+        process = await create_subprocess_exec(
             "pacman",
             "--dbpath",
             str(database_path),
@@ -53,45 +80,29 @@ async def fetch_send(
             str(cache_path),
             "--noconfirm",
             "--sync",
-            "--downloadonly",
             "--nodeps",
             "--nodeps",
+            "--print",
             *package_names,
             stdin=DEVNULL,
-            stdout=DEVNULL,
+            stdout=PIPE,
             stderr=DEVNULL,
-            env=environment,
         )
 
-        await asubprocess_wait(await process, "Error in `pacman -Sw`.")
+        assert process.stdout is not None
+        for package_name in package_names:
+            line = (await process.stdout.readline()).decode()
 
-    process = await create_subprocess_exec(
-        "pacman",
-        "--dbpath",
-        str(database_path),
-        "--cachedir",
-        str(cache_path),
-        "--noconfirm",
-        "--sync",
-        "--nodeps",
-        "--nodeps",
-        "--print",
-        *package_names,
-        stdin=DEVNULL,
-        stdout=PIPE,
-        stderr=DEVNULL,
-    )
+            if line == "":
+                raise SubmanagerCommandFailure
 
-    assert process.stdout is not None
+            line = line.strip()
 
-    for package_name in package_names:
-        line = (await process.stdout.readline()).decode().strip()
+            yield PackageIDAndInfo(
+                name=package_name,
+                id_and_info=IDAndInfo(
+                    product_id=process_product_id(line), product_info=None
+                ),
+            )
 
-        yield PackageIDAndInfo(
-            name=package_name,
-            id_and_info=IDAndInfo(
-                product_id=process_product_id(line), product_info=None
-            ),
-        )
-
-    await asubprocess_wait(process, "Error in `pacman -Sddp`")
+        await asubprocess_wait(process, SubmanagerCommandFailure())
