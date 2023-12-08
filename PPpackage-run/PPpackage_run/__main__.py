@@ -95,7 +95,9 @@ async def container(
         stderr=None,
     )
 
-    await asubprocess_wait(process, f"Error while running {manager} in a container.")
+    await asubprocess_wait(
+        process, MyException(f"Error while running {manager} in a container.")
+    )
 
 
 def process_main(main: Callable, *args):

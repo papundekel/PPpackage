@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import TarFileInMemoryWrite, TarFileWithBytes, tar_append
+from PPpackage_utils.submanager import SubmanagerCommandFailure
+from PPpackage_utils.utils import (
+    TarFileInMemoryWrite,
+    TarFileWithBytes,
+    asubprocess_wait,
+    tar_append,
+)
 
 from .utils import Installation, get_cache_path, make_conan_environment
 
@@ -16,7 +22,7 @@ async def install_product(
     prefix: Path,
     tar: TarFileWithBytes,
     product: Product,
-) -> bool:
+):
     process = await create_subprocess_exec(
         "conan",
         "cache",
@@ -32,16 +38,11 @@ async def install_product(
 
     output_bytes = await process.stdout.read()
 
-    success = await process.wait() == 0
-
-    if not success:
-        return False
+    await asubprocess_wait(process, SubmanagerCommandFailure())
 
     product_path = output_bytes.decode().splitlines()[0]
 
     tar.add(product_path, str(prefix / product.name))
-
-    return True
 
 
 async def install(
@@ -50,7 +51,7 @@ async def install(
     session_directory: Installation,
     cache_path: Path,
     products: AsyncIterable[Product],
-) -> bool:
+):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -73,14 +74,9 @@ async def install(
                     )
                 )
 
-        if any(not success_task.result() for success_task in success_tasks):
-            return False
-
         tar_append(session_directory.data, new_tar)
 
     session_directory.data = new_tar.data
-
-    return True
 
 
 async def install_upload(

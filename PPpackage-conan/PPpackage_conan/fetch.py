@@ -3,7 +3,6 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
@@ -18,8 +17,11 @@ from PPpackage_utils.parse import (
     PackageIDAndInfo,
     load_object,
 )
-from PPpackage_utils.submanager import discard_build_results_context
-from PPpackage_utils.utils import Queue, queue_put_loop
+from PPpackage_utils.submanager import (
+    SubmanagerCommandFailure,
+    discard_build_results_context,
+)
+from PPpackage_utils.utils import asubprocess_wait
 
 from .parse import FetchProductInfo
 from .utils import (
@@ -58,13 +60,8 @@ async def fetch(
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
     build_results: AsyncIterable[BuildResult],
-    success: SimpleQueue[bool],
-    results: Queue[PackageIDAndInfo],
-) -> None:
-    async with (
-        discard_build_results_context(build_results),
-        queue_put_loop(results),
-    ):
+) -> AsyncIterable[PackageIDAndInfo]:
+    async with discard_build_results_context(build_results):
         cache_path = get_cache_path(cache_path)
 
         environment = make_conan_environment(cache_path)
@@ -109,25 +106,17 @@ async def fetch(
             assert process.stdout is not None
             graph_json_bytes = await process.stdout.read()
 
-            return_code = await process.wait()
-
-            if return_code != 0:
-                success.put_nowait(False)
-                return
+            await asubprocess_wait(process, SubmanagerCommandFailure())
 
         nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
         for node in nodes.values():
-            await results.put(
-                PackageIDAndInfo(
-                    name=node.name,
-                    id_and_info=IDAndInfo(
-                        product_id=node.get_product_id(),
-                        product_info=FetchProductInfo(
-                            version=node.get_version(), cpp_info=node.cpp_info
-                        ),
+            yield PackageIDAndInfo(
+                name=node.name,
+                id_and_info=IDAndInfo(
+                    product_id=node.get_product_id(),
+                    product_info=FetchProductInfo(
+                        version=node.get_version(), cpp_info=node.cpp_info
                     ),
-                )
+                ),
             )
-
-        success.put_nowait(True)

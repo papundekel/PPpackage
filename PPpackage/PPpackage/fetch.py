@@ -119,22 +119,38 @@ async def receive(
     reader: StreamReader,
     manager: str,
     nodes: Mapping[ManagerAndName, NodeData],
+    package_names: Iterable[str],
 ) -> bool:
-    async with queue_put_loop(Synchronization.package_names):
-        async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
-            package_name = package_id_and_info.name
-            id_and_info = package_id_and_info.id_and_info
+    packages_unfetched = set(package_names)
+    end = False
 
-            if id_and_info is not None:
-                node = nodes[ManagerAndName(manager, package_name)]
-                node["product_id"] = id_and_info.product_id
-                node["product_info"] = id_and_info.product_info
-            else:
-                await Synchronization.package_names.put(package_name)
+    async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
+        if end:
+            return False
 
-        success = await load_one(debug, reader, bool)
+        package_name = package_id_and_info.name
+        id_and_info = package_id_and_info.id_and_info
 
-        return success
+        if id_and_info is not None:
+            node = nodes[ManagerAndName(manager, package_name)]
+
+            if package_name not in packages_unfetched:
+                return False
+
+            node["product_id"] = id_and_info.product_id
+            node["product_info"] = id_and_info.product_info
+
+            packages_unfetched.remove(package_name)
+
+            if len(packages_unfetched) == 0:
+                await Synchronization.package_names.put(None)
+                end = True
+        else:
+            await Synchronization.package_names.put(package_name)
+
+    success = await load_one(debug, reader, bool)
+
+    return success
 
 
 def log(
@@ -176,7 +192,11 @@ async def fetch_manager(
                 packages_to_dependencies,
             )
         )
-        success_task = group.create_task(receive(debug, reader, manager, nodes))
+        success_task = group.create_task(
+            receive(
+                debug, reader, manager, nodes, (package.name for package, _ in packages)
+            )
+        )
 
     success = success_task.result()
 

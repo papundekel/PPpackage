@@ -14,10 +14,12 @@ from PPpackage_utils.io import (
     pipe_write_string,
 )
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
+from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
     MyException,
     RunnerRequestType,
     TemporaryPipe,
+    asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
     tar_archive,
@@ -87,7 +89,7 @@ async def install(
     destination_path: Path,
     cache_path: Path,
     products: AsyncIterable[Product],
-) -> bool:
+):
     _, cache_path = get_cache_paths(cache_path)
 
     database_path = destination_path / DATABASE_PATH_RELATIVE
@@ -156,12 +158,7 @@ async def install(
                             f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 
-        success = await process.wait() == 0
-
-        if not success:
-            return False
-
-    return True
+        await asubprocess_wait(process, SubmanagerCommandFailure())
 
 
 async def install_upload(

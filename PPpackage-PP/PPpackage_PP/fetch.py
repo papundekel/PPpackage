@@ -16,7 +16,10 @@ from PPpackage_utils.parse import (
     dump_one,
     load_one,
 )
-from PPpackage_utils.submanager import discard_build_results_context
+from PPpackage_utils.submanager import (
+    SubmanagerCommandFailure,
+    discard_build_results_context,
+)
 from PPpackage_utils.utils import (
     ImageType,
     Queue,
@@ -35,13 +38,8 @@ async def fetch(
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
     build_results: AsyncIterable[BuildResult],
-    success_queue: SimpleQueue[bool],
-    results: Queue[PackageIDAndInfo],
-) -> None:
-    async with (
-        discard_build_results_context(build_results),
-        queue_put_loop(results),
-    ):
+) -> AsyncIterable[PackageIDAndInfo]:
+    async with discard_build_results_context(build_results):
         async with communicate_with_runner(debug, runner_info) as (
             runner_reader,
             runner_writer,
@@ -54,8 +52,7 @@ async def fetch(
             success = await load_one(debug, runner_reader, bool)
 
             if not success:
-                success_queue.put_nowait(False)
-                return
+                raise SubmanagerCommandFailure
 
             await dump_many(debug, runner_writer, ["cat", "-"])
 
@@ -86,18 +83,13 @@ async def fetch(
             success = await load_one(debug, runner_reader, bool)
 
             if not success:
-                success_queue.put_nowait(False)
-                return
+                raise SubmanagerCommandFailure
 
             async for package, dependencies in packages:
-                await results.put(
-                    PackageIDAndInfo(
-                        name=package.name,
-                        id_and_info=IDAndInfo(product_id="id", product_info=None),
-                    )
+                yield PackageIDAndInfo(
+                    name=package.name,
+                    id_and_info=IDAndInfo(product_id="id", product_info=None),
                 )
 
                 async for _ in dependencies:
                     pass
-
-        success_queue.put_nowait(True)

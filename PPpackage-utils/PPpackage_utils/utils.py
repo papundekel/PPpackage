@@ -61,11 +61,11 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
-async def asubprocess_wait(process: Process, error_message: str) -> None:
+async def asubprocess_wait(process: Process, exception: Exception) -> None:
     return_code = await process.wait()
 
     if return_code != 0:
-        raise MyException(error_message)
+        raise exception
 
 
 async def asubprocess_communicate(

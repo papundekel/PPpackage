@@ -1,4 +1,3 @@
-from asyncio import Queue as SimpleQueue
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
@@ -13,8 +12,11 @@ from PPpackage_utils.parse import (
     Package,
     PackageIDAndInfo,
 )
-from PPpackage_utils.submanager import discard_build_results_context
-from PPpackage_utils.utils import Queue, ensure_dir_exists, fakeroot, queue_put_loop
+from PPpackage_utils.submanager import (
+    SubmanagerCommandFailure,
+    discard_build_results_context,
+)
+from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
 from .utils import get_cache_paths
 
@@ -35,9 +37,7 @@ async def fetch(
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
     build_results: AsyncIterable[BuildResult],
-    success: SimpleQueue[bool],
-    results: Queue[PackageIDAndInfo],
-) -> None:
+) -> AsyncIterable[PackageIDAndInfo]:
     async with discard_build_results_context(build_results):
         database_path, cache_path = get_cache_paths(cache_path)
 
@@ -70,12 +70,7 @@ async def fetch(
                 env=environment,
             )
 
-            return_code = await process.wait()
-
-            if return_code != 0:
-                results.put_nowait(None)
-                success.put_nowait(False)
-                return
+            await asubprocess_wait(process, SubmanagerCommandFailure())
 
         process = await create_subprocess_exec(
             "pacman",
@@ -95,30 +90,19 @@ async def fetch(
         )
 
         assert process.stdout is not None
+        for package_name in package_names:
+            line = (await process.stdout.readline()).decode()
 
-        async with queue_put_loop(results):
-            for package_name in package_names:
-                line = (await process.stdout.readline()).decode()
+            if line == "":
+                raise SubmanagerCommandFailure
 
-                if line == "":
-                    success.put_nowait(False)
-                    return
+            line = line.strip()
 
-                line = line.strip()
+            yield PackageIDAndInfo(
+                name=package_name,
+                id_and_info=IDAndInfo(
+                    product_id=process_product_id(line), product_info=None
+                ),
+            )
 
-                await results.put(
-                    PackageIDAndInfo(
-                        name=package_name,
-                        id_and_info=IDAndInfo(
-                            product_id=process_product_id(line), product_info=None
-                        ),
-                    )
-                )
-
-        return_code = await process.wait()
-
-        if return_code != 0:
-            success.put_nowait(False)
-            return
-
-        success.put_nowait(True)
+        await asubprocess_wait(process, SubmanagerCommandFailure())

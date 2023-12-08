@@ -1,3 +1,4 @@
+from ast import dump
 from asyncio import CancelledError
 from asyncio import Queue as SimpleQueue
 from asyncio import StreamReader, StreamWriter, TaskGroup, get_running_loop
@@ -11,9 +12,10 @@ from inspect import iscoroutinefunction
 from operator import call
 from pathlib import Path
 from signal import SIGTERM
+from sre_constants import SUCCESS
 from sys import stderr
 from traceback import print_exc
-from typing import Any, ContextManager, Generic, TypeVar
+from typing import Any, ContextManager, Generic, TypeVar, final
 
 from pid import PidFile, PidFileAlreadyLockedError
 from typer import Exit, Typer
@@ -74,7 +76,7 @@ DataTypeType = TypeVar("DataTypeType")
 SessionDataTypeType = TypeVar("SessionDataTypeType")
 
 UpdateDatabaseCallbackType = Callable[
-    [bool, DataTypeType, SessionDataTypeType, Path], Awaitable[bool]
+    [bool, DataTypeType, SessionDataTypeType, Path], Awaitable[None]
 ]
 ResolveCallbackType = Callable[
     [
@@ -96,10 +98,8 @@ FetchCallbackType = Callable[
         Any,
         AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
         AsyncIterable[BuildResult],
-        SimpleQueue[bool],
-        Queue[PackageIDAndInfo],
     ],
-    Coroutine[Any, Any, None],
+    AsyncIterable[PackageIDAndInfo],
 ]
 
 GenerateCallbackType = Callable[
@@ -112,11 +112,11 @@ GenerateCallbackType = Callable[
         AsyncIterable[Product],
         AsyncIterable[str],
     ],
-    Awaitable[memoryview | None],
+    Awaitable[memoryview],
 ]
 InstallCallbackType = Callable[
     [bool, DataTypeType, SessionDataTypeType, Path, AsyncIterable[Product]],
-    Awaitable[bool],
+    Awaitable[None],
 ]
 InstallUploadCallbackType = Callable[
     [bool, DataTypeType, SessionDataTypeType, memoryview], Awaitable[None]
@@ -155,6 +155,21 @@ def run(app: AsyncTyper, program_name: str) -> None:
         exit(1)
 
 
+class SubmanagerCommandFailure(Exception):
+    pass
+
+
+@asynccontextmanager
+async def write_success(debug: bool, writer: StreamWriter):
+    try:
+        yield
+        success = True
+    except SubmanagerCommandFailure:
+        success = False
+
+    await dump_one(debug, writer, success)
+
+
 async def update_database(
     writer: StreamWriter,
     update_database_callback: UpdateDatabaseCallbackType[
@@ -165,9 +180,8 @@ async def update_database(
     session_data: SessionDataTypeType,
     cache_path: Path,
 ) -> None:
-    success = await update_database_callback(debug, data, session_data, cache_path)
-
-    await dump_one(debug, writer, success)
+    async with write_success(debug, writer):
+        await update_database_callback(debug, data, session_data, cache_path)
 
 
 async def resolve(
@@ -194,24 +208,6 @@ async def resolve(
     await dump_many_async(debug, writer, output)
 
 
-class FetchSynchronization:
-    success = SimpleQueue[bool]()
-    queue = Queue[PackageIDAndInfo]()
-
-
-async def fetch_send(debug: bool, writer: StreamWriter) -> None:
-    results = (
-        package_id_and_info
-        async for package_id_and_info in queue_iterate(FetchSynchronization.queue)
-    )
-
-    await dump_many_async(debug, writer, results)
-
-    success = await FetchSynchronization.success.get()
-
-    await dump_one(debug, writer, success)
-
-
 async def fetch(
     reader: StreamReader,
     writer: StreamWriter,
@@ -233,8 +229,10 @@ async def fetch(
 
     build_results = load_many(debug, reader, BuildResult)
 
-    async with TaskGroup() as group:
-        group.create_task(
+    async with write_success(debug, writer):
+        await dump_many_async(
+            debug,
+            writer,
             callback(
                 debug,
                 data,
@@ -243,11 +241,8 @@ async def fetch(
                 options,
                 packages,
                 build_results,
-                FetchSynchronization.success,
-                FetchSynchronization.queue,
-            )
+            ),
         )
-        group.create_task(fetch_send(debug, writer))
 
 
 async def generate(
@@ -263,16 +258,12 @@ async def generate(
     products = load_many(debug, reader, Product)
     generators = load_many(debug, reader, str)
 
-    generators = await callback(
-        debug, data, session_data, cache_path, options, products, generators
-    )
+    async with write_success(debug, writer):
+        generators = await callback(
+            debug, data, session_data, cache_path, options, products, generators
+        )
 
-    success = generators is not None
-
-    await dump_one(debug, writer, success)
-
-    if success:
-        await dump_bytes_chunked(debug, writer, generators)
+    await dump_bytes_chunked(debug, writer, generators)
 
 
 async def install(
@@ -286,9 +277,8 @@ async def install(
 ):
     products = load_many(debug, reader, Product)
 
-    success = await callback(debug, data, session_data, cache_path, products)
-
-    await dump_one(debug, writer, success)
+    async with write_success(debug, writer):
+        await callback(debug, data, session_data, cache_path, products)
 
 
 async def install_upload(
@@ -466,8 +456,8 @@ def noop_session_lifetime(debug: bool, data: Any):
 
 async def update_database_noop(
     debug: bool, data: Any, session_data: Any, cache_path: Path
-) -> bool:
-    return True
+) -> None:
+    pass
 
 
 @asynccontextmanager

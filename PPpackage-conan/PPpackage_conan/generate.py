@@ -8,7 +8,12 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import TarFileInMemoryWrite, TemporaryDirectory
+from PPpackage_utils.submanager import SubmanagerCommandFailure
+from PPpackage_utils.utils import (
+    TarFileInMemoryWrite,
+    TemporaryDirectory,
+    asubprocess_wait,
+)
 
 from .utils import (
     PackagePaths,
@@ -63,7 +68,7 @@ async def generate(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> memoryview | None:
+) -> memoryview:
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -115,10 +120,7 @@ async def generate(
                 env=environment,
             )
 
-            success = await process.wait() == 0
-
-            if not success:
-                return None
+            await asubprocess_wait(process, SubmanagerCommandFailure())
 
         patch_native_generators(native_generators_path, native_generators_path_suffix)
 
