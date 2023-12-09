@@ -8,6 +8,7 @@ from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_utils.parse import ManagerAndName, load_from_bytes
 from PPpackage_utils.utils import tar_archive, tar_extract
+from pydantic import ValidationError
 from pydot import Dot
 
 from .fetch import fetch
@@ -16,7 +17,7 @@ from .install import install
 from .parse import Input
 from .resolve import resolve
 from .update_database import update_database
-from .utils import NodeData, SubmanagerCommandFailure, communicate_with_submanagers
+from .utils import Connections, NodeData, SubmanagerCommandFailure
 
 
 def topological_generations(
@@ -86,23 +87,26 @@ async def main(
     resolve_iteration_limit: int,
 ) -> None:
     try:
-        connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
+        connections = Connections(submanager_socket_paths)
 
-        async with communicate_with_submanagers(debug, connections):
+        async with connections.communicate(debug):
             input_json_bytes = stdin.buffer.read()
 
-            input = load_from_bytes(debug, Input, input_json_bytes)
+            try:
+                input = load_from_bytes(debug, Input, input_json_bytes)
+            except ValidationError as e:
+                stderr.write("ERROR: Invalid input.\n")
+                stderr.write(e.json(indent=4))
+
+                return
 
             if do_update_database:
                 managers = input.requirements.keys()
-                await update_database(
-                    debug, submanager_socket_paths, connections, managers
-                )
+                await update_database(debug, connections, managers)
 
             graph = await resolve(
                 debug,
                 resolve_iteration_limit,
-                submanager_socket_paths,
                 connections,
                 input.requirements,
                 input.options,
@@ -120,6 +124,7 @@ async def main(
             generators = await generate(
                 debug,
                 connections,
+                True,
                 input.generators,
                 graph.nodes(data=True),
                 input.options,

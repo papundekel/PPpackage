@@ -4,15 +4,9 @@ from collections.abc import AsyncIterable
 from pathlib import Path
 from typing import Any
 
-from PPpackage_utils.parse import (
-    BuildResult,
-    Dependency,
-    IDAndInfo,
-    Options,
-    Package,
-    PackageIDAndInfo,
-)
+from PPpackage_utils.parse import Dependency, Options, Package, PackageIDAndInfo
 from PPpackage_utils.submanager import (
+    BuildResult,
     SubmanagerCommandFailure,
     discard_build_results_context,
 )
@@ -100,9 +94,8 @@ async def fetch(
 
             yield PackageIDAndInfo(
                 name=package_name,
-                id_and_info=IDAndInfo(
-                    product_id=process_product_id(line), product_info=None
-                ),
+                product_id=process_product_id(line),
+                product_info=None,
             )
 
         await asubprocess_wait(process, SubmanagerCommandFailure())

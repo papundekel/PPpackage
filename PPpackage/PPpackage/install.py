@@ -13,7 +13,7 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import NodeData, SubmanagerCommandFailure, data_to_product
+from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def install_manager(
@@ -50,14 +50,14 @@ def generate_machine_id(file: IO[bytes]):
 
 async def get_previous_installation(
     debug: bool,
-    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     initial_installation: memoryview,
     previous_manager: str | None,
 ):
     if previous_manager is None:
         return initial_installation
 
-    previous_reader, previous_writer = connections[previous_manager]
+    previous_reader, previous_writer = await connections.connect(previous_manager)
 
     await dump_one(debug, previous_writer, SubmanagerCommand.INSTALL_DOWNLOAD)
 
@@ -68,7 +68,7 @@ async def get_previous_installation(
 
 async def install(
     debug: bool,
-    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     initial_installation: memoryview,
     generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
 ) -> memoryview:
@@ -78,7 +78,7 @@ async def install(
 
     for generation in generations:
         for manager, packages in generation.items():
-            reader, writer = connections[manager]
+            reader, writer = await connections.connect(manager)
 
             if previous_manager != manager:
                 installation = await get_previous_installation(

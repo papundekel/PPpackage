@@ -1,6 +1,7 @@
-from asyncio import StreamReader, StreamWriter, Task, TaskGroup
+from asyncio import Task, TaskGroup
 from collections.abc import Mapping, MutableMapping, MutableSequence, Set
 from itertools import chain
+from sys import stderr
 from typing import Any, Iterable
 
 from PPpackage_utils.parse import (
@@ -19,18 +20,19 @@ from PPpackage_utils.utils import (
 )
 
 from .generators import builtin as builtin_generators
-from .utils import NodeData, SubmanagerCommandFailure, data_to_product
+from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def generate_manager(
     debug: bool,
-    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
+    strict_connection: bool,
     options: Options,
     products: Iterable[Product],
     generators: Set[str],
     manager: str,
 ) -> memoryview:
-    reader, writer = connections[manager]
+    reader, writer = await connections.connect(manager, strict=strict_connection)
 
     await dump_one(debug, writer, SubmanagerCommand.GENERATE)
     await dump_one(debug, writer, options)
@@ -65,11 +67,22 @@ def check_results(
 
 async def generate(
     debug: bool,
-    connections: Mapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
+    strict_connection: bool,
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
 ) -> memoryview:
+    stderr.write("Generating")
+    for generator in generators:
+        stderr.write(f" {generator}")
+    stderr.write(" for...\n")
+
+    for manager_and_name, _ in nodes:
+        package_name = manager_and_name.name
+
+        stderr.write(f"\t{package_name}\n")
+
     meta_products: MutableMapping[str, MutableSequence[Product]] = {}
 
     for manager_and_package, data in nodes:
@@ -87,6 +100,7 @@ async def generate(
                     generate_manager(
                         debug,
                         connections,
+                        strict_connection,
                         meta_options.get(manager),
                         products,
                         generators - builtin_generators.keys(),
