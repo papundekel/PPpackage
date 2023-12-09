@@ -113,7 +113,9 @@ async def receive(
     nodes: Mapping[ManagerAndName, NodeData],
     package_names: Iterable[str],
 ):
-    packages_unfetched = set(package_names)
+    packages_all = set(package_names)
+    packages_remaining = packages_all.copy()
+    packages_build_requested = set()
     end = False
 
     async for package_id_and_info in load_many(debug, reader, PackageIDAndInfo):
@@ -124,26 +126,37 @@ async def receive(
                 f"Too many packages received from {manager}. Got {package_name}."
             )
 
+        if package_name not in packages_all:
+            raise SubmanagerCommandFailure(
+                f"Unrequested package received from {manager}: {package_name}."
+            )
+
         id_and_info = package_id_and_info.id_and_info
 
         if id_and_info is not None:
             node = nodes[ManagerAndName(manager, package_name)]
 
-            if package_name not in packages_unfetched:
-                raise SubmanagerCommandFailure(
-                    f"Duplicate or unrequested package received from {manager}: {package_name}."
-                )
-
             node["product_id"] = id_and_info.product_id
             node["product_info"] = id_and_info.product_info
 
-            packages_unfetched.remove(package_name)
+            packages_remaining.remove(package_name)
 
-            if len(packages_unfetched) == 0:
+            if len(packages_remaining) == 0:
                 await Synchronization.package_names.put(None)
                 end = True
         else:
+            if package_name in packages_build_requested:
+                raise SubmanagerCommandFailure(
+                    f"Build of {package_name} already requested from {manager}."
+                )
+
+            if package_name not in packages_remaining:
+                raise SubmanagerCommandFailure(
+                    f"{package_name} from {manager} was already built."
+                )
+
             await Synchronization.package_names.put(package_name)
+            packages_build_requested.add(package_name)
 
     success = await load_one(debug, reader, bool)
 
