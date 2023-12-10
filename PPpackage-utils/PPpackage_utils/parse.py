@@ -1,184 +1,312 @@
-from collections.abc import Callable, Mapping, Set
+from asyncio import StreamReader, StreamWriter
+from collections.abc import AsyncIterable, Iterable, Mapping
+from inspect import isclass
+from json import loads as json_loads
 from sys import stderr
-from typing import Any, Sequence, TypedDict
-from typing import cast as type_cast
+from typing import Annotated, Any, Generic, TypeVar, get_args
 
-from PPpackage_utils.utils import Lockfile, MyException, Product, frozendict
+from PPpackage_utils.utils import MyException, frozendict
+from pydantic import BaseModel, BeforeValidator, GetCoreSchemaHandler, RootModel
+from pydantic.dataclasses import dataclass
+from pydantic_core import CoreSchema, core_schema
+
+_DEBUG_LOAD = False
+_DEBUG_DUMP = False
+
+Key = TypeVar("Key")
+Value = TypeVar("Value")
 
 
-def json_check_format(
-    debug: bool,
-    input_json: Any,
-    keys_required: Set[str],
-    keys_permitted_unequired: Set[str],
-    error_message: str,
-) -> Mapping[str, Any]:
-    if type(input_json) is not frozendict:
-        raise MyException(error_message)
+class FrozenDictAnnotation(Generic[Key, Value]):
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        key, value = get_args(source_type)
 
-    keys = input_json.keys()
-
-    keys_permitted = keys_required | keys_permitted_unequired
-
-    are_present_required = keys_required <= keys
-    are_present_only_permitted = keys <= keys_permitted
-
-    if not are_present_required or not are_present_only_permitted:
-        if debug:
-            print(f"json_check_format: {input_json}", file=stderr)
-
-        raise MyException(
-            f"{error_message} Must be a JSON object with keys {keys_required} required and {keys_permitted_unequired} optional."
+        return core_schema.no_info_after_validator_function(
+            lambda x: frozendict(x),
+            core_schema.dict_schema(
+                handler.generate_schema(key), handler.generate_schema(value)
+            ),
         )
 
-    return input_json
+
+def frozen_validator(value: Any) -> Any:
+    if type(value) is dict:
+        return frozendict(value)
+
+    return value
 
 
-def check_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    if type(lockfile_json) is not frozendict:
-        raise MyException("Invalid lockfile format: not a dict.")
+FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 
-    for version_json in lockfile_json.values():
-        if type(version_json) is not str:
-            raise MyException(
-                f"Invalid lockfile version format: `{version_json}` not a string."
-            )
-
-    return lockfile_json
+ModelType = TypeVar("ModelType")
 
 
-def parse_lockfile(debug: bool, lockfile_json: Any) -> Lockfile:
-    lockfile_checked = check_lockfile(debug, lockfile_json)
+def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
+    ModelWrapped = (
+        Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
+    )
 
-    return lockfile_checked
+    input = ModelWrapped.model_validate(input_json)
 
-
-def check_generators(debug: bool, generators_json: Any) -> Sequence[str]:
-    if type(generators_json) is not list:
-        raise MyException("Invalid generators format. Must be a JSON array.")
-
-    for generator_json in generators_json:
-        if type(generator_json) is not str:
-            raise MyException("Invalid generator format. Must be a string.")
-
-    return generators_json
+    if isinstance(input, RootModel):
+        return input.root
+    else:
+        return input  # type: ignore
 
 
-def parse_generators(generators_json: Any) -> Set[str]:
-    generators_checked = check_generators(False, generators_json)
+def load_from_bytes(
+    debug: bool, Model: type[ModelType], input_json_bytes: bytes
+) -> ModelType:
+    input_json_string = input_json_bytes.decode()
 
-    generators = set(generators_checked)
+    if _DEBUG_LOAD:
+        print(f"load:\n{input_json_string}", file=stderr)
 
-    if len(generators) != len(generators_checked):
-        raise MyException("Invalid generators format. Generators must be unique.")
+    input_json = json_loads(input_json_string)
 
-    return generators
+    return load_object(Model, input_json)
 
 
-class VersionInfo(TypedDict):
+Options = Mapping[str, Any] | None
+
+
+@dataclass(frozen=True)
+class Product:
+    name: str
     version: str
     product_id: str
 
 
-def check_products(debug: bool, products_json: Any) -> Mapping[str, VersionInfo]:
-    if type(products_json) is not frozendict:
-        raise MyException("Invalid products format. Must be a JSON object.")
-
-    for version_info_json in products_json.values():
-        version_info_checked = json_check_format(
-            debug,
-            version_info_json,
-            {"version", "product_id"},
-            set(),
-            "Invalid products verson info format.",
-        )
-
-        version_json = version_info_checked["version"]
-        product_id_json = version_info_checked["product_id"]
-
-        if type(version_json) is not str:
-            raise MyException("Invalid products version format. Must be a string.")
-
-        if type(product_id_json) is not str:
-            raise MyException("Invalid products product id format. Must be a string.")
-
-    return products_json
+@dataclass(frozen=True)
+class PackageIDAndInfo:
+    name: str
+    product_id: str
+    product_info: Any
 
 
-def parse_products(debug: bool, products_json: Any) -> Set[Product]:
-    products_checked = check_products(debug, products_json)
-
-    return {
-        Product(
-            package=package_checked,
-            version=version_info_checked["version"],
-            product_id=version_info_checked["product_id"],
-        )
-        for package_checked, version_info_checked in products_checked.items()
-    }
+@dataclass(frozen=True)
+class BuildResult:
+    name: str
+    is_root: bool
 
 
-class ResolveInput(TypedDict):
-    requirements: Any
-    options: Any
+@dataclass(frozen=True)
+class ManagerAndName:
+    manager: str
+    name: str
 
 
-def check_resolve_input(debug: bool, input_json: Any) -> ResolveInput:
-    return type_cast(
-        ResolveInput,
-        json_check_format(
-            debug,
-            input_json,
-            {"requirements", "options"},
-            set(),
-            "Invalid resolve input format.",
-        ),
-    )
+@dataclass(frozen=True)
+class Dependency(ManagerAndName):
+    product_info: Any | None
 
 
-def parse_resolve_input(
-    debug: bool,
-    requirements_parser: Callable[[bool, Any], Set[Any]],
-    options_parser: Callable[[bool, Any], Any],
-    input_json: Any,
-) -> tuple[Set[Any], Any]:
-    input_checked = check_resolve_input(debug, input_json)
-
-    requirements = requirements_parser(debug, input_checked["requirements"])
-    options = options_parser(debug, input_checked["options"])
-
-    return requirements, options
+@dataclass(frozen=True)
+class Package:
+    name: str
+    version: str
 
 
-class FetchInput(TypedDict):
-    lockfile: Any
-    options: Any
-    generators: Any
+@dataclass(frozen=True)
+class ManagerRequirement:
+    manager: str
+    requirement: Any
 
 
-def check_fetch_input(debug: bool, input_json: Any) -> FetchInput:
-    return type_cast(
-        FetchInput,
-        json_check_format(
-            debug,
-            input_json,
-            {"lockfile", "options", "generators"},
-            set(),
-            "Invalid fetch input format.",
-        ),
-    )
+@dataclass(frozen=True)
+class ResolutionGraphNode:
+    name: str
+    version: str
+    dependencies: Iterable[str]
+    requirements: Iterable[ManagerRequirement]
 
 
-def parse_fetch_input(
-    debug: bool,
-    lockfile_parser: Callable[[bool, Any], Mapping[str, str]],
-    options_parser: Callable[[bool, Any], Any],
-    input_json: Any,
-) -> tuple[Mapping[str, str], Any, Set[str]]:
-    input_checked = check_fetch_input(debug, input_json)
+@dataclass(frozen=True)
+class ResolutionGraph:
+    roots: Iterable[Iterable[str]]
+    graph: Iterable[ResolutionGraphNode]
 
-    lockfile = lockfile_parser(debug, input_checked["lockfile"])
-    options = options_parser(debug, input_checked["options"])
-    generators = parse_generators(input_checked["generators"])
 
-    return lockfile, options, generators
+def _dump_int(debug: bool, writer: StreamWriter, length: int) -> None:
+    writer.write(f"{length}\n".encode())
+
+    if _DEBUG_DUMP:
+        print(f"dump length: {length}", file=stderr)
+
+
+_TRUE_STRING = "T"
+
+
+def _dump_bool(debug: bool, writer: StreamWriter, value: bool) -> None:
+    value_string = _TRUE_STRING if value else "F"
+
+    writer.write((value_string + "\n").encode())
+
+    if _DEBUG_DUMP:
+        print(f"dump bool: {value}", file=stderr)
+
+
+async def dump_bytes(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
+    _dump_int(debug, writer, len(output_bytes))
+    writer.write(output_bytes)
+
+    await writer.drain()
+
+
+def chunk_bytes(data: memoryview, chunk_size: int) -> Iterable[memoryview]:
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
+
+async def dump_bytes_chunked(
+    debug: bool, writer: StreamWriter, output_bytes: memoryview
+) -> None:
+    async for chunk in dump_loop(debug, writer, chunk_bytes(output_bytes, 2**15)):
+        await dump_bytes(debug, writer, chunk)
+
+
+async def dump_one(
+    debug: bool, writer: StreamWriter, output: BaseModel | Any, loop=False
+) -> None:
+    if loop:
+        _dump_bool(debug, writer, True)
+
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_string = output_wrapped.model_dump_json(indent=4 if debug else None)
+
+    output_json_bytes = output_json_string.encode()
+
+    await dump_bytes(debug, writer, memoryview(output_json_bytes))
+
+    if _DEBUG_DUMP:
+        print(f"dump:\n{output_json_string}", file=stderr)
+
+
+async def dump_loop_end(debug: bool, writer: StreamWriter):
+    _dump_bool(debug, writer, False)
+    await writer.drain()
+
+    if _DEBUG_DUMP:
+        print("loop}", file=stderr)
+
+
+T = TypeVar("T")
+
+
+async def dump_loop(
+    debug: bool, writer: StreamWriter, iterable: Iterable[T]
+) -> AsyncIterable[T]:
+    if _DEBUG_DUMP:
+        print("loop{", file=stderr)
+
+    for obj in iterable:
+        _dump_bool(debug, writer, True)
+        yield obj
+
+    await dump_loop_end(debug, writer)
+
+
+async def dump_loop_async(
+    debug: bool, writer: StreamWriter, iterable: AsyncIterable[T]
+) -> AsyncIterable[T]:
+    async for obj in iterable:
+        _dump_bool(debug, writer, True)
+        yield obj
+
+    await dump_loop_end(debug, writer)
+
+
+async def dump_many(
+    debug: bool, writer: StreamWriter, outputs: Iterable[BaseModel | Any]
+) -> None:
+    async for output in dump_loop(debug, writer, outputs):
+        await dump_one(debug, writer, output)
+
+
+async def dump_many_async(
+    debug: bool, writer: StreamWriter, outputs: AsyncIterable[BaseModel | Any]
+) -> None:
+    async for output in dump_loop_async(debug, writer, outputs):
+        await dump_one(debug, writer, output)
+
+
+async def _load_line(debug: bool, reader: StreamReader) -> str:
+    line_bytes = await reader.readline()
+
+    if len(line_bytes) == 0:
+        raise MyException("Unexpected EOF.")
+
+    line = line_bytes.decode().strip()
+
+    return line
+
+
+async def _load_int(debug: bool, reader: StreamReader) -> int:
+    line = await _load_line(debug, reader)
+
+    length = int(line)
+
+    if _DEBUG_LOAD:
+        print(f"load length: {length}", file=stderr)
+
+    return length
+
+
+async def _load_bool(debug: bool, reader: StreamReader) -> bool:
+    line = await _load_line(debug, reader)
+
+    value = line == _TRUE_STRING
+
+    if _DEBUG_LOAD:
+        print(f"load bool: {value}", file=stderr)
+
+    return value
+
+
+async def load_bytes(debug: bool, reader: StreamReader) -> bytes:
+    length = await _load_int(debug, reader)
+
+    if length == 0:
+        raise MyException("Unexpected length 0.")
+
+    return await reader.readexactly(length)
+
+
+async def load_bytes_chunked(debug: bool, reader: StreamReader) -> memoryview:
+    buffer = bytearray()
+
+    async for _ in load_loop(debug, reader):
+        buffer += await load_bytes(debug, reader)
+
+    return memoryview(buffer)
+
+
+async def load_one(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> ModelType:
+    input_bytes = await load_bytes(debug, reader)
+
+    return load_from_bytes(debug, Model, input_bytes)
+
+
+async def load_loop(debug: bool, reader: StreamReader):
+    while True:
+        do_continue = await _load_bool(debug, reader)
+
+        if not do_continue:
+            break
+
+        yield
+
+
+async def load_many(
+    debug: bool, reader: StreamReader, Model: type[ModelType]
+) -> AsyncIterable[ModelType]:
+    async for _ in load_loop(debug, reader):
+        yield await load_one(debug, reader, Model)

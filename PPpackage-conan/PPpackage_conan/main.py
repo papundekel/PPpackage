@@ -1,35 +1,55 @@
-from PPpackage_utils.app import init, run
-from PPpackage_utils.parse import parse_lockfile, parse_products
-from PPpackage_utils.utils import anoop
+from contextlib import asynccontextmanager, contextmanager
+from functools import partial
+from pathlib import Path
+from typing import Any
+
+from PPpackage_utils.submanager import (
+    SubmanagerCallbacks,
+    handle_connection,
+    run_server,
+    update_database_noop,
+)
 
 from .fetch import fetch
-from .install import install
-from .parse import parse_options, parse_requirements
+from .generate import generate
+from .install import install, install_download, install_upload
+from .parse import Requirement
 from .resolve import resolve
-from .utils import get_package_paths
+from .utils import Installation, get_package_paths
+
+PROGRAM_NAME = "PPpackage-conan"
+CALLBACKS = SubmanagerCallbacks(
+    update_database_noop,
+    resolve,
+    fetch,
+    generate,
+    install,
+    install_upload,
+    install_download,
+    Requirement,
+)
 
 
-def main():
-    data_path, deployer_path = get_package_paths()
+@contextmanager
+def session_lifetime(debug: bool, data: Any):
+    yield Installation(memoryview(bytes()))
 
-    app = init(
-        anoop,
-        lambda cache_path, requirements, options: resolve(
-            data_path, cache_path, requirements, options
-        ),
-        lambda cache_path, lockfile, options, generators, generators_path: fetch(
-            data_path,
-            deployer_path,
-            cache_path,
-            lockfile,
-            options,
-            generators,
-            generators_path,
-        ),
-        install,
-        parse_requirements,
-        parse_options,
-        parse_lockfile,
-        parse_products,
+
+@asynccontextmanager
+async def lifetime(
+    cache_path: Path,
+    debug: bool,
+):
+    package_paths = get_package_paths()
+
+    yield partial(
+        handle_connection, cache_path, CALLBACKS, package_paths, session_lifetime
     )
-    run(app, "conan")
+
+
+async def main(
+    debug: bool,
+    run_path: Path,
+    cache_path: Path,
+):
+    await run_server(debug, PROGRAM_NAME, run_path, partial(lifetime, cache_path))

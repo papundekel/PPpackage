@@ -1,33 +1,66 @@
-from asyncio import open_unix_connection
+from asyncio import StreamReader, StreamWriter, TaskGroup, open_unix_connection
+from collections.abc import Mapping, MutableMapping
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, TypedDict
 
-from PPpackage_utils.io import stream_write_line
-
-machine_id_relative_path = Path("etc") / "machine-id"
-
-
-@asynccontextmanager
-async def communicate_with_daemon(
-    debug: bool,
-    daemon_path: Path,
-):
-    (
-        daemon_reader,
-        daemon_writer,
-    ) = await open_unix_connection(daemon_path)
-
-    try:
-        yield daemon_reader, daemon_writer
-    finally:
-        stream_write_line(debug, "PPpackage", daemon_writer, "END")
-        await daemon_writer.drain()
-        daemon_writer.close()
-        await daemon_writer.wait_closed()
+from PPpackage_utils.io import close_writer
+from PPpackage_utils.parse import Product, dump_one
+from PPpackage_utils.utils import SubmanagerCommand
 
 
-def read_machine_id(machine_id_path: Path) -> str:
-    with machine_id_path.open("r") as machine_id_file:
-        machine_id = machine_id_file.readline().strip()
+class NodeData(TypedDict):
+    version: str
+    product_id: str
+    product_info: Any
 
-        return machine_id
+
+def data_to_product(name: str, node_data: NodeData) -> Product:
+    return Product(
+        name=name, version=node_data["version"], product_id=node_data["product_id"]
+    )
+
+
+async def close_submanager(debug: bool, writer: StreamWriter):
+    await dump_one(debug, writer, SubmanagerCommand.END)
+    await close_writer(writer)
+
+
+class SubmanagerCommandFailure(Exception):
+    def __init__(self, message: str):
+        super().__init__()
+
+        self.message = message
+
+
+class Connections:
+    def __init__(self, submanager_socket_paths: Mapping[str, Path]):
+        self._submanager_socket_paths = submanager_socket_paths
+        self._connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
+
+    async def connect(self, manager: str, strict: bool = False):
+        connection = self._connections.get(manager)
+
+        if connection is None:
+            if strict:
+                raise KeyError()
+
+            socket_path = self._submanager_socket_paths[manager]
+
+            connection = await open_unix_connection(socket_path)
+
+            self._connections[manager] = connection
+
+        return connection
+
+    def duplicate(self):
+        return Connections(self._submanager_socket_paths)
+
+    @asynccontextmanager
+    async def communicate(self, debug: bool):
+        try:
+            yield
+        finally:
+            async with TaskGroup() as group:
+                for _, writer in self._connections.values():
+                    group.create_task(close_submanager(debug, writer))

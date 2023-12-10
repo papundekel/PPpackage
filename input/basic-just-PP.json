@@ -1,0 +1,13 @@
+{
+    "requirements": {
+        "PP": [
+            "p1",
+            "p2",
+            "p1"
+        ]
+    },
+    "options": {},
+    "generators": [
+        "versions"
+    ]
+}

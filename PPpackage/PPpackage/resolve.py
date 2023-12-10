@@ -1,205 +1,328 @@
-from ast import parse
-from asyncio import Lock, TaskGroup, create_subprocess_exec, taskgroups
-from asyncio.subprocess import PIPE
-from collections.abc import Iterable, Mapping, Set
-from functools import partial, reduce
-from hmac import new
-from itertools import chain as itertools_chain
+from asyncio import StreamReader, StreamWriter, TaskGroup
+from collections.abc import (
+    Hashable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    MutableSet,
+    Set,
+)
+from dataclasses import dataclass
 from itertools import product as itertools_product
+from json import dumps as json_dumps
 from pathlib import Path
 from sys import stderr
-from typing import Any, Tuple
+from typing import Any
 
-from PPpackage_utils.parse import Lockfile
-from PPpackage_utils.utils import (
-    MyException,
-    Resolution,
-    asubprocess_communicate,
-    frozendict,
-    json_dumps,
-    json_loads,
+from frozendict import frozendict
+from networkx import MultiDiGraph, is_directed_acyclic_graph
+from PPpackage_utils.parse import (
+    ManagerAndName,
+    ManagerRequirement,
+    Options,
+    ResolutionGraph,
+    dump_loop,
+    dump_many,
+    dump_one,
+    load_many,
+    load_one,
 )
+from PPpackage_utils.utils import SubmanagerCommand
 
-from .parse import parse_resolutions
-from .sub import resolve as PP_resolve
+from .utils import Connections, SubmanagerCommandFailure
 
 
-async def resolve_external_manager(
+async def send(
     debug: bool,
+    writer: StreamWriter,
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+) -> None:
+    await dump_one(debug, writer, SubmanagerCommand.RESOLVE)
+
+    await dump_one(debug, writer, options)
+
+    async for requirements in dump_loop(debug, writer, requirements_list):
+        await dump_many(debug, writer, requirements)
+
+
+async def receive(
+    debug: bool,
+    reader: StreamReader,
     manager: str,
-    cache_path: Path,
-    requirements: Set[Any],
-    options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
-    process = await create_subprocess_exec(
-        f"PPpackage-{manager}",
-        "--debug" if debug else "--no-debug",
-        "resolve",
-        str(cache_path),
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=None,
-    )
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+) -> None:
+    async for graph in load_many(debug, reader, ResolutionGraph):
+        resolution_graphs[manager].append(graph)
 
-    indent = 4 if debug else None
+    success = await load_one(debug, reader, bool)
 
-    resolve_input_json = json_dumps(
-        {
-            "requirements": requirements,
-            "options": options,
-        },
-        indent=indent,
-    )
-
-    if debug:
-        print(f"DEBUG PPpackage: sending to {manager}'s resolve:", file=stderr)
-        print(resolve_input_json, file=stderr)
-
-    resolve_input_json_bytes = resolve_input_json.encode("ascii")
-
-    resolutions_bytes = await asubprocess_communicate(
-        process,
-        f"Error in {manager}'s resolve.",
-        resolve_input_json_bytes,
-    )
-
-    resolutions_string = resolutions_bytes.decode("ascii")
-
-    if debug:
-        print(f"DEBUG PPpackage: received from {manager}' resolve:", file=stderr)
-        print(resolutions_string, file=stderr)
-
-    resolutions = parse_resolutions(debug, json_loads(resolutions_string))
-
-    return resolutions
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager}'s resolve failed.")
 
 
 async def resolve_manager(
     debug: bool,
+    connections: Connections,
     manager: str,
-    cache_path: Path,
-    requirements: Set[Any],
-    options: Mapping[str, Any] | None,
-) -> Set[Resolution]:
-    if manager == "PP":
-        resolver = PP_resolve
-    else:
-        resolver = partial(resolve_external_manager, manager=manager)
+    options: Options,
+    requirements_list: Iterable[Iterable[Any]],
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+) -> None:
+    reader, writer = await connections.connect(manager)
 
-    resolutions = await resolver(
-        debug=debug, cache_path=cache_path, requirements=requirements, options=options
+    async with TaskGroup() as group:
+        group.create_task(send(debug, writer, options, requirements_list))
+        group.create_task(receive(debug, reader, manager, resolution_graphs))
+
+
+@dataclass(frozen=True)
+class WorkGraphNodeValue:
+    version: str
+    dependencies: Set[str]
+    requirements: Mapping[str, frozenset[Any]]
+
+
+@dataclass(frozen=True)
+class WorkGraph:
+    roots: Mapping[frozenset[Hashable], Set[str]]
+    graph: Mapping[str, WorkGraphNodeValue]
+
+
+def get_resolved_requirements(
+    meta_graph: Mapping[str, WorkGraph]
+) -> Mapping[str, Set[Set[Hashable]]]:
+    return {
+        manager: {requirements for requirements in graph.roots.keys()}
+        for manager, graph in meta_graph.items()
+    }
+
+
+def get_all_requirements(
+    meta_graph: Mapping[str, WorkGraph]
+) -> Mapping[str, Set[Set[Hashable]]]:
+    all_requirements: MutableMapping[str, MutableSet[Set[Hashable]]] = {}
+
+    for graph in meta_graph.values():
+        for node_value in graph.graph.values():
+            for manager_dependency, requirements in node_value.requirements.items():
+                all_requirements.setdefault(manager_dependency, set()).add(requirements)
+
+    return frozendict(all_requirements)
+
+
+def process_manager_requirements(
+    manager_requirements: Iterable[ManagerRequirement],
+) -> Mapping[str, frozenset[Any]]:
+    result: MutableMapping[str, MutableSet[Any]] = {}
+
+    for manager_requirement in manager_requirements:
+        result.setdefault(manager_requirement.manager, set()).add(
+            manager_requirement.requirement
+        )
+
+    return {
+        manager: frozenset(requirements) for manager, requirements in result.items()
+    }
+
+
+def make_graph(
+    requirements_list: Iterable[Set[Hashable]], resolution_graph: ResolutionGraph
+) -> WorkGraph:
+    roots = frozendict(
+        {
+            frozenset(requirements): frozenset(roots)
+            for requirements, roots in zip(requirements_list, resolution_graph.roots)
+        }
     )
 
-    return resolutions
+    graph = frozendict(
+        {
+            node.name: WorkGraphNodeValue(
+                node.version,
+                frozenset(node.dependencies),
+                frozendict(process_manager_requirements(node.requirements)),
+            )
+            for node in resolution_graph.graph
+        }
+    )
 
-
-def merge_meta_requirements(a, b):
-    return {
-        manager: a.get(manager, frozenset()) | b.get(manager, frozenset())
-        for manager in a.keys() | b.keys()
-    }
+    return WorkGraph(roots, graph)
 
 
 async def resolve_iteration(
     debug: bool,
-    cache_path: Path,
-    meta_requirements_list: Iterable[Mapping[str, Set[Any]]],
+    connections: Connections,
+    requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
-) -> Tuple[Set[Mapping[str, Lockfile]], Set[Mapping[str, Set[Any]]]]:
-    lockfiles = set()
-    requirements = set()
+    initial: Mapping[str, Set[Hashable]],
+    new_choices: MutableSequence[Any],
+    results: MutableSequence[Mapping[str, WorkGraph]],
+) -> None:
+    requirements_lists = dict[str, Iterable[Set[Hashable]]]()
 
-    for meta_requirements in meta_requirements_list:
-        async with TaskGroup() as group:
-            meta_tasks = {
-                manager: group.create_task(
-                    resolve_manager(
-                        debug,
-                        manager,
-                        cache_path,
-                        requirements,
-                        meta_options.get(manager),
-                    )
+    for manager, requirements_set in requirements.items():
+        requirements_lists[manager] = list(requirements_set)
+
+    resolution_graphs = dict[str, MutableSequence[ResolutionGraph]]()
+
+    async with TaskGroup() as group:
+        for manager, requirements_list in requirements_lists.items():
+            resolution_graphs[manager] = []
+
+            group.create_task(
+                resolve_manager(
+                    debug,
+                    connections,
+                    manager,
+                    meta_options.get(manager),
+                    requirements_list,
+                    resolution_graphs,
                 )
-                for manager, requirements in meta_requirements.items()
-            }
-
-        meta_results = {manager: task.result() for manager, task in meta_tasks.items()}
-
-        manager_resolutions = [
-            {manager: resolution for manager, resolution in i}
-            for i in itertools_product(
-                *[
-                    [(manager, resolution) for resolution in resolutions]
-                    for manager, resolutions in meta_results.items()
-                ]
             )
+
+    for managers_and_graphs in itertools_product(
+        *[
+            [(manager, graph) for graph in graphs]
+            for manager, graphs in resolution_graphs.items()
         ]
+    ):
+        meta_graph = {
+            manager: make_graph(requirements_lists[manager], graph)
+            for manager, graph in managers_and_graphs
+        }
 
-        for manager_resolution in manager_resolutions:
-            meta_lockfile = {
-                manager: resolution.lockfile
-                for manager, resolution in manager_resolution.items()
-            }
+        resolved_requirements = get_resolved_requirements(meta_graph)
+        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
 
-            new_meta_requirements = {
-                manager: resolution.requirements
-                for manager, resolution in manager_resolution.items()
-            }
+        if resolved_requirements == all_requirements:
+            results.append(meta_graph)
+        else:
+            new_choices.append(all_requirements)
 
-            merged_meta_requirements = reduce(
-                merge_meta_requirements,
-                new_meta_requirements.values(),
-                meta_requirements,
+
+def merge_requirements(initial, new):
+    return frozendict(
+        {
+            manager: (
+                (
+                    frozenset([i])
+                    if (i := initial.get(manager)) is not None
+                    else frozenset()
+                )
+                | new.get(manager, frozenset())
             )
+            for manager in initial.keys() | new.keys()
+        }
+    )
 
-            if merged_meta_requirements == meta_requirements:
-                lockfiles.add(frozendict(meta_lockfile))
-            else:
-                requirements.add(frozendict(merged_meta_requirements))
 
-    return lockfiles, requirements
+def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
+    graph = MultiDiGraph()
+
+    graph.add_nodes_from(
+        (ManagerAndName(manager, package_name), {"version": value.version})
+        for manager, work_graph in manager_work_graph.items()
+        for package_name, value in work_graph.graph.items()
+    )
+
+    graph.add_edges_from(
+        {
+            (
+                ManagerAndName(manager, package_name),
+                ManagerAndName(manager, dependency_name),
+            )
+            for manager, work_graph in manager_work_graph.items()
+            for package_name, value in work_graph.graph.items()
+            for dependency_name in value.dependencies
+        }
+        | {
+            (
+                ManagerAndName(manager, package_name),
+                ManagerAndName(requirement_manager, dependency_name),
+            )
+            for manager, work_graph in manager_work_graph.items()
+            for package_name, value in work_graph.graph.items()
+            for requirement_manager, requirement in value.requirements.items()
+            for dependency_name in manager_work_graph[requirement_manager].roots[
+                requirement
+            ]
+        }
+    )
+
+    return graph
 
 
 async def resolve(
     debug: bool,
     iteration_limit: int,
-    cache_path: Path,
-    meta_requirements: Mapping[str, Set[Any]],
+    connections: Connections,
+    initial_requirements: Mapping[str, Set[Any]],
     meta_options: Mapping[str, Any],
-) -> Mapping[str, Lockfile]:
+) -> MultiDiGraph:
+    stderr.write("Resolving requirements...\n")
+
+    for manager, requirements in sorted(
+        initial_requirements.items(), key=lambda x: x[0]
+    ):
+        stderr.write(f"{manager}:\n")
+        for requirement in requirements:
+            stderr.write(f"\t{json_dumps(requirement)}\n")
+
     iterations_done = 0
 
-    meta_requirements_list = [meta_requirements]
-    choices_of_meta_lockfiles = set()
+    all_requirements_choices = [
+        {
+            manager: frozenset([requirements])
+            for manager, requirements in initial_requirements.items()
+        }
+    ]
 
-    while len(meta_requirements_list) != 0:
+    results_work_graph: MutableSequence[Mapping[str, WorkGraph]] = []
+
+    while True:
+        stderr.write(f"Resolution iteration {iterations_done + 1}...\n")
+
         if iterations_done >= iteration_limit:
-            raise MyException("Resolve iteration limit reached.")
+            raise SubmanagerCommandFailure("Resolve iteration limit reached.")
 
-        if debug:
-            print(
-                f"DEBUG PPpackage: resolve iteration with requirements: {json_dumps(meta_requirements_list)}",
-                file=stderr,
-            )
+        new_choices = []
 
-        lockfiles, meta_requirements_list = await resolve_iteration(
-            debug, cache_path, meta_requirements_list, meta_options
-        )
+        async with TaskGroup() as group:
+            for all_requirements in all_requirements_choices:
+                group.create_task(
+                    resolve_iteration(
+                        debug,
+                        connections,
+                        all_requirements,
+                        meta_options,
+                        initial_requirements,
+                        new_choices,
+                        results_work_graph,
+                    )
+                )
 
-        choices_of_meta_lockfiles.update(lockfiles)
+        if len(new_choices) == 0:
+            break
+
+        all_requirements_choices = new_choices
 
         iterations_done += 1
 
-    if debug:
-        print(
-            f"DEBUG PPpackage: resolve choices of meta lockfiles:",
-            file=stderr,
-        )
-        for meta_lockfile in choices_of_meta_lockfiles:
-            print(f"DEBUG PPpackage: {json_dumps(meta_lockfile)}", file=stderr)
+    # TODO: model selection
+    result_work_graph = results_work_graph.pop()
 
-    # here is where the model is chosen
-    meta_lockfile = next(x for x in choices_of_meta_lockfiles)
+    stderr.write("Resolution done.\n")
 
-    return meta_lockfile
+    for manager, work_graph in sorted(result_work_graph.items(), key=lambda x: x[0]):
+        stderr.write(f"{manager}:\n")
+        for package_name, value in sorted(work_graph.graph.items(), key=lambda x: x[0]):
+            stderr.write(f"\t{package_name} -> {value.version}\n")
+
+    graph = process_graph(result_work_graph)
+
+    if not is_directed_acyclic_graph(graph):
+        raise SubmanagerCommandFailure("Cycle found in the resolution graph.")
+
+    return graph

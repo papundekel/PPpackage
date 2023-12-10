@@ -1,17 +1,30 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Iterable, Mapping
+from collections.abc import AsyncIterable, Iterable, Set
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.utils import asubprocess_communicate
-
-from .generators import additional as additional_generators
-from .utils import (
-    GraphInfo,
+from PPpackage_utils.parse import (
+    Dependency,
     Options,
+    Package,
+    PackageIDAndInfo,
+    load_object,
+)
+from PPpackage_utils.submanager import (
+    BuildResult,
+    SubmanagerCommandFailure,
+    discard_build_results_context,
+)
+from PPpackage_utils.utils import asubprocess_wait
+
+from .parse import FetchProductInfo
+from .utils import (
+    FetchNode,
+    PackagePaths,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -19,122 +32,92 @@ from .utils import (
 )
 
 
-def parse_conan_graph_fetch(input: str) -> Mapping[str, GraphInfo]:
-    nodes = parse_conan_graph_nodes(input)
+async def create_requirements(
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]]
+) -> tuple[Iterable[tuple[str, str]], Set[str]]:
+    requirements = []
+    package_names = set()
 
-    return {node["ref"].split("/", 1)[0]: GraphInfo(node) for node in nodes}
+    async for package, dependencies in packages:
+        requirements.append((package.name, package.version))
+        package_names.add(package.name)
 
+        async for dependency in dependencies:
+            if dependency.manager == "conan" and dependency.product_info is not None:
+                product_info_parsed = load_object(
+                    FetchProductInfo, dependency.product_info
+                )
+                requirements.append((dependency.name, product_info_parsed.version))
 
-def patch_native_generators_paths(
-    old_generators_path: Path,
-    new_generators_path: Path,
-    files_to_patch_paths: Iterable[Path],
-) -> None:
-    old_generators_path_abs_str = str(old_generators_path.absolute())
-    new_generators_path_str = str(new_generators_path)
-
-    for file_to_patch_path in files_to_patch_paths:
-        if file_to_patch_path.exists():
-            with open(file_to_patch_path, "r") as file_to_patch:
-                lines = file_to_patch.readlines()
-
-            lines = [
-                line.replace(old_generators_path_abs_str, new_generators_path_str)
-                for line in lines
-            ]
-
-            with open(file_to_patch_path, "w") as file_to_patch:
-                file_to_patch.writelines(lines)
-
-
-def patch_native_generators(
-    native_generators_path: Path, native_generators_path_suffix: Path
-) -> None:
-    new_generators_path = Path("/PPpackage/generators") / native_generators_path_suffix
-
-    patch_native_generators_paths(
-        native_generators_path,
-        new_generators_path,
-        [
-            native_generators_path / file_sub_path
-            for file_sub_path in [Path("CMakePresets.json")]
-        ],
-    )
+    return requirements, package_names
 
 
 async def fetch(
-    templates_path: Path,
-    deployer_path: Path,
+    debug: bool,
+    package_paths: PackagePaths,
+    session_data: Any,
     cache_path: Path,
-    lockfile: Mapping[str, str],
     options: Options,
-    generators: Iterable[str],
-    generators_path: Path,
-) -> Mapping[str, str]:
-    cache_path = get_cache_path(cache_path)
+    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
+    build_results: AsyncIterable[BuildResult],
+) -> AsyncIterable[PackageIDAndInfo]:
+    async with discard_build_results_context(build_results):
+        cache_path = get_cache_path(cache_path)
 
-    environment = make_conan_environment(cache_path)
+        environment = make_conan_environment(cache_path)
 
-    jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(templates_path),
-        autoescape=jinja2_select_autoescape(),
-    )
-
-    conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
-    profile_template = jinja_loader.get_template("profile.jinja")
-
-    native_generators_path_suffix = Path("conan")
-    native_generators_path = generators_path / native_generators_path_suffix
-
-    with (
-        create_and_render_temp_file(
-            conanfile_template,
-            {
-                "lockfile": lockfile,
-                "generators": generators - additional_generators.keys(),
-            },
-            ".py",
-        ) as conanfile_file,
-        create_and_render_temp_file(
-            profile_template, {"options": options}
-        ) as host_profile_file,
-    ):
-        host_profile_path = Path(host_profile_file.name)
-        build_profile_path = templates_path / "profile"
-
-        process = create_subprocess_exec(
-            "conan",
-            "install",
-            "--output-folder",
-            str(native_generators_path),
-            "--deployer",
-            deployer_path,
-            "--build",
-            "missing",
-            "--format",
-            "json",
-            f"--profile:host={host_profile_path}",
-            f"--profile:build={build_profile_path}",
-            conanfile_file.name,
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=None,
-            env=environment,
+        jinja_loader = Jinja2Environment(
+            loader=Jinja2FileSystemLoader(package_paths.data_path),
+            autoescape=jinja2_select_autoescape(),
         )
 
-        graph_json = await asubprocess_communicate(
-            await process, "Error in `conan install`"
-        )
+        conanfile_template = jinja_loader.get_template("conanfile-fetch.py.jinja")
+        profile_template = jinja_loader.get_template("profile.jinja")
 
-    graph_infos = parse_conan_graph_fetch(graph_json.decode("ascii"))
+        requirements, package_names = await create_requirements(packages)
 
-    patch_native_generators(native_generators_path, native_generators_path_suffix)
+        with (
+            create_and_render_temp_file(
+                conanfile_template, {"requirements": requirements}, ".py"
+            ) as conanfile_file,
+            create_and_render_temp_file(
+                profile_template, {"options": options}
+            ) as host_profile_file,
+        ):
+            host_profile_path = Path(host_profile_file.name)
+            build_profile_path = package_paths.data_path / "profile"
 
-    for generator in generators & additional_generators.keys():
-        additional_generators[generator](generators_path, graph_infos)
+            process = await create_subprocess_exec(
+                "conan",
+                "install",
+                "--build",
+                "missing",
+                "--format",
+                "json",
+                f"--profile:host={host_profile_path}",
+                f"--profile:build={build_profile_path}",
+                conanfile_file.name,
+                stdin=DEVNULL,
+                stdout=PIPE,
+                stderr=DEVNULL,
+                env=environment,
+            )
 
-    product_ids = {
-        package: graph_info.product_id for package, graph_info in graph_infos.items()
-    }
+            assert process.stdout is not None
+            graph_json_bytes = await process.stdout.read()
 
-    return product_ids
+            await asubprocess_wait(process, SubmanagerCommandFailure())
+
+        nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
+
+        for node in nodes.values():
+            package_name = node.name
+
+            if package_name in package_names:
+                yield PackageIDAndInfo(
+                    name=package_name,
+                    product_id=node.get_product_id(),
+                    product_info=FetchProductInfo(
+                        version=node.get_version(), cpp_info=node.cpp_info
+                    ),
+                )

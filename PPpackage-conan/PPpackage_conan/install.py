@@ -1,59 +1,96 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping, Set
+from collections.abc import AsyncIterable, Mapping
 from pathlib import Path
-from shutil import copytree, rmtree
+from typing import Any
 
-from PPpackage_utils.utils import Product, asubprocess_communicate, communicate_from_sub
+from PPpackage_utils.parse import Product
+from PPpackage_utils.submanager import SubmanagerCommandFailure
+from PPpackage_utils.utils import (
+    TarFileInMemoryWrite,
+    TarFileWithBytes,
+    asubprocess_wait,
+    tar_append,
+)
 
-from .utils import get_cache_path, make_conan_environment
+from .utils import Installation, get_cache_path, make_conan_environment
 
 
 async def install_product(
-    environment: Mapping[str, str], destination_path: Path, product: Product
-) -> None:
+    debug: bool,
+    environment: Mapping[str, str],
+    prefix: Path,
+    tar: TarFileWithBytes,
+    product: Product,
+):
     process = await create_subprocess_exec(
         "conan",
         "cache",
         "path",
-        f"{product.package}/{product.version}:{product.product_id}",
+        f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=DEVNULL,
         env=environment,
     )
 
-    stdout = await asubprocess_communicate(process, "Error in `conan cache path`")
+    assert process.stdout is not None
 
-    product_path = stdout.decode("ascii").splitlines()[0]
+    output_bytes = await process.stdout.read()
 
-    copytree(
-        product_path,
-        destination_path / product.package,
-        symlinks=True,
-        dirs_exist_ok=True,
-    )
+    await asubprocess_wait(process, SubmanagerCommandFailure())
+
+    product_path = output_bytes.decode().splitlines()[0]
+
+    tar.add(product_path, str(prefix / product.name))
 
 
 async def install(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
     cache_path: Path,
-    products: Set[Product],
-    destination_path: Path,
-    pipe_from_sub_path: Path,
-    pipe_to_sub_path: Path,
-) -> None:
+    products: AsyncIterable[Product],
+):
     cache_path = get_cache_path(cache_path)
 
     environment = make_conan_environment(cache_path)
 
-    destination_path = destination_path / "conan"
+    prefix = Path("conan")
 
-    if destination_path.exists():
-        rmtree(destination_path)
+    with TarFileInMemoryWrite() as new_tar:
+        async with TaskGroup() as group:
+            success_tasks = []
+            async for product in products:
+                success_tasks.append(
+                    group.create_task(
+                        install_product(
+                            debug,
+                            environment,
+                            prefix,
+                            new_tar,
+                            product,
+                        )
+                    )
+                )
 
-    async with TaskGroup() as group:
-        for product in products:
-            group.create_task(install_product(environment, destination_path, product))
+        tar_append(session_directory.data, new_tar)
 
-    with communicate_from_sub(pipe_from_sub_path), open(pipe_to_sub_path, "r"):
-        pass
+    session_directory.data = new_tar.data
+
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+    new_directory: memoryview,
+):
+    session_directory.data = new_directory
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    session_directory: Installation,
+) -> memoryview:
+    return session_directory.data

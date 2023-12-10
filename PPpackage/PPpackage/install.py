@@ -1,265 +1,102 @@
-from asyncio import StreamReader, StreamWriter, create_subprocess_exec
-from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import Mapping
-from functools import partial
-from io import TextIOWrapper
-from os import listdir
-from pathlib import Path
+from asyncio import StreamReader, StreamWriter
+from collections.abc import Iterable, Mapping, Sequence
 from random import choices as random_choices
-from shutil import move
 from sys import stderr
+from typing import IO
 
-from PPpackage_utils.io import (
-    pipe_read_line,
-    pipe_read_string,
-    pipe_read_strings,
-    pipe_write_int,
-    pipe_write_string,
-    stream_read_int,
-    stream_write_line,
-    stream_write_string,
-    stream_write_strings,
+from PPpackage_utils.parse import (
+    dump_bytes_chunked,
+    dump_many,
+    dump_one,
+    load_bytes_chunked,
+    load_one,
 )
-from PPpackage_utils.utils import (
-    MyException,
-    TemporaryPipe,
-    asubprocess_communicate,
-    json_dumps,
-)
+from PPpackage_utils.utils import SubmanagerCommand
 
-from .sub import install as PP_install
-from .utils import communicate_with_daemon, machine_id_relative_path, read_machine_id
-
-
-def merge_lockfiles(
-    versions: Mapping[str, str], product_ids: Mapping[str, str]
-) -> Mapping[str, Mapping[str, str]]:
-    return {
-        package: {"version": versions[package], "product_id": product_ids[package]}
-        for package in versions.keys() & product_ids.keys()
-    }
-
-
-async def install_manager_command(
-    debug: bool,
-    pipe_to_sub: TextIOWrapper,
-    pipe_from_sub: TextIOWrapper,
-    daemon_reader: StreamReader,
-    daemon_writer: StreamWriter,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
-):
-    stream_write_line(debug, "PPpackage", daemon_writer, "COMMAND")
-    stream_write_string(
-        debug, "PPpackage", daemon_writer, str(destination_relative_path)
-    )
-
-    command = pipe_read_string(debug, "PPpackage", pipe_from_sub)
-    stream_write_string(debug, "PPpackage", daemon_writer, command)
-
-    args = pipe_read_strings(debug, "PPpackage", pipe_from_sub)
-    stream_write_strings(debug, "PPpackage", daemon_writer, args)
-
-    with TemporaryPipe(daemon_workdir_path) as pipe_hook_path:
-        pipe_write_string(debug, "PPpackage", pipe_to_sub, str(pipe_hook_path))
-        pipe_to_sub.flush()
-
-        stream_write_string(
-            debug,
-            "PPpackage",
-            daemon_writer,
-            str(pipe_hook_path.relative_to(daemon_workdir_path)),
-        )
-
-        await daemon_writer.drain()
-
-        return_value = await stream_read_int(debug, "PPpackage", daemon_reader)
-
-        pipe_write_int(debug, "PPpackage", pipe_to_sub, return_value)
-        pipe_to_sub.flush()
-
-
-async def install_external_manager(
-    debug: bool,
-    manager: str,
-    cache_path: Path,
-    daemon_reader: StreamReader,
-    daemon_writer: StreamWriter,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
-) -> None:
-    with TemporaryPipe() as pipe_from_sub_path, TemporaryPipe() as pipe_to_sub_path:
-        if debug:
-            print(
-                f"DEBUG PPpackage: {manager} pipe_from_sub_path: {pipe_from_sub_path}, pipe_to_sub_path: {pipe_to_sub_path}",
-                file=stderr,
-            )
-
-        process_creation = create_subprocess_exec(
-            f"PPpackage-{manager}",
-            "--debug" if debug else "--no-debug",
-            "install",
-            str(cache_path),
-            str(daemon_workdir_path / destination_relative_path),
-            str(pipe_from_sub_path),
-            str(pipe_to_sub_path),
-            stdin=PIPE,
-            stdout=DEVNULL,
-            stderr=None,
-        )
-
-        products = merge_lockfiles(versions, product_ids)
-
-        indent = 4 if debug else None
-
-        products_json = json_dumps(products, indent=indent)
-
-        if debug:
-            print(f"DEBUG PPpackage: sending to {manager}'s install:", file=stderr)
-            print(products_json, file=stderr)
-
-        products_json_bytes = products_json.encode("ascii")
-
-        process = await process_creation
-
-        if process.stdin is None:
-            raise MyException(f"Error in {manager}'s install.")
-
-        process.stdin.write(products_json_bytes)
-        process.stdin.close()
-        await process.stdin.wait_closed()
-
-        if debug:
-            print(f"DEBUG PPpackage: closed sub's stdin", file=stderr)
-
-        with open(pipe_from_sub_path, "r", encoding="ascii") as pipe_from_sub:
-            with open(pipe_to_sub_path, "w", encoding="ascii") as pipe_to_sub:
-                while True:
-                    header = pipe_read_line(debug, "PPpackage", pipe_from_sub)
-
-                    if header == "END":
-                        break
-                    elif header == "COMMAND":
-                        await install_manager_command(
-                            debug,
-                            pipe_to_sub,
-                            pipe_from_sub,
-                            daemon_reader,
-                            daemon_writer,
-                            daemon_workdir_path,
-                            destination_relative_path,
-                        )
-                    else:
-                        raise MyException(
-                            f"Invalid hook header from {manager} `{header}`."
-                        )
-
-        await asubprocess_communicate(
-            process,
-            f"Error in {manager}'s install.",
-            None,
-        )
+from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_product
 
 
 async def install_manager(
     debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
     manager: str,
-    cache_path: Path,
-    daemon_reader: StreamReader,
-    daemon_writer: StreamWriter,
-    daemon_workdir_path: Path,
-    destination_relative_path: Path,
-    versions: Mapping[str, str],
-    product_ids: Mapping[str, str],
+    packages: Iterable[tuple[str, NodeData]],
 ) -> None:
-    if manager == "PP":
-        installer = partial(
-            PP_install,
-            destination_path=daemon_workdir_path / destination_relative_path,
-        )
-    else:
-        installer = partial(
-            install_external_manager,
-            manager=manager,
-            daemon_reader=daemon_reader,
-            daemon_writer=daemon_writer,
-            daemon_workdir_path=daemon_workdir_path,
-            destination_relative_path=destination_relative_path,
-        )
+    stderr.write(f"{manager}:\n")
 
-    await installer(
-        debug=debug,
-        cache_path=cache_path,
-        versions=versions,
-        product_ids=product_ids,
+    await dump_one(debug, writer, SubmanagerCommand.INSTALL)
+
+    products = (data_to_product(package_name, data) for package_name, data in packages)
+
+    await dump_many(debug, writer, products)
+
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(f"{manager} failed to install packages.")
+
+    for package_name, _ in sorted(packages, key=lambda p: p[0]):
+        stderr.write(f"\t{package_name}\n")
+
+
+def generate_machine_id(file: IO[bytes]):
+    content_string = (
+        "".join(random_choices([str(digit) for digit in range(10)], k=32)) + "\n"
     )
 
+    file.write(content_string.encode())
 
-def generate_machine_id(machine_id_path: Path):
-    if machine_id_path.exists():
-        return
 
-    machine_id_path.parent.mkdir(exist_ok=True, parents=True)
+async def get_previous_installation(
+    debug: bool,
+    connections: Connections,
+    initial_installation: memoryview,
+    previous_manager: str | None,
+):
+    if previous_manager is None:
+        return initial_installation
 
-    with machine_id_path.open("w") as machine_id_file:
-        machine_id_file.write(
-            "".join(random_choices([str(digit) for digit in range(10)], k=32)) + "\n"
-        )
+    previous_reader, previous_writer = await connections.connect(previous_manager)
+
+    await dump_one(debug, previous_writer, SubmanagerCommand.INSTALL_DOWNLOAD)
+
+    installation = await load_bytes_chunked(debug, previous_reader)
+
+    return installation
 
 
 async def install(
     debug: bool,
-    cache_path: Path,
-    runner_path: Path,
-    runner_workdir_path: Path,
-    destination_path: Path,
-    meta_versions: Mapping[str, Mapping[str, str]],
-    meta_product_ids: Mapping[str, Mapping[str, str]],
-) -> None:
-    workdir_relative_path = Path("root")
+    connections: Connections,
+    initial_installation: memoryview,
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+) -> memoryview:
+    stderr.write(f"Installing packages...\n")
 
-    (runner_workdir_path / workdir_relative_path).mkdir(exist_ok=True, parents=True)
+    previous_manager: str | None = None
 
-    for content in listdir(destination_path):
-        move(
-            destination_path / content,
-            runner_workdir_path / workdir_relative_path / content,
-        )
+    for generation in generations:
+        for manager, packages in generation.items():
+            if len(packages) == 0:
+                continue
 
-    generate_machine_id(
-        runner_workdir_path / workdir_relative_path / machine_id_relative_path
+            reader, writer = await connections.connect(manager)
+
+            if previous_manager != manager:
+                installation = await get_previous_installation(
+                    debug, connections, initial_installation, previous_manager
+                )
+
+                await dump_one(debug, writer, SubmanagerCommand.INSTALL_UPLOAD)
+                await dump_bytes_chunked(debug, writer, installation)
+
+            await install_manager(debug, reader, writer, manager, packages)
+
+            previous_manager = manager
+
+    installation = await get_previous_installation(
+        debug, connections, initial_installation, previous_manager
     )
 
-    machine_id = read_machine_id(Path("/") / machine_id_relative_path)
-
-    if debug:
-        print(f"DEBUG PPpackage: {runner_path=}", file=stderr)
-
-    async with communicate_with_daemon(debug, runner_path) as (
-        daemon_reader,
-        daemon_writer,
-    ):
-        stream_write_string(debug, "PPpackage", daemon_writer, machine_id)
-
-        for manager, versions in meta_versions.items():
-            product_ids = meta_product_ids[manager]
-
-            await install_manager(
-                debug,
-                manager,
-                cache_path,
-                daemon_reader,
-                daemon_writer,
-                runner_workdir_path,
-                workdir_relative_path,
-                versions,
-                product_ids,
-            )
-
-        for content in listdir(runner_workdir_path / workdir_relative_path):
-            move(
-                runner_workdir_path / workdir_relative_path / content,
-                destination_path / content,
-            )
+    return installation

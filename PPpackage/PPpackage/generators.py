@@ -1,37 +1,37 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from io import BytesIO
+from json import dumps as json_dumps
 from pathlib import Path
+from tarfile import TarFile
 
-from PPpackage_utils.utils import ensure_dir_exists, json_dump
+from PPpackage_utils.parse import Product
+from PPpackage_utils.utils import create_tar_directory, create_tar_file
 
 
 def versions(
-    generators_path: Path,
-    meta_versions: Mapping[str, Mapping[str, str]],
-    meta_product_ids: Mapping[str, Mapping[str, str]],
-) -> None:
-    versions_path = generators_path / "versions"
+    meta_products: Mapping[str, Iterable[Product]],
+) -> memoryview:
+    io = BytesIO()
 
-    for manager, versions in meta_versions.items():
-        manager_path = versions_path / manager
+    versions_path = Path("versions")
 
-        ensure_dir_exists(manager_path)
+    with TarFile(fileobj=io, mode="w") as tar:
+        for manager, products in meta_products.items():
+            manager_path = versions_path / manager
 
-        product_ids = meta_product_ids[manager]
+            create_tar_directory(tar, manager_path)
 
-        for package, version in versions.items():
-            product_id = product_ids[package]
+            for product in products:
+                data = {"version": product.version, "product_id": product.product_id}
 
-            with (manager_path / f"{package}.json").open("w") as versions_file:
-                json_dump(
-                    {"version": version, "product_id": product_id},
-                    versions_file,
-                    indent=4,
-                )
+                with create_tar_file(
+                    tar, manager_path / f"{product.name}.json"
+                ) as file:
+                    file.write(json_dumps(data, indent=4).encode())
+
+    return io.getbuffer()
 
 
-builtin: Mapping[
-    str,
-    Callable[
-        [Path, Mapping[str, Mapping[str, str]], Mapping[str, Mapping[str, str]]], None
-    ],
-] = {"versions": versions}
+builtin: Mapping[str, Callable[[Mapping[str, Iterable[Product]]], memoryview]] = {
+    "versions": versions
+}

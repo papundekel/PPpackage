@@ -1,39 +1,112 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import Set
+from collections.abc import AsyncIterable, MutableMapping
+from io import TextIOWrapper
 from pathlib import Path
 from sys import stderr
+from typing import Any
 
-from PPpackage_utils.io import pipe_read_int, pipe_read_string, pipe_write_string
+from PPpackage_utils.io import (
+    pipe_read_line_maybe,
+    pipe_read_string,
+    pipe_read_strings,
+    pipe_write_int,
+    pipe_write_string,
+)
+from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
+from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
-    Product,
-    asubprocess_communicate,
-    communicate_from_sub,
+    RunnerRequestType,
+    TemporaryPipe,
+    asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
+    tar_archive,
+    tar_extract,
 )
 
-from .utils import get_cache_paths
+from .utils import RunnerConnection, get_cache_paths
+
+
+async def install_manager_command(
+    debug: bool,
+    pipe_to_sub: TextIOWrapper,
+    pipe_from_sub: TextIOWrapper,
+    runner_connection: RunnerConnection,
+):
+    await dump_one(debug, runner_connection.writer, RunnerRequestType.COMMAND)
+
+    relative_path = pipe_read_string(debug, "PPpackage-arch", pipe_from_sub)
+    await dump_one(debug, runner_connection.writer, relative_path)
+
+    command = pipe_read_string(debug, "PPpackage-arch", pipe_from_sub)
+    await dump_one(debug, runner_connection.writer, command)
+
+    args = pipe_read_strings(debug, "PPpackage-arch", pipe_from_sub)
+    await dump_many(debug, runner_connection.writer, args)
+
+    with TemporaryPipe(runner_connection.workdir_path) as pipe_hook_path:
+        pipe_write_string(debug, "PPpackage-arch", pipe_to_sub, str(pipe_hook_path))
+        pipe_to_sub.flush()
+
+        await dump_one(
+            debug,
+            runner_connection.writer,
+            pipe_hook_path.relative_to(runner_connection.workdir_path),
+        )
+
+        return_value = await load_one(debug, runner_connection.reader, int)
+
+        pipe_write_int(debug, "PPpackage-arch", pipe_to_sub, return_value)
+        pipe_to_sub.flush()
+
+
+def create_environment(
+    environment: MutableMapping[str, str],
+    pipe_from_fakealpm_path: Path,
+    pipe_to_fakealpm_path: Path,
+    runner_workdir_path: Path,
+    destination_path: Path,
+):
+    environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
+    environment[
+        "LD_PRELOAD"
+    ] += f":PPpackage-arch/fakealpm/build/install/lib/libfakealpm.so"
+    environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
+    environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
+    environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
+        destination_path.relative_to(runner_workdir_path)
+    )
+
+
+DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
 
 
 async def install(
-    cache_path: Path,
-    products: Set[Product],
+    debug: bool,
+    runner_connection: RunnerConnection,
     destination_path: Path,
-    pipe_from_sub_path: Path,
-    pipe_to_sub_path: Path,
-) -> None:
+    cache_path: Path,
+    products: AsyncIterable[Product],
+):
     _, cache_path = get_cache_paths(cache_path)
-    database_path = destination_path / "var" / "lib" / "pacman"
+
+    database_path = destination_path / DATABASE_PATH_RELATIVE
 
     ensure_dir_exists(database_path)
 
-    with communicate_from_sub(pipe_from_sub_path):
-        async with fakeroot() as environment:
-            environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-            environment["LD_PRELOAD"] += ":fakealpm/build/fakealpm.so"
-            environment["PP_PIPE_FROM_SUB_PATH"] = str(pipe_from_sub_path)
-            environment["PP_PIPE_TO_SUB_PATH"] = str(pipe_to_sub_path)
+    with (
+        TemporaryPipe() as pipe_from_fakealpm_path,
+        TemporaryPipe() as pipe_to_fakealpm_path,
+    ):
+        async with fakeroot(debug) as environment:
+            create_environment(
+                environment,
+                pipe_from_fakealpm_path,
+                pipe_to_fakealpm_path,
+                runner_connection.workdir_path,
+                destination_path,
+            )
 
             process = await create_subprocess_exec(
                 "pacman",
@@ -51,14 +124,54 @@ async def install(
                 *[
                     str(
                         cache_path
-                        / f"{product.package}-{product.version}-{product.product_id}.pkg.tar.zst"
+                        / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
                     )
-                    for product in products
+                    async for product in products
                 ],
                 stdin=DEVNULL,
-                stdout=stderr,
-                stderr=None,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
                 env=environment,
             )
 
-            await asubprocess_communicate(process, "Error in `pacman -Udd`")
+            with (
+                open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
+                open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
+            ):
+                while True:
+                    header = pipe_read_line_maybe(
+                        debug, "PPpackage-arch", pipe_from_fakealpm
+                    )
+
+                    if header is None:
+                        break
+                    elif header == "COMMAND":
+                        await install_manager_command(
+                            debug,
+                            pipe_to_fakealpm,
+                            pipe_from_fakealpm,
+                            runner_connection,
+                        )
+                    else:
+                        raise Exception(
+                            f"Unknown header: {header}", "PPpackage-arch", stderr
+                        )
+
+        await asubprocess_wait(process, SubmanagerCommandFailure())
+
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    destination_path: Path,
+    new_directory: memoryview,
+):
+    tar_extract(new_directory, destination_path)
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    destination_path: Path,
+) -> memoryview:
+    return tar_archive(destination_path)

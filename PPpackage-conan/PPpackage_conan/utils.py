@@ -1,39 +1,72 @@
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from os import environ
 from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
-from typing import Any, NotRequired, Optional, TypedDict
+from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.utils import json_loads
-
-
-class Options(TypedDict):
-    settings: NotRequired[Mapping[str, str]]
-    options: NotRequired[Mapping[str, str]]
+from PPpackage_utils.parse import load_from_bytes, load_object
+from pydantic import BaseModel
 
 
 def get_cache_path(cache_path: Path) -> Path:
     return cache_path / "conan"
 
 
-class Node(TypedDict):
+class DependencyValueJSON(BaseModel):
+    direct: bool
+
+
+class BaseNode(BaseModel):
+    id: str
     ref: str
+    user: str | None
+    name: str
+    version: str
+    rrev: str
+
+    def get_version(self) -> str:
+        return f"{self.version}#{self.rrev}"
+
+
+class FetchNode(BaseNode):
     package_id: str
     prev: str
-    user: str
     cpp_info: Mapping[str, Any]
+
+    def get_product_id(self) -> str:
+        return f"{self.package_id}#{self.prev}"
+
+
+class ResolveNode(BaseNode):
+    dependencies: Mapping[str, DependencyValueJSON]
+
+
+class ConanGraphNodes(BaseModel):
+    nodes: Mapping[str, Mapping[str, Any]]
+
+
+class ConanGraph(BaseModel):
+    graph: ConanGraphNodes
+
+
+T = TypeVar("T", bound=BaseModel)
 
 
 def parse_conan_graph_nodes(
-    graph_string: str,
-) -> Iterable[Node]:
-    return [
-        node
-        for node in json_loads(graph_string)["graph"]["nodes"].values()
-        if node["ref"] != ""
-    ]
+    debug: bool,
+    NodeType: type[T],
+    conan_graph_json_bytes: bytes,
+) -> Mapping[str, T]:
+    conan_graph = load_from_bytes(debug, ConanGraph, conan_graph_json_bytes)
+
+    return {
+        node_id: load_object(NodeType, node_json)
+        for node_id, node_json in conan_graph.graph.nodes.items()
+        if node_id != "0"
+    }
 
 
 @contextmanager
@@ -50,18 +83,6 @@ def create_and_render_temp_file(
         yield file
 
 
-class GraphInfo:
-    def __init__(self, node: Node):
-        self.product_id = f"{node['package_id']}#{node['prev']}"
-        self.cpp_info = node["cpp_info"]
-
-
-class Requirement:
-    def __init__(self, package: str, version: str):
-        self.package = package
-        self.version = version
-
-
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
     environment = environ.copy()
 
@@ -74,6 +95,12 @@ def get_path(module) -> Path:
     return Path(module.__file__)
 
 
+@dataclass(frozen=True)
+class PackagePaths:
+    data_path: Path
+    deployer_path: Path
+
+
 def get_package_paths():
     import PPpackage_conan
 
@@ -82,4 +109,9 @@ def get_package_paths():
     data_path = get_path(PPpackage_conan).parent / "data"
     deployer_path = get_path(deployer)
 
-    return data_path, deployer_path
+    return PackagePaths(data_path, deployer_path)
+
+
+@dataclass
+class Installation:
+    data: memoryview
