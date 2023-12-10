@@ -5,6 +5,7 @@ from collections.abc import (
     MutableMapping,
     MutableSequence,
     MutableSet,
+    Sequence,
 )
 from itertools import islice
 from sys import stderr
@@ -26,15 +27,45 @@ from PPpackage_utils.parse import (
     load_many,
     load_one,
 )
-from PPpackage_utils.utils import Queue, SubmanagerCommand, queue_iterate
+from PPpackage_utils.utils import (
+    Queue,
+    SubmanagerCommand,
+    create_empty_tar,
+    queue_iterate,
+)
 
 from PPpackage.generate import generate
+from PPpackage.install import install
 
 from .utils import Connections, NodeData, SubmanagerCommandFailure
 
 
-async def process_build_root():
-    return True, memoryview(bytes())  # TODO
+async def process_build_root(
+    debug: bool,
+    connections: Connections,
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
+):
+    connections = connections.duplicate()
+
+    dependency_set = {manager_and_name for manager_and_name, _ in dependencies}
+
+    dependency_generations = [
+        {
+            manager: [
+                (package, data)
+                for package, data in packages
+                if ManagerAndName(manager, package) in dependency_set
+            ]
+            for manager, packages in generation.items()
+        }
+        for generation in generations
+    ]
+
+    async with connections.communicate(debug):
+        return True, await install(
+            debug, connections, create_empty_tar(), dependency_generations
+        )
 
 
 async def process_build_generate(
@@ -61,10 +92,11 @@ async def process_build(
     package_name: str,
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     generators: Iterable[str],
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
 ):
     for f in as_completed(
         [
-            process_build_root(),
+            process_build_root(debug, connections, generations, dependencies),
             process_build_generate(
                 debug, connections, meta_options, dependencies, generators
             ),
@@ -101,6 +133,7 @@ async def send(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
 ) -> None:
     await dump_one(debug, writer, SubmanagerCommand.FETCH)
 
@@ -130,6 +163,7 @@ async def send(
                     package_name,
                     dependencies,
                     generators,
+                    generations,
                 )
             )
 
@@ -235,6 +269,7 @@ async def fetch_manager(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
 ):
     reader, writer = await connections.connect(manager, strict=True)
 
@@ -251,6 +286,7 @@ async def fetch_manager(
                 meta_options,
                 packages,
                 packages_to_dependencies,
+                generations,
             )
         )
         group.create_task(
@@ -305,7 +341,7 @@ async def fetch(
     connections: Connections,
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
-    generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
 ):
     stderr.write("Fetching packages...\n")
 
@@ -346,5 +382,6 @@ async def fetch(
                         packages,
                         graph.nodes,
                         packages_to_dependencies,
+                        generations,
                     )
                 )

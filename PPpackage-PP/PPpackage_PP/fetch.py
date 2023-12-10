@@ -101,11 +101,10 @@ async def fetch(
     async for build_result in build_results:
         package_name = build_result.name
 
-        if not build_result.is_installation:
-            with TarFileInMemoryRead(build_result.data) as tar:
-                print("PP test:", file=stderr)
-                for member in tar.getmembers():
-                    print(f"\t{member.name}", file=stderr)
+        with TarFileInMemoryRead(build_result.data) as tar:
+            print("PP test:", file=stderr)
+            for member in tar.getmembers():
+                print(f"\t{member.name}", file=stderr)
 
         if build_result.is_installation:
             received_installations.add(package_name)

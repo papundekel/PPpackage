@@ -1,5 +1,5 @@
 from asyncio import StreamReader, StreamWriter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from random import choices as random_choices
 from sys import stderr
 from typing import IO
@@ -70,7 +70,7 @@ async def install(
     debug: bool,
     connections: Connections,
     initial_installation: memoryview,
-    generations: Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]],
+    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
 ) -> memoryview:
     stderr.write(f"Installing packages...\n")
 
@@ -78,6 +78,9 @@ async def install(
 
     for generation in generations:
         for manager, packages in generation.items():
+            if len(packages) == 0:
+                continue
+
             reader, writer = await connections.connect(manager)
 
             if previous_manager != manager:

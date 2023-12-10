@@ -1,5 +1,5 @@
 from asyncio import StreamReader, StreamWriter
-from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from pathlib import Path
 from sys import stderr, stdin
 
@@ -22,7 +22,7 @@ from .utils import Connections, NodeData, SubmanagerCommandFailure
 
 def topological_generations(
     graph: MultiDiGraph,
-) -> Iterable[Mapping[str, Iterable[tuple[str, NodeData]]]]:
+) -> Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]]:
     for generation in base_topological_generations(graph):
         manager_nodes: MutableMapping[str, MutableSequence[tuple[str, NodeData]]] = {}
 
