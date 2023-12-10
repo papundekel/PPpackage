@@ -30,7 +30,7 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import SubmanagerCommandFailure, open_submanager
+from .utils import Connections, SubmanagerCommandFailure
 
 
 async def send(
@@ -64,16 +64,13 @@ async def receive(
 
 async def resolve_manager(
     debug: bool,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     manager: str,
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ) -> None:
-    reader, writer = await open_submanager(
-        manager, submanager_socket_paths, connections
-    )
+    reader, writer = await connections.connect(manager)
 
     async with TaskGroup() as group:
         group.create_task(send(debug, writer, options, requirements_list))
@@ -156,8 +153,7 @@ def make_graph(
 
 async def resolve_iteration(
     debug: bool,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
     initial: Mapping[str, Set[Hashable]],
@@ -178,7 +174,6 @@ async def resolve_iteration(
             group.create_task(
                 resolve_manager(
                     debug,
-                    submanager_socket_paths,
                     connections,
                     manager,
                     meta_options.get(manager),
@@ -262,8 +257,7 @@ def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
 async def resolve(
     debug: bool,
     iteration_limit: int,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     initial_requirements: Mapping[str, Set[Any]],
     meta_options: Mapping[str, Any],
 ) -> MultiDiGraph:
@@ -300,7 +294,6 @@ async def resolve(
                 group.create_task(
                     resolve_iteration(
                         debug,
-                        submanager_socket_paths,
                         connections,
                         all_requirements,
                         meta_options,

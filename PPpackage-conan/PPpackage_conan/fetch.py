@@ -1,4 +1,3 @@
-from asyncio import Queue as SimpleQueue
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Set
@@ -9,15 +8,14 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import (
-    BuildResult,
     Dependency,
-    IDAndInfo,
     Options,
     Package,
     PackageIDAndInfo,
     load_object,
 )
 from PPpackage_utils.submanager import (
+    BuildResult,
     SubmanagerCommandFailure,
     discard_build_results_context,
 )
@@ -118,10 +116,8 @@ async def fetch(
             if package_name in package_names:
                 yield PackageIDAndInfo(
                     name=package_name,
-                    id_and_info=IDAndInfo(
-                        product_id=node.get_product_id(),
-                        product_info=FetchProductInfo(
-                            version=node.get_version(), cpp_info=node.cpp_info
-                        ),
+                    product_id=node.get_product_id(),
+                    product_info=FetchProductInfo(
+                        version=node.get_version(), cpp_info=node.cpp_info
                     ),
                 )

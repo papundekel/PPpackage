@@ -26,37 +26,41 @@ async def close_submanager(debug: bool, writer: StreamWriter):
     await close_writer(writer)
 
 
-@asynccontextmanager
-async def communicate_with_submanagers(
-    debug: bool, connections: Mapping[str, tuple[StreamReader, StreamWriter]]
-):
-    try:
-        yield
-    finally:
-        async with TaskGroup() as group:
-            for _, writer in connections.values():
-                group.create_task(close_submanager(debug, writer))
-
-
-async def open_submanager(
-    manager: str,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
-):
-    connection = connections.get(manager)
-
-    if connection is None:
-        socket_path = submanager_socket_paths[manager]
-
-        connection = await open_unix_connection(socket_path)
-
-        connections[manager] = connection
-
-    return connection
-
-
 class SubmanagerCommandFailure(Exception):
     def __init__(self, message: str):
         super().__init__()
 
         self.message = message
+
+
+class Connections:
+    def __init__(self, submanager_socket_paths: Mapping[str, Path]):
+        self._submanager_socket_paths = submanager_socket_paths
+        self._connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
+
+    async def connect(self, manager: str, strict: bool = False):
+        connection = self._connections.get(manager)
+
+        if connection is None:
+            if strict:
+                raise KeyError()
+
+            socket_path = self._submanager_socket_paths[manager]
+
+            connection = await open_unix_connection(socket_path)
+
+            self._connections[manager] = connection
+
+        return connection
+
+    def duplicate(self):
+        return Connections(self._submanager_socket_paths)
+
+    @asynccontextmanager
+    async def communicate(self, debug: bool):
+        try:
+            yield
+        finally:
+            async with TaskGroup() as group:
+                for _, writer in self._connections.values():
+                    group.create_task(close_submanager(debug, writer))

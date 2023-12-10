@@ -1,23 +1,17 @@
 from asyncio import StreamReader, StreamWriter
 from collections.abc import AsyncIterable, Iterable, Mapping
 from inspect import isclass
-from json import dumps as json_dumps
 from json import loads as json_loads
 from sys import stderr
 from typing import Annotated, Any, Generic, TypeVar, get_args
 
 from PPpackage_utils.utils import MyException, frozendict
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    GetCoreSchemaHandler,
-    RootModel,
-    ValidationError,
-)
+from pydantic import BaseModel, BeforeValidator, GetCoreSchemaHandler, RootModel
 from pydantic.dataclasses import dataclass
 from pydantic_core import CoreSchema, core_schema
 
-_DEBUG = False
+_DEBUG_LOAD = False
+_DEBUG_DUMP = False
 
 Key = TypeVar("Key")
 Value = TypeVar("Value")
@@ -55,18 +49,12 @@ def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
 
-    try:
-        input = ModelWrapped.model_validate(input_json)
+    input = ModelWrapped.model_validate(input_json)
 
-        if isinstance(input, RootModel):
-            return input.root
-        else:
-            return input  # type: ignore
-
-    except ValidationError as e:
-        input_json_string = json_dumps(input_json, indent=4)
-
-        raise MyException(f"Model validation failed:\n{e}\n{input_json_string}")
+    if isinstance(input, RootModel):
+        return input.root
+    else:
+        return input  # type: ignore
 
 
 def load_from_bytes(
@@ -74,7 +62,7 @@ def load_from_bytes(
 ) -> ModelType:
     input_json_string = input_json_bytes.decode()
 
-    if _DEBUG:
+    if _DEBUG_LOAD:
         print(f"load:\n{input_json_string}", file=stderr)
 
     input_json = json_loads(input_json_string)
@@ -93,22 +81,16 @@ class Product:
 
 
 @dataclass(frozen=True)
-class IDAndInfo:
-    product_id: str
-    product_info: Any
-
-
-@dataclass(frozen=True)
 class PackageIDAndInfo:
     name: str
-    id_and_info: IDAndInfo | None
+    product_id: str
+    product_info: Any
 
 
 @dataclass(frozen=True)
 class BuildResult:
     name: str
     is_root: bool
-    directory: str
 
 
 @dataclass(frozen=True)
@@ -151,7 +133,7 @@ class ResolutionGraph:
 def _dump_int(debug: bool, writer: StreamWriter, length: int) -> None:
     writer.write(f"{length}\n".encode())
 
-    if _DEBUG:
+    if _DEBUG_DUMP:
         print(f"dump length: {length}", file=stderr)
 
 
@@ -163,7 +145,7 @@ def _dump_bool(debug: bool, writer: StreamWriter, value: bool) -> None:
 
     writer.write((value_string + "\n").encode())
 
-    if _DEBUG:
+    if _DEBUG_DUMP:
         print(f"dump bool: {value}", file=stderr)
 
 
@@ -202,13 +184,16 @@ async def dump_one(
 
     await dump_bytes(debug, writer, memoryview(output_json_bytes))
 
-    if _DEBUG:
+    if _DEBUG_DUMP:
         print(f"dump:\n{output_json_string}", file=stderr)
 
 
 async def dump_loop_end(debug: bool, writer: StreamWriter):
-    _dump_int(debug, writer, False)
+    _dump_bool(debug, writer, False)
     await writer.drain()
+
+    if _DEBUG_DUMP:
+        print("loop}", file=stderr)
 
 
 T = TypeVar("T")
@@ -217,6 +202,9 @@ T = TypeVar("T")
 async def dump_loop(
     debug: bool, writer: StreamWriter, iterable: Iterable[T]
 ) -> AsyncIterable[T]:
+    if _DEBUG_DUMP:
+        print("loop{", file=stderr)
+
     for obj in iterable:
         _dump_bool(debug, writer, True)
         yield obj
@@ -224,10 +212,12 @@ async def dump_loop(
     await dump_loop_end(debug, writer)
 
 
-async def dump_loop_async(debug: bool, writer: StreamWriter, iterable: AsyncIterable):
+async def dump_loop_async(
+    debug: bool, writer: StreamWriter, iterable: AsyncIterable[T]
+) -> AsyncIterable[T]:
     async for obj in iterable:
         _dump_bool(debug, writer, True)
-        yield obj  # type: ignore
+        yield obj
 
     await dump_loop_end(debug, writer)
 
@@ -262,7 +252,7 @@ async def _load_int(debug: bool, reader: StreamReader) -> int:
 
     length = int(line)
 
-    if _DEBUG:
+    if _DEBUG_LOAD:
         print(f"load length: {length}", file=stderr)
 
     return length
@@ -273,7 +263,7 @@ async def _load_bool(debug: bool, reader: StreamReader) -> bool:
 
     value = line == _TRUE_STRING
 
-    if _DEBUG:
+    if _DEBUG_LOAD:
         print(f"load bool: {value}", file=stderr)
 
     return value

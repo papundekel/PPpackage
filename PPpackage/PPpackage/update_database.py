@@ -1,25 +1,17 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup
-from collections.abc import Iterable, Mapping, MutableMapping
-from pathlib import Path
+from asyncio import TaskGroup
+from collections.abc import Iterable
 from sys import stderr
 
 from PPpackage_utils.parse import dump_one, load_one
 from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import SubmanagerCommandFailure, open_submanager
+from .utils import Connections, SubmanagerCommandFailure
 
 
-async def update_database_manager(
-    debug: bool,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
-    manager: str,
-):
+async def update_database_manager(debug: bool, connections: Connections, manager: str):
     stderr.write(f"Updating {manager} database...\n")
 
-    reader, writer = await open_submanager(
-        manager, submanager_socket_paths, connections
-    )
+    reader, writer = await connections.connect(manager)
 
     await dump_one(debug, writer, SubmanagerCommand.UPDATE_DATABASE)
 
@@ -31,16 +23,11 @@ async def update_database_manager(
 
 async def update_database(
     debug: bool,
-    submanager_socket_paths: Mapping[str, Path],
-    connections: MutableMapping[str, tuple[StreamReader, StreamWriter]],
+    connections: Connections,
     managers: Iterable[str],
 ) -> None:
     stderr.write("Updating databases...\n")
 
     async with TaskGroup() as group:
         for manager in managers:
-            group.create_task(
-                update_database_manager(
-                    debug, submanager_socket_paths, connections, manager
-                )
-            )
+            group.create_task(update_database_manager(debug, connections, manager))

@@ -9,14 +9,15 @@ from inspect import iscoroutinefunction
 from pathlib import Path
 from signal import SIGTERM
 from sys import stderr
+from token import OP
 from traceback import print_exc
 from typing import Any, ContextManager, Generic, TypeVar
 
 from pid import PidFile, PidFileAlreadyLockedError
 from typer import Exit, Typer
 
+from .parse import BuildResult as BuildResultParse
 from .parse import (
-    BuildResult,
     Dependency,
     Options,
     Package,
@@ -24,6 +25,7 @@ from .parse import (
     Product,
     ResolutionGraph,
     dump_bytes_chunked,
+    dump_loop_async,
     dump_many_async,
     dump_one,
     load_bytes_chunked,
@@ -62,6 +64,16 @@ class AsyncTyper(Typer):
         return partial(self.maybe_run_async, decorator)
 
 
+BuildRequest = tuple[str, AsyncIterable[str]]
+
+
+@dataclass(frozen=True)
+class BuildResult:
+    name: str
+    is_installation: bool
+    data: memoryview
+
+
 __app = AsyncTyper()
 
 RequirementTypeType = TypeVar("RequirementTypeType")
@@ -92,7 +104,7 @@ FetchCallbackType = Callable[
         AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
         AsyncIterable[BuildResult],
     ],
-    AsyncIterable[PackageIDAndInfo],
+    AsyncIterable[PackageIDAndInfo | BuildRequest],
 ]
 
 GenerateCallbackType = Callable[
@@ -223,7 +235,14 @@ async def fetch(
         async for _ in load_loop(debug, reader)
     )
 
-    build_results = load_many(debug, reader, BuildResult)
+    build_results = (
+        BuildResult(
+            (build_result := await load_one(debug, reader, BuildResultParse)).name,
+            build_result.is_root,
+            await load_bytes_chunked(debug, reader),
+        )
+        async for _ in load_loop(debug, reader)
+    )
 
     async with write_success(debug, writer):
         output = callback(
@@ -235,7 +254,18 @@ async def fetch(
             packages,
             build_results,
         )
-        await dump_many_async(debug, writer, output)
+
+        async for message in dump_loop_async(debug, writer, output):
+            is_id_and_info = isinstance(message, PackageIDAndInfo)
+
+            await dump_one(debug, writer, is_id_and_info)
+
+            if is_id_and_info:
+                await dump_one(debug, writer, message)
+            else:
+                package_name, generators = message
+                await dump_one(debug, writer, package_name)
+                await dump_many_async(debug, writer, generators)
 
 
 async def generate(
