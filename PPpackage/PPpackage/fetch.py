@@ -33,11 +33,6 @@ from PPpackage.generate import generate
 from .utils import Connections, NodeData, SubmanagerCommandFailure
 
 
-class Synchronization:
-    build_queue = Queue[tuple[str, Iterable[str]]]()
-    lock = Lock()
-
-
 async def process_build_root():
     return True, memoryview(bytes())  # TODO
 
@@ -59,6 +54,7 @@ async def process_build_generate(
 
 async def process_build(
     debug: bool,
+    lock: Lock,
     connections: Connections,
     writer: StreamWriter,
     meta_options: Mapping[str, Options],
@@ -77,7 +73,7 @@ async def process_build(
         is_root, directory = await f
 
         # the message must be sent atomically
-        await Synchronization.lock.acquire()
+        await lock.acquire()
 
         await dump_one(
             debug,
@@ -88,11 +84,15 @@ async def process_build(
 
         await dump_bytes_chunked(debug, writer, directory)
 
-        Synchronization.lock.release()
+        lock.release()
+
+
+BuildQueue = Queue[tuple[str, Iterable[str]]]
 
 
 async def send(
     debug: bool,
+    build_queue: BuildQueue,
     connections: Connections,
     writer: StreamWriter,
     manager: str,
@@ -112,10 +112,10 @@ async def send(
         await dump_one(debug, writer, package)
         await dump_many(debug, writer, dependencies)
 
+    build_lock = Lock()
+
     async with TaskGroup() as group:
-        async for package_name, generators in queue_iterate(
-            Synchronization.build_queue
-        ):
+        async for package_name, generators in queue_iterate(build_queue):
             dependencies = packages_to_dependencies[
                 ManagerAndName(name=package_name, manager=manager)
             ]
@@ -123,6 +123,7 @@ async def send(
             group.create_task(
                 process_build(
                     debug,
+                    build_lock,
                     connections,
                     writer,
                     meta_options,
@@ -170,6 +171,7 @@ def receive_check_build(
 
 async def receive(
     debug: bool,
+    build_queue: BuildQueue,
     reader: StreamReader,
     manager: str,
     nodes: Mapping[ManagerAndName, NodeData],
@@ -195,7 +197,7 @@ async def receive(
             packages_remaining.remove(package_name)
 
             if len(packages_remaining) == 0:
-                await Synchronization.build_queue.put(None)
+                await build_queue.put(None)
                 end = True
         else:
             package_name = await load_one(debug, reader, str)
@@ -213,7 +215,7 @@ async def receive(
                 generator async for generator in load_many(debug, reader, str)
             ]
 
-            await Synchronization.build_queue.put((package_name, generators))
+            await build_queue.put((package_name, generators))
 
             packages_build_requested.add(package_name)
 
@@ -236,10 +238,13 @@ async def fetch_manager(
 ):
     reader, writer = await connections.connect(manager, strict=True)
 
+    build_queue = BuildQueue()
+
     async with TaskGroup() as group:
         group.create_task(
             send(
                 debug,
+                build_queue,
                 connections,
                 writer,
                 manager,
@@ -250,7 +255,12 @@ async def fetch_manager(
         )
         group.create_task(
             receive(
-                debug, reader, manager, nodes, (package.name for package, _ in packages)
+                debug,
+                build_queue,
+                reader,
+                manager,
+                nodes,
+                (package.name for package, _ in packages),
             )
         )
 
