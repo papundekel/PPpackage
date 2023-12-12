@@ -176,5 +176,5 @@ More input examples can be found in the `input/` directory.
 The meta-manager is able to generate a dot file with the resolution graph.
 
 ```bash
-python -m PPpackage_run $containerizer $cache_dir $root_dir --graph-path $graph_path < input.json
+python -m PPpackage_run $containerizer $cache_dir $root_dir --graph $graph_path < input.json
 ```

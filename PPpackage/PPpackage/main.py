@@ -1,4 +1,3 @@
-from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from pathlib import Path
 from sys import stderr, stdin
@@ -88,8 +87,8 @@ async def main(
     debug: bool,
     do_update_database: bool,
     submanager_socket_paths: Mapping[str, Path],
-    generators_path: Path,
     destination_path: Path,
+    generators_path: Path | None,
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
@@ -128,22 +127,23 @@ async def main(
 
             await fetch(debug, connections, input.options, graph, generations)
 
-            generators = await generate(
-                debug,
-                connections,
-                True,
-                input.generators,
-                graph.nodes(data=True),
-                input.options,
-            )
-
             old_installation = tar_archive(destination_path)
 
             new_installation = await install(
                 debug, connections, old_installation, generations
             )
 
-            tar_extract(generators, generators_path)
+            if generators_path is not None:
+                generators = await generate(
+                    debug,
+                    connections,
+                    True,
+                    input.generators,
+                    graph.nodes(data=True),
+                    input.options,
+                )
+                tar_extract(generators, generators_path)
+
             tar_extract(new_installation, destination_path)
 
             stderr.write("Done.\n")
