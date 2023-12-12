@@ -133,8 +133,8 @@ async def main(
                 debug, connections, old_installation, generations
             )
 
-            if generators_path is not None:
-                generators = await generate(
+            if generators_path is not None and input.generators is not None:
+                generators_directory = await generate(
                     debug,
                     connections,
                     True,
@@ -142,7 +142,7 @@ async def main(
                     graph.nodes(data=True),
                     input.options,
                 )
-                tar_extract(generators, generators_path)
+                tar_extract(generators_directory, generators_path)
 
             tar_extract(new_installation, destination_path)
 
