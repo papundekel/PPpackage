@@ -63,7 +63,7 @@ async def handle_command(
 
     with pipe_path.open("r") as pipe:
         process = await create_subprocess_exec(
-            "runc",
+            "crun",
             "--root",
             root_path,
             "run",
@@ -214,7 +214,7 @@ async def handle_connection(
 
 async def create_config(debug: bool, bundle_path: Path):
     process_creation = create_subprocess_exec(
-        "runc",
+        "crun",
         "spec",
         "--rootless",
         "--bundle",
@@ -224,13 +224,11 @@ async def create_config(debug: bool, bundle_path: Path):
         stderr=DEVNULL,
     )
 
-    await asubprocess_wait(await process_creation, MyException("Error in `runc spec`."))
+    await asubprocess_wait(await process_creation, MyException("Error in `crun spec`."))
 
     with edit_config(debug, bundle_path) as config:
         config["process"]["terminal"] = False
         config["root"]["readonly"] = False
-        config["linux"]["uidMappings"][0]["hostID"] = getuid()
-        config["linux"]["gidMappings"][0]["hostID"] = getgid()
 
 
 program_name = "PPpackage-runner"
