@@ -110,12 +110,14 @@ async def main(
                 managers = input.requirements.keys()
                 await update_database(debug, connections, managers)
 
+            options = input.options if input.options is not None else {}
+
             graph = await resolve(
                 debug,
                 resolve_iteration_limit,
                 connections,
                 input.requirements,
-                input.options,
+                options,
             )
 
             if graph_path is not None:
@@ -125,7 +127,7 @@ async def main(
 
             generations = list(topological_generations(reversed_graph))
 
-            await fetch(debug, connections, input.options, graph, generations)
+            await fetch(debug, connections, options, graph, generations)
 
             old_installation = tar_archive(destination_path)
 
@@ -140,7 +142,7 @@ async def main(
                     True,
                     input.generators,
                     graph.nodes(data=True),
-                    input.options,
+                    options,
                 )
                 tar_extract(generators_directory, generators_path)
 

@@ -6,7 +6,6 @@
             "p1"
         ]
     },
-    "options": {},
     "generators": [
         "versions"
     ]

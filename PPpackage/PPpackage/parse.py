@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class Input(BaseModel):
-    options: Mapping[str, Options]
+    options: Mapping[str, Options] | None = None
     generators: Set[str] | None = None
     requirements: Mapping[str, Set[FrozenAny]]
 
