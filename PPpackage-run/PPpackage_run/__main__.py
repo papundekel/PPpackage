@@ -82,7 +82,7 @@ async def container(
         "--mount",
         f"type=bind,source={cache_path},destination={CONTAINER_CACHE_PATH}",
         *additional_mounts,
-        f"fackop/pppackage-{manager.lower()}",
+        f"docker.io/fackop/pppackage-{manager.lower()}",
         "python",
         "-m",
         f"PPpackage_{manager}",
@@ -116,11 +116,11 @@ def process_lifetime(main: Callable, *args):
         process.join()
 
 
-async def wait_for_sockets(max_retries: int, *socket_paths: Path):
+async def wait_for_sockets(max_retries: int | None, *socket_paths: Path):
     tried_count = 0
 
     while any(not socket_path.exists() for socket_path in socket_paths):
-        if tried_count >= max_retries:
+        if max_retries is not None and tried_count >= max_retries:
             raise MyException("Timeout while waiting for sockets.")
 
         await sleep(0.1)
@@ -141,7 +141,7 @@ async def main_command(
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
     debug: bool = False,
-    wait_max_retries: int = 10,
+    wait_max_retries: Optional[int] = None,
 ):
     if containerizer == "native":
         from PPpackage_arch.main import main as PPpackage_arch
