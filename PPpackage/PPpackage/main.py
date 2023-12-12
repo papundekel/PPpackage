@@ -56,11 +56,18 @@ def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
 
     graph_presentation.graph.update(
         {
+            "graph": {
+                "bgcolor": "black",
+                "margin": 0,
+            },
             "node": {
                 "colorscheme": "accent8",
                 "style": "filled",
                 "shape": "box",
-            }
+            },
+            "edge": {
+                "color": "white",
+            },
         }
     )
 
