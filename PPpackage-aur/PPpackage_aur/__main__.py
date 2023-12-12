@@ -1,3 +1,5 @@
-from .main import main
+from PPpackage_utils.submanager import submanager__main__runner
 
-main()
+from .main import PROGRAM_NAME, main
+
+submanager__main__runner(PROGRAM_NAME, main)

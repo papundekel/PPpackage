@@ -1,14 +1,32 @@
-from collections.abc import Set
+from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
-from PPpackage_utils.utils import Product
+from PPpackage_utils.parse import Product
 
 
 async def install(
+    debug: bool,
+    data: Any,
+    session_data: Any,
     cache_path: Path,
-    products: Set[Product],
-    destination_path: Path,
-    pipe_from_sub_path: Path,
-    pipe_to_sub_path: Path,
-) -> None:
+    products: AsyncIterable[Product],
+):
     pass
+
+
+async def install_upload(
+    debug: bool,
+    data: Any,
+    session_data: Any,
+    new_directory: memoryview,
+):
+    pass
+
+
+async def install_download(
+    debug: bool,
+    data: Any,
+    session_data: Any,
+) -> memoryview:
+    return memoryview(bytes())

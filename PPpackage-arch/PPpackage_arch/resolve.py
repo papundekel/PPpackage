@@ -1,13 +1,15 @@
-from asyncio import TaskGroup, create_subprocess_exec
+import asyncio
+from asyncio import StreamReader, TaskGroup, create_subprocess_exec, create_task
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
+from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.submanager import SubmanagerCommandFailure
-from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
+from PPpackage_utils.utils import asubprocess_wait
 from pydot import graph_from_dot_data
 
 from .update_database import update_database
@@ -74,10 +76,20 @@ def clean_graph(graph: MultiDiGraph) -> str:
     return root
 
 
+async def read_lines(reader: StreamReader) -> AsyncIterable[str]:
+    while True:
+        line = await reader.readline()
+
+        if len(line) == 0:
+            break
+
+        yield line.decode().rstrip()
+
+
 async def resolve_versions(
     debug: bool, database_path: Path, packages: Set[str]
 ) -> Mapping[str, str]:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         "pacinfo",
         "--dbpath",
         str(database_path),
@@ -88,13 +100,15 @@ async def resolve_versions(
         stderr=DEVNULL,
     )
 
-    stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
+    assert process.stdout is not None
 
     lockfile = {
         (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]
-        for line in stdout.decode().splitlines()
+        async for line in read_lines(process.stdout)
         if not line.startswith(" ")
     }
+
+    await asubprocess_wait(process, SubmanagerCommandFailure())
 
     return lockfile
 
@@ -134,17 +148,26 @@ async def resolve(
 
     graphs_list = [[task.result() for task in tasks] for tasks in tasks_list]
 
-    roots = [[root for _, root in graphs] for graphs in graphs_list]
-
-    versions = await resolve_versions(
-        debug,
-        database_path,
-        {package for graphs in graphs_list for graph, _ in graphs for package in graph},
+    versions_task = create_task(
+        resolve_versions(
+            debug,
+            database_path,
+            {
+                package
+                for graphs in graphs_list
+                for graph, _ in graphs
+                for package in graph
+            },
+        )
     )
 
     dependencies = resolve_dependencies(
         graph for graphs in graphs_list for graph, _ in graphs
     )
+
+    roots = [[root for _, root in graphs] for graphs in graphs_list]
+
+    versions = await versions_task
 
     yield ResolutionGraph(
         roots,
