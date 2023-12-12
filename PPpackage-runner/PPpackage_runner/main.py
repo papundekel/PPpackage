@@ -221,7 +221,7 @@ async def create_config(debug: bool, bundle_path: Path):
         str(bundle_path),
         stdin=DEVNULL,
         stdout=DEVNULL,
-        stderr=DEVNULL,
+        stderr=None,
     )
 
     await asubprocess_wait(await process_creation, MyException("Error in `crun spec`."))
