@@ -15,9 +15,9 @@ app = AsyncTyper()
 @app.command()
 async def main_command(
     config_path: Path,
-    generators_path: Path,
     destination_path: Path,
-    graph_path: Optional[Path] = None,
+    generators_path: Annotated[Optional[Path], TyperOption("--generators")] = None,
+    graph_path: Annotated[Optional[Path], TyperOption("--graph")] = None,
     do_update_database: Annotated[
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
@@ -33,8 +33,8 @@ async def main_command(
             debug,
             do_update_database,
             config.submanager_socket_paths,
-            generators_path,
             destination_path,
+            generators_path,
             graph_path,
             resolve_iteration_limit,
         )

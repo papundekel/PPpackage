@@ -134,9 +134,9 @@ app = AsyncTyper()
 async def main_command(
     containerizer: str,
     cache_path: Path,
-    generators_path: Path,
     destination_path: Path,
-    graph_path: Optional[Path] = None,
+    generators_path: Annotated[Optional[Path], TyperOption("--generators")] = None,
+    graph_path: Annotated[Optional[Path], TyperOption("--graph")] = None,
     do_update_database: Annotated[
         bool, TyperOption("--update-database/--no-update-database")
     ] = False,
@@ -163,7 +163,8 @@ async def main_command(
     run_path = Path(environ["XDG_RUNTIME_DIR"])
 
     ensure_dir_exists(cache_path)
-    ensure_dir_exists(generators_path)
+    if generators_path is not None:
+        ensure_dir_exists(generators_path)
     ensure_dir_exists(destination_path)
 
     with TemporaryDirectory() as runner_workdirs_path:
@@ -202,8 +203,8 @@ async def main_command(
                     debug,
                     do_update_database,
                     submanager_socket_paths,
-                    generators_path,
                     destination_path,
+                    generators_path,
                     graph_path,
                     10,
                 )

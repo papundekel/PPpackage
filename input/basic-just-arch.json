@@ -5,11 +5,5 @@
             "coreutils",
             "sh"
         ]
-    },
-    "options": {},
-    "generators": [
-        "CMakeDeps",
-        "CMakeToolchain",
-        "versions"
-    ]
+    }
 }

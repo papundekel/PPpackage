@@ -1,4 +1,3 @@
-from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from pathlib import Path
 from sys import stderr, stdin
@@ -88,8 +87,8 @@ async def main(
     debug: bool,
     do_update_database: bool,
     submanager_socket_paths: Mapping[str, Path],
-    generators_path: Path,
     destination_path: Path,
+    generators_path: Path | None,
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
@@ -111,12 +110,14 @@ async def main(
                 managers = input.requirements.keys()
                 await update_database(debug, connections, managers)
 
+            options = input.options if input.options is not None else {}
+
             graph = await resolve(
                 debug,
                 resolve_iteration_limit,
                 connections,
                 input.requirements,
-                input.options,
+                options,
             )
 
             if graph_path is not None:
@@ -126,16 +127,7 @@ async def main(
 
             generations = list(topological_generations(reversed_graph))
 
-            await fetch(debug, connections, input.options, graph, generations)
-
-            generators = await generate(
-                debug,
-                connections,
-                True,
-                input.generators,
-                graph.nodes(data=True),
-                input.options,
-            )
+            await fetch(debug, connections, options, graph, generations)
 
             old_installation = tar_archive(destination_path)
 
@@ -143,7 +135,17 @@ async def main(
                 debug, connections, old_installation, generations
             )
 
-            tar_extract(generators, generators_path)
+            if generators_path is not None and input.generators is not None:
+                generators_directory = await generate(
+                    debug,
+                    connections,
+                    True,
+                    input.generators,
+                    graph.nodes(data=True),
+                    options,
+                )
+                tar_extract(generators_directory, generators_path)
+
             tar_extract(new_installation, destination_path)
 
             stderr.write("Done.\n")
