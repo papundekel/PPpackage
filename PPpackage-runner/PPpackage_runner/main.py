@@ -35,11 +35,11 @@ def edit_json_file(debug: bool, path: Path):
             json_dump(data, file, indent=4 if debug else None)
 
 
-config_relative_path = Path("config.json")
+CONFIG_RELATIVE_PATH = Path("config.json")
 
 
 def edit_config(debug: bool, bundle_path: Path):
-    return edit_json_file(debug, bundle_path / config_relative_path)
+    return edit_json_file(debug, bundle_path / CONFIG_RELATIVE_PATH)
 
 
 async def handle_command(
@@ -217,8 +217,7 @@ async def create_config(debug: bool, bundle_path: Path):
         "crun",
         "spec",
         "--rootless",
-        "--bundle",
-        str(bundle_path),
+        cwd=bundle_path,
         stdin=DEVNULL,
         stdout=DEVNULL,
         stderr=None,
