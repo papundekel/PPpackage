@@ -6,6 +6,7 @@ WORKDIR /workdir
 RUN pacman --noconfirm -Syu
 
 RUN pacman --noconfirm -S python
+RUN pacman --noconfirm -S cmake
 RUN aur-install conan
 
 ENV VIRTUAL_ENV=/workdir/.venv/
