@@ -94,7 +94,7 @@ async def fetch(
                 conanfile_file.name,
                 stdin=DEVNULL,
                 stdout=PIPE,
-                stderr=DEVNULL,
+                stderr=None,
                 env=environment,
             )
 
