@@ -105,18 +105,15 @@ async def process_build(
         is_root, directory = await f
 
         # the message must be sent atomically
-        await lock.acquire()
+        async with lock:
+            await dump_one(
+                debug,
+                writer,
+                BuildResult(name=package_name, is_root=is_root),
+                loop=True,
+            )
 
-        await dump_one(
-            debug,
-            writer,
-            BuildResult(name=package_name, is_root=is_root),
-            loop=True,
-        )
-
-        await dump_bytes_chunked(debug, writer, directory)
-
-        lock.release()
+            await dump_bytes_chunked(debug, writer, directory)
 
 
 BuildQueue = Queue[tuple[str, Iterable[str]]]
