@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
-from typing import Any
 
 from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.parse import (
@@ -23,6 +22,8 @@ from PPpackage_utils.utils import (
     TemporaryPipe,
     discard_async_iterable,
 )
+
+from .utils import Data
 
 
 async def test_runner_run(debug: bool, runner_info: RunnerInfo):
@@ -78,13 +79,13 @@ async def generators():
 
 async def fetch(
     debug: bool,
-    runner_info: RunnerInfo,
+    data: Data,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
     build_results: AsyncIterable[BuildResult],
 ) -> AsyncIterable[PackageIDAndInfo | BuildRequest]:
-    await test_runner_run(debug, runner_info)
+    await test_runner_run(debug, data.runner_info)
 
     async for package, dependencies in packages:
         yield BuildRequest((package.name, generators()))
