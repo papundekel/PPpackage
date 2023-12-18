@@ -1,8 +1,6 @@
 from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping, Sequence
-from random import choices as random_choices
 from sys import stderr
-from typing import IO
 
 from PPpackage_utils.parse import (
     dump_bytes_chunked,
@@ -13,57 +11,91 @@ from PPpackage_utils.parse import (
 )
 from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_product
+from .utils import Connections, NodeData, data_to_product, load_success
 
 
-async def install_manager(
+async def install_patch(
     debug: bool,
     reader: StreamReader,
     writer: StreamWriter,
     manager: str,
+    id: str,
     packages: Iterable[tuple[str, NodeData]],
 ) -> None:
     stderr.write(f"{manager}:\n")
 
-    await dump_one(debug, writer, SubmanagerCommand.INSTALL)
+    await dump_one(debug, writer, SubmanagerCommand.INSTALL_PATCH)
+
+    await dump_one(debug, writer, id)
 
     products = (data_to_product(package_name, data) for package_name, data in packages)
 
     await dump_many(debug, writer, products)
 
-    success = await load_one(debug, reader, bool)
-
-    if not success:
-        raise SubmanagerCommandFailure(f"{manager} failed to install packages.")
+    await load_success(debug, reader, f"{manager} failed to install packages.")
 
     for package_name, _ in sorted(packages, key=lambda p: p[0]):
         stderr.write(f"\t{package_name}\n")
 
 
-def generate_machine_id(file: IO[bytes]):
-    content_string = (
-        "".join(random_choices([str(digit) for digit in range(10)], k=32)) + "\n"
-    )
-
-    file.write(content_string.encode())
-
-
-async def get_previous_installation(
+async def install_get(
     debug: bool,
     connections: Connections,
     initial_installation: memoryview,
     previous_manager: str | None,
+    ids: Mapping[str, str],
 ):
     if previous_manager is None:
         return initial_installation
 
     previous_reader, previous_writer = await connections.connect(previous_manager)
 
-    await dump_one(debug, previous_writer, SubmanagerCommand.INSTALL_DOWNLOAD)
+    await dump_one(debug, previous_writer, SubmanagerCommand.INSTALL_GET)
+    await dump_one(debug, previous_writer, ids[previous_manager])
 
     installation = await load_bytes_chunked(debug, previous_reader)
 
     return installation
+
+
+async def install_post(
+    debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
+    installation: memoryview,
+):
+    await dump_one(debug, writer, SubmanagerCommand.INSTALL_POST)
+    await dump_bytes_chunked(debug, writer, installation)
+
+    id = await load_one(debug, reader, str)
+
+    return id
+
+
+async def install_put(
+    debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
+    id: str,
+    installation: memoryview,
+):
+    await dump_one(debug, writer, SubmanagerCommand.INSTALL_PUT)
+    await dump_one(debug, writer, id)
+    await dump_bytes_chunked(debug, writer, installation)
+
+    await load_success(debug, reader, f"Failed to update installation {id}.")
+
+
+async def install_delete(
+    debug: bool,
+    reader: StreamReader,
+    writer: StreamWriter,
+    id: str,
+):
+    await dump_one(debug, writer, SubmanagerCommand.INSTALL_DELETE)
+    await dump_one(debug, writer, id)
+
+    await load_success(debug, reader, f"Failed to delete installation {id}.")
 
 
 async def install(
@@ -75,6 +107,7 @@ async def install(
     stderr.write(f"Installing packages...\n")
 
     previous_manager: str | None = None
+    ids = dict[str, str]()
 
     for generation in generations:
         for manager, packages in generation.items():
@@ -84,19 +117,31 @@ async def install(
             reader, writer = await connections.connect(manager)
 
             if previous_manager != manager:
-                installation = await get_previous_installation(
-                    debug, connections, initial_installation, previous_manager
+                installation = await install_get(
+                    debug, connections, initial_installation, previous_manager, ids
                 )
 
-                await dump_one(debug, writer, SubmanagerCommand.INSTALL_UPLOAD)
-                await dump_bytes_chunked(debug, writer, installation)
+                id = ids.get(manager)
 
-            await install_manager(debug, reader, writer, manager, packages)
+                if id is None:
+                    id = await install_post(debug, reader, writer, installation)
+                    ids[manager] = id
+                else:
+                    await install_put(debug, reader, writer, id, installation)
+            else:
+                id = ids[manager]
+
+            await install_patch(debug, reader, writer, manager, id, packages)
 
             previous_manager = manager
 
-    installation = await get_previous_installation(
-        debug, connections, initial_installation, previous_manager
+    installation = await install_get(
+        debug, connections, initial_installation, previous_manager, ids
     )
+
+    for manager, id in ids.items():
+        reader, writer = await connections.connect(manager)
+
+        await install_delete(debug, reader, writer, id)
 
     return installation

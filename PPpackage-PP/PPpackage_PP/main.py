@@ -10,12 +10,18 @@ from PPpackage_utils.submanager import (
     run_server,
     update_database_noop,
 )
-from PPpackage_utils.utils import RunnerInfo
+from PPpackage_utils.utils import Installations, RunnerInfo
 
 from .fetch import fetch
-from .install import install, install_download, install_upload
+from .install import (
+    install_delete,
+    install_get,
+    install_patch,
+    install_post,
+    install_put,
+)
 from .resolve import resolve
-from .utils import Installation
+from .utils import Data
 
 PROGRAM_NAME = "PPpackage-PP"
 
@@ -24,16 +30,13 @@ CALLBACKS = SubmanagerCallbacks(
     resolve,
     fetch,
     generate_empty,
-    install,
-    install_upload,
-    install_download,
+    install_patch,
+    install_post,
+    install_put,
+    install_get,
+    install_delete,
     str,
 )
-
-
-@contextmanager
-def session_lifetime(debug: bool, data: Any):
-    yield Installation(memoryview(bytes()))
 
 
 @asynccontextmanager
@@ -43,7 +46,7 @@ async def lifetime(
     debug: bool,
 ):
     yield partial(
-        handle_connection, cache_path, CALLBACKS, runner_info, session_lifetime
+        handle_connection, cache_path, CALLBACKS, Data(runner_info, Installations(1000))
     )
 
 

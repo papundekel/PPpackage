@@ -7,6 +7,7 @@ from json import load as json_load
 from os import getgid, getuid
 from pathlib import Path
 from subprocess import DEVNULL
+from sys import stderr
 from typing import Tuple
 from typing import cast as type_cast
 
@@ -102,7 +103,7 @@ async def pull_image(
                 stderr=DEVNULL,
             )
 
-            await process.communicate(dockerfile.encode("utf-8"))
+            await process.communicate(dockerfile.encode())
             return_code = await process.wait()
 
             return return_code == 0, "pppackage/runner-image"

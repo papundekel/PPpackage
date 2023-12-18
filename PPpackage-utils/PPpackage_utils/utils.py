@@ -301,9 +301,11 @@ class SubmanagerCommand(Enum):
     RESOLVE = enum_auto()
     FETCH = enum_auto()
     GENERATE = enum_auto()
-    INSTALL = enum_auto()
-    INSTALL_UPLOAD = enum_auto()
-    INSTALL_DOWNLOAD = enum_auto()
+    INSTALL_PATCH = enum_auto()
+    INSTALL_POST = enum_auto()
+    INSTALL_PUT = enum_auto()
+    INSTALL_GET = enum_auto()
+    INSTALL_DELETE = enum_auto()
     END = enum_auto()
 
 
@@ -351,3 +353,78 @@ async def queue_put_loop(queue: Queue[T]):
         yield
     finally:
         await queue.put(None)
+
+
+class SubmanagerCommandFailure(Exception):
+    pass
+
+
+class _InstallationsImpl:
+    def __init__(self, max: int):
+        self.mapping = dict[int, memoryview]()
+        self.max = max
+        self.i = 0
+
+    def _find_new_i(self, i: int) -> int:
+        new_i = i + 1
+
+        while new_i in self.mapping:
+            if new_i >= self.max:
+                new_i = 0
+
+            new_i += 1
+
+        return new_i
+
+    def add(self, installation: memoryview) -> str:
+        i = self.i
+
+        self.mapping[i] = installation
+
+        self.i = self._find_new_i(i)
+
+        return str(i)
+
+    def put(self, id: str, installation: memoryview) -> None:
+        i = int(id)
+
+        self.mapping[i] = installation
+
+    def get(self, id: str) -> memoryview:
+        i = int(id)
+
+        return self.mapping[i]
+
+    def remove(self, id: str) -> None:
+        i = int(id)
+
+        del self.mapping[i]
+
+
+class Installations(_InstallationsImpl):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def add(self, installation: memoryview) -> str:
+        try:
+            return super().add(installation)
+        except:
+            raise SubmanagerCommandFailure
+
+    def put(self, id: str, installation: memoryview) -> None:
+        try:
+            super().put(id, installation)
+        except:
+            raise SubmanagerCommandFailure
+
+    def get(self, id: str) -> memoryview:
+        try:
+            return super().get(id)
+        except:
+            raise SubmanagerCommandFailure
+
+    def remove(self, id: str) -> None:
+        try:
+            super().remove(id)
+        except:
+            raise SubmanagerCommandFailure

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from PPpackage_utils.io import close_writer
-from PPpackage_utils.parse import Product, dump_one
+from PPpackage_utils.parse import Product, dump_one, load_one
 from PPpackage_utils.utils import SubmanagerCommand
 
 
@@ -41,15 +41,17 @@ class Connections:
     async def connect(self, manager: str, strict: bool = False):
         connection = self._connections.get(manager)
 
-        if connection is None:
-            if strict:
-                raise KeyError()
+        if connection is not None:
+            return connection
 
-            socket_path = self._submanager_socket_paths[manager]
+        if strict:
+            raise KeyError()
 
-            connection = await open_unix_connection(socket_path)
+        socket_path = self._submanager_socket_paths[manager]
 
-            self._connections[manager] = connection
+        connection = await open_unix_connection(socket_path)
+
+        self._connections[manager] = connection
 
         return connection
 
@@ -64,3 +66,10 @@ class Connections:
             async with TaskGroup() as group:
                 for _, writer in self._connections.values():
                     group.create_task(close_submanager(debug, writer))
+
+
+async def load_success(debug: bool, reader: StreamReader, message: str):
+    success = await load_one(debug, reader, bool)
+
+    if not success:
+        raise SubmanagerCommandFailure(message)

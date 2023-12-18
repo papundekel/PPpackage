@@ -13,15 +13,12 @@ from PPpackage_utils.parse import (
     dump_one,
     load_one,
 )
-from PPpackage_utils.submanager import (
-    BuildRequest,
-    BuildResult,
-    SubmanagerCommandFailure,
-)
+from PPpackage_utils.submanager import BuildRequest, BuildResult
 from PPpackage_utils.utils import (
     ImageType,
     RunnerInfo,
     RunnerRequestType,
+    SubmanagerCommandFailure,
     TarFileInMemoryRead,
     TemporaryPipe,
     discard_async_iterable,
@@ -82,7 +79,6 @@ async def generators():
 async def fetch(
     debug: bool,
     runner_info: RunnerInfo,
-    session_data: Any,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],

@@ -14,17 +14,13 @@ from PPpackage_utils.parse import (
     PackageIDAndInfo,
     load_object,
 )
-from PPpackage_utils.submanager import (
-    BuildResult,
-    SubmanagerCommandFailure,
-    discard_build_results_context,
-)
-from PPpackage_utils.utils import asubprocess_wait
+from PPpackage_utils.submanager import BuildResult, discard_build_results_context
+from PPpackage_utils.utils import SubmanagerCommandFailure, asubprocess_wait
 
 from .parse import FetchProductInfo
 from .utils import (
+    Data,
     FetchNode,
-    PackagePaths,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -54,8 +50,7 @@ async def create_requirements(
 
 async def fetch(
     debug: bool,
-    package_paths: PackagePaths,
-    session_data: Any,
+    data: Data,
     cache_path: Path,
     options: Options,
     packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
@@ -67,7 +62,7 @@ async def fetch(
         environment = make_conan_environment(cache_path)
 
         jinja_loader = Jinja2Environment(
-            loader=Jinja2FileSystemLoader(package_paths.data_path),
+            loader=Jinja2FileSystemLoader(data.data_path),
             autoescape=jinja2_select_autoescape(),
         )
 
@@ -85,7 +80,7 @@ async def fetch(
             ) as host_profile_file,
         ):
             host_profile_path = Path(host_profile_file.name)
-            build_profile_path = package_paths.data_path / "profile"
+            build_profile_path = data.data_path / "profile"
 
             process = await create_subprocess_exec(
                 "conan",

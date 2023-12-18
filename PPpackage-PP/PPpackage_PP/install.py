@@ -1,8 +1,6 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
-from typing import Any
 
-from PPpackage_PP.utils import Installation
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
     TarFileInMemoryWrite,
@@ -11,12 +9,14 @@ from PPpackage_utils.utils import (
     tar_append,
 )
 
+from .utils import Data
 
-async def install(
+
+async def install_patch(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
     cache_path: Path,
+    id: str,
     products: AsyncIterable[Product],
 ):
     prefix = Path("PP")
@@ -30,23 +30,40 @@ async def install(
             with create_tar_file(new_tar, product_path) as file:
                 file.write(f"{product.version} {product.product_id}".encode())
 
-        tar_append(session_directory.data, new_tar)
+        installation = data.installations.get(id)
+        tar_append(installation, new_tar)
 
-    session_directory.data = new_tar.data
+    data.installations.put(id, new_tar.data)
 
 
-async def install_upload(
+async def install_post(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
     new_directory: memoryview,
-):
-    session_directory.data = new_directory
+) -> str:
+    return data.installations.add(new_directory)
 
 
-async def install_download(
+async def install_put(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
+    id: str,
+    new_directory: memoryview,
+) -> None:
+    data.installations.put(id, new_directory)
+
+
+async def install_get(
+    debug: bool,
+    data: Data,
+    id: str,
 ) -> memoryview:
-    return session_directory.data
+    return data.installations.get(id)
+
+
+async def install_delete(
+    debug: bool,
+    data: Data,
+    id: str,
+) -> None:
+    data.installations.remove(id)
