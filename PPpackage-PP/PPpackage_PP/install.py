@@ -1,4 +1,3 @@
-from collections.abc import AsyncIterable
 from pathlib import Path
 
 from PPpackage_utils.parse import Product
@@ -17,18 +16,17 @@ async def install_patch(
     data: Data,
     cache_path: Path,
     id: str,
-    products: AsyncIterable[Product],
+    product: Product,
 ):
     prefix = Path("PP")
 
     with TarFileInMemoryWrite() as new_tar:
         create_tar_directory(new_tar, prefix)
 
-        async for product in products:
-            product_path = prefix / product.name
+        product_path = prefix / product.name
 
-            with create_tar_file(new_tar, product_path) as file:
-                file.write(f"{product.version} {product.product_id}".encode())
+        with create_tar_file(new_tar, product_path) as file:
+            file.write(f"{product.version} {product.product_id}".encode())
 
         installation = data.installations.get(id)
         tar_append(installation, new_tar)

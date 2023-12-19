@@ -1,6 +1,6 @@
-from asyncio import TaskGroup, create_subprocess_exec
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 
 from PPpackage_utils.parse import Product
@@ -49,7 +49,7 @@ async def install_patch(
     data: Data,
     cache_path: Path,
     id: str,
-    products: AsyncIterable[Product],
+    product: Product,
 ):
     cache_path = get_cache_path(cache_path)
 
@@ -58,20 +58,7 @@ async def install_patch(
     prefix = Path("conan")
 
     with TarFileInMemoryWrite() as new_tar:
-        async with TaskGroup() as group:
-            success_tasks = []
-            async for product in products:
-                success_tasks.append(
-                    group.create_task(
-                        install_product(
-                            debug,
-                            environment,
-                            prefix,
-                            new_tar,
-                            product,
-                        )
-                    )
-                )
+        await install_product(debug, environment, prefix, new_tar, product)
 
         installation = data.installations.get(id)
         tar_append(installation, new_tar)

@@ -1,13 +1,11 @@
-from ast import Sub
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import AsyncIterable, MutableMapping
+from collections.abc import MutableMapping
 from io import TextIOWrapper
 from pathlib import Path
 from shutil import rmtree
 from sys import stderr
 from tempfile import mkdtemp
-from typing import Any
 
 from PPpackage_utils.io import (
     pipe_read_line_maybe,
@@ -99,7 +97,7 @@ async def install_patch(
     runner_connection: RunnerConnection,
     cache_path: Path,
     id: str,
-    products: AsyncIterable[Product],
+    product: Product,
 ):
     _, cache_path = get_cache_paths(cache_path)
 
@@ -140,7 +138,6 @@ async def install_patch(
                         cache_path
                         / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
                     )
-                    async for product in products
                 ],
                 stdin=DEVNULL,
                 stdout=DEVNULL,

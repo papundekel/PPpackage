@@ -1,4 +1,3 @@
-import itertools
 from collections.abc import (
     Iterable,
     Mapping,
@@ -6,7 +5,6 @@ from collections.abc import (
     MutableSequence,
     MutableSet,
     Sequence,
-    Set,
 )
 from pathlib import Path
 from platform import node
@@ -43,9 +41,9 @@ def topological_generations(
         yield manager_nodes
 
 
-def topological_test_visit(
+def install_topology_visit(
     graph: MultiDiGraph, seen: MutableSet[ManagerAndName], node: ManagerAndName
-) -> Iterable[ManagerAndName]:
+) -> Iterable[tuple[ManagerAndName, NodeData]]:
     if node not in seen:
         seen.add(node)
 
@@ -53,33 +51,35 @@ def topological_test_visit(
         for successor in graph.successors(node):
             successor_map.setdefault(successor.manager, []).append(successor)
 
-        successors_same_manager = successor_map.get(node.manager, [])
-        for successor in successors_same_manager:
-            yield from topological_test_visit(graph, seen, successor)
-        successor_map.pop(node.manager, None)
+        successors_same_manager = successor_map.pop(node.manager, [])
 
         for successors in successor_map.values():
             for successor in successors:
-                yield from topological_test_visit(graph, seen, successor)
+                yield from install_topology_visit(graph, seen, successor)
 
-        yield node
+        for successor in successors_same_manager:
+            yield from install_topology_visit(graph, seen, successor)
+
+        yield node, graph.nodes[node]
 
 
-def topological_test_iteration(
+def create_install_topology_iteration(
     graph: MultiDiGraph,
     sources: MutableSet[ManagerAndName],
     seen: MutableSet[ManagerAndName],
-) -> Iterable[ManagerAndName]:
+) -> Iterable[tuple[ManagerAndName, NodeData]]:
     while len(sources) != 0:
         node = sources.pop()
 
         if node in seen:
             continue
 
-        yield from topological_test_visit(graph, seen, node)
+        yield from install_topology_visit(graph, seen, node)
 
 
-def topological_test(graph: MultiDiGraph) -> Iterable[ManagerAndName]:
+def create_install_topology(
+    graph: MultiDiGraph,
+) -> Iterable[tuple[ManagerAndName, NodeData]]:
     seen = set[ManagerAndName]()
 
     sources = {node for node, d in graph.in_degree() if d == 0}
@@ -97,8 +97,8 @@ def topological_test(graph: MultiDiGraph) -> Iterable[ManagerAndName]:
         same_manager_mapping.setdefault(node.manager, set()).add(node)
 
     for same_manager_sources in same_manager_mapping.values():
-        yield from topological_test_iteration(graph, same_manager_sources, seen)
-    yield from topological_test_iteration(graph, sources, seen)
+        yield from create_install_topology_iteration(graph, same_manager_sources, seen)
+    yield from create_install_topology_iteration(graph, sources, seen)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
@@ -193,14 +193,15 @@ async def main(
 
             reversed_graph = graph.reverse(copy=False)
 
-            generations = list(topological_generations(reversed_graph))
+            fetch_order = topological_generations(reversed_graph)
+            install_order = list(create_install_topology(graph))
 
-            await fetch(debug, connections, options, graph, generations)
+            await fetch(debug, connections, options, graph, fetch_order, install_order)
 
             old_installation = tar_archive(destination_path)
 
             new_installation = await install(
-                debug, connections, old_installation, generations
+                debug, connections, old_installation, install_order
             )
 
             if generators_path is not None and input.generators is not None:

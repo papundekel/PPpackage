@@ -1,10 +1,10 @@
 from asyncio import StreamReader, StreamWriter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from sys import stderr
 
 from PPpackage_utils.parse import (
+    ManagerAndName,
     dump_bytes_chunked,
-    dump_many,
     dump_one,
     load_bytes_chunked,
     load_one,
@@ -20,22 +20,20 @@ async def install_patch(
     writer: StreamWriter,
     manager: str,
     id: str,
-    packages: Iterable[tuple[str, NodeData]],
+    package_name: str,
+    package_data: NodeData,
 ) -> None:
-    stderr.write(f"{manager}:\n")
+    stderr.write(f"{manager}: ")
 
     await dump_one(debug, writer, SubmanagerCommand.INSTALL_PATCH)
-
     await dump_one(debug, writer, id)
+    await dump_one(debug, writer, data_to_product(package_name, package_data))
 
-    products = (data_to_product(package_name, data) for package_name, data in packages)
+    await load_success(
+        debug, reader, f"{manager} failed to install package {package_name}."
+    )
 
-    await dump_many(debug, writer, products)
-
-    await load_success(debug, reader, f"{manager} failed to install packages.")
-
-    for package_name, _ in sorted(packages, key=lambda p: p[0]):
-        stderr.write(f"\t{package_name}\n")
+    stderr.write(f"{package_name}\n")
 
 
 async def install_get(
@@ -102,38 +100,36 @@ async def install(
     debug: bool,
     connections: Connections,
     initial_installation: memoryview,
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    order: Iterable[tuple[ManagerAndName, NodeData]],
 ) -> memoryview:
     stderr.write(f"Installing packages...\n")
 
     previous_manager: str | None = None
     ids = dict[str, str]()
 
-    for generation in generations:
-        for manager, packages in generation.items():
-            if len(packages) == 0:
-                continue
+    for node, data in order:
+        manager = node.manager
 
-            reader, writer = await connections.connect(manager)
+        reader, writer = await connections.connect(manager)
 
-            if previous_manager != manager:
-                installation = await install_get(
-                    debug, connections, initial_installation, previous_manager, ids
-                )
+        if previous_manager != manager:
+            installation = await install_get(
+                debug, connections, initial_installation, previous_manager, ids
+            )
 
-                id = ids.get(manager)
+            id = ids.get(manager)
 
-                if id is None:
-                    id = await install_post(debug, reader, writer, installation)
-                    ids[manager] = id
-                else:
-                    await install_put(debug, reader, writer, id, installation)
+            if id is None:
+                id = await install_post(debug, reader, writer, installation)
+                ids[manager] = id
             else:
-                id = ids[manager]
+                await install_put(debug, reader, writer, id, installation)
+        else:
+            id = ids[manager]
 
-            await install_patch(debug, reader, writer, manager, id, packages)
+        await install_patch(debug, reader, writer, manager, id, node.name, data)
 
-            previous_manager = manager
+        previous_manager = manager
 
     installation = await install_get(
         debug, connections, initial_installation, previous_manager, ids

@@ -115,7 +115,7 @@ GenerateCallbackType = Callable[
     Awaitable[memoryview],
 ]
 InstallPATCHCallbackType = Callable[
-    [bool, DataTypeType, Path, str, AsyncIterable[Product]],
+    [bool, DataTypeType, Path, str, Product],
     Awaitable[None],
 ]
 InstallPOSTCallbackType = Callable[[bool, DataTypeType, memoryview], Awaitable[str]]
@@ -278,10 +278,10 @@ async def install_patch(
     cache_path: Path,
 ):
     id = await load_one(debug, reader, str)
-    products = load_many(debug, reader, Product)
+    product = await load_one(debug, reader, Product)
 
     async with write_success(debug, writer):
-        await callback(debug, data, cache_path, id, products)
+        await callback(debug, data, cache_path, id, product)
 
 
 async def install_post(

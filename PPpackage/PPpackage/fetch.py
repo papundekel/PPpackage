@@ -43,28 +43,20 @@ from .utils import Connections, NodeData, SubmanagerCommandFailure
 async def process_build_root(
     debug: bool,
     connections: Connections,
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     connections = connections.duplicate()
 
     dependency_set = {manager_and_name for manager_and_name, _ in dependencies}
 
-    dependency_generations = [
-        {
-            manager: [
-                (package, data)
-                for package, data in packages
-                if ManagerAndName(manager, package) in dependency_set
-            ]
-            for manager, packages in generation.items()
-        }
-        for generation in generations
+    dependency_install_order = [
+        (node, data) for node, data in install_order if node in dependency_set
     ]
 
     async with connections.communicate(debug):
         return True, await install(
-            debug, connections, create_empty_tar(), dependency_generations
+            debug, connections, create_empty_tar(), dependency_install_order
         )
 
 
@@ -92,11 +84,11 @@ async def process_build(
     package_name: str,
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     generators: Iterable[str],
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     for f in as_completed(
         [
-            process_build_root(debug, connections, generations, dependencies),
+            process_build_root(debug, connections, install_order, dependencies),
             process_build_generate(
                 debug, connections, meta_options, dependencies, generators
             ),
@@ -130,7 +122,7 @@ async def send(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
 ) -> None:
     await dump_one(debug, writer, SubmanagerCommand.FETCH)
 
@@ -160,7 +152,7 @@ async def send(
                     package_name,
                     dependencies,
                     generators,
-                    generations,
+                    install_order,
                 )
             )
 
@@ -266,7 +258,7 @@ async def fetch_manager(
     packages_to_dependencies: Mapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     reader, writer = await connections.connect(manager, strict=True)
 
@@ -283,7 +275,7 @@ async def fetch_manager(
                 meta_options,
                 packages,
                 packages_to_dependencies,
-                generations,
+                install_order,
             )
         )
         group.create_task(
@@ -326,7 +318,7 @@ def create_dependencies(
     return dependencies
 
 
-def graph_predecessors(
+def graph_successors(
     graph: MultiDiGraph, node: Any
 ) -> Iterable[tuple[ManagerAndName, NodeData]]:
     for node in islice(dfs_preorder_nodes(graph, source=node), 1, None):
@@ -338,7 +330,8 @@ async def fetch(
     connections: Connections,
     meta_options: Mapping[str, Mapping[str, Any] | None],
     graph: MultiDiGraph,
-    generations: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    fetch_order: Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
 ):
     stderr.write("Fetching packages...\n")
 
@@ -346,7 +339,7 @@ async def fetch(
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ] = {}
 
-    for manager_to_generation in generations:
+    for manager_to_generation in fetch_order:
         sent_product_infos: MutableSet[ManagerAndName] = set()
         manager_packages: MutableMapping[
             str, MutableSequence[tuple[Package, Iterable[Dependency]]]
@@ -356,7 +349,7 @@ async def fetch(
             for package_name, data in generation:
                 manager_and_name = ManagerAndName(manager, package_name)
 
-                node_dependencies = list(graph_predecessors(graph, manager_and_name))
+                node_dependencies = list(graph_successors(graph, manager_and_name))
 
                 dependencies = create_dependencies(
                     sent_product_infos, node_dependencies
@@ -379,6 +372,6 @@ async def fetch(
                         packages,
                         graph.nodes,
                         packages_to_dependencies,
-                        generations,
+                        install_order,
                     )
                 )
