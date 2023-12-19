@@ -8,6 +8,7 @@ from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
 from PPpackage_utils.parse import load_from_bytes, load_object
+from PPpackage_utils.utils import Installations
 from pydantic import BaseModel
 
 
@@ -96,12 +97,13 @@ def get_path(module) -> Path:
 
 
 @dataclass(frozen=True)
-class PackagePaths:
+class Data:
     data_path: Path
     deployer_path: Path
+    installations: Installations
 
 
-def get_package_paths():
+def create_data():
     import PPpackage_conan
 
     from . import deployer
@@ -109,9 +111,4 @@ def get_package_paths():
     data_path = get_path(PPpackage_conan).parent / "data"
     deployer_path = get_path(deployer)
 
-    return PackagePaths(data_path, deployer_path)
-
-
-@dataclass
-class Installation:
-    data: memoryview
+    return Data(data_path, deployer_path, Installations(1000))

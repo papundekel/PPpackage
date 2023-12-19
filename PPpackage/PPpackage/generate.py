@@ -26,27 +26,27 @@ from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_prod
 async def generate_manager(
     debug: bool,
     connections: Connections,
-    strict_connection: bool,
     options: Options,
     products: Iterable[Product],
     generators: Set[str],
     manager: str,
 ) -> memoryview:
-    reader, writer = await connections.connect(manager, strict=strict_connection)
+    async with connections.connect(debug, manager, SubmanagerCommand.GENERATE) as (
+        reader,
+        writer,
+    ):
+        await dump_one(debug, writer, options)
+        await dump_many(debug, writer, products)
+        await dump_many(debug, writer, generators)
 
-    await dump_one(debug, writer, SubmanagerCommand.GENERATE)
-    await dump_one(debug, writer, options)
-    await dump_many(debug, writer, products)
-    await dump_many(debug, writer, generators)
+        success = await load_one(debug, reader, bool)
 
-    success = await load_one(debug, reader, bool)
+        if not success:
+            raise SubmanagerCommandFailure(f"{manager} failed to create generators.")
 
-    if not success:
-        raise SubmanagerCommandFailure(f"{manager} failed to create generators.")
+        generators_directory = await load_bytes_chunked(debug, reader)
 
-    generators_directory = await load_bytes_chunked(debug, reader)
-
-    return generators_directory
+        return generators_directory
 
 
 def check_results(
@@ -68,7 +68,6 @@ def check_results(
 async def generate(
     debug: bool,
     connections: Connections,
-    strict_connection: bool,
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Mapping[str, Any] | None],
@@ -100,7 +99,6 @@ async def generate(
                     generate_manager(
                         debug,
                         connections,
-                        strict_connection,
                         meta_options.get(manager),
                         products,
                         generators - builtin_generators.keys(),

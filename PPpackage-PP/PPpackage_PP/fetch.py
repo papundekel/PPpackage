@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
-from typing import Any
 
 from PPpackage_utils.io import communicate_with_runner
 from PPpackage_utils.parse import (
@@ -13,19 +12,17 @@ from PPpackage_utils.parse import (
     dump_one,
     load_one,
 )
-from PPpackage_utils.submanager import (
-    BuildRequest,
-    BuildResult,
-    SubmanagerCommandFailure,
-)
 from PPpackage_utils.utils import (
     ImageType,
     RunnerInfo,
     RunnerRequestType,
+    SubmanagerCommandFailure,
     TarFileInMemoryRead,
     TemporaryPipe,
     discard_async_iterable,
 )
+
+from .utils import Data
 
 
 async def test_runner_run(debug: bool, runner_info: RunnerInfo):
@@ -75,44 +72,37 @@ async def test_runner_run(debug: bool, runner_info: RunnerInfo):
             raise SubmanagerCommandFailure
 
 
-async def generators():
+async def create_generators():
     yield "versions"
+
+
+def print_tar(data: memoryview):
+    with TarFileInMemoryRead(data) as tar:
+        print("PP test:", file=stderr)
+        for member in tar.getmembers():
+            print(f"\t{member.name}", file=stderr)
 
 
 async def fetch(
     debug: bool,
-    runner_info: RunnerInfo,
-    session_data: Any,
+    data: Data,
     cache_path: Path,
     options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-    build_results: AsyncIterable[BuildResult],
-) -> AsyncIterable[PackageIDAndInfo | BuildRequest]:
-    await test_runner_run(debug, runner_info)
+    package: Package,
+    dependencies: AsyncIterable[Dependency],
+    installation: memoryview | None,
+    generators: memoryview | None,
+) -> PackageIDAndInfo | AsyncIterable[str]:
+    if generators is None:
+        return create_generators()
 
-    async for package, dependencies in packages:
-        yield BuildRequest((package.name, generators()))
+    await test_runner_run(debug, data.runner_info)
 
-        await discard_async_iterable(dependencies)
+    await discard_async_iterable(dependencies)
 
-    received_installations = set[str]()
-    received_generators = set[str]()
+    if installation is not None:
+        print_tar(installation)
 
-    async for build_result in build_results:
-        package_name = build_result.name
+    print_tar(generators)
 
-        with TarFileInMemoryRead(build_result.data) as tar:
-            print("PP test:", file=stderr)
-            for member in tar.getmembers():
-                print(f"\t{member.name}", file=stderr)
-
-        if build_result.is_installation:
-            received_installations.add(package_name)
-        else:
-            received_generators.add(package_name)
-
-        if (
-            package_name in received_installations
-            and package_name in received_generators
-        ):
-            yield PackageIDAndInfo(package_name, "id", None)
+    return PackageIDAndInfo("id", None)

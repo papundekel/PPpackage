@@ -8,15 +8,15 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
-from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
+    SubmanagerCommandFailure,
     TarFileInMemoryWrite,
     TemporaryDirectory,
     asubprocess_wait,
 )
 
 from .utils import (
-    PackagePaths,
+    Data,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -62,8 +62,7 @@ def patch_native_generators(
 
 async def generate(
     debug: bool,
-    package_paths: PackagePaths,
-    session_data: Any,
+    data: Data,
     cache_path: Path,
     options: Any,
     products: AsyncIterable[Product],
@@ -74,7 +73,7 @@ async def generate(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(package_paths.data_path),
+        loader=Jinja2FileSystemLoader(data.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -100,7 +99,7 @@ async def generate(
             ) as host_profile_file,
         ):
             host_profile_path = Path(host_profile_file.name)
-            build_profile_path = package_paths.data_path / "profile"
+            build_profile_path = data.data_path / "profile"
 
             process = await create_subprocess_exec(
                 "conan",
@@ -108,7 +107,7 @@ async def generate(
                 "--output-folder",
                 str(native_generators_path),
                 "--deployer",
-                package_paths.deployer_path,
+                data.deployer_path,
                 "--build",
                 "never",
                 f"--profile:host={host_profile_path}",

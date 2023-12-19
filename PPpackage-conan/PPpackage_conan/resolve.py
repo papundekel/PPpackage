@@ -18,8 +18,8 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
+    SubmanagerCommandFailure,
     asubprocess_communicate,
     asubprocess_wait,
     ensure_dir_exists,
@@ -27,7 +27,7 @@ from PPpackage_utils.utils import (
 
 from .parse import Requirement
 from .utils import (
-    PackagePaths,
+    Data,
     ResolveNode,
     create_and_render_temp_file,
     get_cache_path,
@@ -244,8 +244,7 @@ async def create_graph(
 
 async def resolve(
     debug: bool,
-    package_paths: PackagePaths,
-    session_data: Any,
+    data: Data,
     cache_path: Path,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],
@@ -258,7 +257,7 @@ async def resolve(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(package_paths.data_path),
+        loader=Jinja2FileSystemLoader(data.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -267,7 +266,7 @@ async def resolve(
     root_template = jinja_loader.get_template("conanfile-root.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    build_profile_path = package_paths.data_path / "profile"
+    build_profile_path = data.data_path / "profile"
 
     requirement_index = 0
 

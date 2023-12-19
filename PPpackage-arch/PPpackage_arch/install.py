@@ -1,10 +1,11 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from collections.abc import AsyncIterable, MutableMapping
+from collections.abc import MutableMapping
 from io import TextIOWrapper
 from pathlib import Path
+from shutil import rmtree
 from sys import stderr
-from typing import Any
+from tempfile import mkdtemp
 
 from PPpackage_utils.io import (
     pipe_read_line_maybe,
@@ -14,9 +15,9 @@ from PPpackage_utils.io import (
     pipe_write_string,
 )
 from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
-from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
     RunnerRequestType,
+    SubmanagerCommandFailure,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
@@ -82,14 +83,25 @@ def create_environment(
 DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
 
 
-async def install(
+def get_destination_path(runner_connection: RunnerConnection, id: str):
+    destination_path = runner_connection.workdir_path / Path(id)
+
+    if not destination_path.exists():
+        raise SubmanagerCommandFailure
+
+    return destination_path
+
+
+async def install_patch(
     debug: bool,
     runner_connection: RunnerConnection,
-    destination_path: Path,
     cache_path: Path,
-    products: AsyncIterable[Product],
+    id: str,
+    product: Product,
 ):
     _, cache_path = get_cache_paths(cache_path)
+
+    destination_path = get_destination_path(runner_connection, id)
 
     database_path = destination_path / DATABASE_PATH_RELATIVE
 
@@ -126,7 +138,6 @@ async def install(
                         cache_path
                         / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
                     )
-                    async for product in products
                 ],
                 stdin=DEVNULL,
                 stdout=DEVNULL,
@@ -160,18 +171,36 @@ async def install(
         await asubprocess_wait(process, SubmanagerCommandFailure())
 
 
-async def install_upload(
+async def install_post(
     debug: bool,
-    data: Any,
-    destination_path: Path,
+    connection: RunnerConnection,
+    new_directory: memoryview,
+) -> str:
+    destination_path = Path(mkdtemp(dir=Path(connection.workdir_path)))
+
+    tar_extract(new_directory, destination_path)
+
+    return str(destination_path.relative_to(connection.workdir_path))
+
+
+async def install_put(
+    debug: bool,
+    connection: RunnerConnection,
+    id: str,
     new_directory: memoryview,
 ):
+    destination_path = get_destination_path(connection, id)
+
     tar_extract(new_directory, destination_path)
 
 
-async def install_download(
-    debug: bool,
-    data: Any,
-    destination_path: Path,
-) -> memoryview:
+async def install_get(debug: bool, connection: RunnerConnection, id: str) -> memoryview:
+    destination_path = get_destination_path(connection, id)
+
     return tar_archive(destination_path)
+
+
+async def install_delete(debug: bool, connection: RunnerConnection, id: str):
+    destination_path = get_destination_path(connection, id)
+
+    rmtree(destination_path)

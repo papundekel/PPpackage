@@ -1,7 +1,6 @@
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
-from typing import Any
 
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
@@ -12,10 +11,16 @@ from PPpackage_utils.submanager import (
 
 from .fetch import fetch
 from .generate import generate
-from .install import install, install_download, install_upload
+from .install import (
+    install_delete,
+    install_get,
+    install_patch,
+    install_post,
+    install_put,
+)
 from .parse import Requirement
 from .resolve import resolve
-from .utils import Installation, get_package_paths
+from .utils import create_data
 
 PROGRAM_NAME = "PPpackage-conan"
 CALLBACKS = SubmanagerCallbacks(
@@ -23,16 +28,13 @@ CALLBACKS = SubmanagerCallbacks(
     resolve,
     fetch,
     generate,
-    install,
-    install_upload,
-    install_download,
+    install_patch,
+    install_post,
+    install_put,
+    install_get,
+    install_delete,
     Requirement,
 )
-
-
-@contextmanager
-def session_lifetime(debug: bool, data: Any):
-    yield Installation(memoryview(bytes()))
 
 
 @asynccontextmanager
@@ -40,11 +42,9 @@ async def lifetime(
     cache_path: Path,
     debug: bool,
 ):
-    package_paths = get_package_paths()
+    data = create_data()
 
-    yield partial(
-        handle_connection, cache_path, CALLBACKS, package_paths, session_lifetime
-    )
+    yield partial(handle_connection, cache_path, CALLBACKS, data)
 
 
 async def main(

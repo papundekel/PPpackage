@@ -82,7 +82,6 @@ class Product:
 
 @dataclass(frozen=True)
 class PackageIDAndInfo:
-    name: str
     product_id: str
     product_info: Any
 

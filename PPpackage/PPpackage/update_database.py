@@ -2,7 +2,7 @@ from asyncio import TaskGroup
 from collections.abc import Iterable
 from sys import stderr
 
-from PPpackage_utils.parse import dump_one, load_one
+from PPpackage_utils.parse import load_one
 from PPpackage_utils.utils import SubmanagerCommand
 
 from .utils import Connections, SubmanagerCommandFailure
@@ -11,14 +11,13 @@ from .utils import Connections, SubmanagerCommandFailure
 async def update_database_manager(debug: bool, connections: Connections, manager: str):
     stderr.write(f"Updating {manager} database...\n")
 
-    reader, writer = await connections.connect(manager)
+    async with connections.connect(
+        debug, manager, SubmanagerCommand.UPDATE_DATABASE
+    ) as (reader, _):
+        success = await load_one(debug, reader, bool)
 
-    await dump_one(debug, writer, SubmanagerCommand.UPDATE_DATABASE)
-
-    success = await load_one(debug, reader, bool)
-
-    if not success:
-        raise SubmanagerCommandFailure(f"{manager} failed to update its database.")
+        if not success:
+            raise SubmanagerCommandFailure(f"{manager} failed to update its database.")
 
 
 async def update_database(

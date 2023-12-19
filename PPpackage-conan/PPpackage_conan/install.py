@@ -1,19 +1,17 @@
-from asyncio import TaskGroup, create_subprocess_exec
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from PPpackage_utils.parse import Product
-from PPpackage_utils.submanager import SubmanagerCommandFailure
 from PPpackage_utils.utils import (
-    TarFileInMemoryWrite,
+    SubmanagerCommandFailure,
+    TarFileInMemoryAppend,
     TarFileWithBytes,
     asubprocess_wait,
-    tar_append,
 )
 
-from .utils import Installation, get_cache_path, make_conan_environment
+from .utils import Data, get_cache_path, make_conan_environment
 
 
 async def install_product(
@@ -45,12 +43,12 @@ async def install_product(
     tar.add(product_path, str(prefix / product.name))
 
 
-async def install(
+async def install_patch(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
     cache_path: Path,
-    products: AsyncIterable[Product],
+    id: str,
+    product: Product,
 ):
     cache_path = get_cache_path(cache_path)
 
@@ -58,39 +56,42 @@ async def install(
 
     prefix = Path("conan")
 
-    with TarFileInMemoryWrite() as new_tar:
-        async with TaskGroup() as group:
-            success_tasks = []
-            async for product in products:
-                success_tasks.append(
-                    group.create_task(
-                        install_product(
-                            debug,
-                            environment,
-                            prefix,
-                            new_tar,
-                            product,
-                        )
-                    )
-                )
+    installation = data.installations.get(id)
 
-        tar_append(session_directory.data, new_tar)
+    with TarFileInMemoryAppend(installation) as new_tar:
+        await install_product(debug, environment, prefix, new_tar, product)
 
-    session_directory.data = new_tar.data
+    data.installations.put(id, new_tar.data)
 
 
-async def install_upload(
+async def install_post(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
     new_directory: memoryview,
-):
-    session_directory.data = new_directory
+) -> str:
+    return data.installations.add(new_directory)
 
 
-async def install_download(
+async def install_put(
     debug: bool,
-    data: Any,
-    session_directory: Installation,
+    data: Data,
+    id: str,
+    new_directory: memoryview,
+) -> None:
+    data.installations.put(id, new_directory)
+
+
+async def install_get(
+    debug: bool,
+    data: Data,
+    id: str,
 ) -> memoryview:
-    return session_directory.data
+    return data.installations.get(id)
+
+
+async def install_delete(
+    debug: bool,
+    data: Data,
+    id: str,
+) -> None:
+    data.installations.remove(id)
