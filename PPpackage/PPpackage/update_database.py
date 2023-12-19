@@ -2,7 +2,7 @@ from asyncio import TaskGroup
 from collections.abc import Iterable
 from sys import stderr
 
-from PPpackage_utils.parse import dump_one, load_one
+from PPpackage_utils.parse import load_one
 from PPpackage_utils.utils import SubmanagerCommand
 
 from .utils import Connections, SubmanagerCommandFailure

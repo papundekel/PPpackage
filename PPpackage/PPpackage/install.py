@@ -1,4 +1,3 @@
-from asyncio import StreamReader, StreamWriter
 from collections.abc import Iterable, Mapping
 from sys import stderr
 
