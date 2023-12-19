@@ -1,7 +1,7 @@
 from asyncio import CancelledError, StreamReader, StreamWriter, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import start_unix_server
-from collections.abc import AsyncIterable, Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import partial, wraps
@@ -9,14 +9,12 @@ from inspect import iscoroutinefunction
 from pathlib import Path
 from signal import SIGTERM
 from sys import stderr
-from token import OP
 from traceback import print_exc
 from typing import Any, Generic, TypeVar
 
 from pid import PidFile, PidFileAlreadyLockedError
 from typer import Exit, Typer
 
-from .parse import BuildResult as BuildResultParse
 from .parse import (
     Dependency,
     Options,
@@ -25,7 +23,6 @@ from .parse import (
     Product,
     ResolutionGraph,
     dump_bytes_chunked,
-    dump_loop_async,
     dump_many_async,
     dump_one,
     load_bytes_chunked,
@@ -65,9 +62,6 @@ class AsyncTyper(Typer):
         return partial(self.maybe_run_async, decorator)
 
 
-BuildRequest = tuple[str, AsyncIterable[str]]
-
-
 @dataclass(frozen=True)
 class BuildResult:
     name: str
@@ -97,10 +91,12 @@ FetchCallbackType = Callable[
         DataTypeType,
         Path,
         Any,
-        AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-        AsyncIterable[BuildResult],
+        Package,
+        AsyncIterable[Dependency],
+        memoryview | None,
+        memoryview | None,
     ],
-    AsyncIterable[PackageIDAndInfo | BuildRequest],
+    Awaitable[PackageIDAndInfo | AsyncIterable[str]],
 ]
 
 GenerateCallbackType = Callable[
@@ -209,44 +205,34 @@ async def fetch(
 ):
     options = await load_one(debug, reader, Options)
 
-    packages = (
-        (
-            await load_one(debug, reader, Package),
-            load_many(debug, reader, Dependency),
-        )
-        async for _ in load_loop(debug, reader)
+    package = await load_one(debug, reader, Package)
+    installation_present = await load_one(debug, reader, bool)
+    installation = (
+        await load_bytes_chunked(debug, reader) if installation_present else None
     )
-
-    build_results = (
-        BuildResult(
-            (build_result := await load_one(debug, reader, BuildResultParse)).name,
-            build_result.is_root,
-            await load_bytes_chunked(debug, reader),
-        )
-        async for _ in load_loop(debug, reader)
-    )
+    generators_present = await load_one(debug, reader, bool)
+    generators = await load_bytes_chunked(debug, reader) if generators_present else None
+    dependencies = load_many(debug, reader, Dependency)
 
     async with write_success(debug, writer):
-        output = callback(
+        output = await callback(
             debug,
             data,
             cache_path,
             options,
-            packages,
-            build_results,
+            package,
+            dependencies,
+            installation,
+            generators,
         )
 
-        async for message in dump_loop_async(debug, writer, output):
-            is_id_and_info = isinstance(message, PackageIDAndInfo)
+    no_build = isinstance(output, PackageIDAndInfo)
+    await dump_one(debug, writer, no_build)
 
-            await dump_one(debug, writer, is_id_and_info)
-
-            if is_id_and_info:
-                await dump_one(debug, writer, message)
-            else:
-                package_name, generators = message
-                await dump_one(debug, writer, package_name)
-                await dump_many_async(debug, writer, generators)
+    if no_build:
+        await dump_one(debug, writer, output)
+    else:
+        await dump_many_async(debug, writer, output)
 
 
 async def generate(

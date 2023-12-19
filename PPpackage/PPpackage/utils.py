@@ -1,5 +1,5 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup, open_unix_connection
-from collections.abc import Mapping, MutableMapping
+from asyncio import StreamReader, StreamWriter, open_unix_connection
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, TypedDict
@@ -36,36 +36,18 @@ class SubmanagerCommandFailure(Exception):
 class Connections:
     def __init__(self, submanager_socket_paths: Mapping[str, Path]):
         self._submanager_socket_paths = submanager_socket_paths
-        self._connections: MutableMapping[str, tuple[StreamReader, StreamWriter]] = {}
-
-    async def connect(self, manager: str, strict: bool = False):
-        connection = self._connections.get(manager)
-
-        if connection is not None:
-            return connection
-
-        if strict:
-            raise KeyError()
-
-        socket_path = self._submanager_socket_paths[manager]
-
-        connection = await open_unix_connection(socket_path)
-
-        self._connections[manager] = connection
-
-        return connection
-
-    def duplicate(self):
-        return Connections(self._submanager_socket_paths)
 
     @asynccontextmanager
-    async def communicate(self, debug: bool):
+    async def connect(self, debug: bool, manager: str, command: SubmanagerCommand):
+        socket_path = self._submanager_socket_paths[manager]
+
+        reader, writer = await open_unix_connection(socket_path)
+        await dump_one(debug, writer, command)
+
         try:
-            yield
+            yield reader, writer
         finally:
-            async with TaskGroup() as group:
-                for _, writer in self._connections.values():
-                    group.create_task(close_submanager(debug, writer))
+            await close_submanager(debug, writer)
 
 
 async def load_success(debug: bool, reader: StreamReader, message: str):

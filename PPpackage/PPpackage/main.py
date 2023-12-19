@@ -1,13 +1,5 @@
-from collections.abc import (
-    Iterable,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
-    MutableSet,
-    Sequence,
-)
+from collections.abc import Iterable, Mapping, MutableSet
 from pathlib import Path
-from platform import node
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph, convert_node_labels_to_integers
@@ -29,16 +21,9 @@ from .utils import Connections, NodeData, SubmanagerCommandFailure
 
 def topological_generations(
     graph: MultiDiGraph,
-) -> Iterable[Mapping[str, Sequence[tuple[str, NodeData]]]]:
+) -> Iterable[Iterable[tuple[ManagerAndName, NodeData]]]:
     for generation in base_topological_generations(graph):
-        manager_nodes: MutableMapping[str, MutableSequence[tuple[str, NodeData]]] = {}
-
-        for manager_and_name in generation:
-            manager_nodes.setdefault(manager_and_name.manager, []).append(
-                (manager_and_name.name, graph.nodes[manager_and_name])
-            )
-
-        yield manager_nodes
+        yield [(node, graph.nodes[node]) for node in generation]
 
 
 def install_topology_visit(
@@ -163,61 +148,59 @@ async def main(
     try:
         connections = Connections(submanager_socket_paths)
 
-        async with connections.communicate(debug):
-            input_json_bytes = stdin.buffer.read()
+        input_json_bytes = stdin.buffer.read()
 
-            try:
-                input = load_from_bytes(debug, Input, input_json_bytes)
-            except ValidationError as e:
-                stderr.write("ERROR: Invalid input.\n")
-                stderr.write(e.json(indent=4))
+        try:
+            input = load_from_bytes(debug, Input, input_json_bytes)
+        except ValidationError as e:
+            stderr.write("ERROR: Invalid input.\n")
+            stderr.write(e.json(indent=4))
 
-                return
+            return
 
-            if do_update_database:
-                managers = input.requirements.keys()
-                await update_database(debug, connections, managers)
+        if do_update_database:
+            managers = input.requirements.keys()
+            await update_database(debug, connections, managers)
 
-            options = input.options if input.options is not None else {}
+        options = input.options if input.options is not None else {}
 
-            graph = await resolve(
+        graph = await resolve(
+            debug,
+            resolve_iteration_limit,
+            connections,
+            input.requirements,
+            options,
+        )
+
+        if graph_path is not None:
+            graph_to_dot(graph, graph_path)
+
+        reversed_graph = graph.reverse(copy=False)
+
+        fetch_order = topological_generations(reversed_graph)
+        install_order = list(create_install_topology(graph))
+
+        await fetch(debug, connections, options, graph, fetch_order, install_order)
+
+        old_installation = tar_archive(destination_path)
+
+        new_installation = await install(
+            debug, connections, old_installation, install_order
+        )
+
+        if generators_path is not None and input.generators is not None:
+            generators_directory = await generate(
                 debug,
-                resolve_iteration_limit,
                 connections,
-                input.requirements,
+                input.generators,
+                graph.nodes(data=True),
                 options,
             )
+            tar_extract(generators_directory, generators_path)
 
-            if graph_path is not None:
-                graph_to_dot(graph, graph_path)
+        tar_extract(new_installation, destination_path)
 
-            reversed_graph = graph.reverse(copy=False)
-
-            fetch_order = topological_generations(reversed_graph)
-            install_order = list(create_install_topology(graph))
-
-            await fetch(debug, connections, options, graph, fetch_order, install_order)
-
-            old_installation = tar_archive(destination_path)
-
-            new_installation = await install(
-                debug, connections, old_installation, install_order
-            )
-
-            if generators_path is not None and input.generators is not None:
-                generators_directory = await generate(
-                    debug,
-                    connections,
-                    True,
-                    input.generators,
-                    graph.nodes(data=True),
-                    options,
-                )
-                tar_extract(generators_directory, generators_path)
-
-            tar_extract(new_installation, destination_path)
-
-            stderr.write("Done.\n")
+        stderr.write("Done.\n")
     except* SubmanagerCommandFailure as e_group:
         log_exception(e_group)
         stderr.write("Aborting.\n")

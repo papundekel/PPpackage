@@ -12,7 +12,6 @@ from PPpackage_utils.parse import (
     dump_one,
     load_one,
 )
-from PPpackage_utils.submanager import BuildRequest, BuildResult
 from PPpackage_utils.utils import (
     ImageType,
     RunnerInfo,
@@ -73,8 +72,15 @@ async def test_runner_run(debug: bool, runner_info: RunnerInfo):
             raise SubmanagerCommandFailure
 
 
-async def generators():
+async def create_generators():
     yield "versions"
+
+
+def print_tar(data: memoryview):
+    with TarFileInMemoryRead(data) as tar:
+        print("PP test:", file=stderr)
+        for member in tar.getmembers():
+            print(f"\t{member.name}", file=stderr)
 
 
 async def fetch(
@@ -82,34 +88,21 @@ async def fetch(
     data: Data,
     cache_path: Path,
     options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-    build_results: AsyncIterable[BuildResult],
-) -> AsyncIterable[PackageIDAndInfo | BuildRequest]:
+    package: Package,
+    dependencies: AsyncIterable[Dependency],
+    installation: memoryview | None,
+    generators: memoryview | None,
+) -> PackageIDAndInfo | AsyncIterable[str]:
+    if generators is None:
+        return create_generators()
+
     await test_runner_run(debug, data.runner_info)
 
-    async for package, dependencies in packages:
-        yield BuildRequest((package.name, generators()))
+    await discard_async_iterable(dependencies)
 
-        await discard_async_iterable(dependencies)
+    if installation is not None:
+        print_tar(installation)
 
-    received_installations = set[str]()
-    received_generators = set[str]()
+    print_tar(generators)
 
-    async for build_result in build_results:
-        package_name = build_result.name
-
-        with TarFileInMemoryRead(build_result.data) as tar:
-            print("PP test:", file=stderr)
-            for member in tar.getmembers():
-                print(f"\t{member.name}", file=stderr)
-
-        if build_result.is_installation:
-            received_installations.add(package_name)
-        else:
-            received_generators.add(package_name)
-
-        if (
-            package_name in received_installations
-            and package_name in received_generators
-        ):
-            yield PackageIDAndInfo(package_name, "id", None)
+    return PackageIDAndInfo("id", None)

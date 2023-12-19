@@ -11,7 +11,6 @@ from collections.abc import (
 from dataclasses import dataclass
 from itertools import product as itertools_product
 from json import dumps as json_dumps
-from pathlib import Path
 from sys import stderr
 from typing import Any
 
@@ -39,8 +38,6 @@ async def send(
     options: Options,
     requirements_list: Iterable[Iterable[Any]],
 ) -> None:
-    await dump_one(debug, writer, SubmanagerCommand.RESOLVE)
-
     await dump_one(debug, writer, options)
 
     async for requirements in dump_loop(debug, writer, requirements_list):
@@ -70,11 +67,13 @@ async def resolve_manager(
     requirements_list: Iterable[Iterable[Any]],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ) -> None:
-    reader, writer = await connections.connect(manager)
-
-    async with TaskGroup() as group:
-        group.create_task(send(debug, writer, options, requirements_list))
-        group.create_task(receive(debug, reader, manager, resolution_graphs))
+    async with connections.connect(debug, manager, SubmanagerCommand.RESOLVE) as (
+        reader,
+        writer,
+    ):
+        async with TaskGroup() as group:
+            group.create_task(send(debug, writer, options, requirements_list))
+            group.create_task(receive(debug, reader, manager, resolution_graphs))
 
 
 @dataclass(frozen=True)

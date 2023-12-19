@@ -1,13 +1,15 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
+from os import symlink
 from pathlib import Path
 
 from PPpackage_utils.parse import Dependency, Options, Package, PackageIDAndInfo
-from PPpackage_utils.submanager import BuildResult, discard_build_results_context
 from PPpackage_utils.utils import (
     SubmanagerCommandFailure,
+    TemporaryDirectory,
     asubprocess_wait,
+    discard_async_iterable,
     ensure_dir_exists,
     fakeroot,
 )
@@ -28,27 +30,25 @@ async def fetch(
     data: None,
     cache_path: Path,
     options: Options,
-    packages: AsyncIterable[tuple[Package, AsyncIterable[Dependency]]],
-    build_results: AsyncIterable[BuildResult],
-) -> AsyncIterable[PackageIDAndInfo]:
-    async with discard_build_results_context(build_results):
-        database_path, cache_path = get_cache_paths(cache_path)
+    package: Package,
+    dependencies: AsyncIterable[Dependency],
+    installation: memoryview | None,
+    generators: memoryview | None,
+) -> PackageIDAndInfo | AsyncIterable[str]:
+    database_path, cache_path = get_cache_paths(cache_path)
 
-        ensure_dir_exists(cache_path)
+    ensure_dir_exists(cache_path)
 
-        package_names = []
+    await discard_async_iterable(dependencies)
 
-        async for package, dependencies in packages:
-            package_names.append(package.name)
-
-            async for _ in dependencies:
-                pass
+    with TemporaryDirectory() as database_path_fake:
+        symlink(database_path / "sync", database_path_fake / "sync")
 
         async with fakeroot(debug) as environment:
             process = await create_subprocess_exec(
                 "pacman",
                 "--dbpath",
-                str(database_path),
+                str(database_path_fake),
                 "--cachedir",
                 str(cache_path),
                 "--noconfirm",
@@ -56,45 +56,44 @@ async def fetch(
                 "--downloadonly",
                 "--nodeps",
                 "--nodeps",
-                *package_names,
+                package.name,
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=DEVNULL,
+                stderr=None,
                 env=environment,
             )
 
             await asubprocess_wait(process, SubmanagerCommandFailure())
 
-        process = await create_subprocess_exec(
-            "pacman",
-            "--dbpath",
-            str(database_path),
-            "--cachedir",
-            str(cache_path),
-            "--noconfirm",
-            "--sync",
-            "--nodeps",
-            "--nodeps",
-            "--print",
-            *package_names,
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=DEVNULL,
-        )
+    process = await create_subprocess_exec(
+        "pacman",
+        "--dbpath",
+        str(database_path),
+        "--cachedir",
+        str(cache_path),
+        "--noconfirm",
+        "--sync",
+        "--nodeps",
+        "--nodeps",
+        "--print",
+        package.name,
+        stdin=DEVNULL,
+        stdout=PIPE,
+        stderr=None,
+    )
 
-        assert process.stdout is not None
-        for package_name in package_names:
-            line = (await process.stdout.readline()).decode()
+    assert process.stdout is not None
 
-            if line == "":
-                raise SubmanagerCommandFailure
+    line = (await process.stdout.readline()).decode().strip()
 
-            line = line.strip()
+    if line == "":
+        raise SubmanagerCommandFailure
 
-            yield PackageIDAndInfo(
-                name=package_name,
-                product_id=process_product_id(line),
-                product_info=None,
-            )
+    id_and_info = PackageIDAndInfo(
+        product_id=process_product_id(line),
+        product_info=None,
+    )
 
-        await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, SubmanagerCommandFailure())
+
+    return id_and_info
