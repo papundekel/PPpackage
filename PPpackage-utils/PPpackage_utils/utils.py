@@ -248,6 +248,16 @@ def TarFileInMemoryWrite() -> Generator[TarFileWithBytes, Any, None]:
     setattr(tar, "data", io.getbuffer())
 
 
+@contextmanager
+def TarFileInMemoryAppend(data: memoryview) -> Generator[TarFileWithBytes, Any, None]:
+    io = BytesIO(data)
+
+    with TarFile(fileobj=io, mode="a") as tar:
+        yield tar  # type: ignore
+
+    setattr(tar, "data", io.getbuffer())
+
+
 async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
     async for _ in async_iterable:
         pass

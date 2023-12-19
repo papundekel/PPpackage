@@ -2,10 +2,9 @@ from pathlib import Path
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
-    TarFileInMemoryWrite,
+    TarFileInMemoryAppend,
     create_tar_directory,
     create_tar_file,
-    tar_append,
 )
 
 from .utils import Data
@@ -20,16 +19,15 @@ async def install_patch(
 ):
     prefix = Path("PP")
 
-    with TarFileInMemoryWrite() as new_tar:
+    installation = data.installations.get(id)
+
+    with TarFileInMemoryAppend(installation) as new_tar:
         create_tar_directory(new_tar, prefix)
 
         product_path = prefix / product.name
 
         with create_tar_file(new_tar, product_path) as file:
             file.write(f"{product.version} {product.product_id}".encode())
-
-        installation = data.installations.get(id)
-        tar_append(installation, new_tar)
 
     data.installations.put(id, new_tar.data)
 

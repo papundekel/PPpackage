@@ -6,10 +6,9 @@ from pathlib import Path
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
     SubmanagerCommandFailure,
-    TarFileInMemoryWrite,
+    TarFileInMemoryAppend,
     TarFileWithBytes,
     asubprocess_wait,
-    tar_append,
 )
 
 from .utils import Data, get_cache_path, make_conan_environment
@@ -57,11 +56,10 @@ async def install_patch(
 
     prefix = Path("conan")
 
-    with TarFileInMemoryWrite() as new_tar:
-        await install_product(debug, environment, prefix, new_tar, product)
+    installation = data.installations.get(id)
 
-        installation = data.installations.get(id)
-        tar_append(installation, new_tar)
+    with TarFileInMemoryAppend(installation) as new_tar:
+        await install_product(debug, environment, prefix, new_tar, product)
 
     data.installations.put(id, new_tar.data)
 
