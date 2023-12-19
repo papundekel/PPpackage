@@ -1,5 +1,15 @@
-from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
+import itertools
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    MutableSet,
+    Sequence,
+    Set,
+)
 from pathlib import Path
+from platform import node
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph, convert_node_labels_to_integers
@@ -31,6 +41,64 @@ def topological_generations(
             )
 
         yield manager_nodes
+
+
+def topological_test_visit(
+    graph: MultiDiGraph, seen: MutableSet[ManagerAndName], node: ManagerAndName
+) -> Iterable[ManagerAndName]:
+    if node not in seen:
+        seen.add(node)
+
+        successor_map = {}
+        for successor in graph.successors(node):
+            successor_map.setdefault(successor.manager, []).append(successor)
+
+        successors_same_manager = successor_map.get(node.manager, [])
+        for successor in successors_same_manager:
+            yield from topological_test_visit(graph, seen, successor)
+        successor_map.pop(node.manager, None)
+
+        for successors in successor_map.values():
+            for successor in successors:
+                yield from topological_test_visit(graph, seen, successor)
+
+        yield node
+
+
+def topological_test_iteration(
+    graph: MultiDiGraph,
+    sources: MutableSet[ManagerAndName],
+    seen: MutableSet[ManagerAndName],
+) -> Iterable[ManagerAndName]:
+    while len(sources) != 0:
+        node = sources.pop()
+
+        if node in seen:
+            continue
+
+        yield from topological_test_visit(graph, seen, node)
+
+
+def topological_test(graph: MultiDiGraph) -> Iterable[ManagerAndName]:
+    seen = set[ManagerAndName]()
+
+    sources = {node for node, d in graph.in_degree() if d == 0}
+    same_manager_sources = {
+        node
+        for node in sources
+        if all(
+            successor.manager == node.manager for successor in graph.successors(node)
+        )
+    }
+    sources = sources - same_manager_sources
+
+    same_manager_mapping = dict[str, MutableSet[ManagerAndName]]()
+    for node in same_manager_sources:
+        same_manager_mapping.setdefault(node.manager, set()).add(node)
+
+    for same_manager_sources in same_manager_mapping.values():
+        yield from topological_test_iteration(graph, same_manager_sources, seen)
+    yield from topological_test_iteration(graph, sources, seen)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
