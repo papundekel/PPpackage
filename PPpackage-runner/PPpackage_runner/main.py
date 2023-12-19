@@ -4,10 +4,8 @@ from contextlib import asynccontextmanager, contextmanager
 from functools import partial
 from json import dump as json_dump
 from json import load as json_load
-from os import getgid, getuid
 from pathlib import Path
 from subprocess import DEVNULL
-from sys import stderr
 from typing import Tuple
 from typing import cast as type_cast
 
