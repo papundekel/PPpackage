@@ -12,5 +12,7 @@ setup(
         "PPpackage-PP",
         "PPpackage-arch",
         "PPpackage-conan",
+        "hypercorn",
+        "httpx[http2]",
     ],
 )

@@ -9,3 +9,6 @@
 ./PPpackage/
 
 ./PPpackage-run/
+
+hypercorn
+alembic

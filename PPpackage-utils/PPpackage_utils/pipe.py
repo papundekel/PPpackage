@@ -1,12 +1,8 @@
-from asyncio import StreamWriter, open_unix_connection
 from collections.abc import Iterable
-from contextlib import asynccontextmanager
 from io import TextIOBase
-from pathlib import Path
 from sys import stderr
 
-from PPpackage_utils.parse import dump_one, load_one
-from PPpackage_utils.utils import MyException, RunnerInfo, RunnerRequestType
+from PPpackage_utils.utils import MyException
 
 _DEBUG = False
 
@@ -111,25 +107,3 @@ def pipe_write_string(debug, prefix, output: TextIOBase, string: str) -> None:
 
     if _DEBUG:
         print(f"DEBUG {prefix}: pipe write string string: {string}", file=stderr)
-
-
-async def close_writer(writer: StreamWriter):
-    await writer.drain()
-    writer.close()
-    await writer.wait_closed()
-
-
-@asynccontextmanager
-async def communicate_with_runner(debug: bool, runner_info: RunnerInfo):
-    reader, writer = await open_unix_connection(runner_info.socket_path)
-
-    try:
-        workdir_path_relative = await load_one(debug, reader, Path)
-
-        workdir_path = runner_info.workdirs_path / workdir_path_relative
-
-        yield reader, writer, workdir_path
-    finally:
-        await dump_one(debug, writer, RunnerRequestType.END)
-
-        await close_writer(writer)

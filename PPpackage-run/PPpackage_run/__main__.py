@@ -1,28 +1,35 @@
-from asyncio import create_subprocess_exec
+from asyncio import Event, as_completed, create_subprocess_exec, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import sleep
-from collections.abc import Callable
-from contextlib import ExitStack, contextmanager
-from functools import partial
+from collections.abc import AsyncIterable, Callable
+from contextlib import contextmanager
+from importlib import reload as reload_module
 from multiprocessing import Process
 from os import environ, getgid, getuid
 from pathlib import Path
+from signal import SIGTERM
 from subprocess import DEVNULL
 from sys import stderr
 from typing import Annotated, Optional
 
-from PPpackage_runner.main import main as runner
-from PPpackage_utils.submanager import AsyncTyper, run
+from httpx import AsyncClient as HTTPClient
+from httpx import AsyncHTTPTransport
+from hypercorn import Config
+from hypercorn.asyncio import serve
+from PPpackage_submanager.utils import RunnerInfo
+from PPpackage_utils.cli import AsyncTyper, run
 from PPpackage_utils.utils import (
     MyException,
-    RunnerInfo,
     TemporaryDirectory,
     asubprocess_wait,
     ensure_dir_exists,
 )
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel import SQLModel
 from typer import Option as TyperOption
 
-from PPpackage.main import main as PPpackage
+# from PPpackage.main import main as PPpackage
+
 
 RUNNER_MANAGERS = {"arch", "PP"}
 CONTAINER_RUN_PATH = "/mnt/PPpackage-run/"
@@ -100,13 +107,83 @@ async def container(
     )
 
 
-def process_main(main: Callable, *args):
-    asyncio_run(main(*args))
+RUNNER_SOCKET_NAME = Path("PPpackage-runner.sock")
+
+
+def runner_set_environment(database_url: str, workdirs_path: Path):
+    environ["DATABASE_URL"] = database_url
+    environ["WORKDIRS_PATH"] = str(workdirs_path)
+
+
+async def runner_create_db(database_url: str):
+    env = environ.copy()
+
+    runner_set_environment(database_url, Path("/"))
+
+    from PPpackage_runner.utils import framework
+
+    engine = create_async_engine(database_url)
+    async with engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
+
+    token = await framework.create_admin_token(engine)
+
+    await engine.dispose()
+
+    environ.update(env)
+
+    return token
+
+
+async def runner(socket_path: Path, database_url: str, workdirs_path: Path):
+    shutdown_event = Event()
+
+    get_running_loop().add_signal_handler(SIGTERM, shutdown_event.set)
+
+    config = Config()
+    config.bind = [f"unix:{socket_path}"]
+
+    runner_set_environment(database_url, workdirs_path)
+
+    from PPpackage_runner import settings
+
+    reload_module(settings)
+    from PPpackage_runner.app import app
+
+    await serve(
+        app,  # type: ignore
+        config,
+        mode="asgi",
+        shutdown_trigger=shutdown_event.wait,  #  type: ignore
+    )
+
+
+async def runner_create_user(client: HTTPClient, token: str) -> str:
+    response = await client.post(
+        "http://localhost/user", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    token = response.raise_for_status().json()
+
+    if not isinstance(token, str):
+        raise Exception(f"Invalid response from the server.\n{token}")
+
+    return token
+
+
+async def runner_create_users(
+    client: HTTPClient, token: str, count: int
+) -> AsyncIterable[str]:
+    for task in as_completed([runner_create_user(client, token) for _ in range(count)]):
+        yield await task
 
 
 @contextmanager
 def process_lifetime(main: Callable, *args):
-    process = Process(target=partial(process_main, main), args=args)
+    def process_main(*args):
+        asyncio_run(main(*args))
+
+    process = Process(target=process_main, args=args)
     process.start()
 
     try:
@@ -143,22 +220,22 @@ async def main_command(
     debug: bool = False,
     wait_max_retries: Optional[int] = None,
 ):
-    if containerizer == "native":
-        from PPpackage_arch.main import main as PPpackage_arch
-        from PPpackage_conan.main import main as base_PPpackage_conan
-        from PPpackage_PP.main import main as PPpackage_PP
+    # if containerizer == "native":
+    #     from PPpackage_arch.main import main as PPpackage_arch
+    #     from PPpackage_conan.main import main as base_PPpackage_conan
+    #     from PPpackage_PP.main import main as PPpackage_PP
 
-        PPpackage_conan = (
-            lambda debug, run_path, cache_path, *args: base_PPpackage_conan(
-                debug, run_path, cache_path
-            )
-        )
-    else:
-        PPpackage_arch = partial(container, containerizer, "arch")
-        PPpackage_conan = partial(container, containerizer, "conan")
-        PPpackage_PP = partial(container, containerizer, "PP")
+    #     PPpackage_conan = (
+    #         lambda debug, run_path, cache_path, *args: base_PPpackage_conan(
+    #             debug, run_path, cache_path
+    #         )
+    #     )
+    # else:
+    #     PPpackage_arch = partial(container, containerizer, "arch")
+    #     PPpackage_conan = partial(container, containerizer, "conan")
+    #     PPpackage_PP = partial(container, containerizer, "PP")
 
-    SUBMANAGERS = {"arch": PPpackage_arch, "conan": PPpackage_conan, "PP": PPpackage_PP}
+    # SUBMANAGERS = {"arch": PPpackage_arch, "conan": PPpackage_conan, "PP": PPpackage_PP}
 
     run_path = Path(environ["XDG_RUNTIME_DIR"])
 
@@ -167,47 +244,64 @@ async def main_command(
         ensure_dir_exists(generators_path)
     ensure_dir_exists(destination_path)
 
-    with TemporaryDirectory() as runner_workdirs_path:
-        with process_lifetime(runner, debug, run_path, runner_workdirs_path):
-            runner_path = run_path / "PPpackage-runner.sock"
+    with (
+        TemporaryDirectory() as runner_workdirs_path,
+        TemporaryDirectory() as runner_db_dir_path,
+    ):
+        runner_path = run_path / RUNNER_SOCKET_NAME
+
+        runner_database_url = f"sqlite+aiosqlite:///{runner_db_dir_path}/db.sqlite"
+
+        runner_token = await runner_create_db(runner_database_url)
+
+        with process_lifetime(
+            runner, runner_path, runner_database_url, runner_workdirs_path
+        ):
+            async with HTTPClient(
+                transport=AsyncHTTPTransport(uds=str(runner_path))
+            ) as client:
+                async for token in runner_create_users(client, runner_token, 5):
+                    print(token, file=stderr)
 
             await wait_for_sockets(wait_max_retries, runner_path)
 
-            with ExitStack() as exit_stack:
-                submanager_socket_paths = {}
+            await sleep(1000)
 
-                for manager, main in SUBMANAGERS.items():
-                    submanager_run_path = exit_stack.enter_context(
-                        TemporaryDirectory(run_path)
-                    )
+            # with ExitStack() as exit_stack:
+            #     submanager_socket_paths = {}
 
-                    exit_stack.enter_context(
-                        process_lifetime(
-                            main,
-                            debug,
-                            submanager_run_path,
-                            cache_path,
-                            RunnerInfo(runner_path, runner_workdirs_path),
-                        ),
-                    )
+            #     for manager, main in SUBMANAGERS.items():
+            #         submanager_run_path = exit_stack.enter_context(
+            #             TemporaryDirectory(run_path)
+            #         )
 
-                    submanager_socket_paths[manager] = (
-                        submanager_run_path / f"PPpackage-{manager}.sock"
-                    )
+            #         exit_stack.enter_context(
+            #             process_lifetime(
+            #                 main,
+            #                 debug,
+            #                 submanager_run_path,
+            #                 cache_path,
+            #                 RunnerInfo(runner_path, runner_workdirs_path),
+            #             ),
+            #         )
 
-                await wait_for_sockets(
-                    wait_max_retries, *submanager_socket_paths.values()
-                )
+            #         submanager_socket_paths[manager] = (
+            #             submanager_run_path / f"PPpackage-{manager}.sock"
+            #         )
 
-                await PPpackage(
-                    debug,
-                    do_update_database,
-                    submanager_socket_paths,
-                    destination_path,
-                    generators_path,
-                    graph_path,
-                    10,
-                )
+            #     await wait_for_sockets(
+            #         wait_max_retries, *submanager_socket_paths.values()
+            #     )
+
+            #     await PPpackage(
+            #         debug,
+            #         do_update_database,
+            #         submanager_socket_paths,
+            #         destination_path,
+            #         generators_path,
+            #         graph_path,
+            #         10,
+            #     )
 
 
 run(app, "PPpackage-run")
