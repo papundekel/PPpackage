@@ -3,7 +3,7 @@ from asyncio.subprocess import DEVNULL
 from pathlib import Path
 
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
+    CommandException,
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
@@ -30,4 +30,4 @@ async def update_database(debug: bool, data: None, cache_path: Path):
             env=environment,
         )
 
-        await asubprocess_wait(process, SubmanagerCommandFailure())
+        await asubprocess_wait(process, CommandException())

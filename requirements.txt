@@ -2,6 +2,8 @@
 
 ./PPpackage-runner/
 
+./PPpackage-submanager/
+
 ./PPpackage-conan/
 ./PPpackage-arch/
 ./PPpackage-PP/

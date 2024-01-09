@@ -9,7 +9,7 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
+    CommandException,
     TarFileInMemoryWrite,
     TemporaryDirectory,
     asubprocess_wait,
@@ -119,7 +119,7 @@ async def generate(
                 env=environment,
             )
 
-            await asubprocess_wait(process, SubmanagerCommandFailure())
+            await asubprocess_wait(process, CommandException())
 
         patch_native_generators(native_generators_path, native_generators_path_suffix)
 

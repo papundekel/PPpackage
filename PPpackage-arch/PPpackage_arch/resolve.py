@@ -6,7 +6,7 @@ from pathlib import Path
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
+    CommandException,
     asubprocess_communicate,
     asubprocess_wait,
 )
@@ -39,13 +39,13 @@ async def resolve_pactree(
     dot = graph_from_dot_data(graph_string)
 
     if dot is None:
-        raise SubmanagerCommandFailure
+        raise CommandException
 
     graph: MultiDiGraph = nx_pydot.from_pydot(dot[0])
 
     root = clean_graph(graph)
 
-    await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, CommandException())
 
     return graph, root
 
@@ -54,7 +54,7 @@ def get_graph_root(graph: MultiDiGraph) -> str:
     for edge in graph.out_edges("START"):
         return edge[1]
 
-    raise SubmanagerCommandFailure
+    raise CommandException
 
 
 def clean_graph(graph: MultiDiGraph) -> str:

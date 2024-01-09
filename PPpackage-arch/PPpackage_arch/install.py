@@ -7,23 +7,20 @@ from shutil import rmtree
 from sys import stderr
 from tempfile import mkdtemp
 
-from PPpackage_utils.io import (
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Product
+from PPpackage_utils.pipe import (
     pipe_read_line_maybe,
     pipe_read_string,
     pipe_read_strings,
     pipe_write_int,
     pipe_write_string,
 )
-from PPpackage_utils.parse import Product, dump_many, dump_one, load_one
 from PPpackage_utils.utils import (
-    RunnerRequestType,
-    SubmanagerCommandFailure,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
-    tar_archive,
-    tar_extract,
 )
 
 from .utils import RunnerConnection, get_cache_paths
@@ -87,7 +84,7 @@ def get_destination_path(runner_connection: RunnerConnection, id: str):
     destination_path = runner_connection.workdir_path / Path(id)
 
     if not destination_path.exists():
-        raise SubmanagerCommandFailure
+        raise CommandException
 
     return destination_path
 
@@ -168,7 +165,7 @@ async def install_patch(
                             f"Unknown header: {header}", "PPpackage-arch", stderr
                         )
 
-        await asubprocess_wait(process, SubmanagerCommandFailure())
+        await asubprocess_wait(process, CommandException())
 
 
 async def install_post(

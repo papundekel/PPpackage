@@ -4,9 +4,9 @@ from collections.abc import AsyncIterable
 from os import symlink
 from pathlib import Path
 
-from PPpackage_utils.parse import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
     TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
@@ -63,7 +63,7 @@ async def fetch(
                 env=environment,
             )
 
-            await asubprocess_wait(process, SubmanagerCommandFailure())
+            await asubprocess_wait(process, CommandException())
 
     process = await create_subprocess_exec(
         "pacman",
@@ -87,13 +87,13 @@ async def fetch(
     line = (await process.stdout.readline()).decode().strip()
 
     if line == "":
-        raise SubmanagerCommandFailure
+        raise CommandException
 
     id_and_info = PackageIDAndInfo(
         product_id=process_product_id(line),
         product_info=None,
     )
 
-    await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, CommandException())
 
     return id_and_info

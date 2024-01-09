@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable, Iterable, Iterator
 from sys import stderr
 from typing import Any, Protocol, TypeVar
 
@@ -18,54 +18,112 @@ def chunk_bytes(data: memoryview, chunk_size: int) -> Iterable[memoryview]:
         yield data[i : i + chunk_size]
 
 
+def _dump_int(length: int) -> memoryview:
+    length_bytes = f"{length}\n".encode()
+
+    if _DEBUG_DUMP:
+        print(f"dump length: {length}", file=stderr)
+
+    return memoryview(length_bytes)
+
+
+def _dump_bool(value: bool) -> memoryview:
+    value_string = _TRUE_STRING if value else "F"
+
+    bool_bytes = (value_string + "\n").encode()
+
+    if _DEBUG_DUMP:
+        print(f"dump bool: {value}", file=stderr)
+
+    return memoryview(bool_bytes)
+
+
+def dump_bytes(output_bytes: memoryview) -> Iterable[memoryview]:
+    yield _dump_int(len(output_bytes))
+    yield output_bytes
+
+
+def dump_loop_end():
+    end_bytes = _dump_bool(False)
+
+    if _DEBUG_DUMP:
+        print("loop}", file=stderr)
+
+    return end_bytes
+
+
+def dump_loop(iterable: Iterable[Iterable[memoryview]]) -> Iterable[memoryview]:
+    if _DEBUG_DUMP:
+        print("loop{", file=stderr)
+
+    for obj in iterable:
+        yield _dump_bool(True)
+        yield from obj
+
+    yield dump_loop_end()
+
+
+def dump_loop_simple(iterable: Iterable[memoryview]) -> Iterable[memoryview]:
+    yield from dump_loop([iterable])
+
+
+def dump_bytes_chunked(output_bytes: memoryview) -> Iterator[memoryview]:
+    for chunk in dump_loop_simple(chunk_bytes(output_bytes, 2**15)):
+        yield from dump_bytes(chunk)
+
+
+def dump_one(output: BaseModel | Any, loop=False) -> Iterable[memoryview]:
+    if loop:
+        yield _dump_bool(True)
+
+    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+
+    output_json_string = output_wrapped.model_dump_json(
+        indent=4 if _DEBUG_DUMP else None
+    )
+
+    output_json_bytes = output_json_string.encode()
+
+    yield from dump_bytes(memoryview(output_json_bytes))
+
+    if _DEBUG_DUMP:
+        print(f"dump:\n{output_json_string}", file=stderr)
+
+
+def dump_many(outputs: Iterable[BaseModel | Any]) -> Iterable[memoryview]:
+    yield from dump_loop(dump_one(output) for output in outputs)
+
+
+async def dump_many_async(
+    outputs: AsyncIterable[BaseModel | Any],
+) -> AsyncIterable[memoryview]:
+    async for output in outputs:
+        for chunk in dump_one(output):
+            yield chunk
+
+
 class Writer(Protocol):
     async def write(self, data: memoryview) -> None:
         ...
 
-    async def _dump_int(self, length: int) -> None:
-        await self.write(memoryview(f"{length}\n".encode()))
-
-        if _DEBUG_DUMP:
-            print(f"dump length: {length}", file=stderr)
+    async def _write_many(self, data: Iterable[memoryview]) -> None:
+        for chunk in data:
+            await self.write(chunk)
 
     async def _dump_bool(self, value: bool) -> None:
-        value_string = _TRUE_STRING if value else "F"
-
-        await self.write(memoryview((value_string + "\n").encode()))
-
-        if _DEBUG_DUMP:
-            print(f"dump bool: {value}", file=stderr)
+        await self.write(_dump_bool(value))
 
     async def dump_bytes(self, output_bytes: memoryview) -> None:
-        await self._dump_int(len(output_bytes))
-        await self.write(output_bytes)
+        await self._write_many(dump_bytes(output_bytes))
 
     async def dump_bytes_chunked(self, output_bytes: memoryview) -> None:
-        async for chunk in self.dump_loop(chunk_bytes(output_bytes, 2**15)):
-            await self.dump_bytes(chunk)
+        await self._write_many(dump_bytes_chunked(output_bytes))
 
     async def dump_one(self, output: BaseModel | Any, loop=False) -> None:
-        if loop:
-            await self._dump_bool(True)
-
-        output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
-
-        output_json_string = output_wrapped.model_dump_json(
-            indent=4 if _DEBUG_DUMP else None
-        )
-
-        output_json_bytes = output_json_string.encode()
-
-        await self.dump_bytes(memoryview(output_json_bytes))
-
-        if _DEBUG_DUMP:
-            print(f"dump:\n{output_json_string}", file=stderr)
+        await self._write_many(dump_one(output, loop))
 
     async def dump_loop_end(self):
-        await self._dump_bool(False)
-
-        if _DEBUG_DUMP:
-            print("loop}", file=stderr)
+        await self.write(dump_loop_end())
 
     async def dump_loop(self, iterable: Iterable[T]) -> AsyncIterable[T]:
         if _DEBUG_DUMP:
@@ -85,12 +143,11 @@ class Writer(Protocol):
         await self.dump_loop_end()
 
     async def dump_many(self, outputs: Iterable[BaseModel | Any]) -> None:
-        async for output in self.dump_loop(outputs):
-            await self.dump_one(output)
+        await self._write_many(dump_many(outputs))
 
     async def dump_many_async(self, outputs: AsyncIterable[BaseModel | Any]) -> None:
-        async for output in self.dump_loop_async(outputs):
-            await self.dump_one(output)
+        async for chunk in dump_many_async(outputs):
+            await self.write(chunk)
 
 
 ModelType = TypeVar("ModelType")

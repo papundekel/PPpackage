@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, TypedDict
 
-from PPpackage_utils.io import close_writer
 from PPpackage_utils.parse import Product, dump_one, load_one
+from PPpackage_utils.pipe import close_writer
 from PPpackage_utils.utils import SubmanagerCommand
 
 

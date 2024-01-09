@@ -3,14 +3,14 @@ from functools import partial
 from pathlib import Path
 
 from PPpackage_arch.utils import RunnerConnection
-from PPpackage_utils.io import communicate_with_runner
+from PPpackage_submanager.utils import RunnerInfo
+from PPpackage_utils.pipe import communicate_with_runner
 from PPpackage_utils.submanager import (
     SubmanagerCallbacks,
     generate_empty,
     handle_connection,
     run_server,
 )
-from PPpackage_utils.utils import RunnerInfo
 
 from .fetch import fetch
 from .install import (

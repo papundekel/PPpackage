@@ -13,7 +13,7 @@ from PPpackage_utils.parse import (
     PackageIDAndInfo,
     load_object,
 )
-from PPpackage_utils.utils import SubmanagerCommandFailure, asubprocess_wait
+from PPpackage_utils.utils import CommandException, asubprocess_wait
 
 from .parse import FetchProductInfo
 from .utils import (
@@ -93,7 +93,7 @@ async def fetch(
         assert process.stdout is not None
         graph_json_bytes = await process.stdout.read()
 
-        await asubprocess_wait(process, SubmanagerCommandFailure())
+        await asubprocess_wait(process, CommandException())
 
     nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
 
@@ -108,4 +108,4 @@ async def fetch(
                 ),
             )
 
-    raise SubmanagerCommandFailure()
+    raise CommandException()

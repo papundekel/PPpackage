@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PPpackage_utils.parse import Product
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
+    CommandException,
     TarFileInMemoryAppend,
     TarFileWithBytes,
     asubprocess_wait,
@@ -36,7 +36,7 @@ async def install_product(
 
     output_bytes = await process.stdout.read()
 
-    await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, CommandException())
 
     product_path = output_bytes.decode().splitlines()[0]
 

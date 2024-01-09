@@ -2,7 +2,7 @@ from collections.abc import AsyncIterable, MutableSequence
 from pathlib import Path
 from typing import Any
 
-from PPpackage_utils.parse import (
+from PPpackage_submanager.schemes import (
     ManagerRequirement,
     Options,
     ResolutionGraph,

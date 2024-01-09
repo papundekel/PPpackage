@@ -21,7 +21,7 @@ from .install import (
     install_put,
 )
 from .resolve import resolve
-from .utils import Data
+from .utils import State
 
 PROGRAM_NAME = "PPpackage-PP"
 
@@ -37,17 +37,6 @@ CALLBACKS = SubmanagerCallbacks(
     install_delete,
     str,
 )
-
-
-@asynccontextmanager
-async def lifetime(
-    runner_info: RunnerInfo,
-    cache_path: Path,
-    debug: bool,
-):
-    yield partial(
-        handle_connection, cache_path, CALLBACKS, Data(runner_info, Installations(1000))
-    )
 
 
 async def main(

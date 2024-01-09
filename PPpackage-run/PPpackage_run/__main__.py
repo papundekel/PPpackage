@@ -16,7 +16,6 @@ from httpx import AsyncClient as HTTPClient
 from httpx import AsyncHTTPTransport
 from hypercorn import Config
 from hypercorn.asyncio import serve
-from PPpackage_submanager.utils import RunnerInfo
 from PPpackage_utils.cli import AsyncTyper, run
 from PPpackage_utils.utils import (
     MyException,
@@ -42,7 +41,8 @@ async def container(
     debug: bool,
     run_path: Path,
     cache_path: Path,
-    runner_info: RunnerInfo,
+    runner_path: Path,
+    runner_workdirs_path: Path,
 ):
     additional_options = (
         [
@@ -62,9 +62,9 @@ async def container(
     additional_mounts = (
         [
             "--mount",
-            f"type=bind,source={runner_info.socket_path},destination=/run/PPpackage-runner.sock",
+            f"type=bind,source={runner_path},destination=/run/PPpackage-runner.sock",
             "--mount",
-            f"type=bind,source={runner_info.workdirs_path},destination=/mnt/PPpackage-runner-workdirs/",
+            f"type=bind,source={runner_workdirs_path},destination=/mnt/PPpackage-runner-workdirs/",
         ]
         if manager in RUNNER_MANAGERS
         else []
@@ -120,7 +120,7 @@ async def runner_create_db(database_url: str):
 
     runner_set_environment(database_url, Path("/"))
 
-    from PPpackage_runner.utils import framework
+    from PPpackage_runner.framework import framework
 
     engine = create_async_engine(database_url)
     async with engine.begin() as connection:

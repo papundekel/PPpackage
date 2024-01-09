@@ -1,13 +1,16 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Annotated
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 from PPpackage_runner.database import User
-from PPpackage_runner.utils import State
+from PPpackage_runner.framework import framework
 from PPpackage_utils.asyncio_stream import AsyncioWriter
-from PPpackage_utils.stream import Reader, Writer
+from PPpackage_utils.http_stream import HTTPReader
+from PPpackage_utils.stream import Reader
 from PPpackage_utils.utils import asubprocess_wait
-from starlette.datastructures import ImmutableMultiDict
 
 from . import run
 
@@ -32,14 +35,27 @@ async def build_dockerfile(reader: Reader, tag: str) -> None:
 
 
 async def run_dockerfile(
-    state: State,
-    query_parameters: ImmutableMultiDict[str, str],
-    user: User,
-    reader: Reader,
-    writer: Writer,
+    request: Request,
+    user: Annotated[User, Depends(framework.get_user)],
+    tag: str,
+    args: Iterable[str],
+    mount_source_relative_paths: Iterable[str],
+    mount_destination_paths: Iterable[str],
+    stdin_pipe_path: Path,
+    stdout_pipe_path: Path,
 ):
     tag = "pppackage/runner-dockerfile-image"
 
+    reader = HTTPReader(request)
+
     await build_dockerfile(reader, tag)
 
-    return await run(user, tag, query_parameters)
+    await run(
+        user,
+        tag,
+        args,
+        mount_source_relative_paths,
+        mount_destination_paths,
+        stdin_pipe_path,
+        stdout_pipe_path,
+    )

@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 
-from PPpackage_utils.utils import Installations, RunnerInfo
+from PPpackage_utils.server import State as BaseState
 
 
-@dataclass
-class Data:
-    runner_info: RunnerInfo
-    installations: Installations
+@dataclass(frozen=True)
+class State(BaseState):
+    pass

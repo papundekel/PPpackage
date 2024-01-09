@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from pathlib import Path
-
 from PPpackage_submanager.exceptions import CommandException
 
 
@@ -59,9 +56,3 @@ class Installations:
         i = int(id)
 
         del self.mapping[i]
-
-
-@dataclass(frozen=True)
-class RunnerInfo:
-    socket_path: Path
-    workdirs_path: Path

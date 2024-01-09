@@ -5,8 +5,9 @@ from sys import stderr, stdin
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage_utils.parse import ManagerAndName, load_from_bytes
+from PPpackage_utils.schemes import ManagerAndName
 from PPpackage_utils.utils import tar_archive, tar_extract
+from PPpackage_utils.validation import load_from_bytes
 from pydantic import ValidationError
 from pydot import Dot
 

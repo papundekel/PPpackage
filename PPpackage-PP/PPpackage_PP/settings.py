@@ -1,18 +1,18 @@
 from pathlib import Path
 from typing import Annotated
 
+from PPpackage_submanager.runner_settings import RunnerSettings
 from pydantic import AnyUrl, UrlConstraints
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    debug: bool = False
-    workdirs_path: Path = Path("/tmp")
+    debug: bool = True
+    runner: RunnerSettings = RunnerSettings()
     database_url: Annotated[
         AnyUrl, UrlConstraints(allowed_schemes=["sqlite+aiosqlite"])
     ] = AnyUrl("sqlite+aiosqlite:///db.sqlite")
-
-    model_config = SettingsConfigDict(env_file=".env")
+    cache_path: Path = Path("/tmp")
 
 
 settings = Settings()

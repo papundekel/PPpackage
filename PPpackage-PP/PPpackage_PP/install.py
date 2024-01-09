@@ -1,25 +1,25 @@
 from pathlib import Path
 
-from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import (
-    TarFileInMemoryAppend,
-    create_tar_directory,
-    create_tar_file,
-)
+from PPpackage_submanager.schemes import Product
+from PPpackage_utils.tar import TarFileInMemoryAppend
+from PPpackage_utils.tar import create_directory as create_tar_directory
+from PPpackage_utils.tar import create_file as create_tar_file
 
-from .utils import Data
+from .database import User
+from .utils import State
 
 
 async def install_patch(
     debug: bool,
-    data: Data,
+    state: State,
+    user: User,
     cache_path: Path,
     id: str,
     product: Product,
 ):
     prefix = Path("PP")
 
-    installation = data.installations.get(id)
+    installation = state.installations.get(id)
 
     with TarFileInMemoryAppend(installation) as new_tar:
         create_tar_directory(new_tar, prefix)
@@ -29,37 +29,41 @@ async def install_patch(
         with create_tar_file(new_tar, product_path) as file:
             file.write(f"{product.version} {product.product_id}".encode())
 
-    data.installations.put(id, new_tar.data)
+    state.installations.put(id, new_tar.data)
 
 
 async def install_post(
     debug: bool,
-    data: Data,
+    state: State,
+    user: User,
     new_directory: memoryview,
 ) -> str:
-    return data.installations.add(new_directory)
+    return state.installations.add(new_directory)
 
 
 async def install_put(
     debug: bool,
-    data: Data,
+    state: State,
+    user: User,
     id: str,
     new_directory: memoryview,
 ) -> None:
-    data.installations.put(id, new_directory)
+    state.installations.put(id, new_directory)
 
 
 async def install_get(
     debug: bool,
-    data: Data,
+    state: State,
+    user: User,
     id: str,
 ) -> memoryview:
-    return data.installations.get(id)
+    return state.installations.get(id)
 
 
 async def install_delete(
     debug: bool,
-    data: Data,
+    state: State,
+    user: User,
     id: str,
 ) -> None:
-    data.installations.remove(id)
+    state.installations.remove(id)

@@ -6,9 +6,7 @@ from json import dump as json_dump
 from json import load as json_load
 from pathlib import Path
 
-from PPpackage_runner.database import TokenDB, User, UserDB
-from PPpackage_runner.settings import DEBUG
-from PPpackage_utils.server import Framework
+from PPpackage_runner.settings import settings
 from PPpackage_utils.server import State as BaseState
 from PPpackage_utils.utils import asubprocess_wait
 
@@ -17,9 +15,6 @@ from PPpackage_utils.utils import asubprocess_wait
 class State(BaseState):
     bundle_path: Path
     crun_root_path: Path
-
-
-framework = Framework(State, TokenDB, User, UserDB)
 
 
 @contextmanager
@@ -40,7 +35,7 @@ CONFIG_RELATIVE_PATH = Path("config.json")
 
 
 def edit_config(bundle_path: Path):
-    return edit_json_file(DEBUG, bundle_path / CONFIG_RELATIVE_PATH)
+    return edit_json_file(settings.debug, bundle_path / CONFIG_RELATIVE_PATH)
 
 
 async def create_config(bundle_path: Path):

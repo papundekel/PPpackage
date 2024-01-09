@@ -1,21 +1,21 @@
 from asyncio import TaskGroup
-from collections.abc import Callable, Coroutine
+from collections.abc import AsyncIterable, Callable, Coroutine, Iterable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from secrets import token_hex
-from typing import Annotated, Any, Generic, TypeVar
-from typing import cast as type_cast
+from typing import Annotated, Any, AsyncContextManager, Generic, TypeVar
 
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
 from PPpackage_utils.http_stream import HTTPReader, HTTPWriter
 from PPpackage_utils.stream import Reader, Writer
-from sqlalchemy.ext.asyncio import AsyncEngine
+from pydantic import AnyUrl
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import joinedload
 from sqlmodel import Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from starlette.datastructures import ImmutableMultiDict
 from starlette.exceptions import HTTPException
+from starlette.responses import ContentStream
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
@@ -45,7 +45,7 @@ class UserBase(SQLModel):
     token_id: int = Field(foreign_key="tokendb.id", unique=True)
 
 
-StateType = TypeVar("StateType", bound=State)
+StateTypeType = TypeVar("StateTypeType", bound=State)
 TokenDBType = TypeVar("TokenDBType", bound=TokenBase)
 UserType = TypeVar("UserType", bound=UserBase)
 UserDBType = TypeVar("UserDBType", bound=UserBase)
@@ -91,18 +91,25 @@ async def get_not_primary(
     return instance_db
 
 
-class Framework(Generic[StateType, TokenDBType, UserType, UserDBType]):
+def StreamingResponse(
+    status_code: int,
+    generator: Callable[[], ContentStream],
+):
+    return BaseStreamingResponse(
+        generator(), status_code=status_code, media_type="application/octet-stream"
+    )
+
+
+class Framework(Generic[TokenDBType, UserType]):
     def __init__(
         self,
-        State: type[StateType],
         TokenDB: type[TokenDBType],
         User: type[UserType],
-        UserDB: type[UserDBType],
     ):
-        def get_state(request: Request) -> StateType:
-            return type_cast(StateType, request.app.state.state)
+        def get_state(request: Request):
+            return request.app.state.state
 
-        async def get_session(state: Annotated[StateType, Depends(get_state)]):
+        async def get_session(state: Annotated[StateTypeType, Depends(get_state)]):
             async with get_session_from_engine(state.engine) as session:
                 yield session
 
@@ -139,41 +146,6 @@ class Framework(Generic[StateType, TokenDBType, UserType, UserDBType]):
 
             return User.model_validate(user_db)
 
-        def create_endpoint(
-            handler: Callable[
-                [StateType, ImmutableMultiDict[str, Any], UserType, Reader, Writer],
-                Coroutine[Any, Any, None],
-            ]
-        ):
-            async def endpoint(
-                request: Request, user: Annotated[UserType, Depends(get_user)]
-            ):
-                if not isinstance(request.user, User):
-                    raise HTTPException(403)
-
-                async def generator():
-                    writer = HTTPWriter()
-
-                    async with TaskGroup() as group:
-                        group.create_task(
-                            handler(
-                                get_state(request),
-                                request.query_params,
-                                user,
-                                HTTPReader(request),
-                                writer,
-                            )
-                        )
-
-                        async for chunk in writer.iterate():
-                            yield chunk
-
-                return BaseStreamingResponse(
-                    generator(), media_type="application/octet-stream"
-                )
-
-            return endpoint
-
         async def create_admin_token(engine: AsyncEngine) -> str:
             async with get_session_from_engine(engine) as session:
                 token_db = await create_token(session, TokenDB, admin=True)
@@ -195,6 +167,46 @@ class Framework(Generic[StateType, TokenDBType, UserType, UserDBType]):
         self.get_session = get_session
         self.get_token = get_token
         self.get_user = get_user
-        self.create_endpoint = create_endpoint
         self.create_admin_token = create_admin_token
         self.create_user = create_user
+
+
+class Server(FastAPI, Generic[StateTypeType, TokenDBType, UserType, UserDBType]):
+    def __init__(
+        self,
+        debug: bool,
+        framework: Framework[TokenDBType, UserType],
+        database_url: AnyUrl,
+        lifespan: Callable[[AsyncEngine], AsyncContextManager[StateTypeType]],
+        UserDB: type[UserDBType],
+        create_user_kwargs: Callable[[], Mapping[str, Any]],
+    ):
+        @asynccontextmanager
+        async def lifespan_wrap(app: FastAPI):
+            engine = create_async_engine(
+                str(database_url),
+                echo=False,
+                connect_args={"check_same_thread": False},
+            )
+
+            async with lifespan(engine) as state:
+                app.state.state = state
+                yield
+                app.state.state = None
+
+            await engine.dispose()
+
+        async def user(
+            session: Annotated[AsyncSession, Depends(framework.get_session)],
+            token_db: Annotated[TokenDBType, Depends(framework.create_user)],
+        ) -> str:
+            kwargs = create_user_kwargs()
+            session.add(UserDB(token_id=token_db.id, **kwargs))
+
+            await session.commit()
+            await session.refresh(token_db)
+
+            return token_db.token
+
+        super().__init__(debug=debug, lifespan=lifespan_wrap, redoc_url=None)
+        super().post("/user")(user)
