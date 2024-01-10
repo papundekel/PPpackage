@@ -2,14 +2,15 @@ from asyncio import IncompleteReadError
 from collections.abc import AsyncIterable
 
 from fastapi import Request
+from httpx import Response
 from PPpackage_utils.queue import Queue, queue_iterate
 from PPpackage_utils.stream import Reader, Writer
 
 
-class HTTPReader(Reader):
-    def __init__(self, request: Request):
+class AsyncChunkReader(Reader):
+    def __init__(self, chunks: AsyncIterable[memoryview]):
         self._buffer = bytearray()
-        self._iterator = (memoryview(chunk) async for chunk in request.stream())
+        self._iterator = aiter(chunks)
 
     async def _iteration(self) -> memoryview | None:
         try:
@@ -47,6 +48,14 @@ class HTTPReader(Reader):
 
     async def read(self) -> AsyncIterable[memoryview]:
         return self._iterator
+
+
+def HTTPRequestReader(request: Request):
+    return AsyncChunkReader(memoryview(chunk) async for chunk in request.stream())
+
+
+def HTTPResponseReader(response: Response):
+    return AsyncChunkReader(memoryview(chunk) async for chunk in response.aiter_bytes())
 
 
 class HTTPWriter(Writer):

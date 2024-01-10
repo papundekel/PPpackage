@@ -1,4 +1,5 @@
-from PPpackage_runner.database import Token, User
 from PPpackage_utils.server import Framework
+
+from .database import Token, User
 
 framework = Framework(Token, User)

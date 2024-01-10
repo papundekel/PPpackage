@@ -7,16 +7,14 @@ from typing import Any
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import (
-    CommandException,
-    TarFileInMemoryWrite,
-    TemporaryDirectory,
-    asubprocess_wait,
-)
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Product
+from PPpackage_utils.tar import TarFileInMemoryWrite
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_wait
 
+from .settings import Settings
 from .utils import (
-    Data,
+    State,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -61,19 +59,18 @@ def patch_native_generators(
 
 
 async def generate(
-    debug: bool,
-    data: Data,
-    cache_path: Path,
+    settings: Settings,
+    state: State,
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
 ) -> memoryview:
-    cache_path = get_cache_path(cache_path)
+    cache_path = get_cache_path(settings.cache_path)
 
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(data.data_path),
+        loader=Jinja2FileSystemLoader(state.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -99,7 +96,7 @@ async def generate(
             ) as host_profile_file,
         ):
             host_profile_path = Path(host_profile_file.name)
-            build_profile_path = data.data_path / "profile"
+            build_profile_path = state.data_path / "profile"
 
             process = await create_subprocess_exec(
                 "conan",
@@ -107,7 +104,7 @@ async def generate(
                 "--output-folder",
                 str(native_generators_path),
                 "--deployer",
-                data.deployer_path,
+                state.deployer_path,
                 "--build",
                 "never",
                 f"--profile:host={host_profile_path}",

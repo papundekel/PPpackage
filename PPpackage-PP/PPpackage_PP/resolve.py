@@ -1,6 +1,4 @@
 from collections.abc import AsyncIterable, MutableSequence
-from pathlib import Path
-from typing import Any
 
 from PPpackage_submanager.schemes import (
     ManagerRequirement,
@@ -9,11 +7,12 @@ from PPpackage_submanager.schemes import (
     ResolutionGraphNode,
 )
 
+from .settings import Settings
+
 
 async def resolve(
-    debug: bool,
-    data: Any,
-    cache_path: Path,
+    settings: Settings,
+    state: None,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
 ) -> AsyncIterable[ResolutionGraph]:

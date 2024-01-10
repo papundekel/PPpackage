@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import Optional
 
-from PPpackage_utils.submanager import AsyncTyper, run
+from PPpackage_utils.cli import AsyncTyper, run
 from PPpackage_utils.validation import load_from_bytes
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
 from .main import main
-from .parse import Config
+from .schemes import Config
 
 app = AsyncTyper()
 
@@ -27,12 +27,12 @@ async def main_command(
     with config_path.open("rb") as config_file:
         config_bytes = config_file.read()
 
-        config = load_from_bytes(debug, Config, config_bytes)
+        config = load_from_bytes(Config, config_bytes)
 
         await main(
             debug,
             do_update_database,
-            config.submanager_socket_paths,
+            config,
             destination_path,
             generators_path,
             graph_path,

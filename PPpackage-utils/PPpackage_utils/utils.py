@@ -4,7 +4,8 @@ from collections.abc import AsyncIterable, AsyncIterator, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
 from os import environ, kill, mkfifo
 from pathlib import Path
-from shutil import rmtree
+from shutil import move
+from shutil import rmtree as base_rmtree
 from signal import SIGTERM
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import Any, Optional
@@ -151,9 +152,25 @@ def _wipe_directory_onerror(_, __, excinfo):
         raise exc
 
 
+def rmtree(path: Path, onerror=None):
+    if path.is_dir():
+        base_rmtree(path, onerror=onerror)
+    else:
+        path.unlink()
+
+
 def wipe_directory(directory: Path) -> None:
     for path in directory.iterdir():
-        if path.is_symlink():
-            path.unlink()
+        rmtree(path, onerror=_wipe_directory_onerror)
+
+
+def movetree(source: Path, destination: Path):
+    for source_item in source.iterdir():
+        destination_item = destination / source_item.name
+        rmtree(destination_item)
+
+        if source_item.is_dir():
+            destination_item.mkdir()
+            movetree(source_item, destination_item)
         else:
-            rmtree(path, onerror=_wipe_directory_onerror)
+            move(source_item, destination / source_item.name)

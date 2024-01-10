@@ -7,12 +7,11 @@ from json import load as json_load
 from pathlib import Path
 
 from PPpackage_runner.settings import settings
-from PPpackage_utils.server import State as BaseState
 from PPpackage_utils.utils import asubprocess_wait
 
 
 @dataclass(frozen=True)
-class State(BaseState):
+class State:
     bundle_path: Path
     crun_root_path: Path
 

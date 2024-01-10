@@ -258,7 +258,8 @@ async def main_command(
             runner, runner_path, runner_database_url, runner_workdirs_path
         ):
             async with HTTPClient(
-                transport=AsyncHTTPTransport(uds=str(runner_path))
+                http2=True,
+                transport=AsyncHTTPTransport(http2=True, uds=str(runner_path)),
             ) as client:
                 async for token in runner_create_users(client, runner_token, 5):
                     print(token, file=stderr)

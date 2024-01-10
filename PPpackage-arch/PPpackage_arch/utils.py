@@ -1,6 +1,7 @@
-from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass
 from pathlib import Path
+
+from httpx import AsyncClient as HTTPClient
 
 
 def get_cache_paths(cache_path: Path) -> tuple[Path, Path]:
@@ -10,7 +11,5 @@ def get_cache_paths(cache_path: Path) -> tuple[Path, Path]:
 
 
 @dataclass(frozen=True)
-class RunnerConnection:
-    reader: StreamReader
-    writer: StreamWriter
-    workdir_path: Path
+class State:
+    runner_client: HTTPClient

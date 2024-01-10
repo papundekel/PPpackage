@@ -6,19 +6,16 @@ from pathlib import Path
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import (
-    Dependency,
-    Options,
-    Package,
-    PackageIDAndInfo,
-    load_object,
-)
-from PPpackage_utils.utils import CommandException, asubprocess_wait
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_utils.utils import asubprocess_wait
+from PPpackage_utils.validation import load_object
 
 from .parse import FetchProductInfo
+from .settings import Settings
 from .utils import (
-    Data,
     FetchNode,
+    State,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -40,21 +37,20 @@ async def create_requirements(
 
 
 async def fetch(
-    debug: bool,
-    data: Data,
-    cache_path: Path,
+    settings: Settings,
+    state: State,
     options: Options,
     package: Package,
     dependencies: AsyncIterable[Dependency],
-    installation: memoryview | None,
-    generators: memoryview | None,
+    installation_path: Path | None,
+    generators_path: Path | None,
 ) -> PackageIDAndInfo | AsyncIterable[str]:
-    cache_path = get_cache_path(cache_path)
+    cache_path = get_cache_path(settings.cache_path)
 
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(data.data_path),
+        loader=Jinja2FileSystemLoader(state.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -72,7 +68,7 @@ async def fetch(
         ) as host_profile_file,
     ):
         host_profile_path = Path(host_profile_file.name)
-        build_profile_path = data.data_path / "profile"
+        build_profile_path = state.data_path / "profile"
 
         process = await create_subprocess_exec(
             "conan",
@@ -95,7 +91,7 @@ async def fetch(
 
         await asubprocess_wait(process, CommandException())
 
-    nodes = parse_conan_graph_nodes(debug, FetchNode, graph_json_bytes)
+    nodes = parse_conan_graph_nodes(settings.debug, FetchNode, graph_json_bytes)
 
     for node in nodes.values():
         package_name = node.name

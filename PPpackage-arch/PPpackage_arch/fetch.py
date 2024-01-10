@@ -14,7 +14,8 @@ from PPpackage_utils.utils import (
     fakeroot,
 )
 
-from .utils import get_cache_paths
+from .settings import Settings
+from .utils import State, get_cache_paths
 
 
 def process_product_id(line: str):
@@ -26,16 +27,15 @@ def process_product_id(line: str):
 
 
 async def fetch(
-    debug: bool,
-    data: None,
-    cache_path: Path,
+    settings: Settings,
+    state: State,
     options: Options,
     package: Package,
     dependencies: AsyncIterable[Dependency],
-    installation: memoryview | None,
-    generators: memoryview | None,
+    installation_path: Path | None,
+    generators_path: Path | None,
 ) -> PackageIDAndInfo | AsyncIterable[str]:
-    database_path, cache_path = get_cache_paths(cache_path)
+    database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
 
@@ -44,7 +44,7 @@ async def fetch(
     with TemporaryDirectory() as database_path_fake:
         symlink(database_path / "sync", database_path_fake / "sync")
 
-        async with fakeroot(debug) as environment:
+        async with fakeroot(settings.debug) as environment:
             process = await create_subprocess_exec(
                 "pacman",
                 "--dbpath",

@@ -1,34 +1,31 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from pathlib import Path
+from typing import Annotated
 
+from fastapi import Depends
 from PPpackage_runner.database import User
+from PPpackage_runner.framework import framework
 from PPpackage_runner.utils import State, edit_config
-from PPpackage_utils.stream import Reader, Writer
-from starlette.datastructures import ImmutableMultiDict
+from PPpackage_utils.stream import Writer
 
 
 async def command(
-    state: State,
-    query_parameters: ImmutableMultiDict[str, str],
-    user: User,
-    reader: Reader,
-    writer: Writer,
+    state: Annotated[State, Depends(framework.get_state)],
+    user: Annotated[User, Depends(framework.get_user)],
+    image_relative_path: Path,
+    pipe_relative_path: Path,
+    command: str,
+    args: list[str],
 ):
     workdir_path = user.workdir_path
 
-    image_relative_path = query_parameters["image_relative_path"]
-
     image_path = workdir_path / image_relative_path
-
-    command = query_parameters["command"]
-    args = query_parameters.getlist("args")
 
     with edit_config(state.bundle_path) as config:
         config["process"]["args"] = [command, *args[1:]]
         config["root"]["path"] = str(image_path.absolute())
 
-    pipe_relative_path = Path(query_parameters["query_relative_path"])
     pipe_path = workdir_path / pipe_relative_path
 
     with pipe_path.open("r") as pipe:
@@ -47,4 +44,4 @@ async def command(
 
         return_code = await process.wait()
 
-    await writer.dump_one(return_code)
+    return return_code

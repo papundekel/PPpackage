@@ -1,52 +1,17 @@
 from asyncio import Task, TaskGroup
-from collections.abc import Mapping, MutableMapping, MutableSequence, Set
-from itertools import chain
+from collections.abc import Mapping, MutableMapping, MutableSequence
+from pathlib import Path
 from sys import stderr
-from typing import Any, Iterable
+from tempfile import mkdtemp
+from typing import Iterable
 
-from PPpackage_utils.parse import (
-    ManagerAndName,
-    Options,
-    Product,
-    dump_many,
-    dump_one,
-    load_bytes_chunked,
-    load_one,
-)
-from PPpackage_utils.utils import (
-    SubmanagerCommand,
-    TarFileInMemoryRead,
-    TarFileInMemoryWrite,
-)
+from PPpackage_submanager.schemes import ManagerAndName, Options, Product
+from PPpackage_utils.utils import movetree
+
+from PPpackage.submanager import Submanager
 
 from .generators import builtin as builtin_generators
-from .utils import Connections, NodeData, SubmanagerCommandFailure, data_to_product
-
-
-async def generate_manager(
-    debug: bool,
-    connections: Connections,
-    options: Options,
-    products: Iterable[Product],
-    generators: Set[str],
-    manager: str,
-) -> memoryview:
-    async with connections.connect(debug, manager, SubmanagerCommand.GENERATE) as (
-        reader,
-        writer,
-    ):
-        await dump_one(debug, writer, options)
-        await dump_many(debug, writer, products)
-        await dump_many(debug, writer, generators)
-
-        success = await load_one(debug, reader, bool)
-
-        if not success:
-            raise SubmanagerCommandFailure(f"{manager} failed to create generators.")
-
-        generators_directory = await load_bytes_chunked(debug, reader)
-
-        return generators_directory
+from .utils import NodeData, data_to_product
 
 
 def check_results(
@@ -66,12 +31,12 @@ def check_results(
 
 
 async def generate(
-    debug: bool,
-    connections: Connections,
+    submanagers: Mapping[str, Submanager],
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
-    meta_options: Mapping[str, Mapping[str, Any] | None],
-) -> memoryview:
+    meta_options: Mapping[str, Options],
+    generators_path: Path,
+) -> None:
     stderr.write("Generating")
     for generator in generators:
         stderr.write(f" {generator}")
@@ -89,35 +54,30 @@ async def generate(
             data_to_product(manager_and_package.name, data)
         )
 
-    tasks: MutableSequence[Task[memoryview]] = []
-    builtin_directories: MutableSequence[memoryview] = []
+    directories: MutableSequence[Path] = []
 
     async with TaskGroup() as group:
-        for manager, products in meta_products.items():
-            tasks.append(
-                group.create_task(
-                    generate_manager(
-                        debug,
-                        connections,
-                        meta_options.get(manager),
-                        products,
-                        generators - builtin_generators.keys(),
-                        manager,
-                    )
+        for submanager_name, products in meta_products.items():
+            submanager = submanagers[submanager_name]
+
+            destination_path = Path(mkdtemp())
+
+            group.create_task(
+                submanager.generate(
+                    meta_options.get(submanager_name),
+                    products,
+                    generators - builtin_generators.keys(),
+                    destination_path,
                 )
             )
 
+            directories.append(destination_path)
+
         for generator in generators & builtin_generators.keys():
-            builtin_directories.append(builtin_generators[generator](meta_products))
+            destination_path = Path(mkdtemp())
+            builtin_generators[generator](meta_products, destination_path)
+            directories.append(destination_path)
 
-    with TarFileInMemoryWrite() as merged_tar:
-        for generators_directory in chain(
-            builtin_directories, (task.result() for task in tasks)
-        ):
-            with TarFileInMemoryRead(generators_directory) as tar:
-                for member in tar:
-                    merged_tar.addfile(
-                        tar.getmember(member.name), tar.extractfile(member)
-                    )
-
-    return merged_tar.data
+    for directory in directories:
+        movetree(directory, generators_path)
+        directory.rmdir()

@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Request
 from PPpackage_runner.database import User
 from PPpackage_runner.framework import framework
 from PPpackage_utils.asyncio_stream import AsyncioWriter
-from PPpackage_utils.http_stream import HTTPReader
+from PPpackage_utils.http_stream import HTTPRequestReader
 from PPpackage_utils.stream import Reader
 from PPpackage_utils.utils import asubprocess_wait
 
@@ -46,7 +46,7 @@ async def run_dockerfile(
 ):
     tag = "pppackage/runner-dockerfile-image"
 
-    reader = HTTPReader(request)
+    reader = HTTPRequestReader(request)
 
     await build_dockerfile(reader, tag)
 

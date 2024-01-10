@@ -7,18 +7,17 @@ from httpx import AsyncClient as HTTPClient
 from httpx import AsyncHTTPTransport
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
-from PPpackage_utils.tar import TarFileInMemoryRead
 from PPpackage_utils.utils import TemporaryPipe, discard_async_iterable
 
-from .settings import settings
-from .utils import State
+from .settings import Settings
 
 
-async def test_runner_run(debug: bool):
+async def test_runner_run(debug: bool, settings: Settings):
     async with HTTPClient(
-        transport=AsyncHTTPTransport(uds=str(settings.runner.socket_path))
+        http2=True,
+        transport=AsyncHTTPTransport(http2=True, uds=str(settings.runner_socket_path)),
     ) as client:
-        runner_workdir_path = settings.runner.workdir_path
+        runner_workdir_path = settings.runner_workdir_path
 
         with (
             TemporaryPipe(runner_workdir_path) as stdin_pipe_path,
@@ -28,7 +27,7 @@ async def test_runner_run(debug: bool):
                 task = group.create_task(
                     client.post(
                         "http://localhost/user",
-                        headers={"Authorization": f"Bearer {settings.runner.token}"},
+                        headers={"Authorization": f"Bearer {settings.runner_token}"},
                         params={
                             "tag": "docker.io/archlinux:latest",
                             "args": ["cat", "-"],
@@ -56,33 +55,31 @@ async def create_generators():
     yield "versions"
 
 
-def print_tar(data: memoryview):
-    with TarFileInMemoryRead(data) as tar:
-        print("PP test:", file=stderr)
-        for member in tar.getmembers():
-            print(f"\t{member.name}", file=stderr)
+def print_directory(directory: Path):
+    print("PP test:", file=stderr)
+    for member in directory.iterdir():
+        print(f"\t{member.name}", file=stderr)
 
 
 async def fetch(
-    debug: bool,
-    state: State,
-    cache_path: Path,
+    settings: Settings,
+    state: None,
     options: Options,
     package: Package,
     dependencies: AsyncIterable[Dependency],
-    installation: memoryview | None,
-    generators: memoryview | None,
+    installation_path: Path | None,
+    generators_path: Path | None,
 ) -> PackageIDAndInfo | AsyncIterable[str]:
-    if generators is None:
+    if generators_path is None:
         return create_generators()
 
-    await test_runner_run(debug)
+    await test_runner_run(settings.debug, settings)
 
     await discard_async_iterable(dependencies)
 
-    if installation is not None:
-        print_tar(installation)
+    if installation_path is not None:
+        print_directory(installation_path)
 
-    print_tar(generators)
+    print_directory(generators_path)
 
     return PackageIDAndInfo("id", None)

@@ -1,15 +1,13 @@
-from asyncio import TaskGroup
-from collections.abc import AsyncIterable, Callable, Coroutine, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from secrets import token_hex
 from typing import Annotated, Any, AsyncContextManager, Generic, TypeVar
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
-from PPpackage_utils.http_stream import HTTPReader, HTTPWriter
-from PPpackage_utils.stream import Reader, Writer
+from PPpackage_submanager.interface import SettingsType
 from pydantic import AnyUrl
+from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import joinedload
 from sqlmodel import Field, SQLModel, select
@@ -20,6 +18,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
 )
 
 
@@ -27,11 +26,6 @@ from starlette.status import (
 async def get_session_from_engine(engine: AsyncEngine):
     async with AsyncSession(engine) as session:
         yield session
-
-
-@dataclass(frozen=True)
-class State:
-    engine: AsyncEngine
 
 
 class TokenBase(SQLModel):
@@ -45,9 +39,9 @@ class UserBase(SQLModel):
     token_id: int = Field(foreign_key="tokendb.id", unique=True)
 
 
-StateTypeType = TypeVar("StateTypeType", bound=State)
+SettingsType = TypeVar("SettingsType", bound=BaseSettings)
+StateType = TypeVar("StateType")
 TokenDBType = TypeVar("TokenDBType", bound=TokenBase)
-UserType = TypeVar("UserType", bound=UserBase)
 UserDBType = TypeVar("UserDBType", bound=UserBase)
 
 
@@ -57,6 +51,10 @@ def HTTP401Exception():
 
 def HTTP403Exception():
     return HTTPException(status_code=HTTP_403_FORBIDDEN)
+
+
+def HTTP404Exception():
+    return HTTPException(status_code=HTTP_404_NOT_FOUND)
 
 
 def HTTP400Exception():
@@ -100,17 +98,17 @@ def StreamingResponse(
     )
 
 
-class Framework(Generic[TokenDBType, UserType]):
+class Framework(Generic[TokenDBType, UserDBType]):
     def __init__(
         self,
         TokenDB: type[TokenDBType],
-        User: type[UserType],
+        UserDB: type[UserDBType],
     ):
         def get_state(request: Request):
             return request.app.state.state
 
-        async def get_session(state: Annotated[StateTypeType, Depends(get_state)]):
-            async with get_session_from_engine(state.engine) as session:
+        async def get_session(request: Request):
+            async with get_session_from_engine(request.app.state.engine) as session:
                 yield session
 
         async def get_token(
@@ -136,15 +134,13 @@ class Framework(Generic[TokenDBType, UserType]):
 
             return token_db
 
-        async def get_user(
-            token: Annotated[TokenDBType, Depends(get_token)]
-        ) -> UserType:
+        async def get_user(token: Annotated[TokenDBType, Depends(get_token)]) -> UserDB:
             user_db = token.user
 
             if user_db is None:
                 raise HTTP401Exception()
 
-            return User.model_validate(user_db)
+            return user_db
 
         async def create_admin_token(engine: AsyncEngine) -> str:
             async with get_session_from_engine(engine) as session:
@@ -171,13 +167,13 @@ class Framework(Generic[TokenDBType, UserType]):
         self.create_user = create_user
 
 
-class Server(FastAPI, Generic[StateTypeType, TokenDBType, UserType, UserDBType]):
+class Server(FastAPI, Generic[SettingsType, StateType, TokenDBType, UserDBType]):
     def __init__(
         self,
-        debug: bool,
-        framework: Framework[TokenDBType, UserType],
+        settings: SettingsType,
+        framework: Framework[TokenDBType, UserDBType],
         database_url: AnyUrl,
-        lifespan: Callable[[AsyncEngine], AsyncContextManager[StateTypeType]],
+        lifespan: Callable[[SettingsType], AsyncContextManager[StateType]],
         UserDB: type[UserDBType],
         create_user_kwargs: Callable[[], Mapping[str, Any]],
     ):
@@ -189,9 +185,11 @@ class Server(FastAPI, Generic[StateTypeType, TokenDBType, UserType, UserDBType])
                 connect_args={"check_same_thread": False},
             )
 
-            async with lifespan(engine) as state:
+            async with lifespan(settings) as state:
                 app.state.state = state
+                app.state.engine = engine
                 yield
+                app.state.engine = None
                 app.state.state = None
 
             await engine.dispose()
@@ -200,13 +198,16 @@ class Server(FastAPI, Generic[StateTypeType, TokenDBType, UserType, UserDBType])
             session: Annotated[AsyncSession, Depends(framework.get_session)],
             token_db: Annotated[TokenDBType, Depends(framework.create_user)],
         ) -> str:
-            kwargs = create_user_kwargs()
-            session.add(UserDB(token_id=token_db.id, **kwargs))
+            session.add(UserDB(token_id=token_db.id, **create_user_kwargs()))
 
             await session.commit()
             await session.refresh(token_db)
 
             return token_db.token
 
-        super().__init__(debug=debug, lifespan=lifespan_wrap, redoc_url=None)
+        super().__init__(
+            debug=getattr(settings, "debug", False),
+            lifespan=lifespan_wrap,
+            redoc_url=None,
+        )
         super().post("/user")(user)

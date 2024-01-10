@@ -6,19 +6,14 @@ from PPpackage_utils.server import TokenBase, UserBase
 from sqlmodel import Relationship
 
 
-class TokenDB(TokenBase, table=True):
-    user: Optional["UserDB"] = Relationship(back_populates="token")
+class Token(TokenBase, table=True):
+    user: Optional["User"] = Relationship(back_populates="token")
 
 
-class UserDB(UserBase, table=True):
+class User(UserBase, table=True):
     workdir_relative_path: str
-    token: TokenDB = Relationship(back_populates="user")
-
-
-class User(UserBase):
-    workdir_relative_path: Path
-    token: TokenDB
+    token: Token = Relationship(back_populates="user")
 
     @property
     def workdir_path(self) -> Path:
-        return settings.workdirs_path / self.workdir_relative_path
+        return settings.workdirs_path / Path(self.workdir_relative_path)

@@ -1,23 +1,25 @@
-from collections.abc import Iterable, Mapping, MutableSet
+from collections.abc import Iterable, MutableSet
 from pathlib import Path
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage_utils.schemes import ManagerAndName
-from PPpackage_utils.utils import tar_archive, tar_extract
+from PPpackage_submanager.schemes import ManagerAndName
+from PPpackage_utils.utils import TemporaryDirectory, movetree
 from PPpackage_utils.validation import load_from_bytes
 from pydantic import ValidationError
 from pydot import Dot
 
+from PPpackage.submanager import Submanagers
+
 from .fetch import fetch
 from .generate import generate
 from .install import install
-from .parse import Input
 from .resolve import resolve
+from .schemes import Config, Input
 from .update_database import update_database
-from .utils import Connections, NodeData, SubmanagerCommandFailure
+from .utils import NodeData, SubmanagerCommandFailure
 
 
 def topological_generations(
@@ -140,19 +142,19 @@ def log_exception(e: BaseExceptionGroup) -> None:
 async def main(
     debug: bool,
     do_update_database: bool,
-    submanager_socket_paths: Mapping[str, Path],
+    config: Config,
     destination_path: Path,
     generators_path: Path | None,
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
     try:
-        connections = Connections(submanager_socket_paths)
+        submanagers = Submanagers(config.submanagers)
 
         input_json_bytes = stdin.buffer.read()
 
         try:
-            input = load_from_bytes(debug, Input, input_json_bytes)
+            input = load_from_bytes(Input, input_json_bytes)
         except ValidationError as e:
             stderr.write("ERROR: Invalid input.\n")
             stderr.write(e.json(indent=4))
@@ -160,15 +162,14 @@ async def main(
             return
 
         if do_update_database:
-            managers = input.requirements.keys()
-            await update_database(debug, connections, managers)
+            submanager_names = input.requirements.keys()
+            await update_database(submanagers, submanager_names)
 
         options = input.options if input.options is not None else {}
 
         graph = await resolve(
-            debug,
+            submanagers,
             resolve_iteration_limit,
-            connections,
             input.requirements,
             options,
         )
@@ -181,27 +182,31 @@ async def main(
         fetch_order = topological_generations(reversed_graph)
         install_order = list(create_install_topology(graph))
 
-        await fetch(debug, connections, options, graph, fetch_order, install_order)
+        await fetch(submanagers, options, graph, fetch_order, install_order)
 
-        old_installation = tar_archive(destination_path)
+        with TemporaryDirectory() as destination_temporary_path:
+            movetree(destination_path, destination_temporary_path)
 
-        new_installation = await install(
-            debug, connections, old_installation, install_order
-        )
+            await install(submanagers, install_order, destination_temporary_path)
 
-        if generators_path is not None and input.generators is not None:
-            generators_directory = await generate(
-                debug,
-                connections,
-                input.generators,
-                graph.nodes(data=True),
-                options,
-            )
-            tar_extract(generators_directory, generators_path)
+            if generators_path is not None and input.generators is not None:
+                with TemporaryDirectory() as generators_temporary_path:
+                    movetree(generators_path, generators_temporary_path)
 
-        tar_extract(new_installation, destination_path)
+                    await generate(
+                        submanagers,
+                        input.generators,
+                        graph.nodes(data=True),
+                        options,
+                        generators_temporary_path,
+                    )
+
+                    movetree(generators_temporary_path, generators_path)
+
+            movetree(destination_temporary_path, destination_path)
 
         stderr.write("Done.\n")
+
     except* SubmanagerCommandFailure as e_group:
         log_exception(e_group)
         stderr.write("Aborting.\n")

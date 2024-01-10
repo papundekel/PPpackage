@@ -7,8 +7,7 @@ from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypeVar
 
 from jinja2 import Template as Jinja2Template
-from PPpackage_utils.parse import load_from_bytes, load_object
-from PPpackage_utils.utils import Installations
+from PPpackage_utils.validation import load_from_bytes, load_object
 from pydantic import BaseModel
 
 
@@ -61,7 +60,7 @@ def parse_conan_graph_nodes(
     NodeType: type[T],
     conan_graph_json_bytes: bytes,
 ) -> Mapping[str, T]:
-    conan_graph = load_from_bytes(debug, ConanGraph, conan_graph_json_bytes)
+    conan_graph = load_from_bytes(ConanGraph, conan_graph_json_bytes)
 
     return {
         node_id: load_object(NodeType, node_json)
@@ -97,18 +96,6 @@ def get_path(module) -> Path:
 
 
 @dataclass(frozen=True)
-class Data:
+class State:
     data_path: Path
     deployer_path: Path
-    installations: Installations
-
-
-def create_data():
-    import PPpackage_conan
-
-    from . import deployer
-
-    data_path = get_path(PPpackage_conan).parent / "data"
-    deployer_path = get_path(deployer)
-
-    return Data(data_path, deployer_path, Installations(1000))

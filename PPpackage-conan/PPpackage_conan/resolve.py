@@ -17,18 +17,19 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
-from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
 from PPpackage_utils.utils import (
-    CommandException,
     asubprocess_communicate,
     asubprocess_wait,
     ensure_dir_exists,
 )
 
 from .parse import Requirement
+from .settings import Settings
 from .utils import (
-    Data,
     ResolveNode,
+    State,
     create_and_render_temp_file,
     get_cache_path,
     make_conan_environment,
@@ -243,13 +244,12 @@ async def create_graph(
 
 
 async def resolve(
-    debug: bool,
-    data: Data,
-    cache_path: Path,
+    settings: Settings,
+    state: State,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],
 ) -> AsyncIterable[ResolutionGraph]:
-    cache_path = get_cache_path(cache_path)
+    cache_path = get_cache_path(settings.cache_path)
 
     ensure_dir_exists(cache_path)
 
@@ -257,7 +257,7 @@ async def resolve(
     environment = make_conan_environment(cache_path)
 
     jinja_loader = Jinja2Environment(
-        loader=Jinja2FileSystemLoader(data.data_path),
+        loader=Jinja2FileSystemLoader(state.data_path),
         autoescape=jinja2_select_autoescape(),
     )
 
@@ -266,7 +266,7 @@ async def resolve(
     root_template = jinja_loader.get_template("conanfile-root.py.jinja")
     profile_template = jinja_loader.get_template("profile.jinja")
 
-    build_profile_path = data.data_path / "profile"
+    build_profile_path = state.data_path / "profile"
 
     requirement_index = 0
 
@@ -274,11 +274,15 @@ async def resolve(
         requirement_partitions = await create_requirement_partitions(requirements)
 
         leaves_task = export_leaves(
-            debug, environment, leaf_template, requirement_index, requirement_partitions
+            settings.debug,
+            environment,
+            leaf_template,
+            requirement_index,
+            requirement_partitions,
         )
 
         requirement_task = export_requirement(
-            debug,
+            settings.debug,
             environment,
             requirement_template,
             requirement_index,
@@ -293,7 +297,7 @@ async def resolve(
     requirements_length = requirement_index
 
     graph = await create_graph(
-        debug,
+        settings.debug,
         environment,
         root_template,
         profile_template,
@@ -302,6 +306,6 @@ async def resolve(
         requirements_length,
     )
 
-    await remove_temporary_packages_from_cache(debug, environment)
+    await remove_temporary_packages_from_cache(settings.debug, environment)
 
     yield graph
