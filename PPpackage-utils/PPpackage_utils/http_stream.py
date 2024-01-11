@@ -55,7 +55,7 @@ def HTTPRequestReader(request: Request):
 
 
 def HTTPResponseReader(response: Response):
-    return AsyncChunkReader(memoryview(chunk) async for chunk in response.aiter_bytes())
+    return AsyncChunkReader(memoryview(chunk) async for chunk in response.aiter_raw())
 
 
 class HTTPWriter(Writer):

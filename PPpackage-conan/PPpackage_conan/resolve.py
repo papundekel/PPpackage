@@ -31,7 +31,6 @@ from .utils import (
     ResolveNode,
     State,
     create_and_render_temp_file,
-    get_cache_path,
     make_conan_environment,
     parse_conan_graph_nodes,
 )
@@ -249,12 +248,9 @@ async def resolve(
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[Requirement]],
 ) -> AsyncIterable[ResolutionGraph]:
-    cache_path = get_cache_path(settings.cache_path)
+    ensure_dir_exists(settings.cache_path)
 
-    ensure_dir_exists(cache_path)
-
-    # CONAN_HOME must be an absolute path
-    environment = make_conan_environment(cache_path)
+    environment = make_conan_environment(settings.cache_path)
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),

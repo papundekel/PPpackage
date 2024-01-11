@@ -1,17 +1,16 @@
 from contextlib import asynccontextmanager
 
-from PPpackage_runner.database import User
-from PPpackage_runner.endpoints.command import command
-from PPpackage_runner.endpoints.run.dockerfile import run_dockerfile
-from PPpackage_runner.endpoints.run.tag import run_tag
-from PPpackage_runner.framework import framework
-from PPpackage_runner.settings import settings
-from PPpackage_runner.user import create_user_kwargs
-from PPpackage_runner.utils import State, create_config
 from PPpackage_utils.server import Server
 from PPpackage_utils.utils import TemporaryDirectory
 
-from .settings import Settings
+from .database import User
+from .endpoints.command import command
+from .endpoints.run.dockerfile import run_dockerfile
+from .endpoints.run.tag import run_tag
+from .framework import framework
+from .settings import Settings, settings
+from .user import create_user_kwargs, create_user_response
+from .utils import State, create_config
 
 
 @asynccontextmanager
@@ -29,6 +28,7 @@ app = Server(
     lifespan,
     User,
     create_user_kwargs,
+    create_user_response,
 )
 
 app.post("/run/tag")(run_tag)

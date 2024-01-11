@@ -54,13 +54,11 @@ async def fetch(
                 submanager_name = node.manager
                 submanager = submanagers[submanager_name]
 
-                group.create_task(
-                    submanager.fetch(
-                        meta_options.get(submanager_name),
-                        Package(name=node.name, version=data["version"]),
-                        dependencies,
-                        graph.nodes,
-                        packages_to_dependencies,
-                        install_order,
-                    )
-                )
+                async with submanager.fetch(
+                    meta_options.get(submanager_name),
+                    Package(name=node.name, version=data["version"]),
+                    dependencies,
+                    None,
+                    None,
+                ) as x:
+                    pass

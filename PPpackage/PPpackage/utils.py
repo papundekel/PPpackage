@@ -1,13 +1,7 @@
-from typing import Any, TypedDict
-
 from PPpackage_submanager.schemes import Product
 from PPpackage_utils.stream import Reader
 
-
-class NodeData(TypedDict):
-    version: str
-    product_id: str
-    product_info: Any
+from PPpackage.schemes import NodeData
 
 
 def data_to_product(name: str, node_data: NodeData) -> Product:

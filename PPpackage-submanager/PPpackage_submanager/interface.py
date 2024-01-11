@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, AsyncContextManager, Generic, TypeVar
 
 from PPpackage_utils.server import UserBase
-from PPpackage_utils.tar import create_empty as create_empty_tar
 from pydantic_settings import BaseSettings
 
 from .schemes import Dependency, Package, PackageIDAndInfo, Product, ResolutionGraph

@@ -7,7 +7,6 @@ from pathlib import Path
 from httpx import AsyncClient as HTTPClient
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
-from PPpackage_utils.http_stream import HTTPResponseReader
 from PPpackage_utils.pipe import (
     pipe_read_line_maybe,
     pipe_read_string,
@@ -23,6 +22,7 @@ from PPpackage_utils.utils import (
     fakeroot,
     movetree,
 )
+from PPpackage_utils.validation import load_from_bytes
 
 from .settings import Settings
 from .utils import State, get_cache_paths
@@ -61,9 +61,14 @@ async def install_manager_command(
             debug, "PPpackage-arch", pipe_to_fakealpm, str(pipe_hook_path)
         )
 
-    reader = HTTPResponseReader(task.result())
+    response = task.result()
 
-    return_value = await reader.load_one(int)
+    if not response.is_success:
+        raise CommandException
+
+    response_bytes = await response.aread()
+
+    return_value = load_from_bytes(int, response_bytes)
 
     pipe_write_int(debug, "PPpackage-arch", pipe_to_fakealpm, return_value)
 

@@ -101,10 +101,20 @@ def make_graph(
     return WorkGraph(roots, graph)
 
 
+async def resolve_manager(
+    submanager: Submanager,
+    meta_options: Mapping[str, Any],
+    requirements_list: Iterable[Set[Hashable]],
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+):
+    async for resolution_graph in submanager.resolve(meta_options, requirements_list):
+        resolution_graphs[submanager.name].append(resolution_graph)
+
+
 async def resolve_iteration(
     submanagers: Mapping[str, Submanager],
-    requirements: Mapping[str, Set[Set[Hashable]]],
     meta_options: Mapping[str, Any],
+    requirements: Mapping[str, Set[Set[Hashable]]],
     initial: Mapping[str, Set[Hashable]],
     new_choices: MutableSequence[Any],
     results: MutableSequence[Mapping[str, WorkGraph]],
@@ -122,10 +132,8 @@ async def resolve_iteration(
             submanager = submanagers[submanager_name]
 
             group.create_task(
-                submanager.resolve(
-                    meta_options.get(submanager_name),
-                    requirements_list,
-                    resolution_graphs,
+                resolve_manager(
+                    submanager, meta_options, requirements_list, resolution_graphs
                 )
             )
 
@@ -240,8 +248,8 @@ async def resolve(
                 group.create_task(
                     resolve_iteration(
                         submanagers,
-                        all_requirements,
                         meta_options,
+                        all_requirements,
                         initial_requirements,
                         new_choices,
                         results_work_graph,

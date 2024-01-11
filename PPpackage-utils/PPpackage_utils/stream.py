@@ -72,7 +72,7 @@ def dump_bytes_chunked(output_bytes: memoryview) -> Iterator[memoryview]:
         yield from dump_bytes(chunk)
 
 
-def dump_one(output: BaseModel | Any, loop=False) -> Iterable[memoryview]:
+def dump_one(output: BaseModel | Any, loop=False) -> Iterator[memoryview]:
     if loop:
         yield _dump_bool(True)
 

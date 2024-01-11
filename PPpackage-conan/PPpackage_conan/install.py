@@ -9,7 +9,7 @@ from PPpackage_submanager.schemes import Product
 from PPpackage_utils.utils import asubprocess_wait
 
 from .settings import Settings
-from .utils import State, get_cache_path, make_conan_environment
+from .utils import State, make_conan_environment
 
 
 async def install_product(
@@ -48,9 +48,7 @@ async def install(
     installation_path: Path,
     product: Product,
 ):
-    cache_path = get_cache_path(settings.cache_path)
-
-    environment = make_conan_environment(cache_path)
+    environment = make_conan_environment(settings.cache_path)
 
     prefix = Path("conan")
 

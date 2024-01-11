@@ -5,7 +5,7 @@ from typing import Annotated, Any, AsyncContextManager, Generic, TypeVar
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
-from pydantic import AnyUrl
+from pydantic import AnyUrl, BaseModel
 from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import joinedload
@@ -40,8 +40,8 @@ class UserBase(SQLModel):
 
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
 StateType = TypeVar("StateType")
-TokenDBType = TypeVar("TokenDBType", bound=TokenBase)
-UserDBType = TypeVar("UserDBType", bound=UserBase)
+TokenType = TypeVar("TokenType", bound=TokenBase)
+UserType = TypeVar("UserType", bound=UserBase)
 
 
 def HTTP401Exception():
@@ -60,7 +60,7 @@ def HTTP400Exception():
     return HTTPException(status_code=HTTP_400_BAD_REQUEST)
 
 
-async def create_token(session: AsyncSession, TokenDB: type[TokenDBType], **kwargs):
+async def create_token(session: AsyncSession, TokenDB: type[TokenType], **kwargs):
     token = token_hex(32)
 
     token_db = TokenDB(token=token, **kwargs)
@@ -97,11 +97,11 @@ def StreamingResponse(
     )
 
 
-class Framework(Generic[TokenDBType, UserDBType]):
+class Framework(Generic[TokenType, UserType]):
     def __init__(
         self,
-        TokenDB: type[TokenDBType],
-        UserDB: type[UserDBType],
+        Token: type[TokenType],
+        User: type[UserType],
     ):
         def get_state(request: Request):
             return request.app.state.state
@@ -113,7 +113,7 @@ class Framework(Generic[TokenDBType, UserDBType]):
         async def get_token(
             request: Request,
             session: Annotated[AsyncSession, Depends(get_session)],
-        ) -> TokenDBType:
+        ) -> TokenType:
             header = request.headers.get("Authorization")
 
             if header is None:
@@ -125,7 +125,7 @@ class Framework(Generic[TokenDBType, UserDBType]):
                 raise HTTP401Exception()
 
             token_db = await get_not_primary(
-                session, TokenDB, TokenDB.token, token, joinedload(TokenDB.user)
+                session, Token, Token.token, token, joinedload(Token.user)
             )
 
             if token_db is None:
@@ -133,7 +133,7 @@ class Framework(Generic[TokenDBType, UserDBType]):
 
             return token_db
 
-        async def get_user(token: Annotated[TokenDBType, Depends(get_token)]) -> UserDB:
+        async def get_user(token: Annotated[TokenType, Depends(get_token)]) -> User:
             user_db = token.user
 
             if user_db is None:
@@ -143,18 +143,18 @@ class Framework(Generic[TokenDBType, UserDBType]):
 
         async def create_admin_token(engine: AsyncEngine) -> str:
             async with get_session_from_engine(engine) as session:
-                token_db = await create_token(session, TokenDB, admin=True)
+                token_db = await create_token(session, Token, admin=True)
 
                 return token_db.token
 
         async def create_user(
             session: Annotated[AsyncSession, Depends(get_session)],
-            token: Annotated[TokenDBType, Depends(get_token)],
-        ) -> TokenDBType:
+            token: Annotated[TokenType, Depends(get_token)],
+        ) -> TokenType:
             if not token.admin:
                 raise HTTP403Exception()
 
-            user_token_db = await create_token(session, TokenDB, admin=False)
+            user_token_db = await create_token(session, Token, admin=False)
 
             return user_token_db
 
@@ -166,15 +166,16 @@ class Framework(Generic[TokenDBType, UserDBType]):
         self.create_user = create_user
 
 
-class Server(FastAPI, Generic[SettingsType, StateType, TokenDBType, UserDBType]):
+class Server(FastAPI, Generic[SettingsType, StateType, TokenType, UserType]):
     def __init__(
         self,
         settings: SettingsType,
-        framework: Framework[TokenDBType, UserDBType],
+        framework: Framework[TokenType, UserType],
         database_url: AnyUrl,
         lifespan: Callable[[SettingsType], AsyncContextManager[StateType]],
-        UserDB: type[UserDBType],
+        User: type[UserType],
         create_user_kwargs: Callable[[], Mapping[str, Any]],
+        create_user_response: Callable[[str, UserType], BaseModel],
     ):
         @asynccontextmanager
         async def lifespan_wrap(app: FastAPI):
@@ -195,14 +196,16 @@ class Server(FastAPI, Generic[SettingsType, StateType, TokenDBType, UserDBType])
 
         async def user(
             session: Annotated[AsyncSession, Depends(framework.get_session)],
-            token_db: Annotated[TokenDBType, Depends(framework.create_user)],
-        ) -> str:
-            session.add(UserDB(token_id=token_db.id, **create_user_kwargs()))
+            token_db: Annotated[TokenType, Depends(framework.create_user)],
+        ):
+            user_db = User(token_id=token_db.id, **create_user_kwargs())
+            session.add(user_db)
 
             await session.commit()
             await session.refresh(token_db)
+            await session.refresh(user_db)
 
-            return token_db.token
+            return create_user_response(token_db.token, user_db)
 
         super().__init__(
             debug=getattr(settings, "debug", False),

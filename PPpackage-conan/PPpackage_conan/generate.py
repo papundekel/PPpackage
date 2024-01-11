@@ -12,12 +12,7 @@ from PPpackage_submanager.schemes import Product
 from PPpackage_utils.utils import asubprocess_wait
 
 from .settings import Settings
-from .utils import (
-    State,
-    create_and_render_temp_file,
-    get_cache_path,
-    make_conan_environment,
-)
+from .utils import State, create_and_render_temp_file, make_conan_environment
 
 
 def patch_native_generators_paths(
@@ -65,9 +60,7 @@ async def generate(
     generators: AsyncIterable[str],
     destination_path: Path,
 ) -> None:
-    cache_path = get_cache_path(settings.cache_path)
-
-    environment = make_conan_environment(cache_path)
+    environment = make_conan_environment(settings.cache_path)
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),

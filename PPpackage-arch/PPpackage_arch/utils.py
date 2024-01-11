@@ -5,8 +5,8 @@ from httpx import AsyncClient as HTTPClient
 
 
 def get_cache_paths(cache_path: Path) -> tuple[Path, Path]:
-    database_path = cache_path / "arch" / "db"
-    cache_path = cache_path / "arch" / "cache"
+    database_path = cache_path / Path("db")
+    cache_path = cache_path / Path("cache")
     return database_path, cache_path
 
 

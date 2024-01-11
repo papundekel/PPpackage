@@ -8,7 +8,7 @@ from typing import Annotated, Generic, TypeVar
 from fastapi import Depends, Request
 from PPpackage_utils.http_stream import HTTPRequestReader
 from PPpackage_utils.server import Server, StreamingResponse
-from PPpackage_utils.stream import Reader, dump_bytes_chunked, dump_many_async
+from PPpackage_utils.stream import Reader, dump_bytes_chunked, dump_many_async, dump_one
 from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
 from PPpackage_utils.utils import TemporaryDirectory
@@ -21,7 +21,7 @@ from .database import Installation, User, get_installation
 from .framework import framework
 from .interface import Interface
 from .schemes import Dependency, Options, Package, PackageIDAndInfo, Product
-from .user import create_user_kwargs
+from .user import create_user_kwargs, create_user_response
 
 RequirementType = TypeVar("RequirementType")
 
@@ -63,6 +63,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             interface.lifespan,
             User,
             create_user_kwargs,
+            create_user_response,
         )
 
         async def resolve(
@@ -113,13 +114,13 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
                     installation_path,
                     generators_path,
                 )
-
-            if not isinstance(output, PackageIDAndInfo):
+            if isinstance(output, PackageIDAndInfo):
+                return StreamingResponse(HTTP_200_OK, lambda: dump_one(output))
+            else:
                 return StreamingResponse(
-                    HTTP_422_UNPROCESSABLE_ENTITY, partial(dump_many_async, output)
+                    HTTP_422_UNPROCESSABLE_ENTITY,
+                    partial(dump_many_async, output),
                 )
-
-            return output
 
         async def generate(
             request: Request,
@@ -131,16 +132,20 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             products = reader.load_many(Product)
             generators = reader.load_many(str)
 
-            generators = await interface.generate(
-                settings,  # type: ignore
-                state,
-                options,
-                products,
-                generators,
-            )
+            with TemporaryDirectory() as destination_path:
+                await interface.generate(
+                    settings,  # type: ignore
+                    state,
+                    options,
+                    products,
+                    generators,
+                    destination_path,
+                )
+
+                generators_bytes = tar_archive(destination_path)
 
             return StreamingResponse(
-                HTTP_200_OK, partial(dump_bytes_chunked, generators)
+                HTTP_200_OK, partial(dump_bytes_chunked, generators_bytes)
             )
 
         async def install_patch(
@@ -180,7 +185,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             await session.commit()
             await session.refresh(installation_db)
 
-            return installation_db.id
+            return str(installation_db.id)
 
         async def install_put(
             request: Request,
@@ -221,7 +226,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             await session.delete(installation_db)
             await session.commit()
 
-        super().get("/resolve/")(resolve)
+        super().post("/resolve/")(resolve)
         super().post("/products/")(fetch)
         super().post("/generators/")(generate)
         super().post("/installations/")(install_post)

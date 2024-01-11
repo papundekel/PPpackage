@@ -1,12 +1,13 @@
-from collections.abc import AsyncIterable, Iterable, Mapping, MutableSequence, Set
+from collections.abc import AsyncGenerator, AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
-from typing import Any, Final, Protocol, Self
+from typing import Any, AsyncContextManager, Final, Protocol, Self
 
 from PPpackage_submanager.schemes import (
     Dependency,
     ManagerAndName,
     Options,
     Package,
+    PackageIDAndInfo,
     Product,
     ResolutionGraph,
 )
@@ -23,31 +24,24 @@ class Submanager(Protocol):
     def __init__(self, name: str):
         self.name = name
 
-    async def close(self) -> None:
-        pass
-
     async def update_database(self) -> None:
         ...
 
-    async def resolve(
+    def resolve(
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
-        resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
-    ) -> None:
+    ) -> AsyncIterable[ResolutionGraph]:
         ...
 
-    async def fetch(
+    def fetch(
         self,
         options: Options,
         package: Package,
         dependencies: Iterable[Dependency],
-        nodes: Mapping[ManagerAndName, NodeData],
-        packages_to_dependencies: Mapping[
-            ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
-        ],
-        install_order: Iterable[tuple[ManagerAndName, NodeData]],
-    ) -> None:
+        installation_path: Path | None,
+        generators_path: Path | None,
+    ) -> AsyncContextManager[PackageIDAndInfo | AsyncIterable[str]]:
         ...
 
     async def install(self, id: str, installation_path: Path, product: Product) -> None:
@@ -57,13 +51,23 @@ class Submanager(Protocol):
         ...
 
     async def install_send(
-        self, source_id: str, destination: Self, destination_id: str | None
+        self,
+        source_id: str,
+        destination: Self,
+        destination_id: str | None,
+        installation_path: Path,
     ) -> str:
         ...
 
     async def install_receive(
-        self, destination_id: str | None, installation_path: Path
+        self,
+        destination_id: str | None,
+        installation: memoryview | None,
+        installation_path: Path,
     ) -> str:
+        ...
+
+    async def install_download(self, id: str, installation_path: Path) -> None:
         ...
 
     async def install_delete(self, id: str) -> None:

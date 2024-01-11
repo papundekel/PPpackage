@@ -28,7 +28,10 @@ async def install(
         elif previous_submanager.name != submanager.name:
             previous_id = ids[previous_submanager.name]
             id = ids.get(submanager.name)
-            id = await previous_submanager.install_send(previous_id, submanager, id)
+            id = await previous_submanager.install_send(
+                previous_id, submanager, id, installation_path
+            )
+            ids[submanager.name] = id
         else:
             id = ids[submanager.name]
 
@@ -37,6 +40,10 @@ async def install(
         )
 
         previous_submanager = submanager
+
+    if previous_submanager is not None:
+        id = ids[previous_submanager.name]
+        await previous_submanager.install_download(id, installation_path)
 
     for submanager_name, id in ids.items():
         await submanagers[submanager_name].install_delete(id)

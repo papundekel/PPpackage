@@ -11,10 +11,6 @@ from PPpackage_utils.validation import load_from_bytes, load_object
 from pydantic import BaseModel
 
 
-def get_cache_path(cache_path: Path) -> Path:
-    return cache_path / "conan"
-
-
 class DependencyValueJSON(BaseModel):
     direct: bool
 
@@ -86,6 +82,7 @@ def create_and_render_temp_file(
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
     environment = environ.copy()
 
+    # CONAN_HOME must be an absolute path
     environment["CONAN_HOME"] = str(cache_path.absolute())
 
     return environment

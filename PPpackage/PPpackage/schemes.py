@@ -1,6 +1,5 @@
 from collections.abc import Mapping, Set
-from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from PPpackage_submanager.schemes import FrozenAny, Options
 from pydantic import HttpUrl
@@ -15,11 +14,23 @@ class Input:
 
 
 @dataclass(frozen=True)
-class SubmanagerLocalConfig:
+class LocalSubmanagerConfig:
     package: str
     settings: Any
 
 
 @dataclass(frozen=True)
+class RemoteSubmanagerConfig:
+    url: HttpUrl
+    token: str
+
+
+@dataclass(frozen=True)
 class Config:
-    submanagers: Mapping[str, HttpUrl | SubmanagerLocalConfig]
+    submanagers: Mapping[str, RemoteSubmanagerConfig | LocalSubmanagerConfig]
+
+
+class NodeData(TypedDict):
+    version: str
+    product_id: str
+    product_info: Any

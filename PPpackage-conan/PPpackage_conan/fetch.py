@@ -17,7 +17,6 @@ from .utils import (
     FetchNode,
     State,
     create_and_render_temp_file,
-    get_cache_path,
     make_conan_environment,
     parse_conan_graph_nodes,
 )
@@ -45,9 +44,7 @@ async def fetch(
     installation_path: Path | None,
     generators_path: Path | None,
 ) -> PackageIDAndInfo | AsyncIterable[str]:
-    cache_path = get_cache_path(settings.cache_path)
-
-    environment = make_conan_environment(cache_path)
+    environment = make_conan_environment(settings.cache_path)
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),
