@@ -35,7 +35,7 @@ class TokenBase(SQLModel):
 
 class UserBase(SQLModel):
     id: int = Field(default=None, primary_key=True)
-    token_id: int = Field(foreign_key="tokendb.id", unique=True)
+    token_id: int = Field(foreign_key="token.id", unique=True)
 
 
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
