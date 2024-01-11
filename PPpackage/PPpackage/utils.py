@@ -1,7 +1,7 @@
 from PPpackage_submanager.schemes import Product
 from PPpackage_utils.stream import Reader
 
-from PPpackage.schemes import NodeData
+from .schemes import NodeData
 
 
 def data_to_product(name: str, node_data: NodeData) -> Product:

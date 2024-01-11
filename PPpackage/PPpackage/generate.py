@@ -8,9 +8,8 @@ from typing import Iterable
 from PPpackage_submanager.schemes import ManagerAndName, Options, Product
 from PPpackage_utils.utils import movetree
 
-from PPpackage.submanager import Submanager
-
 from .generators import builtin as builtin_generators
+from .submanager import Submanager
 from .utils import NodeData, data_to_product
 
 
