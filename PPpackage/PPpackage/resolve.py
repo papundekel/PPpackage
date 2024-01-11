@@ -19,6 +19,7 @@ from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_submanager.schemes import (
     ManagerAndName,
     ManagerRequirement,
+    Options,
     ResolutionGraph,
 )
 
@@ -103,11 +104,11 @@ def make_graph(
 
 async def resolve_manager(
     submanager: Submanager,
-    meta_options: Mapping[str, Any],
+    options: Options,
     requirements_list: Iterable[Set[Hashable]],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ):
-    async for resolution_graph in submanager.resolve(meta_options, requirements_list):
+    async for resolution_graph in submanager.resolve(options, requirements_list):
         resolution_graphs[submanager.name].append(resolution_graph)
 
 
@@ -133,7 +134,10 @@ async def resolve_iteration(
 
             group.create_task(
                 resolve_manager(
-                    submanager, meta_options, requirements_list, resolution_graphs
+                    submanager,
+                    meta_options.get(submanager.name),
+                    requirements_list,
+                    resolution_graphs,
                 )
             )
 

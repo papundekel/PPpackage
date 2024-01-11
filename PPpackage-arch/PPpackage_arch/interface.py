@@ -9,6 +9,7 @@ from .update_database import update_database
 
 interface = Interface(
     Settings=Settings,
+    Requirement=str,
     lifespan=lifespan,
     resolve=resolve,
     fetch=fetch,

@@ -10,6 +10,7 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
+from sys import stderr
 from typing import Any, Optional
 from typing import cast as typing_cast
 
@@ -25,7 +26,7 @@ from PPpackage_utils.utils import (
     ensure_dir_exists,
 )
 
-from .parse import Requirement
+from .schemes import Requirement
 from .settings import Settings
 from .utils import (
     ResolveNode,
@@ -203,7 +204,7 @@ async def create_graph(
     root_template: Jinja2Template,
     profile_template: Jinja2Template,
     build_profile_path: Path,
-    options: Any,
+    options: Options,
     requirements_list_length: int,
 ) -> ResolutionGraph:
     with (
@@ -229,7 +230,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
             env=environment,
         )
 

@@ -8,6 +8,7 @@ from .settings import Settings
 
 interface = Interface(
     Settings=Settings,
+    Requirement=str,
     lifespan=lifespan,
     resolve=resolve,
     fetch=fetch,

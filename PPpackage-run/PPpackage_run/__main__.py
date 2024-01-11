@@ -2,7 +2,7 @@ from asyncio import Event, as_completed, create_subprocess_exec, get_running_loo
 from asyncio import run as asyncio_run
 from asyncio import sleep
 from collections.abc import AsyncIterable, Callable
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from importlib import reload as reload_module
 from multiprocessing import Process
 from os import environ, getgid, getuid
@@ -152,12 +152,18 @@ async def runner(socket_path: Path, database_url: str, workdirs_path: Path):
     reload_module(settings)
     from PPpackage_runner.app import app
 
-    await serve(
-        app,  # type: ignore
-        config,
-        mode="asgi",
-        shutdown_trigger=shutdown_event.wait,  #  type: ignore
-    )
+    @contextmanager
+    def socket_lifetime():
+        yield
+        socket_path.unlink()
+
+    with socket_lifetime():
+        await serve(
+            app,  # type: ignore
+            config,
+            mode="asgi",
+            shutdown_trigger=shutdown_event.wait,  #  type: ignore
+        )
 
 
 async def runner_create_user(

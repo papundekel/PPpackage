@@ -2,7 +2,8 @@ from collections.abc import AsyncGenerator, Iterable, Set
 from contextlib import asynccontextmanager
 from importlib import import_module
 from pathlib import Path
-from typing import Any, AsyncIterable
+from sys import stderr
+from typing import Any, AsyncIterable, Type, TypeVar
 from typing import cast as type_cast
 
 from PPpackage_submanager.interface import Interface
@@ -21,6 +22,15 @@ from pydantic import BaseModel
 
 from .schemes import LocalSubmanagerConfig
 from .submanager import Submanager
+
+RequirementType = TypeVar("RequirementType")
+
+
+async def make_async_requirements(
+    Requirement: type[RequirementType], requirements: Iterable[Any]
+) -> AsyncIterable[RequirementType]:
+    for requirement in requirements:
+        yield load_object(Requirement, requirement)
 
 
 class LocalSubmanager(Submanager):
@@ -50,7 +60,8 @@ class LocalSubmanager(Submanager):
             self.state,
             options,
             make_async_iterable(
-                make_async_iterable(requirements) for requirements in requirements_list
+                make_async_requirements(self.interface.Requirement, requirements)
+                for requirements in requirements_list
             ),
         )
 
@@ -132,7 +143,7 @@ async def LocalSubmanagerContext(
         Interface,
         import_module(f"{config.package}.interface").interface,
     )
-
+    print(config.settings, file=stderr)
     settings = load_object(
         type_cast(type[BaseModel], interface.Settings), config.settings
     )

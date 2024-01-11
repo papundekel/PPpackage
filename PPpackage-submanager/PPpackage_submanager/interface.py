@@ -62,6 +62,7 @@ async def generate_noop(
 @dataclass(frozen=True, kw_only=True)
 class Interface(Generic[SettingsType, StateType, RequirementType]):
     Settings: type[SettingsType]
+    Requirement: type[RequirementType]
     lifespan: Callable[[SettingsType], AsyncContextManager[StateType]]
     update_database: UpdateDatabaseCallbackType[
         SettingsType, StateType

@@ -11,7 +11,7 @@ from PPpackage_submanager.schemes import Dependency, Options, Package, PackageID
 from PPpackage_utils.utils import asubprocess_wait
 from PPpackage_utils.validation import load_object
 
-from .parse import FetchProductInfo
+from .schemes import FetchProductInfo
 from .settings import Settings
 from .utils import (
     FetchNode,

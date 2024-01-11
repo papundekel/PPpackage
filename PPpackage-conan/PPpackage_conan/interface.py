@@ -5,10 +5,12 @@ from .generate import generate
 from .install import install
 from .lifespan import lifespan
 from .resolve import resolve
+from .schemes import Requirement
 from .settings import Settings
 
 interface = Interface(
     Settings=Settings,
+    Requirement=Requirement,
     lifespan=lifespan,
     resolve=resolve,
     fetch=fetch,

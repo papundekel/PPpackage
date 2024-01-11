@@ -48,7 +48,6 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
         self,
         Settings: type[SettingsType],
         interface: Interface[SettingsType, StateType, RequirementType],
-        Requirement: type[RequirementType],
     ):
         class ServerSettings(Settings):
             database_url: AnyUrl = AnyUrl("")
@@ -75,7 +74,8 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             options = await reader.load_one(Options)
 
             requirements_list = (
-                reader.load_many(Requirement) async for _ in reader.load_loop()
+                reader.load_many(interface.Requirement)
+                async for _ in reader.load_loop()
             )
 
             output = interface.resolve(
