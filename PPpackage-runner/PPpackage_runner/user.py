@@ -2,9 +2,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from tempfile import mkdtemp
 
-from .database import User
-from .schemes import UserResponse
-from .settings import settings
+from PPpackage_runner.database import User
+from PPpackage_runner.schemes import UserResponse
+from PPpackage_runner.settings import settings
 
 
 def create_user_kwargs() -> Mapping[str, str]:
