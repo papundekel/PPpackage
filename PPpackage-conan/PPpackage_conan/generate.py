@@ -9,8 +9,7 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
-from PPpackage_utils.tar import TarFileInMemoryWrite
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_wait
+from PPpackage_utils.utils import asubprocess_wait
 
 from .settings import Settings
 from .utils import (
@@ -64,7 +63,8 @@ async def generate(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> memoryview:
+    destination_path: Path,
+) -> None:
     cache_path = get_cache_path(settings.cache_path)
 
     environment = make_conan_environment(cache_path)
@@ -79,48 +79,42 @@ async def generate(
 
     native_generators_path_suffix = Path("conan")
 
-    with TemporaryDirectory() as root_generators_path:
-        native_generators_path = root_generators_path / native_generators_path_suffix
+    native_generators_path = destination_path / native_generators_path_suffix
 
-        with (
-            create_and_render_temp_file(
-                conanfile_template,
-                {
-                    "packages": [product async for product in products],
-                    "generators": [generator async for generator in generators],
-                },
-                ".py",
-            ) as conanfile_file,
-            create_and_render_temp_file(
-                profile_template, {"options": options}
-            ) as host_profile_file,
-        ):
-            host_profile_path = Path(host_profile_file.name)
-            build_profile_path = state.data_path / "profile"
+    with (
+        create_and_render_temp_file(
+            conanfile_template,
+            {
+                "packages": [product async for product in products],
+                "generators": [generator async for generator in generators],
+            },
+            ".py",
+        ) as conanfile_file,
+        create_and_render_temp_file(
+            profile_template, {"options": options}
+        ) as host_profile_file,
+    ):
+        host_profile_path = Path(host_profile_file.name)
+        build_profile_path = state.data_path / "profile"
 
-            process = await create_subprocess_exec(
-                "conan",
-                "install",
-                "--output-folder",
-                str(native_generators_path),
-                "--deployer",
-                state.deployer_path,
-                "--build",
-                "never",
-                f"--profile:host={host_profile_path}",
-                f"--profile:build={build_profile_path}",
-                conanfile_file.name,
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=DEVNULL,
-                env=environment,
-            )
+        process = await create_subprocess_exec(
+            "conan",
+            "install",
+            "--output-folder",
+            str(native_generators_path),
+            "--deployer",
+            state.deployer_path,
+            "--build",
+            "never",
+            f"--profile:host={host_profile_path}",
+            f"--profile:build={build_profile_path}",
+            conanfile_file.name,
+            stdin=DEVNULL,
+            stdout=DEVNULL,
+            stderr=DEVNULL,
+            env=environment,
+        )
 
-            await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException())
 
-        patch_native_generators(native_generators_path, native_generators_path_suffix)
-
-        with TarFileInMemoryWrite() as tar:
-            tar.add(str(native_generators_path), str(native_generators_path_suffix))
-
-        return tar.data
+    patch_native_generators(native_generators_path, native_generators_path_suffix)

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncContextManager, Generic, TypeVar
 
-from PPpackage_PP.settings import Settings
 from PPpackage_utils.server import UserBase
 from PPpackage_utils.tar import create_empty as create_empty_tar
 from pydantic_settings import BaseSettings
@@ -34,8 +33,8 @@ FetchCallbackType = Callable[
 ]
 
 GenerateCallbackType = Callable[
-    [SettingsType, StateType, Any, AsyncIterable[Product], AsyncIterable[str]],
-    Awaitable[memoryview],
+    [SettingsType, StateType, Any, AsyncIterable[Product], AsyncIterable[str], Path],
+    Awaitable[None],
 ]
 InstallCallbackType = Callable[
     [SettingsType, StateType, Path, Product], Awaitable[None]
@@ -52,14 +51,13 @@ async def generate_noop(
     options: Any,
     products: AsyncIterable[Product],
     generators: AsyncIterable[str],
-) -> memoryview:
+    destination_path: Path,
+) -> None:
     async for _ in products:
         pass
 
     async for _ in generators:
         pass
-
-    return create_empty_tar()
 
 
 @dataclass(frozen=True, kw_only=True)

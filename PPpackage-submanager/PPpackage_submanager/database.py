@@ -30,9 +30,9 @@ class Installation(SQLModel, table=True):
         return Path(self.path_raw)
 
 
-async def get_installation(session: AsyncSession, installation_id: int, user_id: int):
+async def get_installation(session: AsyncSession, installation_id: str, user_id: int):
     statement = select(Installation).where(
-        Installation.id == installation_id and Installation.user_id == user_id
+        Installation.id == int(installation_id) and Installation.user_id == user_id
     )
     installation = (await session.exec(statement)).first()
 

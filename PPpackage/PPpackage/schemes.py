@@ -16,7 +16,7 @@ class Input:
 
 @dataclass(frozen=True)
 class SubmanagerLocalConfig:
-    path: Path
+    package: str
     settings: Any
 
 

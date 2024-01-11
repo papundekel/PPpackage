@@ -5,7 +5,6 @@ from typing import Annotated, Any, AsyncContextManager, Generic, TypeVar
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
-from PPpackage_submanager.interface import SettingsType
 from pydantic import AnyUrl
 from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine

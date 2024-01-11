@@ -147,7 +147,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             state: Annotated[StateType, Depends(framework.get_state)],
             session: Annotated[AsyncSession, Depends(framework.get_session)],
             user: Annotated[User, Depends(framework.get_user)],
-            id: int,
+            id: str,
             package_name: str,
             package_version: str,
             product_id: str,
@@ -186,7 +186,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
             request: Request,
             session: Annotated[AsyncSession, Depends(framework.get_session)],
             user: Annotated[User, Depends(framework.get_user)],
-            id: int,
+            id: str,
         ):
             reader = HTTPRequestReader(request)
 
@@ -199,7 +199,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
         async def install_get(
             session: Annotated[AsyncSession, Depends(framework.get_session)],
             user: Annotated[User, Depends(framework.get_user)],
-            id: int,
+            id: str,
         ):
             installation_db = await get_installation(session, id, user.id)
 
@@ -212,7 +212,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
         async def install_delete(
             session: Annotated[AsyncSession, Depends(framework.get_session)],
             user: Annotated[User, Depends(framework.get_user)],
-            id: int,
+            id: str,
         ):
             installation_db = await get_installation(session, id, user.id)
 

@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterable, AsyncIterator, MutableMapping
+from collections.abc import AsyncIterable, AsyncIterator, Iterable, MutableMapping
 from contextlib import asynccontextmanager, contextmanager
 from os import environ, kill, mkfifo
 from pathlib import Path
@@ -8,7 +8,7 @@ from shutil import move
 from shutil import rmtree as base_rmtree
 from signal import SIGTERM
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 
 
 class MyException(Exception):
@@ -143,6 +143,14 @@ def TemporaryPipe(dir=None):
 async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
     async for _ in async_iterable:
         pass
+
+
+T = TypeVar("T")
+
+
+async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
+    for item in iterable:
+        yield item
 
 
 def _wipe_directory_onerror(_, __, excinfo):

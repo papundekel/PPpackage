@@ -11,7 +11,7 @@ from PPpackage_utils.validation import load_from_bytes
 from pydantic import ValidationError
 from pydot import Dot
 
-from PPpackage.submanager import Submanagers
+from PPpackage.submanagers import Submanagers
 
 from .fetch import fetch
 from .generate import generate
@@ -149,63 +149,62 @@ async def main(
     resolve_iteration_limit: int,
 ) -> None:
     try:
-        submanagers = Submanagers(config.submanagers)
+        async with Submanagers(config.submanagers) as submanagers:
+            input_json_bytes = stdin.buffer.read()
 
-        input_json_bytes = stdin.buffer.read()
+            try:
+                input = load_from_bytes(Input, input_json_bytes)
+            except ValidationError as e:
+                stderr.write("ERROR: Invalid input.\n")
+                stderr.write(e.json(indent=4))
 
-        try:
-            input = load_from_bytes(Input, input_json_bytes)
-        except ValidationError as e:
-            stderr.write("ERROR: Invalid input.\n")
-            stderr.write(e.json(indent=4))
+                return
 
-            return
+            if do_update_database:
+                submanager_names = input.requirements.keys()
+                await update_database(submanagers, submanager_names)
 
-        if do_update_database:
-            submanager_names = input.requirements.keys()
-            await update_database(submanagers, submanager_names)
+            options = input.options if input.options is not None else {}
 
-        options = input.options if input.options is not None else {}
+            graph = await resolve(
+                submanagers,
+                resolve_iteration_limit,
+                input.requirements,
+                options,
+            )
 
-        graph = await resolve(
-            submanagers,
-            resolve_iteration_limit,
-            input.requirements,
-            options,
-        )
+            if graph_path is not None:
+                graph_to_dot(graph, graph_path)
 
-        if graph_path is not None:
-            graph_to_dot(graph, graph_path)
+            reversed_graph = graph.reverse(copy=False)
 
-        reversed_graph = graph.reverse(copy=False)
+            fetch_order = topological_generations(reversed_graph)
+            install_order = list(create_install_topology(graph))
 
-        fetch_order = topological_generations(reversed_graph)
-        install_order = list(create_install_topology(graph))
+            await fetch(submanagers, options, graph, fetch_order, install_order)
 
-        await fetch(submanagers, options, graph, fetch_order, install_order)
+            with TemporaryDirectory() as destination_temporary_path:
+                movetree(destination_path, destination_temporary_path)
 
-        with TemporaryDirectory() as destination_temporary_path:
-            movetree(destination_path, destination_temporary_path)
+                await install(submanagers, install_order, destination_temporary_path)
 
-            await install(submanagers, install_order, destination_temporary_path)
+                if generators_path is not None and input.generators is not None:
+                    with TemporaryDirectory() as generators_temporary_path:
+                        movetree(generators_path, generators_temporary_path)
 
-            if generators_path is not None and input.generators is not None:
-                with TemporaryDirectory() as generators_temporary_path:
-                    movetree(generators_path, generators_temporary_path)
+                        await generate(
+                            submanagers,
+                            input.generators,
+                            graph.nodes(data=True),
+                            options,
+                            generators_temporary_path,
+                        )
 
-                    await generate(
-                        submanagers,
-                        input.generators,
-                        graph.nodes(data=True),
-                        options,
-                        generators_temporary_path,
-                    )
+                        movetree(generators_temporary_path, generators_path)
 
-                    movetree(generators_temporary_path, generators_path)
+                movetree(destination_temporary_path, destination_path)
 
-            movetree(destination_temporary_path, destination_path)
-
-        stderr.write("Done.\n")
+            stderr.write("Done.\n")
 
     except* SubmanagerCommandFailure as e_group:
         log_exception(e_group)

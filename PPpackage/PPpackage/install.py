@@ -17,7 +17,7 @@ async def install(
     stderr.write(f"Installing packages...\n")
 
     previous_submanager: Submanager | None = None
-    ids = dict[str, int]()
+    ids = dict[str, str]()
 
     for node, data in order:
         submanager = submanagers[node.manager]
