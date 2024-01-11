@@ -1,13 +1,11 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
-from os import symlink
 from pathlib import Path
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
 from PPpackage_utils.utils import (
-    TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
     ensure_dir_exists,
@@ -41,29 +39,26 @@ async def fetch(
 
     await discard_async_iterable(dependencies)
 
-    with TemporaryDirectory() as database_path_fake:
-        symlink(database_path / "sync", database_path_fake / "sync")
+    async with fakeroot(settings.debug) as environment:
+        process = await create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--cachedir",
+            str(cache_path),
+            "--noconfirm",
+            "--sync",
+            "--downloadonly",
+            "--nodeps",
+            "--nodeps",
+            package.name,
+            stdin=DEVNULL,
+            stdout=DEVNULL,
+            stderr=None,
+            env=environment,
+        )
 
-        async with fakeroot(settings.debug) as environment:
-            process = await create_subprocess_exec(
-                "pacman",
-                "--dbpath",
-                str(database_path_fake),
-                "--cachedir",
-                str(cache_path),
-                "--noconfirm",
-                "--sync",
-                "--downloadonly",
-                "--nodeps",
-                "--nodeps",
-                package.name,
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=None,
-                env=environment,
-            )
-
-            await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException())
 
     process = await create_subprocess_exec(
         "pacman",
