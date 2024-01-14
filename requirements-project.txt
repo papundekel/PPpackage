@@ -1,7 +1,5 @@
 ./PPpackage-utils/
 
-./PPpackage-runner/
-
 ./PPpackage-submanager/
 
 ./PPpackage-conan/
