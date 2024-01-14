@@ -2,11 +2,21 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_submanager.schemes import ManagerAndName
+from PPpackage_submanager.schemes import ManagerAndName, Product
 
 from PPpackage.submanager import Submanager
 
 from .utils import NodeData, data_to_product
+
+
+async def install_manager(
+    submanager: Submanager, id: str, installation_path: Path, product: Product
+) -> None:
+    stderr.write(f"{submanager.name}: ")
+
+    await submanager.install(id, installation_path, product)
+
+    stderr.write(f"{product.name}\n")
 
 
 async def install(
@@ -35,8 +45,8 @@ async def install(
         else:
             id = ids[submanager.name]
 
-        await submanager.install(
-            id, installation_path, data_to_product(node.name, data)
+        await install_manager(
+            submanager, id, installation_path, data_to_product(node.name, data)
         )
 
         previous_submanager = submanager

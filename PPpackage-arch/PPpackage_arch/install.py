@@ -1,10 +1,9 @@
-from asyncio import TaskGroup, create_subprocess_exec
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import MutableMapping
 from io import TextIOWrapper
 from pathlib import Path
 
-from httpx import AsyncClient as HTTPClient
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
 from PPpackage_utils.pipe import (
@@ -15,70 +14,58 @@ from PPpackage_utils.pipe import (
     pipe_write_string,
 )
 from PPpackage_utils.utils import (
-    TemporaryDirectory,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
     fakeroot,
-    movetree,
 )
-from PPpackage_utils.validation import load_from_bytes
 
 from .settings import Settings
-from .utils import State, get_cache_paths
+from .utils import get_cache_paths
 
 
 async def install_manager_command(
     debug: bool,
     pipe_to_fakealpm: TextIOWrapper,
     pipe_from_fakealpm: TextIOWrapper,
-    runner_client: HTTPClient,
-    runner_token: str,
-    runner_workdir_path: Path,
+    rootfs_path: Path,
 ):
-    relative_path = pipe_read_string(debug, "PPpackage-arch", pipe_from_fakealpm)
     command = pipe_read_string(debug, "PPpackage-arch", pipe_from_fakealpm)
     args = pipe_read_strings(debug, "PPpackage-arch", pipe_from_fakealpm)
 
-    with TemporaryPipe(runner_workdir_path) as pipe_hook_path:
-        async with TaskGroup() as group:
-            task = group.create_task(
-                runner_client.post(
-                    "http://localhost/command",
-                    headers={"Authorization": f"Bearer {runner_token}"},
-                    params={
-                        "image_relative_path": str(relative_path),
-                        "pipe_relative_path": str(
-                            pipe_hook_path.relative_to(runner_workdir_path)
-                        ),
-                        "command": command,
-                        "args": list(args),
-                    },
-                )
-            )
+    with TemporaryPipe() as pipe_hook_path:
+        args = [*args][1:]
 
         pipe_write_string(
             debug, "PPpackage-arch", pipe_to_fakealpm, str(pipe_hook_path)
         )
+        pipe_to_fakealpm.flush()
 
-    response = task.result()
+        with pipe_hook_path.open("r") as pipe_hook:
+            process = await create_subprocess_exec(
+                "podman-remote",
+                "run",
+                "--rm",
+                "--interactive",
+                "--rootfs",
+                str(rootfs_path),
+                command,
+                *args,
+                stdin=pipe_hook,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
 
-    if not response.is_success:
-        raise CommandException
+            return_code = await asubprocess_wait(process, CommandException())
 
-    response_bytes = await response.aread()
-
-    return_value = load_from_bytes(int, response_bytes)
-
-    pipe_write_int(debug, "PPpackage-arch", pipe_to_fakealpm, return_value)
+    pipe_write_int(debug, "PPpackage-arch", pipe_to_fakealpm, return_code)
+    pipe_to_fakealpm.flush()
 
 
 def create_environment(
     environment: MutableMapping[str, str],
     pipe_from_fakealpm_path: Path,
     pipe_to_fakealpm_path: Path,
-    runner_workdir_path: Path,
-    destination_path: Path,
 ):
     environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
     environment[
@@ -86,94 +73,79 @@ def create_environment(
     ] += f":PPpackage-arch/fakealpm/build/install/lib/libfakealpm.so"
     environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
     environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
-    environment["PP_RUNNER_WORKDIR_RELATIVE_PATH"] = str(
-        destination_path.relative_to(runner_workdir_path)
-    )
 
 
-DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
+DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
 
 
 async def install(
     settings: Settings,
-    state: State,
+    state: None,
     installation_path: Path,
     product: Product,
 ):
+    host_installation_path = (
+        settings.containerizer_host_workdir_path
+        / installation_path.relative_to(settings.containerizer_container_workdir_path)
+    )
+
     _, cache_path = get_cache_paths(settings.cache_path)
 
-    runner_workdir_path = settings.runner_workdir_path
+    database_path = installation_path / DATABASE_PATH_RELATIVE
 
-    with TemporaryDirectory(runner_workdir_path) as destination_path:
-        movetree(installation_path, destination_path)
+    ensure_dir_exists(database_path)
 
-        database_path = destination_path / DATABASE_PATH_RELATIVE
+    with (
+        TemporaryPipe() as pipe_from_fakealpm_path,
+        TemporaryPipe() as pipe_to_fakealpm_path,
+    ):
+        async with fakeroot(settings.debug) as environment:
+            create_environment(
+                environment, pipe_from_fakealpm_path, pipe_to_fakealpm_path
+            )
 
-        ensure_dir_exists(database_path)
+            process = await create_subprocess_exec(
+                "pacman",
+                "--noconfirm",
+                "--needed",
+                "--dbpath",
+                str(database_path),
+                "--cachedir",
+                str(cache_path),
+                "--root",
+                str(installation_path),
+                "--upgrade",
+                "--nodeps",
+                "--nodeps",
+                str(
+                    cache_path
+                    / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
+                ),
+                stdin=DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                env=environment,
+            )
 
-        with (
-            TemporaryPipe() as pipe_from_fakealpm_path,
-            TemporaryPipe() as pipe_to_fakealpm_path,
-        ):
-            async with fakeroot(settings.debug) as environment:
-                create_environment(
-                    environment,
-                    pipe_from_fakealpm_path,
-                    pipe_to_fakealpm_path,
-                    runner_workdir_path,
-                    destination_path,
-                )
+            with (
+                open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
+                open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
+            ):
+                while True:
+                    header = pipe_read_line_maybe(
+                        settings.debug, "PPpackage-arch", pipe_from_fakealpm
+                    )
 
-                process = await create_subprocess_exec(
-                    "pacman",
-                    "--noconfirm",
-                    "--needed",
-                    "--dbpath",
-                    str(database_path),
-                    "--cachedir",
-                    str(cache_path),
-                    "--root",
-                    str(destination_path),
-                    "--upgrade",
-                    "--nodeps",
-                    "--nodeps",
-                    *[
-                        str(
-                            cache_path
-                            / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst"
+                    if header is None:
+                        break
+                    elif header == "COMMAND":
+                        await install_manager_command(
+                            settings.debug,
+                            pipe_to_fakealpm,
+                            pipe_from_fakealpm,
+                            host_installation_path,
                         )
-                    ],
-                    stdin=DEVNULL,
-                    stdout=DEVNULL,
-                    stderr=DEVNULL,
-                    env=environment,
-                )
+                    else:
+                        raise Exception(f"Unknown header: {header}", "PPpackage-arch")
 
-                with (
-                    open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
-                    open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
-                ):
-                    while True:
-                        header = pipe_read_line_maybe(
-                            settings.debug, "PPpackage-arch", pipe_from_fakealpm
-                        )
-
-                        if header is None:
-                            break
-                        elif header == "COMMAND":
-                            await install_manager_command(
-                                settings.debug,
-                                pipe_to_fakealpm,
-                                pipe_from_fakealpm,
-                                state.runner_client,
-                                settings.runner_token,
-                                runner_workdir_path,
-                            )
-                        else:
-                            raise Exception(
-                                f"Unknown header: {header}", "PPpackage-arch"
-                            )
-
-            await asubprocess_wait(process, CommandException())
-
-        movetree(destination_path, installation_path)
+        await asubprocess_wait(process, CommandException())

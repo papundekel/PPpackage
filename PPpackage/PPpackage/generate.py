@@ -1,4 +1,4 @@
-from asyncio import Task, TaskGroup
+from asyncio import Task, TaskGroup, create_subprocess_exec
 from collections.abc import Mapping, MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr
@@ -34,7 +34,7 @@ async def generate(
     generators: Iterable[str],
     nodes: Iterable[tuple[ManagerAndName, NodeData]],
     meta_options: Mapping[str, Options],
-    generators_path: Path,
+    destination_path: Path,
 ) -> None:
     stderr.write("Generating")
     for generator in generators:
@@ -59,24 +59,25 @@ async def generate(
         for submanager_name, products in meta_products.items():
             submanager = submanagers[submanager_name]
 
-            destination_path = Path(mkdtemp())
+            submanager_destination_path = Path(mkdtemp())
 
             group.create_task(
                 submanager.generate(
                     meta_options.get(submanager_name),
                     products,
                     generators - builtin_generators.keys(),
-                    destination_path,
+                    submanager_destination_path,
                 )
             )
 
-            directories.append(destination_path)
+            directories.append(submanager_destination_path)
 
         for generator in generators & builtin_generators.keys():
-            destination_path = Path(mkdtemp())
-            builtin_generators[generator](meta_products, destination_path)
-            directories.append(destination_path)
+            submanager_destination_path = Path(mkdtemp())
+            builtin_generators[generator](meta_products, submanager_destination_path)
+
+            directories.append(submanager_destination_path)
 
     for directory in directories:
-        movetree(directory, generators_path)
+        movetree(directory, destination_path)
         directory.rmdir()

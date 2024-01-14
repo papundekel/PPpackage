@@ -193,7 +193,7 @@ class Reader(Protocol):
 
         return value
 
-    async def load_bytes(self) -> bytes:
+    async def load_bytes(self) -> memoryview:
         length = await self._load_int()
 
         if length == 0:
@@ -227,6 +227,6 @@ class Reader(Protocol):
         async for _ in self.load_loop():
             yield await self.load_one(Model)
 
-    async def dump(self, writer: Writer) -> None:
-        async for chunk in self.read():
-            await writer.write(chunk)
+    async def dump_bytes_chunked(self, writer: Writer) -> None:
+        async for _ in self.load_loop():
+            await writer.write(await self.load_bytes())

@@ -15,15 +15,12 @@
 
 static FILE* pipe_from_fakealpm;
 static FILE* pipe_to_fakealpm;
-static const char* runner_workdir_relative_path;
 
 [[gnu::constructor]] static void pipes_ctr()
 {
     const auto pipe_from_fakealpm_path =
         std::getenv("PP_PIPE_FROM_FAKEALPM_PATH");
     const auto pipe_to_fakealpm_path = std::getenv("PP_PIPE_TO_FAKEALPM_PATH");
-    runner_workdir_relative_path =
-        std::getenv("PP_RUNNER_WORKDIR_RELATIVE_PATH");
 
     pipe_from_fakealpm = std::fopen(pipe_from_fakealpm_path, "w");
     pipe_to_fakealpm = std::fopen(pipe_to_fakealpm_path, "r");
@@ -69,8 +66,6 @@ extern "C" int _alpm_run_chroot(alpm_handle_t*,
     std::fprintf(stderr, "Executing command %s...", command);
 
     std::fprintf(pipe_from_fakealpm, "COMMAND\n");
-
-    write_string(runner_workdir_relative_path);
 
     write_string(command);
 

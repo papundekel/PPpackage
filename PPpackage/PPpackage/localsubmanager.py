@@ -85,7 +85,9 @@ class LocalSubmanager(Submanager):
         )
 
     async def install(self, id: str, installation_path: Path, product: Product) -> None:
-        self.interface.install(self.settings, self.state, installation_path, product)
+        await self.interface.install(
+            self.settings, self.state, installation_path, product
+        )
 
     async def install_init(self, installation_path: Path) -> str:
         return str(installation_path)
@@ -143,7 +145,7 @@ async def LocalSubmanagerContext(
         Interface,
         import_module(f"{config.package}.interface").interface,
     )
-    print(config.settings, file=stderr)
+
     settings = load_object(
         type_cast(type[BaseModel], interface.Settings), config.settings
     )

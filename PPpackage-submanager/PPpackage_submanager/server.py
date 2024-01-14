@@ -114,6 +114,7 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
                     installation_path,
                     generators_path,
                 )
+
             if isinstance(output, PackageIDAndInfo):
                 return StreamingResponse(HTTP_200_OK, lambda: dump_one(output))
             else:

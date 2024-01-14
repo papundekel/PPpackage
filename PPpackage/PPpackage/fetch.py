@@ -5,10 +5,19 @@ from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes
-from PPpackage_submanager.schemes import Dependency, ManagerAndName, Package
+from PPpackage_submanager.schemes import (
+    Dependency,
+    ManagerAndName,
+    Options,
+    Package,
+    PackageIDAndInfo,
+)
+from PPpackage_utils.utils import TemporaryDirectory
+
+from PPpackage.fetch_helpers import fetch_install_generate
 
 from .submanager import Submanager
-from .utils import NodeData
+from .utils import NodeData, SubmanagerCommandFailure
 
 
 def create_dependencies(node_dependencies: Iterable[tuple[ManagerAndName, NodeData]]):
@@ -29,9 +38,64 @@ def graph_successors(
         yield node, graph.nodes[node]
 
 
+async def fetch_manager(
+    submanagers: Mapping[str, Submanager],
+    submanager_name: str,
+    meta_options: Mapping[str, Options],
+    package: Package,
+    dependencies: Iterable[Dependency],
+    nodes: Mapping[Any, NodeData],
+    packages_to_dependencies: Mapping[
+        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
+    ],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
+):
+    submanager = submanagers[submanager_name]
+    options = meta_options.get(submanager.name)
+
+    async with submanager.fetch(
+        options, package, dependencies, None, None
+    ) as result_first:
+        if isinstance(result_first, PackageIDAndInfo):
+            id_and_info = result_first
+        else:
+            generators = result_first
+            meta_dependencies = packages_to_dependencies[
+                ManagerAndName(submanager.name, package.name)
+            ]
+
+            with (
+                TemporaryDirectory() as installation_path,
+                TemporaryDirectory() as generators_path,
+            ):
+                await fetch_install_generate(
+                    submanagers,
+                    meta_options,
+                    install_order,
+                    meta_dependencies,
+                    generators,
+                    installation_path,
+                    generators_path,
+                )
+
+                async with submanager.fetch(
+                    options, package, dependencies, installation_path, generators_path
+                ) as result_second:
+                    if isinstance(result_second, PackageIDAndInfo):
+                        id_and_info = result_second
+                    else:
+                        raise SubmanagerCommandFailure("Fetch failed.")
+
+    node = nodes[ManagerAndName(submanager.name, package.name)]
+    node["product_id"] = id_and_info.product_id
+    node["product_info"] = id_and_info.product_info
+
+    stderr.write(f"{submanager.name}: {package.name} -> {id_and_info.product_id}\n")
+
+
 async def fetch(
     submanagers: Mapping[str, Submanager],
-    meta_options: Mapping[str, Mapping[str, Any] | None],
+    meta_options: Mapping[str, Options],
     graph: MultiDiGraph,
     fetch_order: Iterable[Iterable[tuple[ManagerAndName, NodeData]]],
     install_order: Iterable[tuple[ManagerAndName, NodeData]],
@@ -51,14 +115,15 @@ async def fetch(
 
                 packages_to_dependencies[node] = node_dependencies
 
-                submanager_name = node.manager
-                submanager = submanagers[submanager_name]
-
-                async with submanager.fetch(
-                    meta_options.get(submanager_name),
-                    Package(name=node.name, version=data["version"]),
-                    dependencies,
-                    None,
-                    None,
-                ) as x:
-                    pass
+                group.create_task(
+                    fetch_manager(
+                        submanagers,
+                        node.manager,
+                        meta_options,
+                        Package(name=node.name, version=data["version"]),
+                        dependencies,
+                        graph.nodes,
+                        packages_to_dependencies,
+                        install_order,
+                    )
+                )

@@ -36,11 +36,13 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
-async def asubprocess_wait(process: Process, exception: Exception) -> None:
+async def asubprocess_wait(process: Process, exception: Exception) -> int:
     return_code = await process.wait()
 
     if return_code != 0:
         raise exception
+
+    return return_code
 
 
 async def asubprocess_communicate(
@@ -161,7 +163,9 @@ def _wipe_directory_onerror(_, __, excinfo):
 
 
 def rmtree(path: Path, onerror=None):
-    if path.is_dir():
+    if not path.exists():
+        pass
+    elif not path.is_symlink() and path.is_dir():
         base_rmtree(path, onerror=onerror)
     else:
         path.unlink()
@@ -177,8 +181,9 @@ def movetree(source: Path, destination: Path):
         destination_item = destination / source_item.name
         rmtree(destination_item)
 
-        if source_item.is_dir():
+        if not source_item.is_symlink() and source_item.is_dir():
             destination_item.mkdir()
             movetree(source_item, destination_item)
+            source_item.rmdir()
         else:
-            move(source_item, destination / source_item.name)
+            move(source_item, destination_item)

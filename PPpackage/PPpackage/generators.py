@@ -1,12 +1,8 @@
 from collections.abc import Callable, Iterable, Mapping
-from io import BytesIO
 from json import dumps as json_dumps
 from pathlib import Path
-from tarfile import TarFile
 
 from PPpackage_submanager.schemes import Product
-from PPpackage_utils.tar import create_directory as create_tar_directory
-from PPpackage_utils.tar import create_file as create_tar_file
 from PPpackage_utils.utils import ensure_dir_exists
 
 

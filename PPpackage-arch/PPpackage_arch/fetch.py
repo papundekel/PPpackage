@@ -1,11 +1,13 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
+from os import symlink
 from pathlib import Path
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
 from PPpackage_utils.utils import (
+    TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
     ensure_dir_exists,
@@ -13,7 +15,7 @@ from PPpackage_utils.utils import (
 )
 
 from .settings import Settings
-from .utils import State, get_cache_paths
+from .utils import get_cache_paths
 
 
 def process_product_id(line: str):
@@ -26,7 +28,7 @@ def process_product_id(line: str):
 
 async def fetch(
     settings: Settings,
-    state: State,
+    state: None,
     options: Options,
     package: Package,
     dependencies: AsyncIterable[Dependency],
@@ -39,26 +41,29 @@ async def fetch(
 
     await discard_async_iterable(dependencies)
 
-    async with fakeroot(settings.debug) as environment:
-        process = await create_subprocess_exec(
-            "pacman",
-            "--dbpath",
-            str(database_path),
-            "--cachedir",
-            str(cache_path),
-            "--noconfirm",
-            "--sync",
-            "--downloadonly",
-            "--nodeps",
-            "--nodeps",
-            package.name,
-            stdin=DEVNULL,
-            stdout=DEVNULL,
-            stderr=None,
-            env=environment,
-        )
+    with TemporaryDirectory() as database_path_fake:
+        symlink(database_path.absolute() / "sync", database_path_fake / "sync")
 
-        await asubprocess_wait(process, CommandException())
+        async with fakeroot(settings.debug) as environment:
+            process = await create_subprocess_exec(
+                "pacman",
+                "--dbpath",
+                str(database_path_fake),
+                "--cachedir",
+                str(cache_path),
+                "--noconfirm",
+                "--sync",
+                "--downloadonly",
+                "--nodeps",
+                "--nodeps",
+                package.name,
+                stdin=DEVNULL,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                env=environment,
+            )
+
+            await asubprocess_wait(process, CommandException())
 
     process = await create_subprocess_exec(
         "pacman",
@@ -74,7 +79,7 @@ async def fetch(
         package.name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=DEVNULL,
     )
 
     assert process.stdout is not None

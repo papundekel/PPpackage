@@ -12,7 +12,7 @@ from pydot import graph_from_dot_data
 
 from .settings import Settings
 from .update_database import update_database
-from .utils import State, get_cache_paths
+from .utils import get_cache_paths
 
 
 async def resolve_pactree(
@@ -113,7 +113,7 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
 
 async def resolve(
     settings: Settings,
-    state: State,
+    state: None,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
 ) -> AsyncIterable[ResolutionGraph]:
