@@ -8,7 +8,6 @@ setup(
         "typer",
         "PPpackage",
         "PPpackage-utils",
-        "PPpackage-runner",
         "PPpackage-PP",
         "PPpackage-arch",
         "PPpackage-conan",
