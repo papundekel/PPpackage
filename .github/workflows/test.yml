@@ -66,7 +66,9 @@ jobs:
                   outputs: type=${{ github.ref_name == 'main' && 'image' || 'docker' }}
                   cache-from: type=registry,ref=fackop/pppackage-conan:buildcache
                   cache-to: type=registry,ref=fackop/pppackage-conan:buildcache,mode=max
-
+            - name: Start podman API service
+              run: |
+                  systemctl --user enable --now podman.socket
             - name: Try run.sh
               run: |
                   python -m venv .venv/
