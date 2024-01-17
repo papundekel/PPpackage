@@ -1,19 +1,34 @@
 services:
     metamanager:
+        # comment out to pull from dockerhub
         build:
             context: ../
             target: metamanager
-            args:
-            -   USER
-        ulimits:
-            nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
-                soft: 1024
-                hard: 1048576
-        user: $USER
+            # uncomment to use with docker
+            # args:
+            # -   USER
+            
+        # uncomment to pull from dockerhub
+        # image: docker.io/fackop/pppackage:latest
+
+        # uncomment to use with docker
+        # fakeroot + docker issue https://github.com/moby/moby/issues/27195
+        # ulimits:
+        #     nofile:
+        #         soft: 1024
+        #         hard: 1048576
+        
+        # uncomment to use with docker
+        # user: $USER
+
         command: 
         -   /mnt/workdir/root/
         -   --workdir
         -   /mnt/workdir/
+        -   --generators
+        -   /mnt/workdir/generators
+        -   --graph
+        -   /mnt/workdir/graph.dot
         environment:
             submanagers__arch__package: PPpackage_arch
             submanagers__arch__settings__debug: true
@@ -32,7 +47,7 @@ services:
             submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
         volumes:
         -   type: bind
-            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            source: $XDG_RUNTIME_DIR/podman/podman.sock # set to podman service socket if elsewhere
             target: /run/podman/podman.sock
         -   type: bind
             source: $WORKDIR
@@ -46,15 +61,16 @@ services:
         -   type: volume
             source: PP-cache
             target: /mnt/cache/PP/
-   
-        -   type: bind
-            source: /etc/passwd
-            target: /etc/passwd
-            read_only: true
-        -   type: bind
-            source: /etc/group
-            target: /etc/group
-            read_only: true
+
+        # uncomment to use with docker  
+        # -   type: bind
+        #     source: /etc/passwd
+        #     target: /etc/passwd
+        #     read_only: true
+        # -   type: bind
+        #     source: /etc/group
+        #     target: /etc/group
+        #     read_only: true
 volumes:
     arch-cache:
     conan-cache:

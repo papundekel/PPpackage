@@ -1,12 +1,12 @@
 services:
     metamanager:
-        image: fackop/pppackage
+        image: fackop/pppackage:latest
         ulimits:
             nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
                 soft: 1024
                 hard: 1048576
         user: $USER
-        command: 
+        command:
         -   /mnt/workdir/root/
         -   --workdir
         -   /mnt/workdir/
