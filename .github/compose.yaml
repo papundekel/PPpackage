@@ -12,7 +12,7 @@ services:
             target: /mnt/workdir/
     metamanager:
         build:
-            context: ./
+            context: ../
             target: metamanager
             args:
             -   USER
