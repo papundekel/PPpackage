@@ -36,8 +36,7 @@ jobs:
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
-                  push: ${{ github.ref_name == 'main' }}
-                  tags: fackop/pppackage:latest
+                  tags: pppackage:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
