@@ -5,8 +5,6 @@ services:
             target: metamanager
             args:
             -   USER
-        depends_on:
-        -   podman-server
         ulimits:
             nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
                 soft: 1024

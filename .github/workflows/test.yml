@@ -11,8 +11,6 @@ jobs:
 
             - uses: gacts/install-podman@v1.1.0
 
-            - run: podman version
-
             - name: Cache arch
               uses: actions/cache@v3.3.3
               with:
