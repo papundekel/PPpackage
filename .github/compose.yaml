@@ -1,10 +1,6 @@
 services:
     metamanager:
-        build:
-            context: ../
-            target: metamanager
-            args:
-            -   USER
+        image: fackop/pppackage:latest
         ulimits:
             nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
                 soft: 1024
