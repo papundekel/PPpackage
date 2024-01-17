@@ -51,7 +51,7 @@ async def export_package(
             conanfile.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=stderr,
+            stderr=DEVNULL,
             env=environment,
         )
 

@@ -82,7 +82,7 @@ async def install_manager_command(
                 *args,
                 stdin=pipe_hook,
                 stdout=DEVNULL,
-                stderr=stderr,
+                stderr=DEVNULL,
                 env={
                     "CONTAINERS_CONF": containers_conf.name
                 },  # hack, allows $HOME to not exist
