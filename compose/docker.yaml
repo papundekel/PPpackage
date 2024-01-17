@@ -1,7 +1,7 @@
 services:
     metamanager:
         build:
-            context: ./
+            context: ../
             target: metamanager
             args:
             -   USER

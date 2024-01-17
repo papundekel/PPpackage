@@ -1,7 +1,7 @@
 services:
     podman-server:
         build:
-            context: ./.github/podman
+            context: ./podman/
         command:
         -   tcp://localhost:8888
         ports:
