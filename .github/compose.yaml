@@ -19,7 +19,7 @@ services:
             submanagers__arch__settings__debug: true
             submanagers__arch__settings__cache_path: /mnt/cache/arch/
             submanagers__arch__settings__containerizer: unix:///run/podman/podman.sock
-            submanagers__arch__settings__workdir_containerizer: /mnt/workdir/
+            submanagers__arch__settings__workdir_containerizer: $PWD
             submanagers__arch__settings__workdir_container: /mnt/workdir/
 
             submanagers__conan__package: PPpackage_conan
