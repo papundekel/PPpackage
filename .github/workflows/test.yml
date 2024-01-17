@@ -1,6 +1,9 @@
 name: Test
 
-on: push
+on:
+    push:
+        branches-ignore:
+            - main
 
 jobs:
     build:
@@ -36,8 +39,9 @@ jobs:
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
+                  target: metamanager
                   load: true
-                  tags: pppackage:latest
+                  tags: fackop/pppackage:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
