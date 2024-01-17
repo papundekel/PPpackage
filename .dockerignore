@@ -8,3 +8,6 @@ Dockerfile
 .github/
 **/*.egg-info/
 **/build/
+.*/
+input/
+podman-server/

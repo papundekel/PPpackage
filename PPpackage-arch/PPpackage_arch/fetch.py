@@ -4,9 +4,9 @@ from collections.abc import AsyncIterable
 from os import symlink
 from pathlib import Path
 
-from PPpackage_utils.parse import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
 from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
     TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
@@ -14,6 +14,7 @@ from PPpackage_utils.utils import (
     fakeroot,
 )
 
+from .settings import Settings
 from .utils import get_cache_paths
 
 
@@ -26,25 +27,24 @@ def process_product_id(line: str):
 
 
 async def fetch(
-    debug: bool,
-    data: None,
-    cache_path: Path,
+    settings: Settings,
+    state: None,
     options: Options,
     package: Package,
     dependencies: AsyncIterable[Dependency],
-    installation: memoryview | None,
-    generators: memoryview | None,
+    installation_path: Path | None,
+    generators_path: Path | None,
 ) -> PackageIDAndInfo | AsyncIterable[str]:
-    database_path, cache_path = get_cache_paths(cache_path)
+    database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
 
     await discard_async_iterable(dependencies)
 
     with TemporaryDirectory() as database_path_fake:
-        symlink(database_path / "sync", database_path_fake / "sync")
+        symlink(database_path.absolute() / "sync", database_path_fake / "sync")
 
-        async with fakeroot(debug) as environment:
+        async with fakeroot(settings.debug) as environment:
             process = await create_subprocess_exec(
                 "pacman",
                 "--dbpath",
@@ -59,11 +59,11 @@ async def fetch(
                 package.name,
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=None,
+                stderr=DEVNULL,
                 env=environment,
             )
 
-            await asubprocess_wait(process, SubmanagerCommandFailure())
+            await asubprocess_wait(process, CommandException())
 
     process = await create_subprocess_exec(
         "pacman",
@@ -79,7 +79,7 @@ async def fetch(
         package.name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=DEVNULL,
     )
 
     assert process.stdout is not None
@@ -87,13 +87,13 @@ async def fetch(
     line = (await process.stdout.readline()).decode().strip()
 
     if line == "":
-        raise SubmanagerCommandFailure
+        raise CommandException
 
     id_and_info = PackageIDAndInfo(
         product_id=process_product_id(line),
         product_info=None,
     )
 
-    await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, CommandException())
 
     return id_and_info

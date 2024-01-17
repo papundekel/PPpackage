@@ -1,37 +1,28 @@
 from collections.abc import Callable, Iterable, Mapping
-from io import BytesIO
 from json import dumps as json_dumps
 from pathlib import Path
-from tarfile import TarFile
 
-from PPpackage_utils.parse import Product
-from PPpackage_utils.utils import create_tar_directory, create_tar_file
+from PPpackage_submanager.schemes import Product
+from PPpackage_utils.utils import ensure_dir_exists
 
 
 def versions(
-    meta_products: Mapping[str, Iterable[Product]],
-) -> memoryview:
-    io = BytesIO()
+    meta_products: Mapping[str, Iterable[Product]], destination_path: Path
+) -> None:
+    versions_path = destination_path / Path("versions")
 
-    versions_path = Path("versions")
+    for manager, products in meta_products.items():
+        manager_path = versions_path / manager
 
-    with TarFile(fileobj=io, mode="w") as tar:
-        for manager, products in meta_products.items():
-            manager_path = versions_path / manager
+        ensure_dir_exists(manager_path)
 
-            create_tar_directory(tar, manager_path)
+        for product in products:
+            data = {"version": product.version, "product_id": product.product_id}
 
-            for product in products:
-                data = {"version": product.version, "product_id": product.product_id}
-
-                with create_tar_file(
-                    tar, manager_path / f"{product.name}.json"
-                ) as file:
-                    file.write(json_dumps(data, indent=4).encode())
-
-    return io.getbuffer()
+            with (manager_path / f"{product.name}.json").open("w") as file:
+                file.write(json_dumps(data, indent=4))
 
 
-builtin: Mapping[str, Callable[[Mapping[str, Iterable[Product]]], memoryview]] = {
+builtin: Mapping[str, Callable[[Mapping[str, Iterable[Product]], Path], None]] = {
     "versions": versions
 }

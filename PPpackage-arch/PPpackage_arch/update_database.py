@@ -1,23 +1,20 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from pathlib import Path
+from sys import stderr
 
-from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
-    asubprocess_wait,
-    ensure_dir_exists,
-    fakeroot,
-)
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
 
+from .settings import Settings
 from .utils import get_cache_paths
 
 
-async def update_database(debug: bool, data: None, cache_path: Path):
-    database_path, _ = get_cache_paths(cache_path)
+async def update_database(settings: Settings, state: None):
+    database_path, _ = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(database_path)
 
-    async with fakeroot(debug) as environment:
+    async with fakeroot(settings.debug) as environment:
         process = await create_subprocess_exec(
             "pacman",
             "--dbpath",
@@ -30,4 +27,4 @@ async def update_database(debug: bool, data: None, cache_path: Path):
             env=environment,
         )
 
-        await asubprocess_wait(process, SubmanagerCommandFailure())
+        await asubprocess_wait(process, CommandException())

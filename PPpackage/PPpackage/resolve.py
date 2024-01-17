@@ -1,4 +1,4 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup
+from asyncio import TaskGroup
 from collections.abc import (
     Hashable,
     Iterable,
@@ -16,64 +16,16 @@ from typing import Any
 
 from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
-from PPpackage_utils.parse import (
+from PPpackage_submanager.schemes import (
     ManagerAndName,
     ManagerRequirement,
     Options,
     ResolutionGraph,
-    dump_loop,
-    dump_many,
-    dump_one,
-    load_many,
-    load_one,
 )
-from PPpackage_utils.utils import SubmanagerCommand
 
-from .utils import Connections, SubmanagerCommandFailure
+from PPpackage.submanager import Submanager
 
-
-async def send(
-    debug: bool,
-    writer: StreamWriter,
-    options: Options,
-    requirements_list: Iterable[Iterable[Any]],
-) -> None:
-    await dump_one(debug, writer, options)
-
-    async for requirements in dump_loop(debug, writer, requirements_list):
-        await dump_many(debug, writer, requirements)
-
-
-async def receive(
-    debug: bool,
-    reader: StreamReader,
-    manager: str,
-    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
-) -> None:
-    async for graph in load_many(debug, reader, ResolutionGraph):
-        resolution_graphs[manager].append(graph)
-
-    success = await load_one(debug, reader, bool)
-
-    if not success:
-        raise SubmanagerCommandFailure(f"{manager}'s resolve failed.")
-
-
-async def resolve_manager(
-    debug: bool,
-    connections: Connections,
-    manager: str,
-    options: Options,
-    requirements_list: Iterable[Iterable[Any]],
-    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
-) -> None:
-    async with connections.connect(debug, manager, SubmanagerCommand.RESOLVE) as (
-        reader,
-        writer,
-    ):
-        async with TaskGroup() as group:
-            group.create_task(send(debug, writer, options, requirements_list))
-            group.create_task(receive(debug, reader, manager, resolution_graphs))
+from .utils import SubmanagerCommandFailure
 
 
 @dataclass(frozen=True)
@@ -150,32 +102,40 @@ def make_graph(
     return WorkGraph(roots, graph)
 
 
+async def resolve_manager(
+    submanager: Submanager,
+    options: Options,
+    requirements_list: Iterable[Set[Hashable]],
+    resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
+):
+    async for resolution_graph in submanager.resolve(options, requirements_list):
+        resolution_graphs[submanager.name].append(resolution_graph)
+
+
 async def resolve_iteration(
-    debug: bool,
-    connections: Connections,
-    requirements: Mapping[str, Set[Set[Hashable]]],
+    submanagers: Mapping[str, Submanager],
     meta_options: Mapping[str, Any],
+    requirements: Mapping[str, Set[Set[Hashable]]],
     initial: Mapping[str, Set[Hashable]],
     new_choices: MutableSequence[Any],
     results: MutableSequence[Mapping[str, WorkGraph]],
 ) -> None:
     requirements_lists = dict[str, Iterable[Set[Hashable]]]()
 
-    for manager, requirements_set in requirements.items():
-        requirements_lists[manager] = list(requirements_set)
+    for submanager_name, requirements_set in requirements.items():
+        requirements_lists[submanager_name] = list(requirements_set)
 
     resolution_graphs = dict[str, MutableSequence[ResolutionGraph]]()
 
     async with TaskGroup() as group:
-        for manager, requirements_list in requirements_lists.items():
-            resolution_graphs[manager] = []
+        for submanager_name, requirements_list in requirements_lists.items():
+            resolution_graphs[submanager_name] = []
+            submanager = submanagers[submanager_name]
 
             group.create_task(
                 resolve_manager(
-                    debug,
-                    connections,
-                    manager,
-                    meta_options.get(manager),
+                    submanager,
+                    meta_options.get(submanager.name),
                     requirements_list,
                     resolution_graphs,
                 )
@@ -254,9 +214,8 @@ def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
 
 
 async def resolve(
-    debug: bool,
+    submanagers: Mapping[str, Submanager],
     iteration_limit: int,
-    connections: Connections,
     initial_requirements: Mapping[str, Set[Any]],
     meta_options: Mapping[str, Any],
 ) -> MultiDiGraph:
@@ -292,10 +251,9 @@ async def resolve(
             for all_requirements in all_requirements_choices:
                 group.create_task(
                     resolve_iteration(
-                        debug,
-                        connections,
-                        all_requirements,
+                        submanagers,
                         meta_options,
+                        all_requirements,
                         initial_requirements,
                         new_choices,
                         results_work_graph,

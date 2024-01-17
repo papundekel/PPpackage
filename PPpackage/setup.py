@@ -11,5 +11,6 @@ setup(
         "frozendict",
         "networkx",
         "pydot",
+        "httpx",
     ],
 )

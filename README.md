@@ -11,7 +11,7 @@ Takes a set of requirements and creates an installation directory with packages 
 ```bash
 python -m venv .venv/
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-project.txt
 python -m PPpackage_run $containerizer $cache_dir $root_dir < input.json
 ```
 

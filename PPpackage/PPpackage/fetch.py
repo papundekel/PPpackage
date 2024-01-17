@@ -1,156 +1,24 @@
-from asyncio import StreamReader, StreamWriter, TaskGroup
+from asyncio import TaskGroup
 from collections.abc import Iterable, Mapping, MutableMapping
 from itertools import islice
+from pathlib import Path
 from sys import stderr
 from typing import Any
 
 from networkx import MultiDiGraph, dfs_preorder_nodes
-from PPpackage_utils.parse import (
+from PPpackage_submanager.schemes import (
     Dependency,
     ManagerAndName,
     Options,
     Package,
     PackageIDAndInfo,
-    dump_bytes_chunked,
-    dump_many,
-    dump_one,
-    load_many,
-    load_one,
 )
-from PPpackage_utils.utils import SubmanagerCommand, create_empty_tar
+from PPpackage_utils.utils import TemporaryDirectory
 
-from PPpackage.generate import generate
-from PPpackage.install import install
+from PPpackage.fetch_helpers import fetch_install_generate
 
-from .utils import Connections, NodeData, SubmanagerCommandFailure, load_success
-
-
-async def build_install(
-    debug: bool,
-    connections: Connections,
-    install_order: Iterable[tuple[ManagerAndName, NodeData]],
-    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
-):
-    dependency_set = {manager_and_name for manager_and_name, _ in dependencies}
-
-    dependency_install_order = [
-        (node, data) for node, data in install_order if node in dependency_set
-    ]
-
-    return await install(
-        debug, connections, create_empty_tar(), dependency_install_order
-    )
-
-
-async def send(
-    debug: bool,
-    reader: StreamReader,
-    writer: StreamWriter,
-    manager: str,
-    options: Options,
-    package: Package,
-    dependencies: Iterable[Dependency],
-    installation: memoryview | None,
-    generators: memoryview | None,
-):
-    await dump_one(debug, writer, options)
-    await dump_one(debug, writer, package)
-
-    installation_present = installation is not None
-    await dump_one(debug, writer, installation_present)
-    if installation_present:
-        await dump_bytes_chunked(debug, writer, installation)
-
-    generators_present = generators is not None
-    await dump_one(debug, writer, generators_present)
-    if generators_present:
-        await dump_bytes_chunked(debug, writer, generators)
-
-    await dump_many(debug, writer, dependencies)
-
-    await load_success(
-        debug, reader, f"{manager} failed to fetch package {package.name}."
-    )
-
-
-async def fetch_manager(
-    debug: bool,
-    connections: Connections,
-    manager: str,
-    meta_options: Mapping[str, Options],
-    package: Package,
-    dependencies: Iterable[Dependency],
-    nodes: Mapping[ManagerAndName, NodeData],
-    packages_to_dependencies: Mapping[
-        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
-    ],
-    install_order: Iterable[tuple[ManagerAndName, NodeData]],
-):
-    async with connections.connect(debug, manager, SubmanagerCommand.FETCH) as (
-        reader,
-        writer,
-    ):
-        options = meta_options.get(manager)
-        await send(
-            debug, reader, writer, manager, options, package, dependencies, None, None
-        )
-
-        no_build = await load_one(debug, reader, bool)
-
-        if not no_build:
-            async with TaskGroup() as group:
-                dependencieds = packages_to_dependencies[
-                    ManagerAndName(manager, package.name)
-                ]
-
-                task_install = group.create_task(
-                    build_install(debug, connections, install_order, dependencieds)
-                )
-
-                generators = [
-                    generator async for generator in load_many(debug, reader, str)
-                ]
-                task_generate = group.create_task(
-                    generate(
-                        debug, connections, generators, dependencieds, meta_options
-                    )
-                )
-
-            installation = task_install.result()
-            generators = task_generate.result()
-
-            async with connections.connect(debug, manager, SubmanagerCommand.FETCH) as (
-                r2,
-                w2,
-            ):
-                await send(
-                    debug,
-                    r2,
-                    w2,
-                    manager,
-                    options,
-                    package,
-                    dependencies,
-                    installation,
-                    generators,
-                )
-
-                no_build = await load_one(debug, r2, bool)
-
-                if not no_build:
-                    raise SubmanagerCommandFailure(
-                        f"{manager} failed to build package {package.name}."
-                    )
-
-                id_and_info = await load_one(debug, r2, PackageIDAndInfo)
-        else:
-            id_and_info = await load_one(debug, reader, PackageIDAndInfo)
-
-    node = nodes[ManagerAndName(manager, package.name)]
-    node["product_id"] = id_and_info.product_id
-    node["product_info"] = id_and_info.product_info
-
-    stderr.write(f"{manager}: {package.name} -> {id_and_info.product_id}\n")
+from .submanager import Submanager
+from .utils import NodeData, SubmanagerCommandFailure
 
 
 def create_dependencies(node_dependencies: Iterable[tuple[ManagerAndName, NodeData]]):
@@ -171,10 +39,66 @@ def graph_successors(
         yield node, graph.nodes[node]
 
 
+async def fetch_manager(
+    workdir_path: Path,
+    submanagers: Mapping[str, Submanager],
+    submanager_name: str,
+    meta_options: Mapping[str, Options],
+    package: Package,
+    dependencies: Iterable[Dependency],
+    nodes: Mapping[Any, NodeData],
+    packages_to_dependencies: Mapping[
+        ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
+    ],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
+):
+    submanager = submanagers[submanager_name]
+    options = meta_options.get(submanager.name)
+
+    async with submanager.fetch(
+        options, package, dependencies, None, None
+    ) as result_first:
+        if isinstance(result_first, PackageIDAndInfo):
+            id_and_info = result_first
+        else:
+            generators = result_first
+            meta_dependencies = packages_to_dependencies[
+                ManagerAndName(submanager.name, package.name)
+            ]
+
+            with (
+                TemporaryDirectory(workdir_path) as installation_path,
+                TemporaryDirectory(workdir_path) as generators_path,
+            ):
+                await fetch_install_generate(
+                    submanagers,
+                    meta_options,
+                    install_order,
+                    meta_dependencies,
+                    generators,
+                    installation_path,
+                    generators_path,
+                )
+
+                async with submanager.fetch(
+                    options, package, dependencies, installation_path, generators_path
+                ) as result_second:
+                    if isinstance(result_second, PackageIDAndInfo):
+                        id_and_info = result_second
+                    else:
+                        raise SubmanagerCommandFailure("Fetch failed.")
+
+    node = nodes[ManagerAndName(submanager.name, package.name)]
+    node["product_id"] = id_and_info.product_id
+    node["product_info"] = id_and_info.product_info
+
+    stderr.write(f"{submanager.name}: {package.name} -> {id_and_info.product_id}\n")
+
+
 async def fetch(
-    debug: bool,
-    connections: Connections,
-    meta_options: Mapping[str, Mapping[str, Any] | None],
+    workdir_path: Path,
+    submanagers: Mapping[str, Submanager],
+    meta_options: Mapping[str, Options],
     graph: MultiDiGraph,
     fetch_order: Iterable[Iterable[tuple[ManagerAndName, NodeData]]],
     install_order: Iterable[tuple[ManagerAndName, NodeData]],
@@ -196,8 +120,8 @@ async def fetch(
 
                 group.create_task(
                     fetch_manager(
-                        debug,
-                        connections,
+                        workdir_path,
+                        submanagers,
                         node.manager,
                         meta_options,
                         Package(name=node.name, version=data["version"]),

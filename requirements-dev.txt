@@ -1,6 +1,6 @@
 -e ./PPpackage-utils/
 
--e ./PPpackage-runner/
+-e ./PPpackage-submanager/
 
 -e ./PPpackage-conan/
 -e ./PPpackage-arch/

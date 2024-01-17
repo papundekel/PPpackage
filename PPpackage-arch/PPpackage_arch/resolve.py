@@ -2,22 +2,22 @@ from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
+from sys import stderr
 
 from networkx import MultiDiGraph, nx_pydot
-from PPpackage_utils.parse import Options, ResolutionGraph, ResolutionGraphNode
-from PPpackage_utils.utils import (
-    SubmanagerCommandFailure,
-    asubprocess_communicate,
-    asubprocess_wait,
-)
+from PPpackage_arch.settings import Settings
+from PPpackage_submanager.exceptions import CommandException
+from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
 from pydot import graph_from_dot_data
 
+from .settings import Settings
 from .update_database import update_database
 from .utils import get_cache_paths
 
 
 async def resolve_pactree(
-    debug: bool, database_path: Path, requirement: str
+    database_path: Path, requirement: str
 ) -> tuple[MultiDiGraph, str]:
     process = await create_subprocess_exec(
         "pactree",
@@ -39,13 +39,13 @@ async def resolve_pactree(
     dot = graph_from_dot_data(graph_string)
 
     if dot is None:
-        raise SubmanagerCommandFailure
+        raise CommandException
 
     graph: MultiDiGraph = nx_pydot.from_pydot(dot[0])
 
     root = clean_graph(graph)
 
-    await asubprocess_wait(process, SubmanagerCommandFailure())
+    await asubprocess_wait(process, CommandException())
 
     return graph, root
 
@@ -54,7 +54,7 @@ def get_graph_root(graph: MultiDiGraph) -> str:
     for edge in graph.out_edges("START"):
         return edge[1]
 
-    raise SubmanagerCommandFailure
+    raise CommandException
 
 
 def clean_graph(graph: MultiDiGraph) -> str:
@@ -77,7 +77,7 @@ def clean_graph(graph: MultiDiGraph) -> str:
 
 
 async def resolve_versions(
-    debug: bool, database_path: Path, packages: Set[str]
+    database_path: Path, packages: Set[str]
 ) -> Mapping[str, str]:
     process = create_subprocess_exec(
         "pacinfo",
@@ -113,21 +113,20 @@ def resolve_dependencies(graphs: Iterable[MultiDiGraph]) -> Mapping[str, Set[str
 
 
 async def resolve(
-    debug: bool,
-    data: None,
-    cache_path: Path,
+    settings: Settings,
+    state: None,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
 ) -> AsyncIterable[ResolutionGraph]:
-    database_path, _ = get_cache_paths(cache_path)
+    database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
-        await update_database(debug, data, cache_path)
+        await update_database(settings, state)
 
     async with TaskGroup() as group:
         tasks_list = [
             [
-                group.create_task(resolve_pactree(debug, database_path, requirement))
+                group.create_task(resolve_pactree(database_path, requirement))
                 async for requirement in requirements
             ]
             async for requirements in requirements_list
@@ -138,7 +137,6 @@ async def resolve(
     roots = [[root for _, root in graphs] for graphs in graphs_list]
 
     versions = await resolve_versions(
-        debug,
         database_path,
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
