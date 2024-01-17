@@ -10,3 +10,4 @@ Dockerfile
 **/build/
 .*/
 input/
+podman-server/

@@ -7,22 +7,26 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4.1.1
+
+            - uses: gacts/install-podman@v1.1.0
+
+            - run: podman version
 
             - name: Cache arch
-              uses: actions/cache@v3.3.2
+              uses: actions/cache@v3.3.3
               with:
                   path: ${{ github.workspace }}/cache/arch
                   key: cache-arch
 
             - name: Cache Conan
-              uses: actions/cache@v3.3.2
+              uses: actions/cache@v3.3.3
               with:
                   path: ${{ github.workspace }}/cache/conan
                   key: cache-conan
 
             - name: Cache PP
-              uses: actions/cache@v3.3.2
+              uses: actions/cache@v3.3.3
               with:
                   path: ${{ github.workspace }}/cache/PP
                   key: cache-PP

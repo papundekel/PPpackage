@@ -1,15 +1,4 @@
 services:
-    podman-server:
-        build:
-            context: ./podman/
-        command:
-        -   tcp://localhost:8888
-        ports:
-        -   8888
-        volumes:
-        -   type: bind
-            source: $PWD
-            target: /mnt/workdir/
     metamanager:
         build:
             context: ../
@@ -31,7 +20,7 @@ services:
             submanagers__arch__package: PPpackage_arch
             submanagers__arch__settings__debug: true
             submanagers__arch__settings__cache_path: /mnt/cache/arch/
-            submanagers__arch__settings__containerizer: tcp://podman-server:8888
+            submanagers__arch__settings__containerizer: unix:///run/podman/podman.sock
             submanagers__arch__settings__workdir_containerizer: /mnt/workdir/
             submanagers__arch__settings__workdir_container: /mnt/workdir/
 
@@ -42,8 +31,11 @@ services:
             submanagers__PP__package: PPpackage_PP
             submanagers__PP__settings__debug: true
             submanagers__PP__settings__cache_path: /mnt/cache/PP/
-            submanagers__PP__settings__containerizer: tcp://podman-server:8888
+            submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
         volumes:
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
         -   type: bind
             source: $PWD
             target: /mnt/workdir/
