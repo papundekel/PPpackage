@@ -7,6 +7,7 @@ from pathlib import Path
 from shutil import move
 from shutil import rmtree as base_rmtree
 from signal import SIGTERM
+from sys import stderr
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import Any, Optional, TypeVar
 

@@ -28,7 +28,7 @@ def load_from_bytes(Model: type[ModelType], input_json_bytes: bytes) -> ModelTyp
     input_json_string = input_json_bytes.decode()
 
     if _DEBUG_LOAD:
-        print(f"load:\n{input_json_string}", file=stderr)
+        stderr.write(f"load:\n{input_json_string}\n")
 
     input_json = json_loads(input_json_string)
 

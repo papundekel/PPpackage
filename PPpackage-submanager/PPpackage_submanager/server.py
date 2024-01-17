@@ -19,7 +19,7 @@ from starlette.status import HTTP_200_OK, HTTP_422_UNPROCESSABLE_ENTITY
 
 from .database import Installation, User, get_installation
 from .framework import framework
-from .interface import Interface
+from .interface import load_interface_module
 from .schemes import Dependency, Options, Package, PackageIDAndInfo, Product
 from .user import create_user_kwargs, create_user_response
 
@@ -43,18 +43,25 @@ async def load_tar_and_extract(reader: Reader, present: bool):
         yield destination_path
 
 
+class SubmanagerPackageSettings(BaseSettings):
+    submanager_package: str
+
+
+submanager_package_settings = SubmanagerPackageSettings()  # type: ignore
+
+interface = load_interface_module(submanager_package_settings.submanager_package)
+
+
+class ServerSettings(interface.Settings):
+    database_url: AnyUrl
+    installations_path: Path
+
+
+settings = ServerSettings()
+
+
 class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]):
-    def __init__(
-        self,
-        Settings: type[SettingsType],
-        interface: Interface[SettingsType, StateType, RequirementType],
-    ):
-        class ServerSettings(Settings):
-            database_url: AnyUrl = AnyUrl("")
-            installations_path: Path = Path("/tmp")
-
-        settings = ServerSettings()
-
+    def __init__(self):
         super().__init__(
             settings,
             framework,
@@ -235,3 +242,6 @@ class SubmanagerServer(Server, Generic[SettingsType, StateType, RequirementType]
         super().put("/installations/{id}")(install_put)
         super().get("/installations/{id}")(install_get)
         super().delete("/installations/{id}")(install_delete)
+
+
+server = SubmanagerServer()

@@ -7,6 +7,7 @@ from .lifespan import lifespan
 from .resolve import resolve
 from .schemes import Requirement
 from .settings import Settings
+from .update_database import update_database
 
 interface = Interface(
     Settings=Settings,
@@ -16,4 +17,5 @@ interface = Interface(
     fetch=fetch,
     install=install,
     generate=generate,
+    update_database=update_database,
 )

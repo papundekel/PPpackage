@@ -1,6 +1,6 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from pathlib import Path
+from sys import stderr
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot

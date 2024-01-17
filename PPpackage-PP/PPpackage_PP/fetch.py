@@ -13,9 +13,9 @@ async def create_generators():
 
 
 def print_directory(directory: Path):
-    print("PP test:", file=stderr)
+    stderr.write("PP test:\n")
     for member in directory.iterdir():
-        print(f"\t{member.name}", file=stderr)
+        stderr.write(f"\t{member.name}")
 
 
 async def fetch(
@@ -29,8 +29,6 @@ async def fetch(
 ) -> PackageIDAndInfo | AsyncIterable[str]:
     if generators_path is None:
         return create_generators()
-
-    print(f"PP fetching package {package.name}", file=stderr)
 
     await discard_async_iterable(dependencies)
 

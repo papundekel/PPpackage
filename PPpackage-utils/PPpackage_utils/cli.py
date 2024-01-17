@@ -36,7 +36,7 @@ def run(app: AsyncTyper, program_name: str) -> None:
     try:
         app()
     except Exception:
-        print(f"{program_name}:", file=stderr)
+        stderr.write(f"{program_name}:\n")
         print_exc()
 
         exit(1)

@@ -1,12 +1,10 @@
 from collections.abc import AsyncGenerator, Iterable, Set
 from contextlib import asynccontextmanager
-from importlib import import_module
 from pathlib import Path
-from sys import stderr
-from typing import Any, AsyncIterable, Type, TypeVar
+from typing import Any, AsyncIterable, TypeVar
 from typing import cast as type_cast
 
-from PPpackage_submanager.interface import Interface
+from PPpackage_submanager.interface import Interface, load_interface_module
 from PPpackage_submanager.schemes import (
     Dependency,
     Options,
@@ -141,10 +139,7 @@ class LocalSubmanager(Submanager):
 async def LocalSubmanagerContext(
     name: str, config: LocalSubmanagerConfig
 ) -> AsyncGenerator[LocalSubmanager, None]:
-    interface = type_cast(
-        Interface,
-        import_module(f"{config.package}.interface").interface,
-    )
+    interface = load_interface_module(config.package)
 
     settings = load_object(
         type_cast(type[BaseModel], interface.Settings), config.settings

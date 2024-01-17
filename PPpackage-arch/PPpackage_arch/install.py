@@ -1,8 +1,11 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import MutableMapping
+from contextlib import contextmanager
 from io import TextIOWrapper
 from pathlib import Path
+from sys import stderr
+from tempfile import NamedTemporaryFile
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
@@ -24,26 +27,52 @@ from .settings import Settings
 from .utils import get_cache_paths
 
 
+@contextmanager
+def necessary_container_files(root_path: Path):
+    hostname_path = root_path / "etc" / "hostname"
+    containerenv_path = root_path / "run" / ".containerenv"
+
+    try:
+        ensure_dir_exists(hostname_path.parent)
+        ensure_dir_exists(containerenv_path.parent)
+
+        hostname_path.touch()
+        containerenv_path.touch()
+
+        yield
+
+    finally:
+        hostname_path.unlink()
+        containerenv_path.unlink()
+
+
 async def install_manager_command(
-    debug: bool,
+    settings: Settings,
     pipe_to_fakealpm: TextIOWrapper,
     pipe_from_fakealpm: TextIOWrapper,
+    installation_path: Path,
     rootfs_path: Path,
 ):
-    command = pipe_read_string(debug, "PPpackage-arch", pipe_from_fakealpm)
-    args = pipe_read_strings(debug, "PPpackage-arch", pipe_from_fakealpm)
+    command = pipe_read_string(settings.debug, "PPpackage-arch", pipe_from_fakealpm)
+    args = pipe_read_strings(settings.debug, "PPpackage-arch", pipe_from_fakealpm)
 
     with TemporaryPipe() as pipe_hook_path:
         args = [*args][1:]
 
         pipe_write_string(
-            debug, "PPpackage-arch", pipe_to_fakealpm, str(pipe_hook_path)
+            settings.debug, "PPpackage-arch", pipe_to_fakealpm, str(pipe_hook_path)
         )
         pipe_to_fakealpm.flush()
 
-        with pipe_hook_path.open("r") as pipe_hook:
+        with (
+            pipe_hook_path.open("r") as pipe_hook,
+            necessary_container_files(installation_path),
+            NamedTemporaryFile() as containers_conf,
+        ):
             process = await create_subprocess_exec(
                 "podman-remote",
+                "--url",
+                f"unix://{settings.containerizer}",
                 "run",
                 "--rm",
                 "--interactive",
@@ -54,11 +83,14 @@ async def install_manager_command(
                 stdin=pipe_hook,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
+                env={
+                    "CONTAINERS_CONF": containers_conf.name
+                },  # hack, allows $HOME to not exist
             )
 
             return_code = await asubprocess_wait(process, CommandException())
 
-    pipe_write_int(debug, "PPpackage-arch", pipe_to_fakealpm, return_code)
+    pipe_write_int(settings.debug, "PPpackage-arch", pipe_to_fakealpm, return_code)
     pipe_to_fakealpm.flush()
 
 
@@ -68,9 +100,7 @@ def create_environment(
     pipe_to_fakealpm_path: Path,
 ):
     environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-    environment[
-        "LD_PRELOAD"
-    ] += f":PPpackage-arch/fakealpm/build/install/lib/libfakealpm.so"
+    environment["LD_PRELOAD"] += f":/usr/local/lib/libfakealpm.so"
     environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
     environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
 
@@ -84,9 +114,8 @@ async def install(
     installation_path: Path,
     product: Product,
 ):
-    host_installation_path = (
-        settings.containerizer_host_workdir_path
-        / installation_path.relative_to(settings.containerizer_container_workdir_path)
+    host_installation_path = settings.workdir_host / installation_path.relative_to(
+        settings.workdir_container
     )
 
     _, cache_path = get_cache_paths(settings.cache_path)
@@ -140,9 +169,10 @@ async def install(
                         break
                     elif header == "COMMAND":
                         await install_manager_command(
-                            settings.debug,
+                            settings,
                             pipe_to_fakealpm,
                             pipe_from_fakealpm,
+                            installation_path,
                             host_installation_path,
                         )
                     else:

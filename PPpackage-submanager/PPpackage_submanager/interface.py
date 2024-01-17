@@ -1,7 +1,9 @@
 from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import Any, AsyncContextManager, Generic, TypeVar
+from typing import cast as type_cast
 
 from PPpackage_utils.server import UserBase
 from pydantic_settings import BaseSettings
@@ -71,3 +73,9 @@ class Interface(Generic[SettingsType, StateType, RequirementType]):
     fetch: FetchCallbackType[SettingsType, StateType]
     generate: GenerateCallbackType[SettingsType, StateType] = generate_noop
     install: InstallCallbackType[SettingsType, StateType]
+
+
+def load_interface_module(submanager_package_name: str) -> Interface:
+    return type_cast(
+        Interface, import_module(f"{submanager_package_name}.interface").interface
+    )

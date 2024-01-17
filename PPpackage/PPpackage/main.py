@@ -6,18 +6,17 @@ from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_submanager.schemes import ManagerAndName
-from PPpackage_utils.utils import TemporaryDirectory, movetree
 from PPpackage_utils.validation import load_from_bytes
 from pydantic import ValidationError
 from pydot import Dot
-
-from PPpackage.submanagers import Submanagers
 
 from .fetch import fetch
 from .generate import generate
 from .install import install
 from .resolve import resolve
-from .schemes import Config, Input
+from .schemes import Input
+from .settings import Settings
+from .submanagers import Submanagers
 from .update_database import update_database
 from .utils import NodeData, SubmanagerCommandFailure
 
@@ -140,16 +139,16 @@ def log_exception(e: BaseExceptionGroup) -> None:
 
 
 async def main(
-    debug: bool,
+    workdir_path: Path,
     do_update_database: bool,
-    config: Config,
+    settings: Settings,
     destination_path: Path,
     generators_path: Path | None,
     graph_path: Path | None,
     resolve_iteration_limit: int,
 ) -> None:
     try:
-        async with Submanagers(config.submanagers) as submanagers:
+        async with Submanagers(settings.submanagers) as submanagers:
             input_json_bytes = stdin.buffer.read()
 
             try:
@@ -181,28 +180,20 @@ async def main(
             fetch_order = topological_generations(reversed_graph)
             install_order = list(create_install_topology(graph))
 
-            await fetch(submanagers, options, graph, fetch_order, install_order)
+            await fetch(
+                workdir_path, submanagers, options, graph, fetch_order, install_order
+            )
 
-            with TemporaryDirectory() as destination_temporary_path:
-                movetree(destination_path, destination_temporary_path)
+            await install(submanagers, install_order, destination_path)
 
-                await install(submanagers, install_order, destination_temporary_path)
-
-                if generators_path is not None and input.generators is not None:
-                    with TemporaryDirectory() as generators_temporary_path:
-                        movetree(generators_path, generators_temporary_path)
-
-                        await generate(
-                            submanagers,
-                            input.generators,
-                            graph.nodes(data=True),
-                            options,
-                            generators_temporary_path,
-                        )
-
-                        movetree(generators_temporary_path, generators_path)
-
-                movetree(destination_temporary_path, destination_path)
+            if generators_path is not None and input.generators is not None:
+                await generate(
+                    submanagers,
+                    input.generators,
+                    graph.nodes(data=True),
+                    options,
+                    generators_path,
+                )
 
             stderr.write("Done.\n")
 

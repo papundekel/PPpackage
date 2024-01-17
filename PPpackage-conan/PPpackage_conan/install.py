@@ -18,6 +18,11 @@ async def install_product(
     installation_path: Path,
     product: Product,
 ):
+    product_installation_path = installation_path / product.name
+
+    if product_installation_path.exists():
+        return
+
     process = await create_subprocess_exec(
         "conan",
         "cache",
@@ -36,8 +41,6 @@ async def install_product(
     await asubprocess_wait(process, CommandException())
 
     product_cache_path = output_bytes.decode().splitlines()[0]
-
-    product_installation_path = installation_path / product.name
 
     copytree(product_cache_path, product_installation_path)
 

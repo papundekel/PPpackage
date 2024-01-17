@@ -4,8 +4,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    debug: bool = False
-    cache_path: Path = Path("/invalid/")
-    containerizer_socket_path: Path = Path("/invalid.sock")
-    containerizer_host_workdir_path: Path = Path("/invalid/")
-    containerizer_container_workdir_path: Path = Path("/invalid/")
+    debug: bool
+    cache_path: Path
+    containerizer: Path
+    workdir_host: Path
+    workdir_container: Path

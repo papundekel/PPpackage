@@ -1,0 +1,49 @@
+services:
+    metamanager:
+        build:
+            context: ./
+            target: metamanager
+        command: 
+        -   /mnt/workdir/root/
+        -   --workdir
+        -   /mnt/workdir/
+        -   --generators
+        -   /mnt/workdir/generators
+        -   --graph
+        -   /mnt/workdir/graph.dot
+        environment:
+            submanagers__arch__package: PPpackage_arch
+            submanagers__arch__settings__debug: true
+            submanagers__arch__settings__cache_path: /mnt/cache/arch/
+            submanagers__arch__settings__containerizer: /run/podman/podman.sock
+            submanagers__arch__settings__workdir_host: ${WORKDIR?env WORKDIR not set}
+            submanagers__arch__settings__workdir_container: /mnt/workdir/
+
+            submanagers__conan__package: PPpackage_conan
+            submanagers__conan__settings__debug: true
+            submanagers__conan__settings__cache_path: /mnt/cache/conan/
+
+            submanagers__PP__package: PPpackage_PP
+            submanagers__PP__settings__debug: true
+            submanagers__PP__settings__cache_path: /mnt/cache/PP/
+            submanagers__PP__settings__containerizer: /run/podman/podman.sock
+        volumes:
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
+        -   type: bind
+            source: $WORKDIR
+            target: /mnt/workdir/
+        -   type: volume
+            source: arch-cache
+            target: /mnt/cache/arch/
+        -   type: volume
+            source: conan-cache
+            target: /mnt/cache/conan/
+        -   type: volume
+            source: PP-cache
+            target: /mnt/cache/PP/
+volumes:
+    arch-cache:
+    conan-cache:
+    PP-cache:

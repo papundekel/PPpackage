@@ -1,4 +1,4 @@
-from asyncio import create_subprocess_exec
+from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import (
     AsyncIterable,
@@ -28,6 +28,7 @@ from PPpackage_utils.utils import (
 
 from .schemes import Requirement
 from .settings import Settings
+from .update_database import update_database_impl
 from .utils import (
     ResolveNode,
     State,
@@ -253,6 +254,9 @@ async def resolve(
 
     environment = make_conan_environment(settings.cache_path)
 
+    if not (settings.cache_path / Path("p")).exists():
+        await update_database_impl(environment)
+
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),
         autoescape=jinja2_select_autoescape(),
@@ -270,24 +274,26 @@ async def resolve(
     async for requirements in requirements_list:
         requirement_partitions = await create_requirement_partitions(requirements)
 
-        leaves_task = export_leaves(
-            settings.debug,
-            environment,
-            leaf_template,
-            requirement_index,
-            requirement_partitions,
-        )
+        async with TaskGroup() as group:
+            group.create_task(
+                export_leaves(
+                    settings.debug,
+                    environment,
+                    leaf_template,
+                    requirement_index,
+                    requirement_partitions,
+                )
+            )
 
-        requirement_task = export_requirement(
-            settings.debug,
-            environment,
-            requirement_template,
-            requirement_index,
-            range(len(requirement_partitions)),
-        )
-
-        await leaves_task
-        await requirement_task
+            group.create_task(
+                export_requirement(
+                    settings.debug,
+                    environment,
+                    requirement_template,
+                    requirement_index,
+                    range(len(requirement_partitions)),
+                )
+            )
 
         requirement_index += 1
 

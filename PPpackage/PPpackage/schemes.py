@@ -16,18 +16,13 @@ class Input:
 @dataclass(frozen=True)
 class LocalSubmanagerConfig:
     package: str
-    settings: Any
+    settings: Mapping
 
 
 @dataclass(frozen=True)
 class RemoteSubmanagerConfig:
     url: HttpUrl
     token: str
-
-
-@dataclass(frozen=True)
-class Config:
-    submanagers: Mapping[str, RemoteSubmanagerConfig | LocalSubmanagerConfig]
 
 
 class NodeData(TypedDict):

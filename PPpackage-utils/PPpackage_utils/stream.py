@@ -22,7 +22,7 @@ def _dump_int(length: int) -> memoryview:
     length_bytes = f"{length}\n".encode()
 
     if _DEBUG_DUMP:
-        print(f"dump length: {length}", file=stderr)
+        stderr.write(f"dump length: {length}\n")
 
     return memoryview(length_bytes)
 
@@ -33,7 +33,7 @@ def _dump_bool(value: bool) -> memoryview:
     bool_bytes = (value_string + "\n").encode()
 
     if _DEBUG_DUMP:
-        print(f"dump bool: {value}", file=stderr)
+        stderr.write(f"dump bool: {value}\n")
 
     return memoryview(bool_bytes)
 
@@ -47,14 +47,14 @@ def dump_loop_end():
     end_bytes = _dump_bool(False)
 
     if _DEBUG_DUMP:
-        print("loop}", file=stderr)
+        stderr.write("loop}\n")
 
     return end_bytes
 
 
 def dump_loop(iterable: Iterable[Iterable[memoryview]]) -> Iterable[memoryview]:
     if _DEBUG_DUMP:
-        print("loop{", file=stderr)
+        stderr.write("loop{\n")
 
     for obj in iterable:
         yield _dump_bool(True)
@@ -87,7 +87,7 @@ def dump_one(output: BaseModel | Any, loop=False) -> Iterator[memoryview]:
     yield from dump_bytes(memoryview(output_json_bytes))
 
     if _DEBUG_DUMP:
-        print(f"dump:\n{output_json_string}", file=stderr)
+        stderr.write(f"dump:\n{output_json_string}\n")
 
 
 def dump_many(outputs: Iterable[BaseModel | Any]) -> Iterable[memoryview]:
@@ -127,7 +127,7 @@ class Writer(Protocol):
 
     async def dump_loop(self, iterable: Iterable[T]) -> AsyncIterable[T]:
         if _DEBUG_DUMP:
-            print("loop{", file=stderr)
+            stderr.write("loop{\n")
 
         for obj in iterable:
             await self._dump_bool(True)
@@ -179,7 +179,7 @@ class Reader(Protocol):
         length = int(line)
 
         if _DEBUG_LOAD:
-            print(f"load length: {length}", file=stderr)
+            stderr.write(f"load length: {length}\n")
 
         return length
 
@@ -189,7 +189,7 @@ class Reader(Protocol):
         value = line == _TRUE_STRING
 
         if _DEBUG_LOAD:
-            print(f"load bool: {value}", file=stderr)
+            stderr.write(f"load bool: {value}\n")
 
         return value
 

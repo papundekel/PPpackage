@@ -1,4 +1,4 @@
-from asyncio import TaskGroup, create_subprocess_exec
+from asyncio import TaskGroup
 from collections.abc import AsyncIterable, Iterable, Mapping
 from pathlib import Path
 from sys import stderr
@@ -18,20 +18,17 @@ async def fetch_install(
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     destination_path: Path,
 ):
-    print("RECURSIVE INSTALL BEGIN", file=stderr)
+    stderr.write("RECURSIVE INSTALL BEGIN\n")
 
     dependency_set = {manager_and_name for manager_and_name, _ in dependencies}
 
     dependency_install_order = [
         (node, data) for node, data in install_order if node in dependency_set
     ]
-    print(dependency_install_order, file=stderr)
 
-    x = await install(submanagers, dependency_install_order, destination_path)
+    await install(submanagers, dependency_install_order, destination_path)
 
-    print("RECURSIVE INSTALL DONE", file=stderr)
-
-    return x
+    stderr.write("RECURSIVE INSTALL DONE\n")
 
 
 async def fetch_generate(
@@ -41,7 +38,7 @@ async def fetch_generate(
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     destination_path: Path,
 ):
-    print("RECURSIVE GENERATE BEGIN", file=stderr)
+    stderr.write("RECURSIVE GENERATE BEGIN\n")
 
     generators_list = [generator async for generator in generators]
 
@@ -49,7 +46,7 @@ async def fetch_generate(
         submanagers, generators_list, dependencies, meta_options, destination_path
     )
 
-    print("RECURSIVE GENERATE DONE", file=stderr)
+    stderr.write("RECURSIVE GENERATE DONE\n")
 
 
 async def fetch_install_generate(

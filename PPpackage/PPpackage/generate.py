@@ -1,4 +1,4 @@
-from asyncio import Task, TaskGroup, create_subprocess_exec
+from asyncio import Task, TaskGroup
 from collections.abc import Mapping, MutableMapping, MutableSequence
 from pathlib import Path
 from sys import stderr
@@ -6,7 +6,7 @@ from tempfile import mkdtemp
 from typing import Iterable
 
 from PPpackage_submanager.schemes import ManagerAndName, Options, Product
-from PPpackage_utils.utils import movetree
+from PPpackage_utils.utils import ensure_dir_exists, movetree
 
 from .generators import builtin as builtin_generators
 from .submanager import Submanager
@@ -40,6 +40,8 @@ async def generate(
     for generator in generators:
         stderr.write(f" {generator}")
     stderr.write(" for...\n")
+
+    ensure_dir_exists(destination_path)
 
     for manager_and_name, _ in nodes:
         package_name = manager_and_name.name

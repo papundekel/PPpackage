@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from collections.abc import Iterable, Mapping, MutableMapping
 from itertools import islice
+from pathlib import Path
 from sys import stderr
 from typing import Any
 
@@ -39,6 +40,7 @@ def graph_successors(
 
 
 async def fetch_manager(
+    workdir_path: Path,
     submanagers: Mapping[str, Submanager],
     submanager_name: str,
     meta_options: Mapping[str, Options],
@@ -65,8 +67,8 @@ async def fetch_manager(
             ]
 
             with (
-                TemporaryDirectory() as installation_path,
-                TemporaryDirectory() as generators_path,
+                TemporaryDirectory(workdir_path) as installation_path,
+                TemporaryDirectory(workdir_path) as generators_path,
             ):
                 await fetch_install_generate(
                     submanagers,
@@ -94,6 +96,7 @@ async def fetch_manager(
 
 
 async def fetch(
+    workdir_path: Path,
     submanagers: Mapping[str, Submanager],
     meta_options: Mapping[str, Options],
     graph: MultiDiGraph,
@@ -117,6 +120,7 @@ async def fetch(
 
                 group.create_task(
                     fetch_manager(
+                        workdir_path,
                         submanagers,
                         node.manager,
                         meta_options,

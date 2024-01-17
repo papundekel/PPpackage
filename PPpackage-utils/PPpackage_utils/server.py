@@ -180,9 +180,7 @@ class Server(FastAPI, Generic[SettingsType, StateType, TokenType, UserType]):
         @asynccontextmanager
         async def lifespan_wrap(app: FastAPI):
             engine = create_async_engine(
-                str(database_url),
-                echo=False,
-                connect_args={"check_same_thread": False},
+                str(database_url), echo=False, connect_args={"check_same_thread": False}
             )
 
             async with lifespan(settings) as state:
