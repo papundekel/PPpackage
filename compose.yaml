@@ -2,7 +2,7 @@ services:
     metamanager:
         # comment out to pull from dockerhub
         build:
-            context: ../
+            context: ./
             target: metamanager
             # uncomment to use with docker
             # args:
