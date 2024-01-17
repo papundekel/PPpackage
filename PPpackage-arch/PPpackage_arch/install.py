@@ -51,7 +51,7 @@ async def install_manager_command(
     pipe_to_fakealpm: TextIOWrapper,
     pipe_from_fakealpm: TextIOWrapper,
     installation_path: Path,
-    rootfs_path: Path,
+    containerizer_installation_path: Path,
 ):
     command = pipe_read_string(settings.debug, "PPpackage-arch", pipe_from_fakealpm)
     args = pipe_read_strings(settings.debug, "PPpackage-arch", pipe_from_fakealpm)
@@ -72,12 +72,12 @@ async def install_manager_command(
             process = await create_subprocess_exec(
                 "podman-remote",
                 "--url",
-                f"unix://{settings.containerizer}",
+                settings.containerizer,
                 "run",
                 "--rm",
                 "--interactive",
                 "--rootfs",
-                str(rootfs_path),
+                str(containerizer_installation_path),
                 command,
                 *args,
                 stdin=pipe_hook,
@@ -114,8 +114,9 @@ async def install(
     installation_path: Path,
     product: Product,
 ):
-    host_installation_path = settings.workdir_host / installation_path.relative_to(
-        settings.workdir_container
+    containerizer_installation_path = (
+        settings.workdir_containerizer
+        / installation_path.relative_to(settings.workdir_container)
     )
 
     _, cache_path = get_cache_paths(settings.cache_path)
@@ -173,7 +174,7 @@ async def install(
                             pipe_to_fakealpm,
                             pipe_from_fakealpm,
                             installation_path,
-                            host_installation_path,
+                            containerizer_installation_path,
                         )
                     else:
                         raise Exception(f"Unknown header: {header}", "PPpackage-arch")

@@ -1,0 +1,67 @@
+services:
+    podman-server:
+        build:
+            context: ./.github/podman
+        command:
+        -   tcp://localhost:8888
+        ports:
+        -   8888
+        volumes:
+        -   type: bind
+            source: $PWD
+            target: /mnt/workdir/
+    metamanager:
+        build:
+            context: ./
+            target: metamanager
+            args:
+            -   USER
+        depends_on:
+        -   podman-server
+        ulimits:
+            nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
+                soft: 1024
+                hard: 1048576
+        user: $USER
+        command: 
+        -   /mnt/workdir/root/
+        -   --workdir
+        -   /mnt/workdir/
+        environment:
+            submanagers__arch__package: PPpackage_arch
+            submanagers__arch__settings__debug: true
+            submanagers__arch__settings__cache_path: /mnt/cache/arch/
+            submanagers__arch__settings__containerizer: tcp://podman-server:8888
+            submanagers__arch__settings__workdir_containerizer: /mnt/workdir/
+            submanagers__arch__settings__workdir_container: /mnt/workdir/
+
+            submanagers__conan__package: PPpackage_conan
+            submanagers__conan__settings__debug: true
+            submanagers__conan__settings__cache_path: /mnt/cache/conan/
+
+            submanagers__PP__package: PPpackage_PP
+            submanagers__PP__settings__debug: true
+            submanagers__PP__settings__cache_path: /mnt/cache/PP/
+            submanagers__PP__settings__containerizer: tcp://podman-server:8888
+        volumes:
+        -   type: bind
+            source: $PWD
+            target: /mnt/workdir/
+        -   type: bind
+            source: $PWD/cache/arch/
+            target: /mnt/cache/arch/
+        -   type: bind
+            source: $PWD/cache/conan/
+            target: /mnt/cache/conan/
+        -   type: bind
+            source: $PWD/cache/PP/
+            target: /mnt/cache/PP/
+   
+        -   type: bind
+            source: /etc/passwd
+            target: /etc/passwd
+            read_only: true
+        -   type: bind
+            source: /etc/group
+            target: /etc/group
+            read_only: true

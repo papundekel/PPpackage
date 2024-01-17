@@ -9,6 +9,24 @@ jobs:
         steps:
             - uses: actions/checkout@v3
 
+            - name: Cache arch
+              uses: actions/cache@v3.3.2
+              with:
+                  path: ${{ github.workspace }}/cache/arch
+                  key: cache-arch
+
+            - name: Cache Conan
+              uses: actions/cache@v3.3.2
+              with:
+                  path: ${{ github.workspace }}/cache/conan
+                  key: cache-conan
+
+            - name: Cache PP
+              uses: actions/cache@v3.3.2
+              with:
+                  path: ${{ github.workspace }}/cache/PP
+                  key: cache-PP
+
             - name: Log in to Docker Hub
               uses: docker/login-action@v3.0.0
               with:
@@ -18,13 +36,10 @@ jobs:
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Start podman API service
-              run: |
-                  systemctl --user enable --now podman
-
             - name: Run PPpackage
               run: |
-                  USER="$(id -u):$(id -g)" WORKDIR=$(pwd) docker compose --file compose-docker.yaml run --build --rm -T metamanager < input/basic.json
+                  mkdir -p cache/arch cache/conan cache/PP
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --build --rm -T metamanager < input/basic.json
 
             - name: See if ldconfig ran
               run: ls -l root/etc/ld.so.cache

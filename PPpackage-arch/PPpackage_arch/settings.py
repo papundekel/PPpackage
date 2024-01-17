@@ -6,6 +6,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     debug: bool
     cache_path: Path
-    containerizer: Path
-    workdir_host: Path
+    containerizer: str
+    workdir_containerizer: Path
     workdir_container: Path

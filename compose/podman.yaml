@@ -15,8 +15,8 @@ services:
             submanagers__arch__package: PPpackage_arch
             submanagers__arch__settings__debug: true
             submanagers__arch__settings__cache_path: /mnt/cache/arch/
-            submanagers__arch__settings__containerizer: /run/podman/podman.sock
-            submanagers__arch__settings__workdir_host: ${WORKDIR?env WORKDIR not set}
+            submanagers__arch__settings__containerizer: unix:///run/podman/podman.sock
+            submanagers__arch__settings__workdir_containerizer: ${WORKDIR?env WORKDIR not set}
             submanagers__arch__settings__workdir_container: /mnt/workdir/
 
             submanagers__conan__package: PPpackage_conan
@@ -26,7 +26,7 @@ services:
             submanagers__PP__package: PPpackage_PP
             submanagers__PP__settings__debug: true
             submanagers__PP__settings__cache_path: /mnt/cache/PP/
-            submanagers__PP__settings__containerizer: /run/podman/podman.sock
+            submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
         volumes:
         -   type: bind
             source: $XDG_RUNTIME_DIR/podman/podman.sock
