@@ -138,7 +138,9 @@ class RemoteSubmanager(Submanager):
         )
 
         if not response.is_success:
-            raise SubmanagerCommandFailure("install failed")
+            raise SubmanagerCommandFailure(
+                f"remote install failed: {(await response.aread()).decode()}"
+            )
 
     async def install_post(self, installation: memoryview) -> str:
         async def content():
@@ -153,7 +155,9 @@ class RemoteSubmanager(Submanager):
         )
 
         if not response.is_success:
-            raise SubmanagerCommandFailure("remote install_init failed")
+            raise SubmanagerCommandFailure(
+                f"remote install post failed: {(await response.aread()).decode()}"
+            )
 
         response_bytes = await response.aread()
         id = load_from_bytes(str, memoryview(response_bytes))

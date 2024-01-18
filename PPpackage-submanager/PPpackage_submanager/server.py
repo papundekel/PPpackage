@@ -14,7 +14,7 @@ from PPpackage_utils.stream import (
 )
 from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
-from PPpackage_utils.utils import TemporaryDirectory
+from PPpackage_utils.utils import TemporaryDirectory, ensure_dir_exists
 from pydantic import AnyUrl
 from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -82,7 +82,11 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
             async with interface.lifespan(settings) as state:
                 app.state.state = state
                 app.state.engine = engine
+
+                ensure_dir_exists(settings.installations_path)
+
                 yield
+
                 app.state.engine = None
                 app.state.state = None
 

@@ -28,11 +28,13 @@ services:
             submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
         volumes:
         -   type: bind
-            source: $XDG_RUNTIME_DIR/podman/podman.sock
-            target: /run/podman/podman.sock
-        -   type: bind
             source: $PWD
             target: /mnt/workdir/
+
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
+
         -   type: bind
             source: $PWD/cache/arch/
             target: /mnt/cache/arch/

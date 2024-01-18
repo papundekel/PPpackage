@@ -93,13 +93,13 @@ services:
                 condition: service_healthy
 
         command:
-        -   /mnt/workdir/root/
+        -   /mnt/workdir/output/root/
         -   --workdir
         -   /mnt/workdir/
         -   --generators
-        -   /mnt/workdir/generators
+        -   /mnt/workdir/output/generators
         -   --graph
-        -   /mnt/workdir/graph.dot
+        -   /mnt/workdir/output/graph.dot
         
         environment:
             submanagers__arch__url: http://submanager-arch:8888
@@ -180,7 +180,8 @@ services:
             context: ../../
             target: submanager-create-user
         depends_on:
-        -   submanager-arch
+            submanager-arch:
+                condition: service_healthy
         command:
         -   /run/secrets/user-token/secret
         -   http://submanager-arch:8888
@@ -199,7 +200,8 @@ services:
             context: ../../
             target: submanager-create-user
         depends_on:
-        -   submanager-conan
+            submanager-conan:
+                condition: service_healthy
         command:
         -   /run/secrets/user-token/secret
         -   http://submanager-conan:8888
@@ -218,7 +220,8 @@ services:
             context: ../../
             target: submanager-create-user
         depends_on:
-        -   submanager-pp
+            submanager-pp:
+                condition: service_healthy
         command:
         -   /run/secrets/user-token/secret
         -   http://submanager-pp:8888
