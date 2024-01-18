@@ -153,7 +153,7 @@ async def install(
                 ),
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=stderr,
+                stderr=DEVNULL,
                 env=environment,
             )
 

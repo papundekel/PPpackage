@@ -28,7 +28,7 @@ async def resolve_pactree(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=stderr,
+        stderr=DEVNULL,
     )
 
     assert process.stdout is not None
