@@ -13,4 +13,4 @@ input/
 podman-server/
 test/
 compose/
-test.sh
+images-build.sh/

@@ -48,6 +48,7 @@ cleanup()
     rm -f "$database_path_arch" "$database_path_conan" "$database_path_pp"
 
     rm -rf "$installations_arch" "$installations_conan" "$installations_pp"
+    rm -rf tmp/installations
 }
 
 

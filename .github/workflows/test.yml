@@ -41,7 +41,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: metamanager
                   load: true
-                  tags: fackop/pppackage:latest
+                  tags: docker.io/fackop/pppackage:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 

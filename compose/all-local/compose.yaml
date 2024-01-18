@@ -1,9 +1,7 @@
 name: pppackage
 services:
     metamanager:
-        build:
-            context: ../../
-            target: metamanager
+        image: docker.io/fackop/pppackage:latest
 
         command:
         -   /mnt/workdir/output/root/
