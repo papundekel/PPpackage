@@ -152,7 +152,7 @@ async def main(
             input_json_bytes = stdin.buffer.read()
 
             try:
-                input = load_from_bytes(Input, input_json_bytes)
+                input = load_from_bytes(Input, memoryview(input_json_bytes))
             except ValidationError as e:
                 stderr.write("ERROR: Invalid input.\n")
                 stderr.write(e.json(indent=4))

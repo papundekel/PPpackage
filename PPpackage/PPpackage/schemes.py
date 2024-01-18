@@ -1,8 +1,9 @@
 from collections.abc import Mapping, Set
+from pathlib import Path
 from typing import Any, TypedDict
 
 from PPpackage_submanager.schemes import FrozenAny, Options
-from pydantic import HttpUrl
+from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass
 
 
@@ -21,8 +22,8 @@ class LocalSubmanagerConfig:
 
 @dataclass(frozen=True)
 class RemoteSubmanagerConfig:
-    url: HttpUrl
-    token: str
+    url: AnyUrl
+    token_path: Path
 
 
 class NodeData(TypedDict):

@@ -3,6 +3,7 @@ from pathlib import Path
 from sys import stderr
 
 from PPpackage_submanager.schemes import ManagerAndName, Product
+from PPpackage_utils.utils import ensure_dir_exists
 
 from PPpackage.submanager import Submanager
 
@@ -22,9 +23,11 @@ async def install_manager(
 async def install(
     submanagers: Mapping[str, Submanager],
     order: Iterable[tuple[ManagerAndName, NodeData]],
-    installation_path: Path,
+    destination_path: Path,
 ) -> None:
     stderr.write(f"Installing packages...\n")
+
+    ensure_dir_exists(destination_path)
 
     previous_submanager: Submanager | None = None
     ids = dict[str, str]()
@@ -33,27 +36,27 @@ async def install(
         submanager = submanagers[node.manager]
 
         if previous_submanager is None:
-            id = await submanager.install_init(installation_path)
+            id = await submanager.install_init(destination_path)
             ids[submanager.name] = id
         elif previous_submanager.name != submanager.name:
             previous_id = ids[previous_submanager.name]
             id = ids.get(submanager.name)
             id = await previous_submanager.install_send(
-                previous_id, submanager, id, installation_path
+                previous_id, submanager, id, destination_path
             )
             ids[submanager.name] = id
         else:
             id = ids[submanager.name]
 
         await install_manager(
-            submanager, id, installation_path, data_to_product(node.name, data)
+            submanager, id, destination_path, data_to_product(node.name, data)
         )
 
         previous_submanager = submanager
 
     if previous_submanager is not None:
         id = ids[previous_submanager.name]
-        await previous_submanager.install_download(id, installation_path)
+        await previous_submanager.install_download(id, destination_path)
 
     for submanager_name, id in ids.items():
         await submanagers[submanager_name].install_delete(id)

@@ -56,7 +56,7 @@ def parse_conan_graph_nodes(
     NodeType: type[T],
     conan_graph_json_bytes: bytes,
 ) -> Mapping[str, T]:
-    conan_graph = load_from_bytes(ConanGraph, conan_graph_json_bytes)
+    conan_graph = load_from_bytes(ConanGraph, memoryview(conan_graph_json_bytes))
 
     return {
         node_id: load_object(NodeType, node_json)

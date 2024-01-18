@@ -1,7 +1,7 @@
-ARG ARCH_TAG=paru-20231217.0.300
+ARG AUR_TAG=paru-20231217.0.300
 # -----------------------------------------------------------------------------
 
-FROM docker.io/greyltc/archlinux-aur:$ARCH_TAG AS base
+FROM docker.io/greyltc/archlinux-aur:$AUR_TAG AS base
 
 RUN mkdir -p /workdir
 WORKDIR /workdir
@@ -53,6 +53,8 @@ RUN aur-install conan
 
 FROM base-python as submanager-notconan
 
+RUN pacman --noconfirm -S curl
+
 RUN pip install hypercorn
 
 # -----------------------------------------------------------------------------
@@ -83,6 +85,8 @@ ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
 
 FROM base-conan as submanager-conan
 
+RUN pacman --noconfirm -S curl
+
 RUN pip install hypercorn
 
 COPY PPpackage-utils/ /workdir/PPpackage-utils
@@ -98,7 +102,7 @@ ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
 
 # -----------------------------------------------------------------------------
 
-FROM submanager-notconan as submanager-PP
+FROM submanager-notconan as submanager-pp
 
 COPY PPpackage-utils/ /workdir/PPpackage-utils
 RUN pip install PPpackage-utils/
@@ -149,3 +153,35 @@ COPY PPpackage/ /workdir/PPpackage
 RUN pip install PPpackage/
 
 ENTRYPOINT [ "python", "-m", "PPpackage" ]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python as submanager-db-init
+
+COPY PPpackage-utils/ /workdir/PPpackage-utils
+RUN pip install PPpackage-utils/
+
+COPY PPpackage-submanager/ /workdir/PPpackage-submanager
+RUN pip install PPpackage-submanager/
+
+COPY wrap_script_container.sh /workdir/wrap_script_container.sh
+COPY --chmod=774 init_database.py /workdir/init_database.py
+
+ENTRYPOINT [ "bash", "wrap_script_container.sh", "./init_database.py" ]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python as submanager-create-user
+
+RUN pip install httpx
+
+COPY PPpackage-utils/ /workdir/PPpackage-utils
+RUN pip install PPpackage-utils/
+
+COPY PPpackage-submanager/ /workdir/PPpackage-submanager
+RUN pip install PPpackage-submanager/
+
+COPY wrap_script_container.sh /workdir/wrap_script_container.sh
+COPY --chmod=774 create_user.py /workdir/create_user.py
+
+ENTRYPOINT [ "bash", "wrap_script_container.sh", "./create_user.py" ]

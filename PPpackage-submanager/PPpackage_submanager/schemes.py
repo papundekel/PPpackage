@@ -1,8 +1,9 @@
+import token
 from collections.abc import Iterable, Mapping
 from typing import Annotated, Any
 
 from frozendict import frozendict
-from pydantic import BeforeValidator
+from pydantic import BaseModel, BeforeValidator
 from pydantic.dataclasses import dataclass
 
 
@@ -67,3 +68,7 @@ class ResolutionGraphNode:
 class ResolutionGraph:
     roots: Iterable[Iterable[str]]
     graph: Iterable[ResolutionGraphNode]
+
+
+class UserCreated(BaseModel):
+    token: str

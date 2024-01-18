@@ -1,0 +1,250 @@
+name: pppackage
+services:
+    submanager-arch:
+        build:
+            context: ../../
+            target: submanager-arch
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+        -   0.0.0.0:8888
+        environment:
+            DEBUG: true
+            CACHE_PATH: /mnt/cache/
+            CONTAINERIZER: unix:///run/podman/podman.sock
+            WORKDIR_CONTAINERIZER: ${ARCH_INSTALLATIONS?env ARCH_INSTALLATIONS not set}
+            WORKDIR_CONTAINER: /mnt/db/installations/
+            SUBMANAGER_PACKAGE: PPpackage_arch
+            DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
+            INSTALLATIONS_PATH: /mnt/db/installations/
+        ports:
+        -   8888
+        volumes:
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
+        -   type: bind
+            source: $ARCH_INSTALLATIONS
+            target: /mnt/db/installations/
+        -   type: volume
+            source: arch-cache
+            target: /mnt/cache/
+        -   type: volume
+            source: arch-db
+            target: /mnt/db/
+    submanager-conan:
+        build:
+            context: ../../
+            target: submanager-conan
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+        -   0.0.0.0:8888
+        environment:
+            DEBUG: true
+            CACHE_PATH: /mnt/cache/
+            SUBMANAGER_PACKAGE: PPpackage_conan
+            DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
+            INSTALLATIONS_PATH: /mnt/db/installations/
+        ports:
+        -   8888
+        volumes:
+        -   type: volume
+            source: conan-cache
+            target: /mnt/cache/
+        -   type: volume
+            source: conan-db
+            target: /mnt/db/
+    submanager-pp:
+        build:
+            context: ../../
+            target: submanager-pp
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+        -   0.0.0.0:8888
+        environment:
+            DEBUG: true
+            CACHE_PATH: /mnt/cache/
+            CONTAINERIZER: unix:///run/podman/podman.sock
+            SUBMANAGER_PACKAGE: PPpackage_PP
+            DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
+            INSTALLATIONS_PATH: /mnt/db/installations/
+        ports:
+        -   8888
+        volumes:
+        -   type: volume
+            source: pp-cache
+            target: /mnt/cache/
+        -   type: volume
+            source: pp-db
+            target: /mnt/db/
+    metamanager:
+        build:
+            context: ../../
+            target: metamanager
+
+        depends_on:
+            submanager-arch:
+                condition: service_healthy
+            submanager-conan:
+                condition: service_healthy
+            submanager-pp:
+                condition: service_healthy
+
+        command:
+        -   /mnt/workdir/root/
+        -   --workdir
+        -   /mnt/workdir/
+        -   --generators
+        -   /mnt/workdir/generators
+        -   --graph
+        -   /mnt/workdir/graph.dot
+        
+        environment:
+            submanagers__arch__url: http://submanager-arch:8888
+            submanagers__arch__token_path: /run/secrets/token-arch/secret
+
+            submanagers__conan__url: http://submanager-conan:8888
+            submanagers__conan__token_path: /run/secrets/token-conan/secret
+
+            submanagers__PP__url: http://submanager-pp:8888
+            submanagers__PP__token_path: /run/secrets/token-pp/secret
+
+        volumes:
+        -   type: bind
+            source: $WORKDIR
+            target: /mnt/workdir/
+
+        -   type: volume
+            source: user-token-arch
+            target: /run/secrets/token-arch/
+        -   type: volume
+            source: user-token-conan
+            target: /run/secrets/token-conan/
+        -   type: volume
+            source: user-token-pp
+            target: /run/secrets/token-pp/
+
+    db-init-arch:
+        build:
+            context: ../../
+            target: submanager-db-init
+        command:
+        -   /run/secrets/admin-token/secret
+        -   sqlite+aiosqlite:////mnt/db/db.sqlite3
+        volumes:
+        -   type: volume
+            source: arch-db
+            target: /mnt/db/
+        -   type: volume
+            source: admin-token-arch
+            target: /run/secrets/admin-token/
+        profiles:
+        -   submanager-db-init
+    db-init-conan:
+        build:
+            context: ../../
+            target: submanager-db-init
+        command:
+        -   /run/secrets/admin-token/secret
+        -   sqlite+aiosqlite:////mnt/db/db.sqlite3
+        volumes:
+        -   type: volume
+            source: conan-db
+            target: /mnt/db/
+        -   type: volume
+            source: admin-token-conan
+            target: /run/secrets/admin-token/
+        profiles:
+        -   submanager-db-init
+    db-init-pp:
+        build:
+            context: ../../
+            target: submanager-db-init
+        command:
+        -   /run/secrets/admin-token/secret
+        -   sqlite+aiosqlite:////mnt/db/db.sqlite3
+        volumes:
+        -   type: volume
+            source: pp-db
+            target: /mnt/db/
+        -   type: volume
+            source: admin-token-pp
+            target: /run/secrets/admin-token/
+        profiles:
+        -   submanager-db-init
+
+    create-user-arch:
+        build:
+            context: ../../
+            target: submanager-create-user
+        depends_on:
+        -   submanager-arch
+        command:
+        -   /run/secrets/user-token/secret
+        -   http://submanager-arch:8888
+        -   /run/secrets/admin-token/secret
+        profiles:
+        -   submanager-create-user
+        volumes:
+        -   type: volume
+            source: admin-token-arch
+            target: /run/secrets/admin-token/
+        -   type: volume
+            source: user-token-arch
+            target: /run/secrets/user-token/
+    create-user-conan:
+        build:
+            context: ../../
+            target: submanager-create-user
+        depends_on:
+        -   submanager-conan
+        command:
+        -   /run/secrets/user-token/secret
+        -   http://submanager-conan:8888
+        -   /run/secrets/admin-token/secret
+        profiles:
+        -   submanager-create-user
+        volumes:
+        -   type: volume
+            source: admin-token-conan
+            target: /run/secrets/admin-token/
+        -   type: volume
+            source: user-token-conan
+            target: /run/secrets/user-token/
+    create-user-pp:
+        build:
+            context: ../../
+            target: submanager-create-user
+        depends_on:
+        -   submanager-pp
+        command:
+        -   /run/secrets/user-token/secret
+        -   http://submanager-pp:8888
+        -   /run/secrets/admin-token/secret
+        profiles:
+        -   submanager-create-user
+        volumes:
+        -   type: volume
+            source: admin-token-pp
+            target: /run/secrets/admin-token/
+        -   type: volume
+            source: user-token-pp
+            target: /run/secrets/user-token/
+volumes:
+    arch-cache:
+    conan-cache:
+    pp-cache:
+
+    arch-db:
+    conan-db:
+    pp-db:
+        
+    admin-token-arch:
+    admin-token-conan:
+    admin-token-pp:
+        
+    user-token-arch:
+    user-token-conan:
+    user-token-pp:

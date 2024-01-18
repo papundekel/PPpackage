@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, AsyncContextManager, Generic, TypeVar
 from typing import cast as type_cast
 
-from PPpackage_utils.server import UserBase
 from pydantic_settings import BaseSettings
 
 from .schemes import Dependency, Package, PackageIDAndInfo, Product, ResolutionGraph
@@ -13,7 +12,6 @@ from .schemes import Dependency, Package, PackageIDAndInfo, Product, ResolutionG
 RequirementType = TypeVar("RequirementType")
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
 StateType = TypeVar("StateType")
-UserType = TypeVar("UserType", bound=UserBase)
 
 UpdateDatabaseCallbackType = Callable[[SettingsType, StateType], Awaitable[None]]
 ResolveCallbackType = Callable[

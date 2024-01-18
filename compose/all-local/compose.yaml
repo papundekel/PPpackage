@@ -1,27 +1,11 @@
+name: pppackage
 services:
     metamanager:
-        # comment out to pull from dockerhub
         build:
-            context: ../
+            context: ../../
             target: metamanager
-            # uncomment to use with docker
-            # args:
-            # -   USER
-            
-        # uncomment to pull from dockerhub
-        # image: docker.io/fackop/pppackage:latest
 
-        # uncomment to use with docker
-        # fakeroot + docker issue https://github.com/moby/moby/issues/27195
-        # ulimits:
-        #     nofile:
-        #         soft: 1024
-        #         hard: 1048576
-        
-        # uncomment to use with docker
-        # user: $USER
-
-        command: 
+        command:
         -   /mnt/workdir/root/
         -   --workdir
         -   /mnt/workdir/
@@ -47,11 +31,13 @@ services:
             submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
         volumes:
         -   type: bind
-            source: $XDG_RUNTIME_DIR/podman/podman.sock # set to podman service socket if elsewhere
-            target: /run/podman/podman.sock
-        -   type: bind
             source: $WORKDIR
             target: /mnt/workdir/
+
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
+
         -   type: volume
             source: arch-cache
             target: /mnt/cache/arch/
@@ -59,19 +45,9 @@ services:
             source: conan-cache
             target: /mnt/cache/conan/
         -   type: volume
-            source: PP-cache
+            source: pp-cache
             target: /mnt/cache/PP/
-
-        # uncomment to use with docker  
-        # -   type: bind
-        #     source: /etc/passwd
-        #     target: /etc/passwd
-        #     read_only: true
-        # -   type: bind
-        #     source: /etc/group
-        #     target: /etc/group
-        #     read_only: true
 volumes:
     arch-cache:
     conan-cache:
-    PP-cache:
+    pp-cache:

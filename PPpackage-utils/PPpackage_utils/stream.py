@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, Iterator
+from collections.abc import AsyncIterable, Iterable
 from sys import stderr
 from typing import Any, Protocol, TypeVar
 
@@ -67,12 +67,13 @@ def dump_loop_simple(iterable: Iterable[memoryview]) -> Iterable[memoryview]:
     yield from dump_loop([iterable])
 
 
-def dump_bytes_chunked(output_bytes: memoryview) -> Iterator[memoryview]:
-    for chunk in dump_loop_simple(chunk_bytes(output_bytes, 2**15)):
-        yield from dump_bytes(chunk)
+def dump_bytes_chunked(output_bytes: memoryview) -> Iterable[memoryview]:
+    yield from dump_loop(
+        dump_bytes(chunk) for chunk in chunk_bytes(output_bytes, 2**15)
+    )
 
 
-def dump_one(output: BaseModel | Any, loop=False) -> Iterator[memoryview]:
+def dump_one(output: BaseModel | Any, loop=False) -> Iterable[memoryview]:
     if loop:
         yield _dump_bool(True)
 
