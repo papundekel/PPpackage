@@ -6,13 +6,13 @@ services:
             target: metamanager
 
         command:
-        -   /mnt/workdir/root/
+        -   /mnt/workdir/output/root/
         -   --workdir
         -   /mnt/workdir/
         -   --generators
-        -   /mnt/workdir/generators
+        -   /mnt/workdir/output/generators
         -   --graph
-        -   /mnt/workdir/graph.dot
+        -   /mnt/workdir/output/graph.dot
         environment:
             submanagers__arch__package: PPpackage_arch
             submanagers__arch__settings__debug: true
