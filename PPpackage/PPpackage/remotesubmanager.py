@@ -12,7 +12,6 @@ from PPpackage_submanager.schemes import (
     Product,
     ResolutionGraph,
 )
-from PPpackage_utils.http_stream import HTTPResponseReader
 from PPpackage_utils.stream import dump_bytes_chunked, dump_loop, dump_many, dump_one
 from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
@@ -22,6 +21,7 @@ from PPpackage.schemes import RemoteSubmanagerConfig
 from PPpackage.utils import SubmanagerCommandFailure
 
 from .submanager import Submanager
+from .utils import HTTPResponseReader
 
 
 class RemoteSubmanager(Submanager):
@@ -29,8 +29,11 @@ class RemoteSubmanager(Submanager):
         super().__init__(name)
 
         self.client = client
-        self.url = config.url
-        self.token = config.token
+
+        self.url = str(config.url).rstrip("/")
+
+        with config.token_path.open("r") as token_file:
+            self.token = token_file.read().strip()
 
     async def update_database(self) -> None:
         pass
@@ -55,9 +58,12 @@ class RemoteSubmanager(Submanager):
             f"{self.url}/resolve",
             headers={"Authorization": f"Bearer {self.token}"},
             content=content(),
+            timeout=None,
         ) as response:
             if not response.is_success:
-                raise SubmanagerCommandFailure("remote resolve failed")
+                raise SubmanagerCommandFailure(
+                    f"remote resolve failed {(await response.aread()).decode()}"
+                )
 
             reader = HTTPResponseReader(response)
 
@@ -97,7 +103,7 @@ class RemoteSubmanager(Submanager):
 
         async with self.client.stream(
             "POST",
-            f"{self.url}/fetch",
+            f"{self.url}/products",
             headers={"Authorization": f"Bearer {self.token}"},
             params={
                 "package_name": package.name,
@@ -106,6 +112,7 @@ class RemoteSubmanager(Submanager):
                 "generators_present": generators_path is not None,
             },
             content=content(),
+            timeout=None,
         ) as response:
             reader = HTTPResponseReader(response)
 
@@ -114,7 +121,9 @@ class RemoteSubmanager(Submanager):
             elif response.status_code == 422:
                 yield reader.load_many(str)
             else:
-                raise SubmanagerCommandFailure("remote fetch failed")
+                raise SubmanagerCommandFailure(
+                    f"remote fetch failed: {(await response.aread()).decode()}"
+                )
 
     async def install(self, id: str, installation_path: Path, product: Product) -> None:
         response = await self.client.patch(
@@ -125,23 +134,33 @@ class RemoteSubmanager(Submanager):
                 "package_version": product.version,
                 "product_id": product.product_id,
             },
+            timeout=None,
         )
 
         if not response.is_success:
-            raise SubmanagerCommandFailure("install failed")
+            raise SubmanagerCommandFailure(
+                f"remote install failed: {(await response.aread()).decode()}"
+            )
 
     async def install_post(self, installation: memoryview) -> str:
+        async def content():
+            for chunk in dump_bytes_chunked(installation):
+                yield chunk
+
         response = await self.client.post(
             f"{self.url}/installations",
             headers={"Authorization": f"Bearer {self.token}"},
-            content=dump_bytes_chunked(installation),
+            content=content(),
+            timeout=None,
         )
 
         if not response.is_success:
-            raise SubmanagerCommandFailure("remote install_init failed")
+            raise SubmanagerCommandFailure(
+                f"remote install post failed: {(await response.aread()).decode()}"
+            )
 
         response_bytes = await response.aread()
-        id = load_from_bytes(str, response_bytes)
+        id = load_from_bytes(str, memoryview(response_bytes))
 
         return id
 
@@ -155,6 +174,7 @@ class RemoteSubmanager(Submanager):
             "GET",
             f"{self.url}/installations/{id}",
             headers={"Authorization": f"Bearer {self.token}"},
+            timeout=None,
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure("remote install_send failed")
@@ -191,6 +211,7 @@ class RemoteSubmanager(Submanager):
             response = await self.client.put(
                 f"{self.url}/installations/{destination_id}",
                 content=dump_bytes_chunked(installation),
+                timeout=None,
             )
 
             if not response.is_success:
@@ -209,6 +230,7 @@ class RemoteSubmanager(Submanager):
         response = await self.client.delete(
             f"{self.url}/installations/{id}",
             headers={"Authorization": f"Bearer {self.token}"},
+            timeout=None,
         )
 
         if not response.is_success:
@@ -233,9 +255,10 @@ class RemoteSubmanager(Submanager):
 
         async with self.client.stream(
             "POST",
-            f"{self.url}/generators/",
+            f"{self.url}/generators",
             headers={"Authorization": f"Bearer {self.token}"},
             content=content(),
+            timeout=None,
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure("remote generate failed")
@@ -244,4 +267,5 @@ class RemoteSubmanager(Submanager):
 
             generators_bytes = await reader.load_bytes_chunked()
 
+        tar_extract(generators_bytes, destination_path)
         tar_extract(generators_bytes, destination_path)

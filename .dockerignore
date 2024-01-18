@@ -1,5 +1,5 @@
 .vscode/
-__pycache__/
+**/__pycache__/
 .dockerignore
 .gitignore
 tmp/
@@ -11,3 +11,6 @@ Dockerfile
 .*/
 input/
 podman-server/
+test/
+compose/
+test.sh

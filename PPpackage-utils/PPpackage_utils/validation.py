@@ -24,8 +24,8 @@ def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
         return input  # type: ignore
 
 
-def load_from_bytes(Model: type[ModelType], input_json_bytes: bytes) -> ModelType:
-    input_json_string = input_json_bytes.decode()
+def load_from_bytes(Model: type[ModelType], input_json_bytes: memoryview) -> ModelType:
+    input_json_string = str(input_json_bytes, encoding="utf-8")
 
     if _DEBUG_LOAD:
         stderr.write(f"load:\n{input_json_string}\n")

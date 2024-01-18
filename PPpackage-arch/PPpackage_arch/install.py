@@ -116,7 +116,7 @@ async def install(
 ):
     containerizer_installation_path = (
         settings.workdir_containerizer
-        / installation_path.relative_to(settings.workdir_container)
+        / installation_path.absolute().relative_to(settings.workdir_container)
     )
 
     _, cache_path = get_cache_paths(settings.cache_path)

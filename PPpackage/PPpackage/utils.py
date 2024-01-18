@@ -1,4 +1,6 @@
+from httpx import Response
 from PPpackage_submanager.schemes import Product
+from PPpackage_utils.http_stream import AsyncChunkReader
 from PPpackage_utils.stream import Reader
 
 from .schemes import NodeData
@@ -22,3 +24,7 @@ async def load_success(reader: Reader, message: str):
 
     if not success:
         raise SubmanagerCommandFailure(message)
+
+
+def HTTPResponseReader(response: Response):
+    return AsyncChunkReader(memoryview(chunk) async for chunk in response.aiter_raw())

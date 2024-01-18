@@ -1,4 +1,83 @@
+from collections.abc import AsyncIterable, Iterable
+from contextlib import asynccontextmanager
+from typing import Any, TypeVar
+
+from fastapi import HTTPException, Request
+from fastapi.responses import StreamingResponse as BaseStreamingResponse
 from PPpackage_submanager.exceptions import CommandException
+from PPpackage_utils.http_stream import AsyncChunkReader
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.exceptions import HTTPException
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+)
+
+
+@asynccontextmanager
+async def get_session_from_engine(engine: AsyncEngine):
+    async with AsyncSession(engine) as session:
+        yield session
+
+
+def get_state(request: Request):
+    return request.app.state.state
+
+
+async def get_session(request: Request):
+    async with get_session_from_engine(request.app.state.engine) as session:
+        yield session
+
+
+def HTTP401Exception():
+    return HTTPException(status_code=HTTP_401_UNAUTHORIZED)
+
+
+def HTTP403Exception():
+    return HTTPException(status_code=HTTP_403_FORBIDDEN)
+
+
+def HTTP404Exception():
+    return HTTPException(status_code=HTTP_404_NOT_FOUND)
+
+
+def HTTP400Exception():
+    return HTTPException(status_code=HTTP_400_BAD_REQUEST)
+
+
+Model = TypeVar("Model", bound=SQLModel)
+
+
+async def get_not_primary(
+    session: AsyncSession, ModelDB: type[Model], column: Any, pk: Any, *options: Any
+) -> Model | None:
+    query = select(ModelDB).where(column == pk)
+
+    if options != ():
+        query = query.options(*options)
+
+    instance_db = (await session.exec(query)).first()
+    return instance_db
+
+
+def StreamingResponse(
+    status_code: int,
+    generator: Iterable[memoryview] | AsyncIterable[memoryview],
+):
+    if isinstance(generator, Iterable):
+        generator_wrapped = (bytes(chunk) for chunk in generator)
+    else:
+        generator_wrapped = (bytes(chunk) async for chunk in generator)
+
+    return BaseStreamingResponse(
+        generator_wrapped,
+        status_code=status_code,
+        media_type="application/octet-stream",
+    )
 
 
 def _command_exception(f):
@@ -56,3 +135,7 @@ class Installations:
         i = int(id)
 
         del self.mapping[i]
+
+
+def HTTPRequestReader(request: Request):
+    return AsyncChunkReader(memoryview(chunk) async for chunk in request.stream())
