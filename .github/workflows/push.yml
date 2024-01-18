@@ -46,8 +46,63 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: metamanager
+                  load: true
+                  tags: docker.io/fackop/pppackage:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Run PPpackage
+              run: |
+                  mkdir -p cache/arch cache/conan cache/PP
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < input/basic.json
+
+            - name: Build and push pppackage-submanager-db-init
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-db-init
                   push: true
-                  tags: fackop/pppackage:latest
+                  tags: docker.io/fackop/pppackage-submanager-db-init:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push pppackage-submanager-create-user
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-create-user
+                  push: true
+                  tags: docker.io/fackop/pppackage-submanager-create-user:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push pppackage-arch
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-arch
+                  push: true
+                  tags: docker.io/fackop/pppackage-arch:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push pppackage-conan
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-conan
+                  push: true
+                  tags: docker.io/fackop/pppackage-conan:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push pppackage-pp
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-pp
+                  push: true
+                  tags: docker.io/fackop/pppackage-pp:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -56,12 +111,7 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: metamanager
-                  load: true
-                  tags: fackop/pppackage:latest
+                  push: true
+                  tags: docker.io/fackop/pppackage:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
-
-            - name: Run PPpackage
-              run: |
-                  mkdir -p cache/arch cache/conan cache/PP
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < input/basic.json
