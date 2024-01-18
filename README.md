@@ -6,6 +6,126 @@ Currently supports [`arch`](https://archlinux.org/) and [`conan`](https://conan.
 
 Takes a set of requirements and creates an installation directory with packages that satisfy the requirements.
 
+## Architecture
+
+The application consists of two main parts. The meta-manager, with which the user interacts, and submanagers, which are queried by the meta-manager.
+
+### Glossary
+
+- **package** - a string identifying a set of related package versions. Unique to a submanager.
+- **package version** - a string identifying a specific version of a package. Corresponds to one **package source**.
+- **package source** - a set of files from which a package can be built.
+- **package product** or **product** - a set of files that are the result of building a package from a package source. Can be installed into a directory.
+- **product ID** - a string identifying a product.
+- **product info** - a JSON containing information about a product. May contain useful information about ABI. **infos** of dependencies are consumed when building the depending package.
+- **requirement** - a JSON with specific meaning to a submanager. Constrains the resulting installation.
+
+### Meta-manager
+
+The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the submanagers, and to combine the results and present them to the user.
+
+Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section.
+
+The meta-manager works in these basic phases:
+
+1. **RESOLVE** - forwards the requirements to the submanagers until a set of package versions that satisfy the requirements is found
+2. **FETCH** - when versions are known, the submanagers are requested to fetch the package products (e. g. binaries). This may mean downloading built binaries or building the packages. Outputs of this phase are also the product ID and product info. Fetching is done in the order defined by the dependency graph. Unordered packages are fetched in parallel.
+3. **INSTALL** - when products are known, the submanagers are requested to install them into the installation directory. Output of this phase is the installation directory. Installation is done sequentially in the order defined by the dependency graph.
+4. **GENERATE** - optional. When the installation directory is used to build a package depending on the installed packages, generators can be produced. Output of this phase is the generators directory. It contains necessary files for building against the installed packages.
+
+### Submanagers
+
+Submanagers are the actual package managers. They are responsible for resolving requirements, downloading or building binaries and installing them into a directory.
+
+Communication between the meta-manager and submanagers can be done in two ways. The first is by running the submanagers as part of the meta-manager by loading them as Python modules. The second is by making requests to a REST API. The way in which the submanagers are used is defined the meta-manager configuration.
+
+The same interface that can be loaded by the meta-manager can also be used by the framework `PPpackage-submanager` to create a HTTP server serving the REST API interface needed by the meta-manager.
+
+## Interfaces
+
+### Python
+
+```python
+from PPpackage_submanager.schemes import (
+    Dependency,
+    Package,
+    Product,
+    ResolutionGraph,
+)
+
+async def update_database(
+    settings: Settings,
+    state: State,
+):
+    ...
+
+async def resolve(
+    settings: Settings,
+    state: State,
+    options: Any,
+    requirements: AsyncIterable[AsyncIterable[Requirement]],
+) -> AsyncIterable[ResolutionGraph]:
+    ...
+
+async def fetch(
+    settings: Settings,
+    state: State,
+    options: Any,
+    package: Package,
+    dependencies: AsyncIterable[Dependency],
+    installation_path: Path | None,
+    generators_path: Path | None,
+) -> PackageIDAndInfo | AsyncIterable[str]:
+    ...
+
+async def install(
+    settings: Settings,
+    state: State,
+    options: Any,
+    product: Product,
+    installation_path: Path,
+) -> None:
+    ...
+
+async def generate(
+    settings: Settings,
+    state: State,
+    options: Any,
+    products: AsyncIterable[Product],
+    generators: AsyncIterable[str],
+    generators_path: Path,
+):
+    ...
+```
+
+`Settings` and `State` are defined by the submanager.
+
+### REST API
+
+<summary><code>POST</code> <code><b>/resolve</b></code></summary>
+<summary><code>POST</code> <code><b>/products</b></code></summary>
+<summary><code>POST</code> <code><b>/installations</b></code></summary>
+<summary><code>PATCH</code> <code><b>/installations/{id}</b></code></summary>
+<summary><code>PUT</code> <code><b>/installations/{id}</b></code></summary>
+<summary><code>GET</code> <code><b>/installations/{id}</b></code></summary>
+<summary><code>DELETE</code> <code><b>/installations/{id}</b></code></summary>
+<summary><code>POST</code> <code><b>/generators</b></code></summary>
+
+\
+All endpoints behave as their Python counterparts except for installation.
+
+The **INSTALL** phase is fragmented in remote submanagers to allow for request interleaving.
+
+To simulate the same behavior as in the Python interface, these steps are made:
+
+1. a `POST` request is made to `/installations` to upload a directory. `id` is returned.
+2. a series of `PATCH` requests is made to `/installations/{id}` to install products
+3. `GET` request is made to `/installations/{id}` to download the installation directory
+4. other submanagers do work on the directory
+5. a `PUT` request is made to `/installations/{id}` to update the directory after changes made
+6. `GET` request is made to `/installations/{id}` to download the installation directory when all work is done
+7. a `DELETE` request is made to `/installations/{id}` to delete the installation directory
+
 ## Meta-manager Input
 
 The input is taken by stdin and it is in JSON format.
@@ -90,7 +210,7 @@ Applies to all sub-managers (each gets the whole set).
 Only useful when building. The installation contains the dependencies and generators are used to build againts them.
 
 ```bash
-python -m PPpackage_run $containerizer $cache_dir $root_dir --generators $generators_dir < input.json
+python -m PPpackage --generators <generators_path> ...
 ```
 
 ### arch
@@ -155,7 +275,7 @@ More input examples can be found in the `input/` directory.
 The meta-manager is able to generate a dot file with the resolution graph.
 
 ```bash
-python -m PPpackage_run $containerizer $cache_dir $root_dir --graph $graph_path < input.json
+python -m PPpackage --graph <graph_path> ...
 ```
 
 ## Testing
