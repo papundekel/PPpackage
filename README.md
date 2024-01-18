@@ -225,7 +225,7 @@ the cache from native runs will not be used. To use the cache from native runs,
 change the compose files and bind mount the cache directories instead.
 
 This script runs the metamanager in a container with all submanagers running
-its parts:
+as its parts:
 
 ```bash
 ./test/containerized-all-local.sh < input/basic.json
