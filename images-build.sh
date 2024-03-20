@@ -1,9 +1,4 @@
-if [ -z "$1" ]; then
-    echo "Usage: $0 [docker | podman]"
-    exit 1
-fi
-
-if [ "$1" != "docker" ] && [ "$1" != "podman" ]; then
+if [ -z "$1" ] || ([ "$1" != "docker" ] && [ "$1" != "podman" ]); then
     echo "Usage: $0 [docker | podman]"
     exit 1
 fi
@@ -13,4 +8,5 @@ fi
 "$1" build --target submanager-arch --tag docker.io/fackop/pppackage-arch:latest . && \
 "$1" build --target submanager-conan --tag docker.io/fackop/pppackage-conan:latest . && \
 "$1" build --target submanager-pp --tag docker.io/fackop/pppackage-pp:latest . &&\
+"$1" build --target submanager-aur --tag docker.io/fackop/pppackage-aur:latest . &&\
 "$1" build --target metamanager --tag docker.io/fackop/pppackage:latest .

@@ -117,6 +117,20 @@ ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
 
 # -----------------------------------------------------------------------------
 
+FROM submanager-notconan as submanager-aur
+
+COPY PPpackage-utils/ /workdir/PPpackage-utils
+RUN pip install PPpackage-utils/
+
+COPY PPpackage-submanager/ /workdir/PPpackage-submanager
+RUN pip install PPpackage-submanager/
+
+COPY PPpackage-AUR/ /workdir/PPpackage-AUR
+RUN pip install PPpackage-AUR/
+
+ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
 FROM base-conan AS metamanager
 
 ARG USER=root
@@ -132,6 +146,7 @@ COPY --from=fakealpm /usr/local/lib/libfakealpm.so /usr/local/lib/libfakealpm.so
 RUN mkdir -p /mnt/cache/arch/ && chown $USER /mnt/cache/arch/
 RUN mkdir -p /mnt/cache/conan/ && chown $USER /mnt/cache/conan/
 RUN mkdir -p /mnt/cache/PP/ && chown $USER /mnt/cache/PP/
+RUN mkdir -p /mnt/cache/AUR/ && chown $USER /mnt/cache/AUR/
 
 COPY PPpackage-utils/ /workdir/PPpackage-utils
 RUN pip install PPpackage-utils/
@@ -148,6 +163,9 @@ RUN pip install PPpackage-conan/
 
 COPY PPpackage-PP/ /workdir/PPpackage-PP
 RUN pip install PPpackage-PP/
+
+COPY PPpackage-AUR/ /workdir/PPpackage-AUR
+RUN pip install PPpackage-AUR/
 
 COPY PPpackage/ /workdir/PPpackage
 RUN pip install PPpackage/

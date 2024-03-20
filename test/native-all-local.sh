@@ -3,6 +3,7 @@
 cache_path_arch="tmp/cache/arch"
 cache_path_conan="tmp/cache/conan"
 cache_path_pp="tmp/cache/PP"
+cache_path_pp="tmp/cache/AUR"
 
 containerizer="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
 
@@ -16,8 +17,8 @@ submanagers__arch__package=PPpackage_arch \
 submanagers__arch__settings__debug=true \
 submanagers__arch__settings__cache_path="$cache_path_arch" \
 submanagers__arch__settings__containerizer="$containerizer" \
-submanagers__arch__settings__workdir_containerizer=/ \
-submanagers__arch__settings__workdir_container=/ \
+submanagers__arch__settings__workdir_containerizer="/" \
+submanagers__arch__settings__workdir_container="/" \
 \
 submanagers__conan__package=PPpackage_conan \
 submanagers__conan__settings__debug=true \
@@ -27,6 +28,11 @@ submanagers__PP__package=PPpackage_PP \
 submanagers__PP__settings__debug=true \
 submanagers__PP__settings__cache_path="$cache_path_pp" \
 submanagers__PP__settings__containerizer="$containerizer" \
+\
+submanagers__AUR__package=PPpackage_AUR \
+submanagers__AUR__settings__debug=true \
+submanagers__AUR__settings__cache_path="$cache_path_aur" \
+submanagers__AUR__settings__containerizer="$containerizer" \
 python \
     -m PPpackage \
     tmp/output/root/ \
