@@ -10,7 +10,6 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
-from sys import stderr
 from typing import Any, Optional
 from typing import cast as typing_cast
 
