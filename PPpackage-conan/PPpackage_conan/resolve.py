@@ -10,7 +10,6 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
-from sys import stderr
 from typing import Any, Optional
 from typing import cast as typing_cast
 
@@ -255,7 +254,7 @@ async def resolve(
     environment = make_conan_environment(settings.cache_path)
 
     if not (settings.cache_path / Path("p")).exists():
-        await update_database_impl(environment)
+        await update_database_impl(environment, settings.cache_path)
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),
