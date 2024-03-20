@@ -49,13 +49,15 @@ cleanup()
 
     rm -rf "$installations_arch" "$installations_conan" "$installations_pp"
     rm -rf tmp/installations
+
+    exit "$1"
 }
 
 
 
-./init_database.py "$database_url_arch" > "$admin_token_path_arch" || (cleanup; exit 10)
-./init_database.py "$database_url_conan" > "$admin_token_path_conan" || (cleanup; exit 11)
-./init_database.py "$database_url_pp" > "$admin_token_path_pp" || (cleanup; exit 12)
+./init_database.py "$database_url_arch" > "$admin_token_path_arch" || cleanup 10
+./init_database.py "$database_url_conan" > "$admin_token_path_conan" || cleanup 11
+./init_database.py "$database_url_pp" > "$admin_token_path_pp" || cleanup 12
 
 
 
@@ -117,15 +119,14 @@ done
 
 
 
-curl -f -X POST "$url_arch/update-database" > /dev/null 2>/dev/null || (cleanup; exit 20)
-curl -f -X POST "$url_conan/update-database" > /dev/null 2>/dev/null || (cleanup; exit 21)
-curl -f -X POST "$url_pp/update-database" > /dev/null 2>/dev/null || (cleanup; exit 22)
+./update_database.py "$url_arch" "$admin_token_path_arch" || cleanup 20
+./update_database.py "$url_conan" "$admin_token_path_conan" || cleanup 21
+./update_database.py "$url_pp" "$admin_token_path_pp" || cleanup 22
 
 
-
-./create_user.py "$url_arch" "$admin_token_path_arch" > "$user_token_path_arch" || (cleanup; exit 30)
-./create_user.py "$url_conan" "$admin_token_path_conan" > "$user_token_path_conan" || (cleanup; exit 31)
-./create_user.py "$url_pp" "$admin_token_path_pp" > "$user_token_path_pp" || (cleanup; exit 32)
+./create_user.py "$url_arch" "$admin_token_path_arch" > "$user_token_path_arch" || cleanup 30
+./create_user.py "$url_conan" "$admin_token_path_conan" > "$user_token_path_conan" || cleanup 31
+./create_user.py "$url_pp" "$admin_token_path_pp" > "$user_token_path_pp" || cleanup 32
 
 
 
@@ -148,4 +149,4 @@ python \
 
 
 
-cleanup
+cleanup 0

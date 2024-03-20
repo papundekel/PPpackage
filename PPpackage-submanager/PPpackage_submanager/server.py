@@ -280,7 +280,9 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
         )
 
         super().post("/user", dependencies=[Depends(require_admin_token)])(create_user)
-        super().post("/update-database")(update_database)
+        super().post("/update-database", dependencies=[Depends(require_admin_token)])(
+            update_database
+        )
         super().post("/resolve")(resolve)
         super().post("/products")(fetch)
         super().post("/generators")(generate)
