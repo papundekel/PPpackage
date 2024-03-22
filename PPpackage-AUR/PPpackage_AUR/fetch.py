@@ -5,7 +5,7 @@ from hashlib import sha1
 from itertools import chain
 from pathlib import Path
 from sys import stderr
-from tempfile import mkdtemp
+from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Protocol
 
 from jinja2 import Environment as Jinja2Environment
@@ -107,18 +107,21 @@ async def fetch(
                     },
                 ) as dockerfile,
                 TemporaryDirectory() as empty_directory,
+                NamedTemporaryFile() as containers_conf,
             ):
                 process = await create_subprocess_exec(
-                    "podman",
-                    # "--url",
-                    # settings.containerizer,
+                    "podman-remote",
+                    "--url",
+                    settings.containerizer,
                     "build",
+                    "--quiet",
                     "--file",
                     dockerfile.name,
-                    "/tmp",
+                    empty_directory,
                     stdin=DEVNULL,
-                    stdout=stderr,
+                    stdout=PIPE,
                     stderr=None,
+                    env={"CONTAINERS_CONF": containers_conf.name},
                 )
 
                 build_stdout = await asubprocess_communicate(
