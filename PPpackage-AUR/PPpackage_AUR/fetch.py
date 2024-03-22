@@ -108,13 +108,10 @@ async def fetch(
                 ) as dockerfile,
                 TemporaryDirectory() as empty_directory,
             ):
-                print(f"containerizer: {settings.containerizer}", file=stderr)
-                print(f"dockerfile: {dockerfile.name}", file=stderr)
-                print(f"empty_directory: {empty_directory}", file=stderr)
                 process = await create_subprocess_exec(
-                    "podman-remote",
-                    "--url",
-                    settings.containerizer,
+                    "podman",
+                    # "--url",
+                    # settings.containerizer,
                     "build",
                     "--quiet",
                     "--file",
