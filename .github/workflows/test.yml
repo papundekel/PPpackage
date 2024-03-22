@@ -15,7 +15,7 @@ jobs:
             - uses: gacts/install-podman@v1.1.0
 
             - name: Download seccomp.json
-              run: wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
+              run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
 
             - name: Cache arch
               uses: actions/cache@v4.0.2
