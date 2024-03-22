@@ -116,9 +116,9 @@ async def fetch(
                     "--quiet",
                     "--file",
                     dockerfile.name,
-                    empty_directory,
+                    "/tmp",
                     stdin=DEVNULL,
-                    stdout=PIPE,
+                    stdout=stderr,
                     stderr=None,
                 )
 
