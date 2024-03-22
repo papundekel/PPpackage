@@ -11,7 +11,7 @@ from PPpackage_submanager.schemes import (
     ManagerAndName,
     Options,
     Package,
-    PackageIDAndInfo,
+    ProductIDAndInfo,
 )
 from PPpackage_utils.utils import TemporaryDirectory
 
@@ -58,7 +58,7 @@ async def fetch_manager(
     async with submanager.fetch(
         options, package, dependencies, None, None
     ) as result_first:
-        if isinstance(result_first, PackageIDAndInfo):
+        if isinstance(result_first, ProductIDAndInfo):
             id_and_info = result_first
         else:
             generators = result_first
@@ -83,7 +83,7 @@ async def fetch_manager(
                 async with submanager.fetch(
                     options, package, dependencies, installation_path, generators_path
                 ) as result_second:
-                    if isinstance(result_second, PackageIDAndInfo):
+                    if isinstance(result_second, ProductIDAndInfo):
                         id_and_info = result_second
                     else:
                         raise SubmanagerCommandFailure("Fetch failed.")

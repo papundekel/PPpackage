@@ -4,7 +4,6 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from io import TextIOWrapper
 from pathlib import Path
-from sys import stderr
 from tempfile import NamedTemporaryFile
 
 from PPpackage_submanager.exceptions import CommandException
@@ -28,7 +27,7 @@ from .utils import get_cache_paths
 
 
 @contextmanager
-def necessary_container_files(root_path: Path):
+def create_necessary_container_files(root_path: Path):
     hostname_path = root_path / "etc" / "hostname"
     containerenv_path = root_path / "run" / ".containerenv"
 
@@ -66,7 +65,7 @@ async def install_manager_command(
 
         with (
             pipe_hook_path.open("r") as pipe_hook,
-            necessary_container_files(installation_path),
+            create_necessary_container_files(installation_path),
             NamedTemporaryFile() as containers_conf,
         ):
             process = await create_subprocess_exec(

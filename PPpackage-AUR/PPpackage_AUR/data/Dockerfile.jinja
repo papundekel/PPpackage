@@ -1,0 +1,14 @@
+FROM docker.io/greyltc/archlinux-aur:paru
+
+RUN mkdir -p /workdir
+RUN chown ab:ab /workdir
+WORKDIR /workdir
+
+RUN pacman --noconfirm --sync --refresh --sysupgrade
+
+{% for dependency in dependencies %}
+RUN aur-install {{ dependency }}
+{% endfor %}
+
+RUN paru -Gp {{ package }} > /workdir/PKGBUILD
+RUN sudo --user ab PKGDEST=./product/ makepkg --noconfirm

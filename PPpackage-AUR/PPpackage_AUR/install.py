@@ -3,12 +3,13 @@ from pathlib import Path
 from PPpackage_submanager.schemes import Product
 from PPpackage_utils.utils import ensure_dir_exists
 
+from .lifespan import State
 from .settings import Settings
 
 
 async def install(
     settings: Settings,
-    state: None,
+    state: State,
     installation_path: Path,
     product: Product,
 ):

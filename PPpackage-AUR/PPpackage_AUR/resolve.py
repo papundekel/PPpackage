@@ -1,18 +1,19 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL, PIPE
-from collections.abc import AsyncIterable, Iterable, MutableSequence
-from dataclasses import dataclass
-from sys import stderr
+from asyncio.subprocess import DEVNULL
+from collections.abc import AsyncIterable, MutableSequence
 
+from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import (
     ManagerRequirement,
     Options,
     ResolutionGraph,
     ResolutionGraphNode,
 )
-from PPpackage_utils.utils import asubprocess_communicate
+from PPpackage_utils.utils import asubprocess_wait
 
+from .lifespan import State
 from .settings import Settings
+from .utils import PackageInfo, fetch_info
 
 
 async def is_package_from_aur(name: str) -> bool:
@@ -32,36 +33,6 @@ async def is_package_from_aur(name: str) -> bool:
 
 def split_version_requirement(requirement: str) -> str:
     return requirement.split("==")[0].split(">=")[0]
-
-
-@dataclass(frozen=True)
-class PackageInfo:
-    version: str
-    dependencies: Iterable[str]
-
-
-async def fetch_info(name: str) -> PackageInfo:
-    process = await create_subprocess_exec(
-        "paru",
-        "-Si",
-        name,
-        stdin=DEVNULL,
-        stdout=PIPE,
-        stderr=None,
-    )
-
-    stdout = await asubprocess_communicate(process, "Error in `paru -Si`.")
-
-    dependencies = []
-    version = ""
-
-    for line in stdout.decode().splitlines():
-        if line.startswith("Depends On"):
-            dependencies = line.split(":")[1].split()
-        elif line.startswith("Version"):
-            version = line.split(":")[1].strip().rsplit("-", 1)[0]
-
-    return PackageInfo(version, dependencies)
 
 
 async def create_node(name: str, info: PackageInfo) -> ResolutionGraphNode:
@@ -94,7 +65,7 @@ async def create_node(name: str, info: PackageInfo) -> ResolutionGraphNode:
 
 async def resolve(
     settings: Settings,
-    state: None,
+    state: State,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
 ) -> AsyncIterable[ResolutionGraph]:
@@ -109,8 +80,7 @@ async def resolve(
             package_name = split_version_requirement(requirement)
 
             if package_name not in package_names_with_info:
-                dependencies = await fetch_info(package_name)
-                package_names_with_info[package_name] = dependencies
+                package_names_with_info[package_name] = await fetch_info(package_name)
 
             requirements_roots.append(package_name)
 

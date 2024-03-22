@@ -2,7 +2,7 @@ from collections.abc import AsyncIterable
 from pathlib import Path
 from sys import stderr
 
-from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
 from PPpackage_utils.utils import discard_async_iterable
 
 from .settings import Settings
@@ -26,7 +26,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> PackageIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | AsyncIterable[str]:
     if generators_path is None:
         return create_generators()
 
@@ -37,4 +37,4 @@ async def fetch(
 
     print_directory(generators_path)
 
-    return PackageIDAndInfo("id", None)
+    return ProductIDAndInfo("id", None)

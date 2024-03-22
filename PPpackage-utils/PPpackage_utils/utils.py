@@ -188,3 +188,7 @@ def movetree(source: Path, destination: Path):
             source_item.rmdir()
         else:
             move(source_item, destination_item)
+
+
+def get_module_path(module) -> Path:
+    return Path(module.__file__)

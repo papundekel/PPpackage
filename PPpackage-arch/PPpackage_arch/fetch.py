@@ -5,7 +5,7 @@ from os import symlink
 from pathlib import Path
 
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
 from PPpackage_utils.utils import (
     TemporaryDirectory,
     asubprocess_wait,
@@ -13,7 +13,9 @@ from PPpackage_utils.utils import (
     ensure_dir_exists,
     fakeroot,
 )
+from pydantic import RootModel
 
+from .schemes import ProductInfo
 from .settings import Settings
 from .utils import get_cache_paths
 
@@ -34,7 +36,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> PackageIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | AsyncIterable[str]:
     database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
@@ -89,9 +91,13 @@ async def fetch(
     if line == "":
         raise CommandException
 
-    id_and_info = PackageIDAndInfo(
-        product_id=process_product_id(line),
-        product_info=None,
+    product_id = process_product_id(line)
+
+    id_and_info = ProductIDAndInfo(
+        product_id=product_id,
+        product_info=RootModel(
+            ProductInfo(version=package.version, product_id=product_id)
+        ).model_dump(),
     )
 
     await asubprocess_wait(process, CommandException())

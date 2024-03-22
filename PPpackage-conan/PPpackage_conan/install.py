@@ -8,8 +8,9 @@ from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
 from PPpackage_utils.utils import asubprocess_wait
 
+from .lifespan import State
 from .settings import Settings
-from .utils import State, make_conan_environment
+from .utils import make_conan_environment
 
 
 async def install_product(

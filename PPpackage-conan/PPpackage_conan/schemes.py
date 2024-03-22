@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
 
-class FetchProductInfo(BaseModel):
+class ProductInfo(BaseModel):
     version: str
     cpp_info: Any
 

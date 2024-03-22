@@ -19,22 +19,18 @@ from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_submanager.utils import jinja_render_temp_file
 from PPpackage_utils.utils import (
     asubprocess_communicate,
     asubprocess_wait,
     ensure_dir_exists,
 )
 
+from .lifespan import State
 from .schemes import Requirement
 from .settings import Settings
 from .update_database import update_database_impl
-from .utils import (
-    ResolveNode,
-    State,
-    create_and_render_temp_file,
-    make_conan_environment,
-    parse_conan_graph_nodes,
-)
+from .utils import ResolveNode, make_conan_environment, parse_conan_graph_nodes
 
 
 async def export_package(
@@ -43,7 +39,7 @@ async def export_package(
     template: Jinja2Template,
     **template_context: Any,
 ) -> None:
-    with create_and_render_temp_file(template, template_context, ".py") as conanfile:
+    with jinja_render_temp_file(template, template_context, ".py") as conanfile:
         process = create_subprocess_exec(
             "conan",
             "export",
@@ -208,12 +204,12 @@ async def create_graph(
     requirements_list_length: int,
 ) -> ResolutionGraph:
     with (
-        create_and_render_temp_file(
+        jinja_render_temp_file(
             root_template,
             {"requirement_indices": range(requirements_list_length)},
             ".py",
         ) as requirement_file,
-        create_and_render_temp_file(
+        jinja_render_temp_file(
             profile_template, {"options": options}
         ) as host_profile_file,
     ):

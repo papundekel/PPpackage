@@ -6,8 +6,8 @@ from PPpackage_submanager.schemes import (
     Dependency,
     Options,
     Package,
-    PackageIDAndInfo,
     Product,
+    ProductIDAndInfo,
     ResolutionGraph,
 )
 
@@ -18,15 +18,13 @@ class Submanager(Protocol):
     def __init__(self, name: str):
         self.name = name
 
-    async def update_database(self) -> None:
-        ...
+    async def update_database(self) -> None: ...
 
     def resolve(
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
-    ) -> AsyncIterable[ResolutionGraph]:
-        ...
+    ) -> AsyncIterable[ResolutionGraph]: ...
 
     def fetch(
         self,
@@ -35,14 +33,13 @@ class Submanager(Protocol):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncContextManager[PackageIDAndInfo | AsyncIterable[str]]:
-        ...
+    ) -> AsyncContextManager[ProductIDAndInfo | AsyncIterable[str]]: ...
 
-    async def install(self, id: str, installation_path: Path, product: Product) -> None:
-        ...
+    async def install(
+        self, id: str, installation_path: Path, product: Product
+    ) -> None: ...
 
-    async def install_init(self, installation_path: Path) -> str:
-        ...
+    async def install_init(self, installation_path: Path) -> str: ...
 
     async def install_send(
         self,
@@ -50,22 +47,18 @@ class Submanager(Protocol):
         destination: Self,
         destination_id: str | None,
         installation_path: Path,
-    ) -> str:
-        ...
+    ) -> str: ...
 
     async def install_receive(
         self,
         destination_id: str | None,
         installation: memoryview | None,
         installation_path: Path,
-    ) -> str:
-        ...
+    ) -> str: ...
 
-    async def install_download(self, id: str, installation_path: Path) -> None:
-        ...
+    async def install_download(self, id: str, installation_path: Path) -> None: ...
 
-    async def install_delete(self, id: str) -> None:
-        ...
+    async def install_delete(self, id: str) -> None: ...
 
     async def generate(
         self,
@@ -73,5 +66,4 @@ class Submanager(Protocol):
         products: Iterable[Product],
         generators: Set[str],
         destination_path: Path,
-    ) -> None:
-        ...
+    ) -> None: ...

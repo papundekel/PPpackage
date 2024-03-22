@@ -1,9 +1,11 @@
-from collections.abc import AsyncIterable, Iterable
-from contextlib import asynccontextmanager
-from typing import Any, TypeVar
+from collections.abc import AsyncIterable, Generator, Iterable, Mapping
+from contextlib import asynccontextmanager, contextmanager
+from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
+from typing import Any, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
+from jinja2 import Template as Jinja2Template
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_utils.http_stream import AsyncChunkReader
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -139,3 +141,17 @@ class Installations:
 
 def HTTPRequestReader(request: Request):
     return AsyncChunkReader(memoryview(chunk) async for chunk in request.stream())
+
+
+@contextmanager
+def jinja_render_temp_file(
+    template: Jinja2Template,
+    template_context: Mapping[str, Any],
+    suffix: Optional[str] = None,
+) -> Generator[_TemporaryFileWrapper, Any, Any]:
+    with NamedTemporaryFile(mode="w", suffix=suffix) as file:
+        template.stream(**template_context).dump(file)
+
+        file.flush()
+
+        yield file
