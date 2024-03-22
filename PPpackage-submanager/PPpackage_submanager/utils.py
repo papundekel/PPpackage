@@ -1,13 +1,16 @@
+from asyncio import create_subprocess_exec
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from contextlib import asynccontextmanager, contextmanager
+from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
 from jinja2 import Template as Jinja2Template
-from PPpackage_submanager.exceptions import CommandException
 from PPpackage_utils.http_stream import AsyncChunkReader
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -18,6 +21,8 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
+
+from .exceptions import CommandException
 
 
 @asynccontextmanager
@@ -155,3 +160,42 @@ def jinja_render_temp_file(
         file.flush()
 
         yield file
+
+
+async def containerizer_subprocess_exec(
+    url: str, *args, stdin: Any, stdout: Any, stderr: Any
+):
+    with NamedTemporaryFile() as containers_conf:
+        return await create_subprocess_exec(
+            "podman-remote",
+            "--url",
+            url,
+            *args,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            env={"CONTAINERS_CONF": containers_conf.name},
+        )
+
+
+async def containerizer_build(url: str, dockerfile_path: Path) -> str:
+    with TemporaryDirectory() as empty_directory:
+        process = await containerizer_subprocess_exec(
+            url,
+            "build",
+            "--quiet",
+            "--file",
+            dockerfile_path,
+            empty_directory,
+            stdin=DEVNULL,
+            stdout=PIPE,
+            stderr=DEVNULL,
+        )
+
+        build_stdout = await asubprocess_communicate(
+            process, "Error in podman-remote build"
+        )
+
+    image_id = build_stdout.decode().strip()
+
+    return image_id

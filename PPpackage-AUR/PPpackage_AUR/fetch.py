@@ -13,7 +13,11 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
-from PPpackage_submanager.utils import jinja_render_temp_file
+from PPpackage_submanager.utils import (
+    containerizer_build,
+    containerizer_subprocess_exec,
+    jinja_render_temp_file,
+)
 from PPpackage_utils.utils import (
     TemporaryDirectory,
     asubprocess_communicate,
@@ -95,44 +99,21 @@ async def fetch(
 
             dockerfile_template = jinja_loader.get_template("Dockerfile.jinja")
 
-            with (
-                jinja_render_temp_file(
-                    dockerfile_template,
-                    {
-                        "dependencies": chain(
-                            (dependency.name for dependency in dependencies),
-                            package_info.build_dependencies,
-                        ),
-                        "package": package.name,
-                    },
-                ) as dockerfile,
-                TemporaryDirectory() as empty_directory,
-                NamedTemporaryFile() as containers_conf,
-            ):
-                process = await create_subprocess_exec(
-                    "podman-remote",
-                    "--url",
-                    settings.containerizer,
-                    "build",
-                    "--quiet",
-                    "--file",
-                    dockerfile.name,
-                    empty_directory,
-                    stdin=DEVNULL,
-                    stdout=PIPE,
-                    stderr=None,
-                    env={"CONTAINERS_CONF": containers_conf.name},
+            with jinja_render_temp_file(
+                dockerfile_template,
+                {
+                    "dependencies": chain(
+                        (dependency.name for dependency in dependencies),
+                        package_info.build_dependencies,
+                    ),
+                    "package": package.name,
+                },
+            ) as dockerfile:
+                image_id = await containerizer_build(
+                    settings.containerizer, Path(dockerfile.name)
                 )
 
-                build_stdout = await asubprocess_communicate(
-                    process, "Error in podman-remote build"
-                )
-
-            image_id = build_stdout.decode().strip()
-
-            process = await create_subprocess_exec(
-                "podman-remote",
-                "--url",
+            process = await containerizer_subprocess_exec(
                 settings.containerizer,
                 "create",
                 image_id,
@@ -147,9 +128,7 @@ async def fetch(
 
             container_id = create_stdout.decode().strip()
 
-            process = await create_subprocess_exec(
-                "podman-remote",
-                "--url",
+            process = await containerizer_subprocess_exec(
                 settings.containerizer,
                 "cp",
                 f"{container_id}:/workdir/product/.",
@@ -163,9 +142,7 @@ async def fetch(
 
             product_path = next(product_path_dir.iterdir())
 
-            process = await create_subprocess_exec(
-                "podman-remote",
-                "--url",
+            process = await containerizer_subprocess_exec(
                 settings.containerizer,
                 "rm",
                 container_id,

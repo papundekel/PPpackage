@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
+from PPpackage_submanager.utils import containerizer_subprocess_exec
 from PPpackage_utils.pipe import (
     pipe_read_line_maybe,
     pipe_read_string,
@@ -66,11 +67,8 @@ async def install_manager_command(
         with (
             pipe_hook_path.open("r") as pipe_hook,
             create_necessary_container_files(installation_path),
-            NamedTemporaryFile() as containers_conf,
         ):
-            process = await create_subprocess_exec(
-                "podman-remote",
-                "--url",
+            process = await containerizer_subprocess_exec(
                 settings.containerizer,
                 "run",
                 "--rm",
@@ -82,9 +80,6 @@ async def install_manager_command(
                 stdin=pipe_hook,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
-                env={
-                    "CONTAINERS_CONF": containers_conf.name
-                },  # hack, allows $HOME to not exist
             )
 
             return_code = await process.wait()
