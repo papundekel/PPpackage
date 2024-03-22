@@ -14,6 +14,9 @@ jobs:
 
             - uses: gacts/install-podman@v1.1.0
 
+            - name: cigga
+              run: ls -l /etc/containers/
+
             - name: Cache arch
               uses: actions/cache@v4.0.2
               with:
