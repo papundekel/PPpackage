@@ -68,7 +68,7 @@ async def install_manager_command(
             pipe_hook_path.open("r") as pipe_hook,
             create_necessary_container_files(installation_path),
         ):
-            process = await containerizer_subprocess_exec(
+            async with containerizer_subprocess_exec(
                 settings.containerizer,
                 "run",
                 "--rm",
@@ -80,9 +80,8 @@ async def install_manager_command(
                 stdin=pipe_hook,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
-            )
-
-            return_code = await process.wait()
+            ) as process:
+                return_code = await process.wait()
 
     pipe_write_int(settings.debug, "PPpackage-arch", pipe_to_fakealpm, return_code)
     pipe_to_fakealpm.flush()

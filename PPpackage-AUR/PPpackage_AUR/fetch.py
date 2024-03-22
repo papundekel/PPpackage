@@ -113,22 +113,21 @@ async def fetch(
                     settings.containerizer, Path(dockerfile.name)
                 )
 
-            process = await containerizer_subprocess_exec(
+            async with containerizer_subprocess_exec(
                 settings.containerizer,
                 "create",
                 image_id,
                 stdin=DEVNULL,
                 stdout=PIPE,
                 stderr=DEVNULL,
-            )
-
-            create_stdout = await asubprocess_communicate(
-                process, "Error in podman-remote create"
-            )
+            ) as process:
+                create_stdout = await asubprocess_communicate(
+                    process, "Error in podman-remote create"
+                )
 
             container_id = create_stdout.decode().strip()
 
-            process = await containerizer_subprocess_exec(
+            async with containerizer_subprocess_exec(
                 settings.containerizer,
                 "cp",
                 f"{container_id}:/workdir/product/.",
@@ -136,22 +135,20 @@ async def fetch(
                 stdin=DEVNULL,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
-            )
-
-            await asubprocess_wait(process, CommandException())
+            ) as process:
+                await asubprocess_wait(process, CommandException())
 
             product_path = next(product_path_dir.iterdir())
 
-            process = await containerizer_subprocess_exec(
+            async with containerizer_subprocess_exec(
                 settings.containerizer,
                 "rm",
                 container_id,
                 stdin=DEVNULL,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
-            )
-
-            await asubprocess_wait(process, CommandException())
+            ) as process:
+                await asubprocess_wait(process, CommandException())
 
             state.product_paths[product_key] = product_path
             state.product_paths.commit()

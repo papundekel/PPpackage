@@ -162,11 +162,12 @@ def jinja_render_temp_file(
         yield file
 
 
+@asynccontextmanager
 async def containerizer_subprocess_exec(
     url: str, *args, stdin: Any, stdout: Any, stderr: Any
 ):
     with NamedTemporaryFile() as containers_conf:
-        return await create_subprocess_exec(
+        yield await create_subprocess_exec(
             "podman-remote",
             "--url",
             url,
@@ -180,7 +181,7 @@ async def containerizer_subprocess_exec(
 
 async def containerizer_build(url: str, dockerfile_path: Path) -> str:
     with TemporaryDirectory() as empty_directory:
-        process = await containerizer_subprocess_exec(
+        async with containerizer_subprocess_exec(
             url,
             "build",
             "--quiet",
@@ -190,11 +191,11 @@ async def containerizer_build(url: str, dockerfile_path: Path) -> str:
             stdin=DEVNULL,
             stdout=PIPE,
             stderr=None,
-        )
+        ) as process:
 
-        build_stdout = await asubprocess_communicate(
-            process, "Error in podman-remote build"
-        )
+            build_stdout = await asubprocess_communicate(
+                process, "Error in podman-remote build"
+            )
 
     image_id = build_stdout.decode().strip()
 
