@@ -119,7 +119,7 @@ async def fetch(
                     empty_directory,
                     stdin=DEVNULL,
                     stdout=PIPE,
-                    stderr=DEVNULL,
+                    stderr=None,
                 )
 
                 build_stdout = await asubprocess_communicate(
