@@ -113,7 +113,6 @@ async def fetch(
                     # "--url",
                     # settings.containerizer,
                     "build",
-                    "--quiet",
                     "--file",
                     dockerfile.name,
                     "/tmp",
