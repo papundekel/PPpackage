@@ -87,7 +87,7 @@ async def install_manager_command(
                 },  # hack, allows $HOME to not exist
             )
 
-            return_code = await asubprocess_wait(process, CommandException())
+            return_code = await process.wait()
 
     pipe_write_int(settings.debug, "PPpackage-arch", pipe_to_fakealpm, return_code)
     pipe_to_fakealpm.flush()
