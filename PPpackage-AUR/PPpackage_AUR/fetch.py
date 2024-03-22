@@ -4,6 +4,7 @@ from collections.abc import AsyncIterable
 from hashlib import sha1
 from itertools import chain
 from pathlib import Path
+from sys import stderr
 from tempfile import mkdtemp
 from typing import Protocol
 
@@ -87,6 +88,11 @@ async def fetch(
         product_path_dir = Path(mkdtemp(dir=settings.cache_path))
 
         try:
+            print(state.data_path, file=stderr)
+            await (
+                await create_subprocess_exec("ls", "-l", state.data_path, stdout=stderr)
+            ).wait()
+
             jinja_loader = Jinja2Environment(
                 loader=Jinja2FileSystemLoader(state.data_path),
                 autoescape=jinja2_select_autoescape(),
