@@ -189,7 +189,7 @@ async def containerizer_build(url: str, dockerfile_path: Path) -> str:
             empty_directory,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
         )
 
         build_stdout = await asubprocess_communicate(
