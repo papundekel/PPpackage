@@ -4,6 +4,7 @@ from collections.abc import AsyncIterable
 from os import symlink
 from pathlib import Path
 
+from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
 from PPpackage_utils.utils import (
@@ -15,7 +16,6 @@ from PPpackage_utils.utils import (
 )
 from pydantic import RootModel
 
-from .schemes import ProductInfo
 from .settings import Settings
 from .utils import get_cache_paths
 
@@ -46,7 +46,7 @@ async def fetch(
     with TemporaryDirectory() as database_path_fake:
         symlink(database_path.absolute() / "sync", database_path_fake / "sync")
 
-        async with fakeroot(settings.debug) as environment:
+        async with fakeroot() as environment:
             process = await create_subprocess_exec(
                 "pacman",
                 "--dbpath",
@@ -95,9 +95,7 @@ async def fetch(
 
     id_and_info = ProductIDAndInfo(
         product_id=product_id,
-        product_info=RootModel(
-            ProductInfo(version=package.version, product_id=product_id)
-        ).model_dump(),
+        product_info=ProductInfo(version=package.version, product_id=product_id),
     )
 
     await asubprocess_wait(process, CommandException())

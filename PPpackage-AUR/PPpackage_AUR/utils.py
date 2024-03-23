@@ -56,3 +56,7 @@ async def fetch_info(name: str) -> PackageInfo:
         raise ValueError("Build dependencies not found.")
 
     return PackageInfo(version, dependencies, build_dependencies)
+
+
+def make_product_key(name: str, version: str, product_id: str) -> str:
+    return f"{name}-{version}-{product_id}"

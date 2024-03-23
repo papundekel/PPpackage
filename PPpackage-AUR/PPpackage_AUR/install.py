@@ -1,10 +1,11 @@
 from pathlib import Path
 
+from PPpackage_pacman_utils.install import pacman_install
 from PPpackage_submanager.schemes import Product
-from PPpackage_utils.utils import ensure_dir_exists
 
 from .lifespan import State
 from .settings import Settings
+from .utils import make_product_key
 
 
 async def install(
@@ -13,13 +14,14 @@ async def install(
     installation_path: Path,
     product: Product,
 ):
-    prefix = Path("AUR")
+    product_key = make_product_key(product.name, product.version, product.product_id)
 
-    products_path = installation_path / prefix
+    product_path = state.product_paths[product_key]
 
-    ensure_dir_exists(products_path)
-
-    product_path = products_path / product.name
-
-    with product_path.open("w") as file:
-        file.write(f"{product.version} {product.product_id}\n")
+    await pacman_install(
+        settings.containerizer,
+        settings.workdir_containerizer,
+        settings.workdir_container,
+        installation_path,
+        product_path,
+    )

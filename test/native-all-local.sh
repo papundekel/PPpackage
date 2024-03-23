@@ -33,6 +33,8 @@ submanagers__AUR__package=PPpackage_AUR \
 submanagers__AUR__settings__debug=true \
 submanagers__AUR__settings__cache_path="$cache_path_AUR" \
 submanagers__AUR__settings__containerizer="$containerizer" \
+submanagers__AUR__settings__workdir_containerizer="/" \
+submanagers__AUR__settings__workdir_container="/" \
 python \
     -m PPpackage \
     tmp/output/root/ \

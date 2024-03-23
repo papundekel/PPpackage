@@ -2,14 +2,12 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, MutableSequence
 
-from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import (
     ManagerRequirement,
     Options,
     ResolutionGraph,
     ResolutionGraphNode,
 )
-from PPpackage_utils.utils import asubprocess_wait
 
 from .lifespan import State
 from .settings import Settings

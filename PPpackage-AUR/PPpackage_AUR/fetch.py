@@ -1,16 +1,15 @@
-from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
 from hashlib import sha1
 from itertools import chain
 from pathlib import Path
-from sys import stderr
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import mkdtemp
 from typing import Protocol
 
 from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
+from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
 from PPpackage_submanager.utils import (
@@ -18,17 +17,12 @@ from PPpackage_submanager.utils import (
     containerizer_subprocess_exec,
     jinja_render_temp_file,
 )
-from PPpackage_utils.utils import (
-    TemporaryDirectory,
-    asubprocess_communicate,
-    asubprocess_wait,
-)
+from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
 from PPpackage_utils.validation import load_object
 
 from .lifespan import State
-from .schemes import ProductInfo
 from .settings import Settings
-from .utils import fetch_info
+from .utils import fetch_info, make_product_key
 
 
 class Hash(Protocol):
@@ -86,7 +80,7 @@ async def fetch(
 
     product_paths = state.product_paths
 
-    product_key = f"{package.name}-{package.version}-{product_id}"
+    product_key = make_product_key(package.name, package.version, product_id)
 
     if product_key not in product_paths:
         product_path_dir = Path(mkdtemp(dir=settings.cache_path))

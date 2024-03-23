@@ -14,7 +14,7 @@ async def update_database(settings: Settings, state: None):
 
     ensure_dir_exists(database_path)
 
-    async with fakeroot(settings.debug) as environment:
+    async with fakeroot() as environment:
         process = await create_subprocess_exec(
             "pacman",
             "--dbpath",

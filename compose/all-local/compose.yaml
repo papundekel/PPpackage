@@ -32,6 +32,8 @@ services:
             submanagers__AUR__settings__debug: true
             submanagers__AUR__settings__cache_path: /mnt/cache/AUR/
             submanagers__AUR__settings__containerizer: unix:///run/podman/podman.sock
+            submanagers__AUR__settings__workdir_containerizer: ${WORKDIR?env WORKDIR not set}
+            submanagers__AUR__settings__workdir_container: /mnt/workdir/
         volumes:
         -   type: bind
             source: $WORKDIR
