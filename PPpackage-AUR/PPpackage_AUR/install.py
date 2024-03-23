@@ -3,23 +3,25 @@ from pathlib import Path
 from PPpackage_pacman_utils.install import pacman_install
 from PPpackage_submanager.schemes import Product
 
+from .lifespan import State
 from .settings import Settings
-from .utils import get_cache_paths
+from .utils import make_product_key
 
 
 async def install(
     settings: Settings,
-    state: None,
+    state: State,
     installation_path: Path,
     product: Product,
 ):
-    _, cache_path = get_cache_paths(settings.cache_path)
+    product_key = make_product_key(product.name, product.version, product.product_id)
+
+    product_path = state.product_paths[product_key]
 
     await pacman_install(
         settings.containerizer,
         settings.workdir_containerizer,
         settings.workdir_container,
         installation_path,
-        cache_path
-        / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst",
+        product_path,
     )

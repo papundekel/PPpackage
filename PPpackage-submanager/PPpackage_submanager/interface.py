@@ -7,7 +7,7 @@ from typing import cast as type_cast
 
 from pydantic_settings import BaseSettings
 
-from .schemes import Dependency, Package, PackageIDAndInfo, Product, ResolutionGraph
+from .schemes import Dependency, Package, Product, ProductIDAndInfo, ResolutionGraph
 
 RequirementType = TypeVar("RequirementType")
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
@@ -28,7 +28,7 @@ FetchCallbackType = Callable[
         Path | None,
         Path | None,
     ],
-    Awaitable[PackageIDAndInfo | AsyncIterable[str]],
+    Awaitable[ProductIDAndInfo | AsyncIterable[str]],
 ]
 
 GenerateCallbackType = Callable[
@@ -64,9 +64,9 @@ class Interface(Generic[SettingsType, StateType, RequirementType]):
     Settings: type[SettingsType]
     Requirement: type[RequirementType]
     lifespan: Callable[[SettingsType], AsyncContextManager[StateType]]
-    update_database: UpdateDatabaseCallbackType[
-        SettingsType, StateType
-    ] = update_database_noop
+    update_database: UpdateDatabaseCallbackType[SettingsType, StateType] = (
+        update_database_noop
+    )
     resolve: ResolveCallbackType[SettingsType, StateType, RequirementType]
     fetch: FetchCallbackType[SettingsType, StateType]
     generate: GenerateCallbackType[SettingsType, StateType] = generate_noop

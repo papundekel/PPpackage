@@ -5,6 +5,7 @@
 -e ./PPpackage-conan/
 -e ./PPpackage-arch/
 -e ./PPpackage-PP/
+-e ./PPpackage-AUR/
 
 -e ./PPpackage/
 

@@ -75,7 +75,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> PackageIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | AsyncIterable[str]:
     ...
 
 async def install(

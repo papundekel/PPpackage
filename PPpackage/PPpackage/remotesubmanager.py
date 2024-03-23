@@ -8,8 +8,8 @@ from PPpackage_submanager.schemes import (
     Dependency,
     Options,
     Package,
-    PackageIDAndInfo,
     Product,
+    ProductIDAndInfo,
     ResolutionGraph,
 )
 from PPpackage_utils.stream import dump_bytes_chunked, dump_loop, dump_many, dump_one
@@ -78,7 +78,7 @@ class RemoteSubmanager(Submanager):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncGenerator[PackageIDAndInfo | AsyncIterable[str], None]:
+    ) -> AsyncGenerator[ProductIDAndInfo | AsyncIterable[str], None]:
         installation = (
             tar_archive(installation_path) if installation_path is not None else None
         )
@@ -117,7 +117,7 @@ class RemoteSubmanager(Submanager):
             reader = HTTPResponseReader(response)
 
             if response.is_success:
-                yield await reader.load_one(PackageIDAndInfo)
+                yield await reader.load_one(ProductIDAndInfo)
             elif response.status_code == 422:
                 yield reader.load_many(str)
             else:

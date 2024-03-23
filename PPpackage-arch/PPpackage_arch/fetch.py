@@ -4,8 +4,9 @@ from collections.abc import AsyncIterable
 from os import symlink
 from pathlib import Path
 
+from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Dependency, Options, Package, PackageIDAndInfo
+from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
 from PPpackage_utils.utils import (
     TemporaryDirectory,
     asubprocess_wait,
@@ -13,6 +14,7 @@ from PPpackage_utils.utils import (
     ensure_dir_exists,
     fakeroot,
 )
+from pydantic import RootModel
 
 from .settings import Settings
 from .utils import get_cache_paths
@@ -34,7 +36,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> PackageIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | AsyncIterable[str]:
     database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
@@ -44,7 +46,7 @@ async def fetch(
     with TemporaryDirectory() as database_path_fake:
         symlink(database_path.absolute() / "sync", database_path_fake / "sync")
 
-        async with fakeroot(settings.debug) as environment:
+        async with fakeroot() as environment:
             process = await create_subprocess_exec(
                 "pacman",
                 "--dbpath",
@@ -89,9 +91,11 @@ async def fetch(
     if line == "":
         raise CommandException
 
-    id_and_info = PackageIDAndInfo(
-        product_id=process_product_id(line),
-        product_info=None,
+    product_id = process_product_id(line)
+
+    id_and_info = ProductIDAndInfo(
+        product_id=product_id,
+        product_info=ProductInfo(version=package.version, product_id=product_id),
     )
 
     await asubprocess_wait(process, CommandException())

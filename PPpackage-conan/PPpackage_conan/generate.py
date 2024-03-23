@@ -9,10 +9,12 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.schemes import Product
+from PPpackage_submanager.utils import jinja_render_temp_file
 from PPpackage_utils.utils import asubprocess_wait
 
+from .lifespan import State
 from .settings import Settings
-from .utils import State, create_and_render_temp_file, make_conan_environment
+from .utils import make_conan_environment
 
 
 def patch_native_generators_paths(
@@ -75,7 +77,7 @@ async def generate(
     native_generators_path = destination_path / native_generators_path_suffix
 
     with (
-        create_and_render_temp_file(
+        jinja_render_temp_file(
             conanfile_template,
             {
                 "packages": [product async for product in products],
@@ -83,7 +85,7 @@ async def generate(
             },
             ".py",
         ) as conanfile_file,
-        create_and_render_temp_file(
+        jinja_render_temp_file(
             profile_template, {"options": options}
         ) as host_profile_file,
     ):

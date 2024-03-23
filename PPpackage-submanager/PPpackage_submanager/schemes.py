@@ -1,4 +1,3 @@
-import token
 from collections.abc import Iterable, Mapping
 from typing import Annotated, Any
 
@@ -28,7 +27,7 @@ class Product:
 
 
 @dataclass(frozen=True)
-class PackageIDAndInfo:
+class ProductIDAndInfo:
     product_id: str
     product_info: Any
 

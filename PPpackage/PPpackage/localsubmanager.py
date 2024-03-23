@@ -9,8 +9,8 @@ from PPpackage_submanager.schemes import (
     Dependency,
     Options,
     Package,
-    PackageIDAndInfo,
     Product,
+    ProductIDAndInfo,
     ResolutionGraph,
 )
 from PPpackage_utils.tar import extract as tar_extract
@@ -71,7 +71,7 @@ class LocalSubmanager(Submanager):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncGenerator[PackageIDAndInfo | AsyncIterable[str], None]:
+    ) -> AsyncGenerator[ProductIDAndInfo | AsyncIterable[str], None]:
         yield await self.interface.fetch(
             self.settings,
             self.state,

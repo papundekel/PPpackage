@@ -6,8 +6,9 @@ from pathlib import Path
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists
 
+from .lifespan import State
 from .settings import Settings
-from .utils import State, make_conan_environment
+from .utils import make_conan_environment
 
 
 async def update_database_impl(environment: Mapping[str, str]):

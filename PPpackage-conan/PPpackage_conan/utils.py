@@ -1,12 +1,8 @@
-from collections.abc import Generator, Mapping
-from contextlib import contextmanager
-from dataclasses import dataclass
+from collections.abc import Mapping
 from os import environ
 from pathlib import Path
-from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
-from jinja2 import Template as Jinja2Template
 from PPpackage_utils.validation import load_from_bytes, load_object
 from pydantic import BaseModel
 
@@ -65,20 +61,6 @@ def parse_conan_graph_nodes(
     }
 
 
-@contextmanager
-def create_and_render_temp_file(
-    template: Jinja2Template,
-    template_context: Mapping[str, Any],
-    suffix: Optional[str] = None,
-) -> Generator[_TemporaryFileWrapper, Any, Any]:
-    with NamedTemporaryFile(mode="w", suffix=suffix) as file:
-        template.stream(**template_context).dump(file)
-
-        file.flush()
-
-        yield file
-
-
 def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
     environment = environ.copy()
 
@@ -86,13 +68,3 @@ def make_conan_environment(cache_path: Path) -> Mapping[str, str]:
     environment["CONAN_HOME"] = str(cache_path.absolute())
 
     return environment
-
-
-def get_path(module) -> Path:
-    return Path(module.__file__)
-
-
-@dataclass(frozen=True)
-class State:
-    data_path: Path
-    deployer_path: Path

@@ -73,6 +73,28 @@ services:
         -   type: volume
             source: pp-db
             target: /mnt/db/
+    submanager-aur:
+        image: docker.io/fackop/pppackage-aur:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+        -   0.0.0.0:8888
+        environment:
+            DEBUG: true
+            CACHE_PATH: /mnt/cache/
+            CONTAINERIZER: unix:///run/podman/podman.sock
+            SUBMANAGER_PACKAGE: PPpackage_AUR
+            DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
+            INSTALLATIONS_PATH: /mnt/db/installations/
+        ports:
+        -   8888
+        volumes:
+        -   type: volume
+            source: aur-cache
+            target: /mnt/cache/
+        -   type: volume
+            source: aur-db
+            target: /mnt/db/
     metamanager:
         image: docker.io/fackop/pppackage:latest
 
@@ -82,6 +104,8 @@ services:
             submanager-conan:
                 condition: service_healthy
             submanager-pp:
+                condition: service_healthy
+            submanager-aur:
                 condition: service_healthy
 
         command:
@@ -103,6 +127,8 @@ services:
             submanagers__PP__url: http://submanager-pp:8888
             submanagers__PP__token_path: /run/secrets/token-pp/secret
 
+            submanagers__AUR__url: http://submanager-aur:8888
+            submanagers__AUR__token_path: /run/secrets/token-aur/secret
         volumes:
         -   type: bind
             source: $WORKDIR
@@ -117,6 +143,9 @@ services:
         -   type: volume
             source: user-token-pp
             target: /run/secrets/token-pp/
+        -   type: volume
+            source: user-token-aur
+            target: /run/secrets/token-aur/
 
     db-init-arch:
         image: docker.io/fackop/pppackage-submanager-db-init:latest
@@ -160,7 +189,21 @@ services:
             target: /run/secrets/admin-token/
         profiles:
         -   submanager-db-init
-
+    db-init-aur:
+        image: docker.io/fackop/pppackage-submanager-db-init:latest
+        command:
+        -   /run/secrets/admin-token/secret
+        -   sqlite+aiosqlite:////mnt/db/db.sqlite3
+        volumes:
+        -   type: volume
+            source: aur-db
+            target: /mnt/db/
+        -   type: volume
+            source: admin-token-aur
+            target: /run/secrets/admin-token/
+        profiles:
+        -   submanager-db-init
+        
     create-user-arch:
         image: docker.io/fackop/pppackage-submanager-create-user:latest
         depends_on:
@@ -215,19 +258,41 @@ services:
         -   type: volume
             source: user-token-pp
             target: /run/secrets/user-token/
+    create-user-aur:
+        image: docker.io/fackop/pppackage-submanager-create-user:latest
+        depends_on:
+            submanager-aur:
+                condition: service_healthy
+        command:
+        -   /run/secrets/user-token/secret
+        -   http://submanager-aur:8888
+        -   /run/secrets/admin-token/secret
+        profiles:
+        -   submanager-create-user
+        volumes:
+        -   type: volume
+            source: admin-token-aur
+            target: /run/secrets/admin-token/
+        -   type: volume
+            source: user-token-aur
+            target: /run/secrets/user-token/
 volumes:
     arch-cache:
     conan-cache:
     pp-cache:
+    aur-cache:
 
     arch-db:
     conan-db:
     pp-db:
-        
+    aur-db:
+
     admin-token-arch:
     admin-token-conan:
     admin-token-pp:
-        
+    admin-token-aur:
+
     user-token-arch:
     user-token-conan:
     user-token-pp:
+    user-token-aur:

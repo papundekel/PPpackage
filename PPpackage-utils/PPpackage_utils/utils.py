@@ -71,7 +71,7 @@ class FakerootInfo:
 _fakeroot_info = None
 
 
-async def get_fakeroot_info(debug: bool):
+async def get_fakeroot_info():
     global _fakeroot_info
 
     if _fakeroot_info is None:
@@ -99,10 +99,10 @@ async def get_fakeroot_info(debug: bool):
 
 
 @asynccontextmanager
-async def fakeroot(debug: bool) -> AsyncIterator[MutableMapping[str, str]]:
+async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     pid = None
     try:
-        fakeroot_info_task = get_fakeroot_info(debug)
+        fakeroot_info_task = get_fakeroot_info()
 
         process_creation = create_subprocess_exec(
             "faked",
@@ -188,3 +188,7 @@ def movetree(source: Path, destination: Path):
             source_item.rmdir()
         else:
             move(source_item, destination_item)
+
+
+def get_module_path(module) -> Path:
+    return Path(module.__file__)

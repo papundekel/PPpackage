@@ -26,6 +26,13 @@ services:
             submanagers__PP__settings__debug: true
             submanagers__PP__settings__cache_path: /mnt/cache/PP/
             submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
+
+            submanagers__AUR__package: PPpackage_AUR
+            submanagers__AUR__settings__debug: true
+            submanagers__AUR__settings__cache_path: /mnt/cache/AUR/
+            submanagers__AUR__settings__containerizer: unix:///run/podman/podman.sock
+            submanagers__AUR__settings__workdir_containerizer: $PWD
+            submanagers__AUR__settings__workdir_container: /mnt/workdir/
         volumes:
         -   type: bind
             source: $PWD
@@ -44,7 +51,10 @@ services:
         -   type: bind
             source: $PWD/cache/PP/
             target: /mnt/cache/PP/
-   
+        -   type: bind
+            source: $PWD/cache/AUR/
+            target: /mnt/cache/AUR/
+
         -   type: bind
             source: /etc/passwd
             target: /etc/passwd

@@ -14,7 +14,7 @@ FROM base AS libalpm-pp
 
 RUN pacman --noconfirm -S meson
 
-COPY --chown=ab:ab PPpackage-arch/libalpm-pp/ /workdir/libalpm-pp
+COPY --chown=ab:ab PPpackage-pacman-utils/libalpm-pp/ /workdir/libalpm-pp
 RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
 
 # -----------------------------------------------------------------------------
@@ -27,7 +27,7 @@ RUN pacman --noconfirm -S ninja
 
 COPY --from=libalpm-pp /usr/share/libalpm-pp /usr/share/libalpm-pp
 
-COPY PPpackage-arch/fakealpm/ /workdir/fakealpm
+COPY PPpackage-pacman-utils/fakealpm/ /workdir/fakealpm
 RUN ./fakealpm/build.sh fakealpm/ fakealpm/build/ /usr/local
 
 # -----------------------------------------------------------------------------
@@ -59,7 +59,7 @@ RUN pip install hypercorn
 
 # -----------------------------------------------------------------------------
 
-FROM submanager-notconan as submanager-arch
+FROM submanager-notconan as submanager-pacman
 
 RUN pacman --noconfirm -S pacutils
 RUN pacman --noconfirm -S pacman-contrib
@@ -75,8 +75,15 @@ RUN pip install PPpackage-utils/
 COPY PPpackage-submanager/ /workdir/PPpackage-submanager
 RUN pip install PPpackage-submanager/
 
-COPY PPpackage-arch/PPpackage_arch/ /workdir/PPpackage-arch/PPpackage_arch
-COPY PPpackage-arch/setup.py /workdir/PPpackage-arch/setup.py
+COPY PPpackage-pacman-utils/PPpackage_pacman_utils/ /workdir/PPpackage-pacman-utils/PPpackage_pacman_utils
+COPY PPpackage-pacman-utils/setup.py /workdir/PPpackage-pacman-utils/setup.py
+RUN pip install PPpackage-pacman-utils/
+
+# -----------------------------------------------------------------------------
+
+FROM submanager-pacman as submanager-arch
+
+COPY PPpackage-arch/ /workdir/PPpackage-arch
 RUN pip install PPpackage-arch/
 
 ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
@@ -117,6 +124,14 @@ ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
 
 # -----------------------------------------------------------------------------
 
+FROM submanager-pacman as submanager-aur
+
+COPY PPpackage-AUR/ /workdir/PPpackage-AUR
+RUN pip install PPpackage-AUR/
+
+ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
 FROM base-conan AS metamanager
 
 ARG USER=root
@@ -132,6 +147,7 @@ COPY --from=fakealpm /usr/local/lib/libfakealpm.so /usr/local/lib/libfakealpm.so
 RUN mkdir -p /mnt/cache/arch/ && chown $USER /mnt/cache/arch/
 RUN mkdir -p /mnt/cache/conan/ && chown $USER /mnt/cache/conan/
 RUN mkdir -p /mnt/cache/PP/ && chown $USER /mnt/cache/PP/
+RUN mkdir -p /mnt/cache/AUR/ && chown $USER /mnt/cache/AUR/
 
 COPY PPpackage-utils/ /workdir/PPpackage-utils
 RUN pip install PPpackage-utils/
@@ -139,8 +155,11 @@ RUN pip install PPpackage-utils/
 COPY PPpackage-submanager/ /workdir/PPpackage-submanager
 RUN pip install PPpackage-submanager/
 
-COPY PPpackage-arch/PPpackage_arch/ /workdir/PPpackage-arch/PPpackage_arch
-COPY PPpackage-arch/setup.py /workdir/PPpackage-arch/setup.py
+COPY PPpackage-pacman-utils/PPpackage_pacman_utils/ /workdir/PPpackage-pacman-utils/PPpackage_pacman_utils
+COPY PPpackage-pacman-utils/setup.py /workdir/PPpackage-pacman-utils/setup.py
+RUN pip install PPpackage-pacman-utils/
+
+COPY PPpackage-arch/ /workdir/PPpackage-arch
 RUN pip install PPpackage-arch/
 
 COPY PPpackage-conan/ /workdir/PPpackage-conan
@@ -148,6 +167,9 @@ RUN pip install PPpackage-conan/
 
 COPY PPpackage-PP/ /workdir/PPpackage-PP
 RUN pip install PPpackage-PP/
+
+COPY PPpackage-AUR/ /workdir/PPpackage-AUR
+RUN pip install PPpackage-AUR/
 
 COPY PPpackage/ /workdir/PPpackage
 RUN pip install PPpackage/

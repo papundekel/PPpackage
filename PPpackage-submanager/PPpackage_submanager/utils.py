@@ -1,11 +1,16 @@
-from collections.abc import AsyncIterable, Iterable
-from contextlib import asynccontextmanager
-from typing import Any, TypeVar
+from asyncio import create_subprocess_exec
+from asyncio.subprocess import DEVNULL, PIPE
+from collections.abc import AsyncIterable, Generator, Iterable, Mapping
+from contextlib import asynccontextmanager, contextmanager
+from pathlib import Path
+from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
+from typing import Any, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
-from PPpackage_submanager.exceptions import CommandException
+from jinja2 import Template as Jinja2Template
 from PPpackage_utils.http_stream import AsyncChunkReader
+from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -16,6 +21,8 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
+
+from .exceptions import CommandException
 
 
 @asynccontextmanager
@@ -139,3 +146,56 @@ class Installations:
 
 def HTTPRequestReader(request: Request):
     return AsyncChunkReader(memoryview(chunk) async for chunk in request.stream())
+
+
+@contextmanager
+def jinja_render_temp_file(
+    template: Jinja2Template,
+    template_context: Mapping[str, Any],
+    suffix: Optional[str] = None,
+) -> Generator[_TemporaryFileWrapper, Any, Any]:
+    with NamedTemporaryFile(mode="w", suffix=suffix) as file:
+        template.stream(**template_context).dump(file)
+
+        file.flush()
+
+        yield file
+
+
+@asynccontextmanager
+async def containerizer_subprocess_exec(
+    url: str, *args, stdin: Any, stdout: Any, stderr: Any
+):
+    with NamedTemporaryFile() as containers_conf:
+        yield await create_subprocess_exec(
+            "podman-remote",
+            "--url",
+            url,
+            *args,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            env={"CONTAINERS_CONF": containers_conf.name},
+        )
+
+
+async def containerizer_build(url: str, dockerfile_path: Path) -> str:
+    with TemporaryDirectory() as empty_directory:
+        async with containerizer_subprocess_exec(
+            url,
+            "build",
+            "--quiet",
+            "--file",
+            dockerfile_path,
+            empty_directory,
+            stdin=DEVNULL,
+            stdout=PIPE,
+            stderr=DEVNULL,
+        ) as process:
+            build_stdout = await asubprocess_communicate(
+                process, "Error in podman-remote build"
+            )
+
+    image_id = build_stdout.decode().strip()
+
+    return image_id

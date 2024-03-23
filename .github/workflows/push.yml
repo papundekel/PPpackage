@@ -14,6 +14,9 @@ jobs:
 
             - uses: gacts/install-podman@v1.1.0
 
+            - name: Download seccomp.json
+              run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
+
             - name: Cache arch
               uses: actions/cache@v4.0.2
               with:
@@ -31,6 +34,12 @@ jobs:
               with:
                   path: ${{ github.workspace }}/cache/PP
                   key: cache-PP
+
+            - name: Cache AUR
+              uses: actions/cache@v4.0.2
+              with:
+                  path: ${{ github.workspace }}/cache/AUR
+                  key: cache-AUR
 
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
@@ -53,7 +62,7 @@ jobs:
 
             - name: Run PPpackage
               run: |
-                  mkdir -p cache/arch cache/conan cache/PP
+                  mkdir -p cache/arch cache/conan cache/PP cache/AUR
                   USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < input/basic.json
 
             - name: Build and push pppackage-submanager-db-init
@@ -103,6 +112,16 @@ jobs:
                   target: submanager-pp
                   push: true
                   tags: docker.io/fackop/pppackage-pp:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push pppackage-aur
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: submanager-aur
+                  push: true
+                  tags: docker.io/fackop/pppackage-aur:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 

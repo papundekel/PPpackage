@@ -10,6 +10,9 @@
             "coreutils",
             "sh"
         ],
+        "AUR": [
+            "conan"
+        ],
         "conan": [
             {
                 "package": "openssl",

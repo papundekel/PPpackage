@@ -28,8 +28,8 @@ from .schemes import (
     Dependency,
     Options,
     Package,
-    PackageIDAndInfo,
     Product,
+    ProductIDAndInfo,
     UserCreated,
 )
 from .utils import HTTPRequestReader, StreamingResponse, get_session, get_state
@@ -166,7 +166,7 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
                     generators_path,
                 )
 
-            if isinstance(output, PackageIDAndInfo):
+            if isinstance(output, ProductIDAndInfo):
                 return StreamingResponse(HTTP_200_OK, dump_one(output))
             else:
                 return StreamingResponse(
