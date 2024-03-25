@@ -166,7 +166,10 @@ def jinja_render_temp_file(
 async def containerizer_subprocess_exec(
     url: str, *args, stdin: Any, stdout: Any, stderr: Any
 ):
-    with NamedTemporaryFile() as containers_conf:
+    with (
+        TemporaryDirectory() as empty_directory,
+        NamedTemporaryFile() as containers_conf,
+    ):
         yield await create_subprocess_exec(
             "podman-remote",
             "--url",
@@ -175,7 +178,10 @@ async def containerizer_subprocess_exec(
             stdin=stdin,
             stdout=stdout,
             stderr=stderr,
-            env={"CONTAINERS_CONF": containers_conf.name},
+            env={
+                "CONTAINERS_CONF": containers_conf.name,
+                "XDG_DATA_HOME": empty_directory,
+            },
         )
 
 
