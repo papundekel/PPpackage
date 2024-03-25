@@ -181,6 +181,7 @@ async def containerizer_subprocess_exec(
             env={
                 "CONTAINERS_CONF": containers_conf.name,
                 "XDG_DATA_HOME": empty_directory,
+                "XDG_CONFIG_HOME": empty_directory,
             },
         )
 
