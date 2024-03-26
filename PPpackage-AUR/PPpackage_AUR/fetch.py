@@ -101,6 +101,11 @@ async def build(
             WORKDIR = "/mnt/build"
 
             with TemporaryDirectory(workdir_info.container_path) as temp_product_path:
+                print(workdir_info, file=stderr)
+                print(temp_product_path, file=stderr)
+                print(build_path, file=stderr)
+                print(build_context_path, file=stderr)
+
                 async with containerizer_subprocess_exec(
                     containerizer,
                     "run",
