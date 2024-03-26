@@ -3,6 +3,7 @@ from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
 from hashlib import sha1
 from pathlib import Path
+from sys import stderr
 from tempfile import mkdtemp
 from typing import Protocol
 
@@ -92,6 +93,8 @@ async def build(
 
             PKGDEST = "/mnt/package"
             WORKDIR = "/mnt/build"
+
+            print(product_path_dir, build_path, build_context_path, file=stderr)
 
             async with containerizer_subprocess_exec(
                 containerizer,
