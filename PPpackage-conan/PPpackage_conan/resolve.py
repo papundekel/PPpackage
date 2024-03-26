@@ -259,9 +259,9 @@ async def resolve(
     environment = make_conan_environment(settings.cache_path)
 
     if not (settings.cache_path / Path("p")).exists():
-        stderr.write("Creating database... ")
+        stderr.write("conan: Creating database...\n")
         await update_database_impl(environment)
-        stderr.write("Done.\n")
+        stderr.write("conan: Created database.\n")
 
     jinja_loader = Jinja2Environment(
         loader=Jinja2FileSystemLoader(state.data_path),

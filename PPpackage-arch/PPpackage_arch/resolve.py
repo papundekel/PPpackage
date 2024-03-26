@@ -126,9 +126,9 @@ async def resolve(
     database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
-        stderr.write("Creating database... ")
+        stderr.write("arch: Creating database...\n")
         await update_database(settings, state)
-        stderr.write("Done.\n")
+        stderr.write("arch: Created database.\n")
 
     locks = set[Lock]()
 

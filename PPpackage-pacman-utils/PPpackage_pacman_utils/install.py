@@ -136,7 +136,7 @@ async def pacman_install(
             )
 
             if str(product_path).find("pacman") != -1:
-                for x in installation_path.iterdir():
+                for x in (installation_path / "etc").iterdir():
                     print(x, file=stderr)
 
                 await (
