@@ -3,7 +3,6 @@ from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
 from hashlib import sha1
 from pathlib import Path
-from sys import stderr
 from tempfile import mkdtemp
 from typing import Protocol
 
@@ -113,7 +112,7 @@ async def build(
                 "makepkg",
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=DEVNULL,
+                stderr=None,
             ) as process:
                 await asubprocess_wait(process, CommandException())
 
