@@ -32,7 +32,7 @@ async def resolve_requirement(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=None,
     )
 
     assert process.stdout is not None
