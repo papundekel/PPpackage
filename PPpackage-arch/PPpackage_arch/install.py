@@ -17,8 +17,7 @@ async def install(
 
     await pacman_install(
         settings.containerizer,
-        settings.workdir_containerizer,
-        settings.workdir_container,
+        settings.workdir,
         installation_path,
         cache_path
         / f"{product.name}-{product.version}-{product.product_id}.pkg.tar.zst",

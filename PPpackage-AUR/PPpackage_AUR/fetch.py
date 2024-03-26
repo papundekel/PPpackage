@@ -17,7 +17,11 @@ from PPpackage_submanager.schemes import (
     ProductIDAndInfo,
 )
 from PPpackage_submanager.utils import containerizer_subprocess_exec
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_wait
+from PPpackage_utils.utils import (
+    ContainerizerWorkdirInfo,
+    TemporaryDirectory,
+    asubprocess_wait,
+)
 from PPpackage_utils.validation import load_object
 from sqlitedict import SqliteDict
 
@@ -69,15 +73,17 @@ def make_product_id(dependencies: Iterable[Dependency]):
 async def build(
     cache_path: Path,
     containerizer: str,
+    workdir_info: ContainerizerWorkdirInfo,
     product_paths: SqliteDict,
     package: Package,
     build_context_path: Path,
     product_key: str,
 ):
     product_path_dir = Path(mkdtemp(dir=cache_path))
+    product_path = product_path_dir / "product.pkg.tar.zst"
 
     try:
-        with TemporaryDirectory() as build_path:
+        with TemporaryDirectory(workdir_info.container_path) as build_path:
             with open(build_path / "PKGBUILD", "w") as file:
                 process = await create_subprocess_exec(
                     "paru",
@@ -94,40 +100,40 @@ async def build(
             PKGDEST = "/mnt/package"
             WORKDIR = "/mnt/build"
 
-            print(product_path_dir, build_path, build_context_path, file=stderr)
-            for x in cache_path.iterdir():
-                print(x, file=stderr)
+            with TemporaryDirectory(workdir_info.container_path) as temp_product_path:
+                async with containerizer_subprocess_exec(
+                    containerizer,
+                    "run",
+                    "--rm",
+                    "--interactive",
+                    "--userns=keep-id",
+                    "--mount",
+                    (
+                        "type=bind,"
+                        f"source={workdir_info.translate(temp_product_path).absolute()},"
+                        f"target={PKGDEST}"
+                    ),
+                    "--mount",
+                    (
+                        "type=bind,"
+                        f"source={workdir_info.translate(build_path).absolute()},"
+                        f"target={WORKDIR}"
+                    ),
+                    "--env",
+                    f"PKGDEST={PKGDEST}",
+                    "--workdir",
+                    WORKDIR,
+                    "--rootfs",
+                    str(build_context_path.absolute()),
+                    "makepkg",
+                    stdin=DEVNULL,
+                    stdout=DEVNULL,
+                    stderr=None,
+                ) as process:
+                    await asubprocess_wait(process, CommandException())
 
-            for x in build_path.parent.iterdir():
-                print(x, file=stderr)
-
-            for x in build_path.iterdir():
-                print(x, file=stderr)
-
-            async with containerizer_subprocess_exec(
-                containerizer,
-                "run",
-                "--rm",
-                "--interactive",
-                "--userns=keep-id",
-                "--mount",
-                f"type=bind,source={product_path_dir.absolute()},target={PKGDEST}",
-                "--mount",
-                f"type=bind,source={build_path.absolute()},target={WORKDIR}",
-                "--env",
-                f"PKGDEST={PKGDEST}",
-                "--workdir",
-                WORKDIR,
-                "--rootfs",
-                str(build_context_path.absolute()),
-                "makepkg",
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=None,
-            ) as process:
-                await asubprocess_wait(process, CommandException())
-
-        product_path = next(product_path_dir.iterdir())
+                temp_product_path = next(temp_product_path.iterdir())
+                temp_product_path.rename(product_path)
 
         product_paths[product_key] = product_path
         product_paths.commit()
@@ -179,6 +185,7 @@ async def fetch(
         await build(
             settings.cache_path,
             settings.containerizer,
+            settings.workdir,
             state.product_paths,
             package,
             installation_path,

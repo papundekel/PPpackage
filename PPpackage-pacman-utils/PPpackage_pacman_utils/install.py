@@ -15,6 +15,7 @@ from PPpackage_utils.pipe import (
     pipe_write_string,
 )
 from PPpackage_utils.utils import (
+    ContainerizerWorkdirInfo,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
@@ -98,15 +99,11 @@ DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
 
 async def pacman_install(
     containerizer: str,
-    workdir_containerizer: Path,
-    workdir_container: Path,
+    workdir_info: ContainerizerWorkdirInfo,
     installation_path: Path,
     product_path: Path,
 ):
-    containerizer_installation_path = (
-        workdir_containerizer
-        / installation_path.absolute().relative_to(workdir_container)
-    )
+    containerizer_installation_path = workdir_info.translate(installation_path)
 
     database_path = installation_path / DATABASE_PATH_RELATIVE
 

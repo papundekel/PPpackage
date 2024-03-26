@@ -15,8 +15,8 @@ services:
             submanagers__arch__settings__debug: true
             submanagers__arch__settings__cache_path: /mnt/cache/arch/
             submanagers__arch__settings__containerizer: unix:///run/podman/podman.sock
-            submanagers__arch__settings__workdir_containerizer: $PWD
-            submanagers__arch__settings__workdir_container: /mnt/workdir/
+            submanagers__arch__settings__workdir__containerizer_path: $PWD
+            submanagers__arch__settings__workdir__container_path: /mnt/workdir/
 
             submanagers__conan__package: PPpackage_conan
             submanagers__conan__settings__debug: true
@@ -31,8 +31,8 @@ services:
             submanagers__AUR__settings__debug: true
             submanagers__AUR__settings__cache_path: /mnt/cache/AUR/
             submanagers__AUR__settings__containerizer: unix:///run/podman/podman.sock
-            submanagers__AUR__settings__workdir_containerizer: $PWD
-            submanagers__AUR__settings__workdir_container: /mnt/workdir/
+            submanagers__AUR__settings__workdir__containerizer_path: $PWD
+            submanagers__AUR__settings__workdir__container_path: /mnt/workdir/
         volumes:
         -   type: bind
             source: $PWD

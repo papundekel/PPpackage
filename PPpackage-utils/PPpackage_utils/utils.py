@@ -18,6 +18,7 @@ from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import Any, Optional, TypeVar, overload
 
 from frozendict import frozendict
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
 class MyException(Exception):
@@ -218,3 +219,16 @@ def freeze(x):
         return frozenset(value for value in x)
     else:
         return x
+
+
+@pydantic_dataclass(frozen=True)
+class ContainerizerWorkdirInfo:
+    containerizer_path: Path
+    container_path: Path
+
+    def translate(self, path: Path) -> Path:
+        containerizer_path = self.containerizer_path / path.absolute().relative_to(
+            self.container_path
+        )
+
+        return containerizer_path

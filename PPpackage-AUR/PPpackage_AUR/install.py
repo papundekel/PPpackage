@@ -20,8 +20,7 @@ async def install(
 
     await pacman_install(
         settings.containerizer,
-        settings.workdir_containerizer,
-        settings.workdir_container,
+        settings.workdir,
         installation_path,
         product_path,
     )

@@ -3,6 +3,7 @@ mkdir -p tmp/output
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -12,6 +13,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -21,6 +23,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -30,6 +33,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -39,6 +43,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -48,6 +53,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -57,6 +63,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
@@ -66,6 +73,7 @@ podman compose \
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 WORKDIR=$(pwd)/tmp \
 ARCH_INSTALLATIONS=$(pwd)/tmp/arch-installations \
+AUR_INSTALLATIONS=$(pwd)/tmp/aur-installations \
 podman compose \
     --file compose/all-remote/compose.yaml \
     run \
