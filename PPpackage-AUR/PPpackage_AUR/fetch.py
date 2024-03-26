@@ -95,6 +95,8 @@ async def build(
             WORKDIR = "/mnt/build"
 
             print(product_path_dir, build_path, build_context_path, file=stderr)
+            for x in cache_path.iterdir():
+                print(x, file=stderr)
 
             async with containerizer_subprocess_exec(
                 containerizer,
