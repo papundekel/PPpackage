@@ -45,7 +45,7 @@ async def export_package(
     **template_context: Any,
 ) -> None:
     with jinja_render_temp_file(template, template_context, ".py") as conanfile:
-        process = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "conan",
             "export",
             conanfile.name,
@@ -55,7 +55,7 @@ async def export_package(
             env=environment,
         )
 
-        await asubprocess_wait(await process, CommandException())
+        await asubprocess_wait(process, CommandException())
 
 
 async def export_leaf(
@@ -113,7 +113,7 @@ async def export_leaves(
 async def remove_temporary_packages_from_cache(
     debug: bool, environment: Mapping[str, str]
 ) -> None:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         "conan",
         "remove",
         "--confirm",
@@ -124,7 +124,7 @@ async def remove_temporary_packages_from_cache(
         env=environment,
     )
 
-    await asubprocess_wait(await process, CommandException())
+    await asubprocess_wait(process, CommandException())
 
 
 async def create_requirement_partitions(
@@ -223,7 +223,7 @@ async def create_graph(
     ):
         host_profile_path = Path(host_profile_file.name)
 
-        process = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "conan",
             "graph",
             "info",
@@ -239,7 +239,7 @@ async def create_graph(
         )
 
         conan_graph_json_bytes = await asubprocess_communicate(
-            await process, "Error in `conan graph info`"
+            process, "Error in `conan graph info`"
         )
 
     graph = parse_conan_graph_resolve(debug, conan_graph_json_bytes)

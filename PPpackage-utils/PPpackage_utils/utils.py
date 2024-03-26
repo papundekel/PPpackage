@@ -84,7 +84,7 @@ async def get_fakeroot_info():
     global _fakeroot_info
 
     if _fakeroot_info is None:
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "fakeroot",
             "printenv",
             "LD_LIBRARY_PATH",
@@ -94,9 +94,7 @@ async def get_fakeroot_info():
             stderr=DEVNULL,
         )
 
-        fakeroot_stdout = await asubprocess_communicate(
-            await process_creation, "Error in `fakeroot`."
-        )
+        fakeroot_stdout = await asubprocess_communicate(process, "Error in `fakeroot`.")
 
         ld_library_path, ld_preload = [
             line.strip() for line in fakeroot_stdout.decode().splitlines()
@@ -113,16 +111,14 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     try:
         fakeroot_info_task = get_fakeroot_info()
 
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "faked",
             stdin=DEVNULL,
             stdout=PIPE,
             stderr=DEVNULL,
         )
 
-        faked_stdout = await asubprocess_communicate(
-            await process_creation, "Error in `faked`."
-        )
+        faked_stdout = await asubprocess_communicate(process, "Error in `faked`.")
 
         key, pid_string = faked_stdout.decode().strip().split(":")
 

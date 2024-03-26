@@ -83,7 +83,7 @@ def clean_graph(graph: MultiDiGraph) -> str:
 async def resolve_versions(
     database_path: Path, packages: Set[str]
 ) -> Mapping[str, str]:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         "pacinfo",
         "--dbpath",
         str(database_path),
@@ -94,7 +94,7 @@ async def resolve_versions(
         stderr=DEVNULL,
     )
 
-    stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
+    stdout = await asubprocess_communicate(process, "Error in `pacinfo`.")
 
     lockfile = {
         (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]

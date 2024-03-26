@@ -158,4 +158,4 @@ async def pacman_install(
                             f"Unknown header: {header}", "PPpackage-pacman-utils"
                         )
 
-        await asubprocess_wait(process, CommandException())
+            await asubprocess_wait(process, CommandException())
