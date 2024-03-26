@@ -228,7 +228,7 @@ class ContainerizerWorkdirInfo:
 
     def translate(self, path: Path) -> Path:
         containerizer_path = self.containerizer_path / path.absolute().relative_to(
-            self.container_path
+            self.container_path.absolute()
         )
 
         return containerizer_path.absolute()

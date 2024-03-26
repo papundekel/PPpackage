@@ -3,6 +3,7 @@ from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
 from hashlib import sha1
 from pathlib import Path
+from shutil import move
 from sys import stderr
 from tempfile import mkdtemp
 from typing import Protocol
@@ -80,7 +81,6 @@ async def build(
     product_key: str,
 ):
     product_path_dir = Path(mkdtemp(dir=cache_path))
-    product_path = product_path_dir / "product.pkg.tar.zst"
 
     try:
         with TemporaryDirectory(workdir_info.container_path) as build_path:
@@ -138,8 +138,9 @@ async def build(
                     await asubprocess_wait(process, CommandException())
 
                 temp_product_path = next(temp_product_path.iterdir())
-                temp_product_path.rename(product_path)
+                move(temp_product_path, product_path_dir)
 
+        product_path = next(product_path_dir.iterdir())
         product_paths[product_key] = product_path
         product_paths.commit()
     except:
