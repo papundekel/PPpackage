@@ -234,7 +234,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
             env=environment,
         )
 

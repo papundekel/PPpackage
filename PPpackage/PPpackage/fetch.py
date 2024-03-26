@@ -1,12 +1,5 @@
-from asyncio import TaskGroup, sleep
-from collections.abc import (
-    AsyncIterable,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    MutableSet,
-    Set,
-)
+from asyncio import TaskGroup
+from collections.abc import AsyncIterable, Iterable, Mapping, MutableMapping, MutableSet
 from itertools import chain, islice
 from pathlib import Path
 from sys import stderr
@@ -84,7 +77,7 @@ async def fetch_install(
         extra_graph, filter_node=lambda node: node not in dependency_dict
     )  # type: ignore
 
-    extra_install_order = await fetch(
+    await fetch(
         workdir_path,
         submanagers,
         {},  # TODO
@@ -96,6 +89,7 @@ async def fetch_install(
     dependency_install_order = (
         (node, data) for node, data in install_order if node in dependency_dict
     )
+    extra_install_order = create_install_topology(extra_graph)
 
     await install(
         submanagers,
