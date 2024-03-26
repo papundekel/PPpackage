@@ -1,13 +1,26 @@
-from asyncio import TaskGroup
-from collections.abc import Iterable, Mapping, MutableMapping
-from itertools import islice
+from asyncio import TaskGroup, sleep
+from collections.abc import (
+    AsyncIterable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSet,
+    Set,
+)
+from itertools import chain, islice
 from pathlib import Path
 from sys import stderr
 from typing import Any
 
-from networkx import MultiDiGraph, dfs_preorder_nodes
+from networkx import (
+    MultiDiGraph,
+    dfs_preorder_nodes,
+    subgraph_view,
+    topological_generations,
+)
 from PPpackage_submanager.schemes import (
     Dependency,
+    Lock,
     ManagerAndName,
     Options,
     Package,
@@ -15,10 +28,135 @@ from PPpackage_submanager.schemes import (
 )
 from PPpackage_utils.utils import TemporaryDirectory
 
-from PPpackage.fetch_helpers import fetch_install_generate
-
+from .generate import generate
+from .install import install
+from .resolve import resolve
+from .schemes import NodeData
 from .submanager import Submanager
+from .topology import create_install_topology
 from .utils import NodeData, SubmanagerCommandFailure
+
+
+async def fetch_install(
+    workdir_path: Path,
+    submanagers: Mapping[str, Submanager],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
+    destination_path: Path,
+    async_extra_requirements: AsyncIterable[tuple[str, Any]],
+    resolve_iteration_limit,
+):
+    stderr.write("RECURSIVE INSTALL BEGIN\n")
+
+    dependency_dict = {
+        manager_and_name: data for manager_and_name, data in dependencies
+    }
+
+    requirements_with_locks = dict[str, MutableSet[Any | Lock]]()
+
+    async for submanager_name, requirement in async_extra_requirements:
+        requirements_with_locks.setdefault(submanager_name, set()).add(requirement)
+
+    for dependency, data in dependency_dict.items():
+        requirements_with_locks.setdefault(dependency.manager, set()).add(
+            Lock(dependency.name, data["version"])
+        )
+
+    extra_graph = await resolve(
+        submanagers, resolve_iteration_limit, requirements_with_locks, {}
+    )
+
+    for dependency, data in dependency_dict.items():
+        extra_graph_node = extra_graph.nodes.get(dependency)
+
+        if extra_graph_node is None:
+            continue
+
+        if extra_graph_node["version"] != data["version"]:
+            raise SubmanagerCommandFailure(
+                f"Version mismatch for {dependency}: {extra_graph_node['version']} != {data['version']}"
+            )
+
+        extra_graph_node["product_id"] = data["product_id"]
+        extra_graph_node["product_info"] = data["product_info"]
+
+    extra_subgraph: MultiDiGraph = subgraph_view(
+        extra_graph, filter_node=lambda node: node not in dependency_dict
+    )  # type: ignore
+
+    extra_install_order = await fetch(
+        workdir_path,
+        submanagers,
+        {},  # TODO
+        extra_graph,
+        extra_subgraph,
+        resolve_iteration_limit,
+    )
+
+    dependency_install_order = (
+        (node, data) for node, data in install_order if node in dependency_dict
+    )
+
+    await install(
+        submanagers,
+        chain(dependency_install_order, extra_install_order),
+        destination_path,
+    )
+
+    stderr.write("RECURSIVE INSTALL DONE\n")
+
+
+async def fetch_generate(
+    submanagers: Mapping[str, Submanager],
+    meta_options: Mapping[str, Options],
+    generators: AsyncIterable[str],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
+    destination_path: Path,
+):
+    stderr.write("RECURSIVE GENERATE BEGIN\n")
+
+    generators_list = [generator async for generator in generators]
+
+    await generate(
+        submanagers, generators_list, dependencies, meta_options, destination_path
+    )
+
+    stderr.write("RECURSIVE GENERATE DONE\n")
+
+
+async def fetch_install_generate(
+    workdir_path: Path,
+    submanagers: Mapping[str, Submanager],
+    meta_options: Mapping[str, Options],
+    install_order: Iterable[tuple[ManagerAndName, NodeData]],
+    dependencies: Iterable[tuple[ManagerAndName, NodeData]],
+    async_extra_requirements: AsyncIterable[tuple[str, Any]],
+    async_generators: AsyncIterable[str],
+    installation_path: Path,
+    generators_path: Path,
+    resolve_iteration_limit: int,
+):
+    async with TaskGroup() as group:
+        group.create_task(
+            fetch_install(
+                workdir_path,
+                submanagers,
+                install_order,
+                dependencies,
+                installation_path,
+                async_extra_requirements,
+                resolve_iteration_limit,
+            )
+        )
+        group.create_task(
+            fetch_generate(
+                submanagers,
+                meta_options,
+                async_generators,
+                dependencies,
+                generators_path,
+            )
+        )
 
 
 def create_dependencies(node_dependencies: Iterable[tuple[ManagerAndName, NodeData]]):
@@ -51,6 +189,7 @@ async def fetch_manager(
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ],
     install_order: Iterable[tuple[ManagerAndName, NodeData]],
+    resolve_iteration_limit: int,
 ):
     submanager = submanagers[submanager_name]
     options = meta_options.get(submanager.name)
@@ -61,7 +200,9 @@ async def fetch_manager(
         if isinstance(result_first, ProductIDAndInfo):
             id_and_info = result_first
         else:
-            generators = result_first
+            async_requirements = result_first.requirements
+            async_generators = result_first.generators
+
             meta_dependencies = packages_to_dependencies[
                 ManagerAndName(submanager.name, package.name)
             ]
@@ -71,13 +212,16 @@ async def fetch_manager(
                 TemporaryDirectory(workdir_path) as generators_path,
             ):
                 await fetch_install_generate(
+                    workdir_path,
                     submanagers,
                     meta_options,
                     install_order,
                     meta_dependencies,
-                    generators,
+                    async_requirements,
+                    async_generators,
                     installation_path,
                     generators_path,
+                    resolve_iteration_limit,
                 )
 
                 async with submanager.fetch(
@@ -100,18 +244,21 @@ async def fetch(
     submanagers: Mapping[str, Submanager],
     meta_options: Mapping[str, Options],
     graph: MultiDiGraph,
-    fetch_order: Iterable[Iterable[tuple[ManagerAndName, NodeData]]],
-    install_order: Iterable[tuple[ManagerAndName, NodeData]],
+    subgraph: MultiDiGraph,
+    resolve_iteration_limit: int,
 ):
     stderr.write("Fetching packages...\n")
+
+    install_order = list(create_install_topology(graph))
+    generations = topological_generations(subgraph.reverse(copy=False))
 
     packages_to_dependencies: MutableMapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
     ] = {}
 
-    for generation in fetch_order:
+    for generation in generations:
         async with TaskGroup() as group:
-            for node, data in generation:
+            for node in generation:
                 node_dependencies = list(graph_successors(graph, node))
 
                 dependencies = create_dependencies(node_dependencies)
@@ -124,10 +271,13 @@ async def fetch(
                         submanagers,
                         node.manager,
                         meta_options,
-                        Package(name=node.name, version=data["version"]),
+                        Package(name=node.name, version=graph.nodes[node]["version"]),
                         dependencies,
                         graph.nodes,
                         packages_to_dependencies,
                         install_order,
+                        resolve_iteration_limit,
                     )
                 )
+
+    return install_order

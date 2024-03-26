@@ -14,14 +14,15 @@ from json import dumps as json_dumps
 from sys import stderr
 from typing import Any
 
-from frozendict import frozendict
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_submanager.schemes import (
+    Lock,
     ManagerAndName,
     ManagerRequirement,
     Options,
     ResolutionGraph,
 )
+from PPpackage_utils.utils import freeze
 
 from PPpackage.submanager import Submanager
 
@@ -32,12 +33,12 @@ from .utils import SubmanagerCommandFailure
 class WorkGraphNodeValue:
     version: str
     dependencies: Set[str]
-    requirements: Mapping[str, frozenset[Any]]
+    requirements: Mapping[str, Set[Any]]
 
 
 @dataclass(frozen=True)
 class WorkGraph:
-    roots: Mapping[frozenset[Hashable], Set[str]]
+    roots: Mapping[Set[Hashable], Set[str]]
     graph: Mapping[str, WorkGraphNodeValue]
 
 
@@ -45,7 +46,7 @@ def get_resolved_requirements(
     meta_graph: Mapping[str, WorkGraph]
 ) -> Mapping[str, Set[Set[Hashable]]]:
     return {
-        manager: {requirements for requirements in graph.roots.keys()}
+        manager: {frozenset(requirements) for requirements in graph.roots.keys()}
         for manager, graph in meta_graph.items()
     }
 
@@ -60,12 +61,12 @@ def get_all_requirements(
             for manager_dependency, requirements in node_value.requirements.items():
                 all_requirements.setdefault(manager_dependency, set()).add(requirements)
 
-    return frozendict(all_requirements)
+    return all_requirements
 
 
 def process_manager_requirements(
     manager_requirements: Iterable[ManagerRequirement],
-) -> Mapping[str, frozenset[Any]]:
+) -> Mapping[str, Set[Any]]:
     result: MutableMapping[str, MutableSet[Any]] = {}
 
     for manager_requirement in manager_requirements:
@@ -73,31 +74,25 @@ def process_manager_requirements(
             manager_requirement.requirement
         )
 
-    return {
-        manager: frozenset(requirements) for manager, requirements in result.items()
-    }
+    return result
 
 
 def make_graph(
     requirements_list: Iterable[Set[Hashable]], resolution_graph: ResolutionGraph
 ) -> WorkGraph:
-    roots = frozendict(
-        {
-            frozenset(requirements): frozenset(roots)
-            for requirements, roots in zip(requirements_list, resolution_graph.roots)
-        }
-    )
+    roots = {
+        requirements: set(roots)
+        for requirements, roots in zip(requirements_list, resolution_graph.roots)
+    }
 
-    graph = frozendict(
-        {
-            node.name: WorkGraphNodeValue(
-                node.version,
-                frozenset(node.dependencies),
-                frozendict(process_manager_requirements(node.requirements)),
-            )
-            for node in resolution_graph.graph
-        }
-    )
+    graph = {
+        node.name: WorkGraphNodeValue(
+            node.version,
+            set(node.dependencies),
+            freeze(process_manager_requirements(node.requirements)),
+        )
+        for node in resolution_graph.graph
+    }
 
     return WorkGraph(roots, graph)
 
@@ -162,19 +157,13 @@ async def resolve_iteration(
 
 
 def merge_requirements(initial, new):
-    return frozendict(
-        {
-            manager: (
-                (
-                    frozenset([i])
-                    if (i := initial.get(manager)) is not None
-                    else frozenset()
-                )
-                | new.get(manager, frozenset())
-            )
-            for manager in initial.keys() | new.keys()
-        }
-    )
+    return {
+        manager: (
+            ({i} if (i := initial.get(manager)) is not None else set())
+            | new.get(manager, set())
+        )
+        for manager in initial.keys() | new.keys()
+    }
 
 
 def process_graph(manager_work_graph: Mapping[str, WorkGraph]) -> MultiDiGraph:
@@ -221,18 +210,23 @@ async def resolve(
 ) -> MultiDiGraph:
     stderr.write("Resolving requirements...\n")
 
+    initial_requirements = freeze(initial_requirements)
+
     for manager, requirements in sorted(
         initial_requirements.items(), key=lambda x: x[0]
     ):
         stderr.write(f"{manager}:\n")
         for requirement in requirements:
-            stderr.write(f"\t{json_dumps(requirement)}\n")
+            if not isinstance(requirement, Lock):
+                stderr.write(f"\t{json_dumps(requirement)}\n")
+            else:
+                stderr.write(f"\t{requirement.lock} -> {requirement.version}\n")
 
     iterations_done = 0
 
     all_requirements_choices = [
         {
-            manager: frozenset([requirements])
+            manager: {frozenset(requirements)}
             for manager, requirements in initial_requirements.items()
         }
     ]
@@ -266,6 +260,9 @@ async def resolve(
         all_requirements_choices = new_choices
 
         iterations_done += 1
+
+    if len(results_work_graph) == 0:
+        raise SubmanagerCommandFailure("No requirement resolution found.")
 
     # TODO: model selection
     result_work_graph = results_work_graph.pop()

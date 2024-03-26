@@ -10,5 +10,6 @@ setup(
         "sqlmodel",
         "aiosqlite",
         "fastapi",
+        "asyncstdlib",
     ],
 )

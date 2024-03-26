@@ -18,7 +18,12 @@ from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import Template as Jinja2Template
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_submanager.schemes import (
+    Lock,
+    Options,
+    ResolutionGraph,
+    ResolutionGraphNode,
+)
 from PPpackage_submanager.utils import jinja_render_temp_file
 from PPpackage_utils.utils import (
     asubprocess_communicate,
@@ -123,11 +128,14 @@ async def remove_temporary_packages_from_cache(
 
 
 async def create_requirement_partitions(
-    requirements: AsyncIterable[Requirement],
+    requirements: AsyncIterable[Requirement | Lock],
 ) -> Sequence[Mapping[str, str]]:
     requirement_partitions: MutableSequence[MutableMapping[str, str]] = []
 
     async for requirement in requirements:
+        if isinstance(requirement, Lock):
+            continue
+
         partition_available: Optional[MutableMapping[str, str]] = next(
             (
                 partition
@@ -243,7 +251,7 @@ async def resolve(
     settings: Settings,
     state: State,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[Requirement]],
+    requirements_list: AsyncIterable[AsyncIterable[Requirement | Lock]],
 ) -> AsyncIterable[ResolutionGraph]:
     ensure_dir_exists(settings.cache_path)
 

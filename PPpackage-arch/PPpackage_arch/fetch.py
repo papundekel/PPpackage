@@ -6,7 +6,13 @@ from pathlib import Path
 
 from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
+from PPpackage_submanager.schemes import (
+    Dependency,
+    FetchRequest,
+    Options,
+    Package,
+    ProductIDAndInfo,
+)
 from PPpackage_utils.utils import (
     TemporaryDirectory,
     asubprocess_wait,
@@ -14,7 +20,6 @@ from PPpackage_utils.utils import (
     ensure_dir_exists,
     fakeroot,
 )
-from pydantic import RootModel
 
 from .settings import Settings
 from .utils import get_cache_paths
@@ -36,7 +41,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> ProductIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | FetchRequest:
     database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)

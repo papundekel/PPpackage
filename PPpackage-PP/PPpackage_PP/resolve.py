@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterable, MutableSequence
 
 from PPpackage_submanager.schemes import (
+    Lock,
     ManagerRequirement,
     Options,
     ResolutionGraph,
@@ -14,7 +15,7 @@ async def resolve(
     settings: Settings,
     state: None,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str]],
+    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
 ) -> AsyncIterable[ResolutionGraph]:
     roots: MutableSequence[MutableSequence[str]] = []
 
@@ -24,6 +25,9 @@ async def resolve(
         requirements_roots = []
 
         async for requirement in requirements:
+            if isinstance(requirement, Lock):
+                continue
+
             requirements_merged.add(requirement)
             requirements_roots.append(requirement)
 

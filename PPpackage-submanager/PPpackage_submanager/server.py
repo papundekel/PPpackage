@@ -169,9 +169,15 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
             if isinstance(output, ProductIDAndInfo):
                 return StreamingResponse(HTTP_200_OK, dump_one(output))
             else:
-                return StreamingResponse(
-                    HTTP_422_UNPROCESSABLE_ENTITY, dump_many_async(output)
-                )
+
+                async def generator():
+                    async for chunk in dump_many_async(output.requirements):
+                        yield chunk
+
+                    async for chunk in dump_many_async(output.generators):
+                        yield chunk
+
+                return StreamingResponse(HTTP_422_UNPROCESSABLE_ENTITY, generator())
 
         async def generate(
             request: Request,

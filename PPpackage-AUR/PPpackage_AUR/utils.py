@@ -6,6 +6,21 @@ from dataclasses import dataclass
 from PPpackage_utils.utils import asubprocess_communicate
 
 
+async def is_package_from_aur(name: str) -> bool:
+    process = await create_subprocess_exec(
+        "pacman",
+        "-Sp",
+        name,
+        stdin=DEVNULL,
+        stdout=DEVNULL,
+        stderr=DEVNULL,
+    )
+
+    return_code = await process.wait()
+
+    return return_code != 0
+
+
 @dataclass(frozen=True)
 class PackageInfo:
     version: str

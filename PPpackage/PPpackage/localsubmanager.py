@@ -1,12 +1,15 @@
 from collections.abc import AsyncGenerator, Iterable, Set
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import UnionType
 from typing import Any, AsyncIterable, TypeVar
 from typing import cast as type_cast
 
 from PPpackage_submanager.interface import Interface, load_interface_module
 from PPpackage_submanager.schemes import (
     Dependency,
+    FetchRequest,
+    Lock,
     Options,
     Package,
     Product,
@@ -26,9 +29,9 @@ RequirementType = TypeVar("RequirementType")
 
 async def make_async_requirements(
     Requirement: type[RequirementType], requirements: Iterable[Any]
-) -> AsyncIterable[RequirementType]:
+) -> AsyncIterable[RequirementType | Lock]:
     for requirement in requirements:
-        yield load_object(Requirement, requirement)
+        yield load_object(Requirement | Lock, requirement)  # type: ignore
 
 
 class LocalSubmanager(Submanager):
@@ -71,7 +74,7 @@ class LocalSubmanager(Submanager):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncGenerator[ProductIDAndInfo | AsyncIterable[str], None]:
+    ) -> AsyncGenerator[ProductIDAndInfo | FetchRequest, None]:
         yield await self.interface.fetch(
             self.settings,
             self.state,

@@ -1,4 +1,4 @@
-from asyncio import TaskGroup, create_subprocess_exec
+from asyncio import Task, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
@@ -6,7 +6,12 @@ from pathlib import Path
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_arch.settings import Settings
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_submanager.schemes import (
+    Lock,
+    Options,
+    ResolutionGraph,
+    ResolutionGraphNode,
+)
 from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
 from pydot import graph_from_dot_data
 
@@ -15,7 +20,7 @@ from .update_database import update_database
 from .utils import get_cache_paths
 
 
-async def resolve_pactree(
+async def resolve_requirement(
     database_path: Path, requirement: str
 ) -> tuple[MultiDiGraph, str]:
     process = await create_subprocess_exec(
@@ -115,21 +120,32 @@ async def resolve(
     settings: Settings,
     state: None,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str]],
+    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
 ) -> AsyncIterable[ResolutionGraph]:
     database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
         await update_database(settings, state)
 
+    locks = set[Lock]()
+
     async with TaskGroup() as group:
-        tasks_list = [
-            [
-                group.create_task(resolve_pactree(database_path, requirement))
-                async for requirement in requirements
-            ]
-            async for requirements in requirements_list
-        ]
+        tasks_list = list[list[Task[tuple[MultiDiGraph, str]]]]()
+
+        async for requirements in requirements_list:
+            task_list = list[Task[tuple[MultiDiGraph, str]]]()
+
+            async for requirement in requirements:
+                if isinstance(requirement, str):
+                    task_list.append(
+                        group.create_task(
+                            resolve_requirement(database_path, requirement)
+                        )
+                    )
+                else:
+                    locks.add(requirement)
+
+            tasks_list.append(task_list)
 
     graphs_list = [[task.result() for task in tasks] for tasks in tasks_list]
 
@@ -139,6 +155,11 @@ async def resolve(
         database_path,
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
+
+    for lock in locks:
+        version = versions.get(lock.lock)
+        if version is not None and version != lock.version:
+            return
 
     dependencies = resolve_dependencies(
         graph for graphs in graphs_list for graph, _ in graphs

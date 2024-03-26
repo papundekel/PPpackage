@@ -1,15 +1,23 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterable, AsyncIterator, Iterable, MutableMapping
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Set,
+)
 from contextlib import asynccontextmanager, contextmanager
 from os import environ, kill, mkfifo
 from pathlib import Path
 from shutil import move
 from shutil import rmtree as base_rmtree
 from signal import SIGTERM
-from sys import stderr
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar, overload
+
+from frozendict import frozendict
 
 
 class MyException(Exception):
@@ -149,6 +157,7 @@ async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
 
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 
 async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
@@ -192,3 +201,20 @@ def movetree(source: Path, destination: Path):
 
 def get_module_path(module) -> Path:
     return Path(module.__file__)
+
+
+@overload
+def freeze(x: Mapping[T, U]) -> Mapping[T, U]: ...
+
+
+@overload
+def freeze(x: Set[T]) -> Set[T]: ...
+
+
+def freeze(x):
+    if isinstance(x, Mapping):
+        return frozendict({key: freeze(value) for key, value in x.items()})
+    elif isinstance(x, Set):
+        return frozenset(value for value in x)
+    else:
+        return x

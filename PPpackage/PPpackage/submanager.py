@@ -4,6 +4,7 @@ from typing import Any, AsyncContextManager, Final, Protocol, Self
 
 from PPpackage_submanager.schemes import (
     Dependency,
+    FetchRequest,
     Options,
     Package,
     Product,
@@ -33,7 +34,7 @@ class Submanager(Protocol):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncContextManager[ProductIDAndInfo | AsyncIterable[str]]: ...
+    ) -> AsyncContextManager[ProductIDAndInfo | FetchRequest]: ...
 
     async def install(
         self, id: str, installation_path: Path, product: Product

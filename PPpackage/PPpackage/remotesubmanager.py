@@ -6,6 +6,7 @@ from typing import Any, AsyncIterable, Self
 from httpx import AsyncClient as HTTPClient
 from PPpackage_submanager.schemes import (
     Dependency,
+    FetchRequest,
     Options,
     Package,
     Product,
@@ -78,7 +79,7 @@ class RemoteSubmanager(Submanager):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncGenerator[ProductIDAndInfo | AsyncIterable[str], None]:
+    ) -> AsyncGenerator[ProductIDAndInfo | FetchRequest, None]:
         installation = (
             tar_archive(installation_path) if installation_path is not None else None
         )
@@ -119,7 +120,9 @@ class RemoteSubmanager(Submanager):
             if response.is_success:
                 yield await reader.load_one(ProductIDAndInfo)
             elif response.status_code == 422:
-                yield reader.load_many(str)
+                yield FetchRequest(
+                    reader.load_many(tuple[str, Any]), reader.load_many(str)
+                )
             else:
                 raise SubmanagerCommandFailure(
                     f"remote fetch failed: {(await response.aread()).decode()}"

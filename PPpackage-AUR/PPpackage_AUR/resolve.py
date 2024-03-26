@@ -1,8 +1,7 @@
-from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, MutableSequence
 
 from PPpackage_submanager.schemes import (
+    Lock,
     ManagerRequirement,
     Options,
     ResolutionGraph,
@@ -11,22 +10,7 @@ from PPpackage_submanager.schemes import (
 
 from .lifespan import State
 from .settings import Settings
-from .utils import PackageInfo, fetch_info
-
-
-async def is_package_from_aur(name: str) -> bool:
-    process = await create_subprocess_exec(
-        "pacman",
-        "-Sp",
-        name,
-        stdin=DEVNULL,
-        stdout=DEVNULL,
-        stderr=DEVNULL,
-    )
-
-    return_code = await process.wait()
-
-    return return_code != 0
+from .utils import PackageInfo, fetch_info, is_package_from_aur
 
 
 def split_version_requirement(requirement: str) -> str:
@@ -65,24 +49,34 @@ async def resolve(
     settings: Settings,
     state: State,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str]],
+    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
 ) -> AsyncIterable[ResolutionGraph]:
     roots: MutableSequence[MutableSequence[str]] = []
-
     package_names_with_info = dict[str, PackageInfo]()
+    locks = set[Lock]()
 
     async for requirements in requirements_list:
         requirements_roots = []
 
         async for requirement in requirements:
-            package_name = split_version_requirement(requirement)
+            if isinstance(requirement, str):
+                package_name = split_version_requirement(requirement)
 
-            if package_name not in package_names_with_info:
-                package_names_with_info[package_name] = await fetch_info(package_name)
+                if package_name not in package_names_with_info:
+                    package_names_with_info[package_name] = await fetch_info(
+                        package_name
+                    )
 
-            requirements_roots.append(package_name)
+                requirements_roots.append(package_name)
+            else:
+                locks.add(requirement)
 
         roots.append(requirements_roots)
+
+    for lock in locks:
+        package_info = package_names_with_info.get(lock.lock)
+        if package_info is not None and package_info.version != lock.version:
+            return
 
     graph = [
         await create_node(name, info) for name, info in package_names_with_info.items()

@@ -2,12 +2,21 @@ from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
+from types import UnionType
 from typing import Any, AsyncContextManager, Generic, TypeVar
 from typing import cast as type_cast
 
 from pydantic_settings import BaseSettings
 
-from .schemes import Dependency, Package, Product, ProductIDAndInfo, ResolutionGraph
+from .schemes import (
+    Dependency,
+    FetchRequest,
+    Lock,
+    Package,
+    Product,
+    ProductIDAndInfo,
+    ResolutionGraph,
+)
 
 RequirementType = TypeVar("RequirementType")
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
@@ -28,7 +37,7 @@ FetchCallbackType = Callable[
         Path | None,
         Path | None,
     ],
-    Awaitable[ProductIDAndInfo | AsyncIterable[str]],
+    Awaitable[ProductIDAndInfo | FetchRequest],
 ]
 
 GenerateCallbackType = Callable[
@@ -67,7 +76,7 @@ class Interface(Generic[SettingsType, StateType, RequirementType]):
     update_database: UpdateDatabaseCallbackType[SettingsType, StateType] = (
         update_database_noop
     )
-    resolve: ResolveCallbackType[SettingsType, StateType, RequirementType]
+    resolve: ResolveCallbackType[SettingsType, StateType, RequirementType | Lock]
     fetch: FetchCallbackType[SettingsType, StateType]
     generate: GenerateCallbackType[SettingsType, StateType] = generate_noop
     install: InstallCallbackType[SettingsType, StateType]
