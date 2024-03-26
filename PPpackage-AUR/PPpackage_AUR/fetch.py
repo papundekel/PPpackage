@@ -129,7 +129,7 @@ async def build(
                     "--workdir",
                     WORKDIR,
                     "--rootfs",
-                    str(build_context_path.absolute()),
+                    str(workdir_info.translate(build_context_path).absolute()),
                     "makepkg",
                     stdin=DEVNULL,
                     stdout=DEVNULL,
