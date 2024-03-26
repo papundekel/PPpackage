@@ -1,8 +1,9 @@
-from asyncio import create_subprocess_exec
+from asyncio import Lock, create_subprocess_exec, sleep
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
 from os import symlink
 from pathlib import Path
+from sys import stderr
 
 from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
@@ -33,6 +34,9 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
+lock = Lock()
+
+
 async def fetch(
     settings: Settings,
     state: None,
@@ -48,29 +52,26 @@ async def fetch(
 
     await discard_async_iterable(dependencies)
 
-    with TemporaryDirectory() as database_path_fake:
-        symlink(database_path.absolute() / "sync", database_path_fake / "sync")
+    async with fakeroot() as environment, lock:
+        process = await create_subprocess_exec(
+            "pacman",
+            "--dbpath",
+            str(database_path),
+            "--cachedir",
+            str(cache_path),
+            "--noconfirm",
+            "--sync",
+            "--downloadonly",
+            "--nodeps",
+            "--nodeps",
+            package.name,
+            stdin=DEVNULL,
+            stdout=DEVNULL,
+            stderr=None,
+            env=environment,
+        )
 
-        async with fakeroot() as environment:
-            process = await create_subprocess_exec(
-                "pacman",
-                "--dbpath",
-                str(database_path_fake),
-                "--cachedir",
-                str(cache_path),
-                "--noconfirm",
-                "--sync",
-                "--downloadonly",
-                "--nodeps",
-                "--nodeps",
-                package.name,
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=None,
-                env=environment,
-            )
-
-            await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException())
 
     process = await create_subprocess_exec(
         "pacman",

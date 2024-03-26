@@ -94,8 +94,6 @@ async def build(
             PKGDEST = "/mnt/package"
             WORKDIR = "/mnt/build"
 
-            print(product_path_dir, build_path, build_context_path, file=stderr)
-
             async with containerizer_subprocess_exec(
                 containerizer,
                 "run",
