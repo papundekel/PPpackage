@@ -98,6 +98,12 @@ async def build(
             for x in cache_path.iterdir():
                 print(x, file=stderr)
 
+            for x in build_path.parent.iterdir():
+                print(x, file=stderr)
+
+            for x in build_path.iterdir():
+                print(x, file=stderr)
+
             async with containerizer_subprocess_exec(
                 containerizer,
                 "run",
