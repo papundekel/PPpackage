@@ -66,7 +66,7 @@ async def fetch(
                 package.name,
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=DEVNULL,
+                stderr=None,
                 env=environment,
             )
 
