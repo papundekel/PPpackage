@@ -44,10 +44,10 @@ def create_necessary_container_files(root_path: Path):
 
 async def install_manager_command(
     containerizer: str,
+    workdir_info: ContainerizerWorkdirInfo,
     pipe_to_fakealpm: TextIOWrapper,
     pipe_from_fakealpm: TextIOWrapper,
     installation_path: Path,
-    containerizer_installation_path: Path,
 ):
     command = pipe_read_string("PPpackage-pacman-utils", pipe_from_fakealpm)
     args = pipe_read_strings("PPpackage-pacman-utils", pipe_from_fakealpm)
@@ -70,7 +70,7 @@ async def install_manager_command(
                 "--rm",
                 "--interactive",
                 "--rootfs",
-                str(containerizer_installation_path),
+                str(workdir_info.translate(installation_path)),
                 command,
                 *args,
                 stdin=pipe_hook,
@@ -103,8 +103,6 @@ async def pacman_install(
     installation_path: Path,
     product_path: Path,
 ):
-    containerizer_installation_path = workdir_info.translate(installation_path)
-
     database_path = installation_path / DATABASE_PATH_RELATIVE
 
     ensure_dir_exists(database_path)
@@ -150,10 +148,10 @@ async def pacman_install(
                     elif header == "COMMAND":
                         await install_manager_command(
                             containerizer,
+                            workdir_info,
                             pipe_to_fakealpm,
                             pipe_from_fakealpm,
                             installation_path,
-                            containerizer_installation_path,
                         )
                     else:
                         raise Exception(

@@ -231,4 +231,4 @@ class ContainerizerWorkdirInfo:
             self.container_path
         )
 
-        return containerizer_path
+        return containerizer_path.absolute()

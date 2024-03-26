@@ -115,13 +115,13 @@ async def build(
                     "--mount",
                     (
                         "type=bind,"
-                        f"source={workdir_info.translate(temp_product_path).absolute()},"
+                        f"source={workdir_info.translate(temp_product_path)},"
                         f"target={PKGDEST}"
                     ),
                     "--mount",
                     (
                         "type=bind,"
-                        f"source={workdir_info.translate(build_path).absolute()},"
+                        f"source={workdir_info.translate(build_path)},"
                         f"target={WORKDIR}"
                     ),
                     "--env",
@@ -129,7 +129,7 @@ async def build(
                     "--workdir",
                     WORKDIR,
                     "--rootfs",
-                    str(workdir_info.translate(build_context_path).absolute()),
+                    str(workdir_info.translate(build_context_path)),
                     "makepkg",
                     stdin=DEVNULL,
                     stdout=DEVNULL,
