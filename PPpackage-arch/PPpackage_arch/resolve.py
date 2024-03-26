@@ -2,6 +2,7 @@ from asyncio import Task, TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
+from sys import stderr
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_arch.settings import Settings
@@ -125,7 +126,9 @@ async def resolve(
     database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
+        stderr.write("Creating database... ")
         await update_database(settings, state)
+        stderr.write("Done.\n")
 
     locks = set[Lock]()
 

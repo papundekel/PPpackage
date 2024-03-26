@@ -4,6 +4,7 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from io import TextIOWrapper
 from pathlib import Path
+from sys import stderr
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.utils import containerizer_subprocess_exec
@@ -133,6 +134,16 @@ async def pacman_install(
                 stderr=None,
                 env=environment,
             )
+
+            if str(product_path).find("pacman") != -1:
+                for x in installation_path.iterdir():
+                    print(x, file=stderr)
+
+            await (
+                await create_subprocess_exec(
+                    "tar", "-tf", str(product_path), stdout=stderr, stderr=None
+                )
+            ).wait()
 
             with (
                 open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
