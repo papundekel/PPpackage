@@ -104,6 +104,9 @@ async def fetch_install(
     )
 
     stderr.write("RECURSIVE INSTALL DONE\n")
+    stderr.write(f"into {destination_path}\n")
+    stderr.write(str(dependency_install_order) + "\n")
+    stderr.write(str(extra_install_order) + "\n")
 
 
 async def fetch_generate(
