@@ -16,7 +16,7 @@ from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
 from PPpackage_utils.utils import TemporaryDirectory, ensure_dir_exists
 from pydantic import AnyUrl
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_200_OK, HTTP_422_UNPROCESSABLE_ENTITY
@@ -66,6 +66,8 @@ interface = load_interface_module(submanager_package_settings.submanager_package
 class ServerSettings(interface.Settings):
     database_url: AnyUrl
     installations_path: Path
+
+    model_config = SettingsConfigDict(env_nested_delimiter="__", case_sensitive=False)
 
 
 settings = ServerSettings()

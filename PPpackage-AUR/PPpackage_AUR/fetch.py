@@ -106,6 +106,9 @@ async def build(
                 print(build_path, file=stderr)
                 print(build_context_path, file=stderr)
 
+                for x in (build_context_path / "etc").iterdir():
+                    print(x, file=stderr)
+
                 async with containerizer_subprocess_exec(
                     containerizer,
                     "run",
