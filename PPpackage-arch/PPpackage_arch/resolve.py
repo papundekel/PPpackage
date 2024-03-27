@@ -95,7 +95,7 @@ async def resolve_versions(
         *packages,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=PIPE,
     )
 
     stdout = await asubprocess_communicate(process, "Error in `pacinfo`.")

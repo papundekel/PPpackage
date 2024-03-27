@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 
+if [ "$#" -ne 0 ]; then
+    echo "Usage: $0 <input.json"
+    exit 1
+fi
+
 cache_path_arch="tmp/cache/arch"
 cache_path_conan="tmp/cache/conan"
 cache_path_PP="tmp/cache/PP"

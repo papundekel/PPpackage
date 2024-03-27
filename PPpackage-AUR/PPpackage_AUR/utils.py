@@ -44,7 +44,7 @@ async def fetch_info(name: str) -> PackageInfo:
         name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=PIPE,
     )
 
     stdout = await asubprocess_communicate(process, "Error in `paru -Si`.")

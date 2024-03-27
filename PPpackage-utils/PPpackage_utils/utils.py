@@ -98,7 +98,7 @@ async def get_fakeroot_info():
             "LD_PRELOAD",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=PIPE,
         )
 
         fakeroot_stdout = await asubprocess_communicate(process, "Error in `fakeroot`.")
@@ -122,7 +122,7 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
             "faked",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=PIPE,
         )
 
         faked_stdout = await asubprocess_communicate(process, "Error in `faked`.")
