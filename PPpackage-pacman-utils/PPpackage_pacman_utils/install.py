@@ -131,19 +131,9 @@ async def pacman_install(
                 str(product_path),
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=None,
+                stderr=DEVNULL,
                 env=environment,
             )
-
-            if str(product_path).find("pacman") != -1:
-                for x in (installation_path / "etc").iterdir():
-                    print(x, file=stderr)
-
-                await (
-                    await create_subprocess_exec(
-                        "tar", "-tf", str(product_path), stdout=stderr, stderr=None
-                    )
-                ).wait()
 
             with (
                 open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,

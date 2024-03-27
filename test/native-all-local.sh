@@ -14,23 +14,19 @@ mkdir -p tmp/output
 
 
 submanagers__arch__package=PPpackage_arch \
-submanagers__arch__settings__debug=true \
 submanagers__arch__settings__cache_path="$cache_path_arch" \
 submanagers__arch__settings__containerizer="$containerizer" \
 submanagers__arch__settings__workdir__containerizer_path="tmp/" \
 submanagers__arch__settings__workdir__container_path="tmp/" \
 \
 submanagers__conan__package=PPpackage_conan \
-submanagers__conan__settings__debug=true \
 submanagers__conan__settings__cache_path="$cache_path_conan" \
 \
 submanagers__PP__package=PPpackage_PP \
-submanagers__PP__settings__debug=true \
 submanagers__PP__settings__cache_path="$cache_path_PP" \
 submanagers__PP__settings__containerizer="$containerizer" \
 \
 submanagers__AUR__package=PPpackage_AUR \
-submanagers__AUR__settings__debug=true \
 submanagers__AUR__settings__cache_path="$cache_path_AUR" \
 submanagers__AUR__settings__containerizer="$containerizer" \
 submanagers__AUR__settings__workdir__containerizer_path="tmp/" \

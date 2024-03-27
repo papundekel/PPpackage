@@ -1,8 +1,6 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from contextlib import asynccontextmanager, contextmanager
-from pathlib import Path
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional, TypeVar
 
@@ -10,7 +8,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
 from jinja2 import Template as Jinja2Template
 from PPpackage_utils.http_stream import AsyncChunkReader
-from PPpackage_utils.utils import TemporaryDirectory, asubprocess_communicate
+from PPpackage_utils.utils import TemporaryDirectory
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -21,8 +19,6 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
-
-from .exceptions import CommandException
 
 
 @asynccontextmanager

@@ -1,8 +1,11 @@
 from asyncio import IncompleteReadError
 from collections.abc import AsyncIterable
+from logging import getLogger
 
 from PPpackage_utils.queue import Queue, queue_iterate
 from PPpackage_utils.stream import Reader, Writer
+
+logger = getLogger(__name__)
 
 
 class AsyncChunkReader(Reader):
@@ -21,6 +24,8 @@ class AsyncChunkReader(Reader):
 
         if chunk is None:
             raise IncompleteReadError(self._buffer, 0)
+
+        logger.debug(f"_fill_buffer: {bytes(chunk)}")
 
         self._buffer += chunk
 

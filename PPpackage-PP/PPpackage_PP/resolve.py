@@ -7,6 +7,7 @@ from PPpackage_submanager.schemes import (
     ResolutionGraph,
     ResolutionGraphNode,
 )
+from PPpackage_utils.utils import discard_async_iterable
 
 from .settings import Settings
 
@@ -15,7 +16,8 @@ async def resolve(
     settings: Settings,
     state: None,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
+    requirements_list: AsyncIterable[AsyncIterable[str]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
     roots: MutableSequence[MutableSequence[str]] = []
 
@@ -25,13 +27,12 @@ async def resolve(
         requirements_roots = []
 
         async for requirement in requirements:
-            if isinstance(requirement, Lock):
-                continue
-
             requirements_merged.add(requirement)
             requirements_roots.append(requirement)
 
         roots.append(requirements_roots)
+
+    await discard_async_iterable(locks)
 
     graph = [
         ResolutionGraphNode(

@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 from typing import Any, AsyncContextManager, Final, Protocol, Self
 
@@ -25,6 +25,7 @@ class Submanager(Protocol):
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
+        locks: Mapping[str, str],
     ) -> AsyncIterable[ResolutionGraph]: ...
 
     def fetch(

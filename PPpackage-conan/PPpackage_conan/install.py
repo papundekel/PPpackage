@@ -14,10 +14,7 @@ from .utils import make_conan_environment
 
 
 async def install_product(
-    debug: bool,
-    environment: Mapping[str, str],
-    installation_path: Path,
-    product: Product,
+    environment: Mapping[str, str], installation_path: Path, product: Product
 ):
     product_installation_path = installation_path / product.name
 
@@ -56,6 +53,4 @@ async def install(
 
     prefix = Path("conan")
 
-    await install_product(
-        settings.debug, environment, installation_path / prefix, product
-    )
+    await install_product(environment, installation_path / prefix, product)

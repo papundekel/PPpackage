@@ -16,7 +16,6 @@ from typing import Any
 
 from networkx import MultiDiGraph, is_directed_acyclic_graph
 from PPpackage_submanager.schemes import (
-    Lock,
     ManagerAndName,
     ManagerRequirement,
     Options,
@@ -101,9 +100,10 @@ async def resolve_manager(
     submanager: Submanager,
     options: Options,
     requirements_list: Iterable[Set[Hashable]],
+    locks: Mapping[str, str],
     resolution_graphs: Mapping[str, MutableSequence[ResolutionGraph]],
 ):
-    async for resolution_graph in submanager.resolve(options, requirements_list):
+    async for resolution_graph in submanager.resolve(options, requirements_list, locks):
         resolution_graphs[submanager.name].append(resolution_graph)
 
 
@@ -111,7 +111,8 @@ async def resolve_iteration(
     submanagers: Mapping[str, Submanager],
     meta_options: Mapping[str, Any],
     requirements: Mapping[str, Set[Set[Hashable]]],
-    initial: Mapping[str, Set[Hashable]],
+    initial_requirements: Mapping[str, Set[Hashable]],
+    manager_locks: Mapping[str, Mapping[str, str]],
     new_choices: MutableSequence[Any],
     results: MutableSequence[Mapping[str, WorkGraph]],
 ) -> None:
@@ -126,12 +127,14 @@ async def resolve_iteration(
         for submanager_name, requirements_list in requirements_lists.items():
             resolution_graphs[submanager_name] = []
             submanager = submanagers[submanager_name]
+            locks = manager_locks.get(submanager_name, {})
 
             group.create_task(
                 resolve_manager(
                     submanager,
                     meta_options.get(submanager.name),
                     requirements_list,
+                    locks,
                     resolution_graphs,
                 )
             )
@@ -148,7 +151,9 @@ async def resolve_iteration(
         }
 
         resolved_requirements = get_resolved_requirements(meta_graph)
-        all_requirements = merge_requirements(initial, get_all_requirements(meta_graph))
+        all_requirements = merge_requirements(
+            initial_requirements, get_all_requirements(meta_graph)
+        )
 
         if resolved_requirements == all_requirements:
             results.append(meta_graph)
@@ -206,7 +211,8 @@ async def resolve(
     submanagers: Mapping[str, Submanager],
     iteration_limit: int,
     initial_requirements: Mapping[str, Set[Any]],
-    meta_options: Mapping[str, Any],
+    manager_locks: Mapping[str, Mapping[str, str]],
+    manager_options: Mapping[str, Any],
 ) -> MultiDiGraph:
     stderr.write("Resolving requirements...\n")
 
@@ -217,10 +223,13 @@ async def resolve(
     ):
         stderr.write(f"{manager}:\n")
         for requirement in requirements:
-            if not isinstance(requirement, Lock):
-                stderr.write(f"\t{json_dumps(requirement)}\n")
-            else:
-                stderr.write(f"\t{requirement.lock} -> {requirement.version}\n")
+            stderr.write(f"\t{json_dumps(requirement)}\n")
+
+        locks = manager_locks.get(manager)
+        if locks is not None:
+            stderr.write(f"\tLocks:\n")
+            for lock, version in locks.items():
+                stderr.write(f"\t\t{lock} -> {version}\n")
 
     iterations_done = 0
 
@@ -246,9 +255,10 @@ async def resolve(
                 group.create_task(
                     resolve_iteration(
                         submanagers,
-                        meta_options,
+                        manager_options,
                         all_requirements,
                         initial_requirements,
+                        manager_locks,
                         new_choices,
                         results_work_graph,
                     )

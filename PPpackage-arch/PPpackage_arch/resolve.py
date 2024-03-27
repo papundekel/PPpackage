@@ -1,6 +1,7 @@
-from asyncio import Task, TaskGroup, create_subprocess_exec
+from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from logging import getLogger
 from pathlib import Path
 from sys import stderr
 
@@ -20,6 +21,8 @@ from .settings import Settings
 from .update_database import update_database
 from .utils import get_cache_paths
 
+logger = getLogger(__name__)
+
 
 async def resolve_requirement(
     database_path: Path, requirement: str
@@ -33,7 +36,7 @@ async def resolve_requirement(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=None,
+        stderr=DEVNULL,
     )
 
     assert process.stdout is not None
@@ -82,7 +85,7 @@ def clean_graph(graph: MultiDiGraph) -> str:
 
 
 async def resolve_versions(
-    database_path: Path, packages: Set[str]
+    database_path: Path, packages: Iterable[str]
 ) -> Mapping[str, str]:
     process = await create_subprocess_exec(
         "pacinfo",
@@ -121,8 +124,11 @@ async def resolve(
     settings: Settings,
     state: None,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
+    requirements_list: AsyncIterable[AsyncIterable[str]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
+    logger.info(f"Resolve begin, options: {options}")
+
     database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
@@ -130,25 +136,14 @@ async def resolve(
         await update_database(settings, state)
         stderr.write("arch: Created database.\n")
 
-    locks = set[Lock]()
-
     async with TaskGroup() as group:
-        tasks_list = list[list[Task[tuple[MultiDiGraph, str]]]]()
-
-        async for requirements in requirements_list:
-            task_list = list[Task[tuple[MultiDiGraph, str]]]()
-
-            async for requirement in requirements:
-                if isinstance(requirement, str):
-                    task_list.append(
-                        group.create_task(
-                            resolve_requirement(database_path, requirement)
-                        )
-                    )
-                else:
-                    locks.add(requirement)
-
-            tasks_list.append(task_list)
+        tasks_list = [
+            [
+                group.create_task(resolve_requirement(database_path, requirement))
+                async for requirement in requirements
+            ]
+            async for requirements in requirements_list
+        ]
 
     graphs_list = [[task.result() for task in tasks] for tasks in tasks_list]
 
@@ -159,8 +154,8 @@ async def resolve(
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
 
-    for lock in locks:
-        version = versions.get(lock.lock)
+    async for lock in locks:
+        version = versions.get(lock.name)
         if version is not None and version != lock.version:
             return
 

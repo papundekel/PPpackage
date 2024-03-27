@@ -2,6 +2,7 @@ from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, Iterable
 from hashlib import sha1
+from logging import getLogger
 from pathlib import Path
 from shutil import move
 from sys import stderr
@@ -29,6 +30,8 @@ from sqlitedict import SqliteDict
 from .lifespan import State
 from .settings import Settings
 from .utils import fetch_info, is_package_from_aur, make_product_key
+
+logger = getLogger(__name__)
 
 
 class Hash(Protocol):
@@ -80,6 +83,8 @@ async def build(
     build_context_path: Path,
     product_key: str,
 ):
+    logger.info(f"Building {package.name} {package.version}...")
+
     product_path_dir = Path(mkdtemp(dir=cache_path))
 
     try:
@@ -101,14 +106,6 @@ async def build(
             WORKDIR = "/mnt/build"
 
             with TemporaryDirectory(workdir_info.container_path) as temp_product_path:
-                print(workdir_info, file=stderr)
-                print(temp_product_path, file=stderr)
-                print(build_path, file=stderr)
-                print(build_context_path, file=stderr)
-
-                for x in (build_context_path / "etc").iterdir():
-                    print(x, file=stderr)
-
                 async with containerizer_subprocess_exec(
                     containerizer,
                     "run",
@@ -136,7 +133,7 @@ async def build(
                     "makepkg",
                     stdin=DEVNULL,
                     stdout=DEVNULL,
-                    stderr=None,
+                    stderr=DEVNULL,
                 ) as process:
                     await asubprocess_wait(process, CommandException())
 
@@ -149,6 +146,8 @@ async def build(
     except:
         product_path_dir.rmdir()
         raise
+
+    logger.info(f"Built {package.name} {package.version}.")
 
 
 async def request_build_context(build_dependencies: Iterable[str]):

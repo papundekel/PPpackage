@@ -1,3 +1,7 @@
+from logging import Filter as LoggingFilter
+from logging import Formatter as LoggingFormatter
+from logging import StreamHandler as StreamLoggingHandler
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +15,15 @@ from .settings import Settings
 settings = Settings()  # type: ignore
 
 app = AsyncTyper()
+
+logging_formatter = LoggingFormatter("%(name)s: %(message)s")
+logging_handler = StreamLoggingHandler()
+logging_handler.setLevel("DEBUG")
+logging_handler.addFilter(LoggingFilter("PPpackage"))
+logging_handler.setFormatter(logging_formatter)
+logger = getLogger()
+logger.setLevel("DEBUG")
+logger.addHandler(logging_handler)
 
 
 @app.command()

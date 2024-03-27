@@ -90,7 +90,7 @@ async def fetch(
 
         await asubprocess_wait(process, CommandException())
 
-    nodes = parse_conan_graph_nodes(settings.debug, FetchNode, graph_json_bytes)
+    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
     for node in nodes.values():
         package_name = node.name

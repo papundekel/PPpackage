@@ -12,10 +12,10 @@ from contextlib import asynccontextmanager, contextmanager
 from os import environ, kill, mkfifo
 from pathlib import Path
 from shutil import move
-from shutil import rmtree as base_rmtree
 from signal import SIGTERM
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import Any, Optional, TypeVar, overload
+from unittest.mock import Base
 
 from frozendict import frozendict
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -162,25 +162,21 @@ async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
         yield item
 
 
-def _wipe_directory_onerror(_, __, excinfo):
-    _, exc, _ = excinfo
-
-    if not isinstance(exc, FileNotFoundError):
-        raise exc
-
-
-def rmtree(path: Path, onerror=None):
+def rmtree(path: Path):
     if not path.exists():
         pass
     elif not path.is_symlink() and path.is_dir():
-        base_rmtree(path, onerror=onerror)
+        temp = BaseTemporaryDirectory()
+        temp.cleanup()
+        temp.name = str(path)
+        temp.cleanup()
     else:
         path.unlink()
 
 
 def wipe_directory(directory: Path) -> None:
     for path in directory.iterdir():
-        rmtree(path, onerror=_wipe_directory_onerror)
+        rmtree(path)
 
 
 def movetree(source: Path, destination: Path):

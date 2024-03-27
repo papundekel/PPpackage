@@ -50,6 +50,7 @@ cleanup()
     kill -s TERM $pid_pp
     kill -s TERM $pid_aur
 
+    
     rm -f \
         "$admin_token_path_arch" \
         "$admin_token_path_conan" \
@@ -73,6 +74,7 @@ cleanup()
         "$installations_conan" \
         "$installations_pp" \
         "$installations_aur"
+
 
     rm -rf tmp/installations
 
@@ -100,7 +102,6 @@ mkdir -p \
 
 
 
-DEBUG=true \
 CACHE_PATH="$cache_path_arch" \
 CONTAINERIZER="$containerizer" \
 WORKDIR__CONTAINERIZER_PATH="tmp/" \
@@ -108,36 +109,36 @@ WORKDIR__CONTAINER_PATH="tmp/" \
 SUBMANAGER_PACKAGE=PPpackage_arch \
 DATABASE_URL="$database_url_arch" \
 INSTALLATIONS_PATH="$installations_arch" \
+BUILD_CONTEXT_WORKDIR_PATH="tmp/" \
 hypercorn \
     PPpackage_submanager.server:server \
     --bind "$address_arch" \
     &
 pid_arch=$!
 
-DEBUG=true \
 CACHE_PATH="$cache_path_conan" \
 SUBMANAGER_PACKAGE=PPpackage_conan \
 DATABASE_URL="$database_url_conan" \
 INSTALLATIONS_PATH="$installations_conan" \
+BUILD_CONTEXT_WORKDIR_PATH="tmp/" \
 hypercorn \
     PPpackage_submanager.server:server \
     --bind "$address_conan" \
     &
 pid_conan=$!
 
-DEBUG=true \
 CACHE_PATH="$cache_path_pp" \
 CONTAINERIZER="$containerizer" \
 SUBMANAGER_PACKAGE=PPpackage_PP \
 DATABASE_URL="$database_url_pp" \
 INSTALLATIONS_PATH="$installations_pp" \
+BUILD_CONTEXT_WORKDIR_PATH="tmp/" \
 hypercorn \
     PPpackage_submanager.server:server \
     --bind "$address_pp" \
     &
 pid_pp=$!
 
-DEBUG=true \
 CACHE_PATH="$cache_path_aur" \
 CONTAINERIZER="$containerizer" \
 WORKDIR__CONTAINERIZER_PATH="tmp/" \
@@ -145,6 +146,7 @@ WORKDIR__CONTAINER_PATH="tmp/" \
 SUBMANAGER_PACKAGE=PPpackage_AUR \
 DATABASE_URL="$database_url_aur" \
 INSTALLATIONS_PATH="$installations_aur" \
+BUILD_CONTEXT_WORKDIR_PATH="tmp/" \
 hypercorn \
     PPpackage_submanager.server:server \
     --bind "$address_aur" \

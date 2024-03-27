@@ -1,5 +1,6 @@
-from collections.abc import AsyncGenerator, Iterable, Set
+from collections.abc import AsyncGenerator, Iterable, Mapping, Set
 from contextlib import asynccontextmanager
+from logging import getLogger
 from pathlib import Path
 from typing import Any, AsyncIterable, Self
 
@@ -8,6 +9,7 @@ from httpx import AsyncClient as HTTPClient
 from PPpackage_submanager.schemes import (
     Dependency,
     FetchRequest,
+    Lock,
     Options,
     Package,
     Product,
@@ -25,6 +27,8 @@ from PPpackage.utils import SubmanagerCommandFailure
 
 from .submanager import Submanager
 from .utils import HTTPResponseReader
+
+logger = getLogger(__name__)
 
 
 class RemoteSubmanager(Submanager):
@@ -45,25 +49,28 @@ class RemoteSubmanager(Submanager):
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
+        locks: Mapping[str, str],
     ) -> AsyncIterable[ResolutionGraph]:
+        content = async_chain(
+            dump_one(options),
+            dump_loop(
+                make_async_iterable(
+                    dump_many(make_async_iterable(requirements))
+                    for requirements in requirements_list
+                )
+            ),
+            dump_many(
+                make_async_iterable(
+                    Lock(name, version) for name, version in locks.items()
+                )
+            ),
+        )
+
         async with self.client.stream(
             "POST",
             f"{self.url}/resolve",
             headers={"Authorization": f"Bearer {self.token}"},
-            content=async_chain(
-                dump_one(options),
-                dump_loop(
-                    make_async_iterable(
-                        (
-                            chunk
-                            async for chunk in dump_many(
-                                make_async_iterable(requirements)
-                            )
-                        )
-                        for requirements in requirements_list
-                    )
-                ),
-            ),
+            content=content,
             timeout=None,
         ) as response:
             if not response.is_success:
@@ -164,6 +171,8 @@ class RemoteSubmanager(Submanager):
         return await self.install_post(installation)
 
     async def install_get(self, id: str) -> memoryview:
+        logger.debug(f"Downloading installation {id}...")
+
         async with self.client.stream(
             "GET",
             f"{self.url}/installations/{id}",
@@ -176,6 +185,8 @@ class RemoteSubmanager(Submanager):
             reader = HTTPResponseReader(response)
 
             installation = await reader.load_bytes_chunked()
+
+        logger.debug(f"Downloaded installation {id}.")
 
         return installation
 
@@ -199,9 +210,17 @@ class RemoteSubmanager(Submanager):
         installation_path: Path,
     ) -> str:
         if installation is None:
+            logger.debug(f"Archiving installation...")
             installation = tar_archive(installation_path)
+            logger.debug(f"Archived installation.")
+
+        logger.debug(f"Uploading installation...")
 
         if destination_id is not None:
+            logger.debug(
+                f"Uploading by replacing the existing installation {destination_id}..."
+            )
+
             response = await self.client.put(
                 f"{self.url}/installations/{destination_id}",
                 content=dump_bytes_chunked(installation),
@@ -211,14 +230,19 @@ class RemoteSubmanager(Submanager):
             if not response.is_success:
                 raise SubmanagerCommandFailure("remote install_receive failed")
         else:
+            logger.debug("Uploading by creating a new installation...")
             destination_id = await self.install_post(installation)
+
+        logger.debug(f"Uploaded installation {destination_id}.")
 
         return destination_id
 
     async def install_download(self, id: str, installation_path: Path) -> None:
         installation = await self.install_get(id)
 
+        logger.debug(f"Extracting installation...")
         tar_extract(installation, installation_path)
+        logger.debug(f"Extracted installation.")
 
     async def install_delete(self, id: str) -> None:
         response = await self.client.delete(

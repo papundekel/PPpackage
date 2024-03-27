@@ -49,32 +49,27 @@ async def resolve(
     settings: Settings,
     state: State,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[str | Lock]],
+    requirements_list: AsyncIterable[AsyncIterable[str]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
     roots: MutableSequence[MutableSequence[str]] = []
     package_names_with_info = dict[str, PackageInfo]()
-    locks = set[Lock]()
 
     async for requirements in requirements_list:
         requirements_roots = []
 
         async for requirement in requirements:
-            if isinstance(requirement, str):
-                package_name = split_version_requirement(requirement)
+            package_name = split_version_requirement(requirement)
 
-                if package_name not in package_names_with_info:
-                    package_names_with_info[package_name] = await fetch_info(
-                        package_name
-                    )
+            if package_name not in package_names_with_info:
+                package_names_with_info[package_name] = await fetch_info(package_name)
 
-                requirements_roots.append(package_name)
-            else:
-                locks.add(requirement)
+            requirements_roots.append(package_name)
 
         roots.append(requirements_roots)
 
-    for lock in locks:
-        package_info = package_names_with_info.get(lock.lock)
+    async for lock in locks:
+        package_info = package_names_with_info.get(lock.name)
         if package_info is not None and package_info.version != lock.version:
             return
 

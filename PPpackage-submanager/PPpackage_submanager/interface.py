@@ -2,7 +2,6 @@ from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
-from types import UnionType
 from typing import Any, AsyncContextManager, Generic, TypeVar
 from typing import cast as type_cast
 
@@ -24,7 +23,13 @@ StateType = TypeVar("StateType")
 
 UpdateDatabaseCallbackType = Callable[[SettingsType, StateType], Awaitable[None]]
 ResolveCallbackType = Callable[
-    [SettingsType, StateType, Any, AsyncIterable[AsyncIterable[RequirementType]]],
+    [
+        SettingsType,
+        StateType,
+        Any,
+        AsyncIterable[AsyncIterable[RequirementType]],
+        AsyncIterable[Lock],
+    ],
     AsyncIterable[ResolutionGraph],
 ]
 FetchCallbackType = Callable[
@@ -76,7 +81,7 @@ class Interface(Generic[SettingsType, StateType, RequirementType]):
     update_database: UpdateDatabaseCallbackType[SettingsType, StateType] = (
         update_database_noop
     )
-    resolve: ResolveCallbackType[SettingsType, StateType, RequirementType | Lock]
+    resolve: ResolveCallbackType[SettingsType, StateType, RequirementType]
     fetch: FetchCallbackType[SettingsType, StateType]
     generate: GenerateCallbackType[SettingsType, StateType] = generate_noop
     install: InstallCallbackType[SettingsType, StateType]

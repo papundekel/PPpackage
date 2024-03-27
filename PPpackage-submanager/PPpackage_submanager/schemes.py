@@ -82,5 +82,5 @@ class FetchRequest:
 
 @pydantic_dataclass(frozen=True)
 class Lock:
-    lock: str
+    name: str
     version: str

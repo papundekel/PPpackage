@@ -1,3 +1,4 @@
+from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 
@@ -17,6 +18,8 @@ from .settings import Settings
 from .submanagers import Submanagers
 from .update_database import update_database
 from .utils import SubmanagerCommandFailure
+
+logger = getLogger(__name__)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
@@ -100,6 +103,7 @@ async def main(
                 submanagers,
                 resolve_iteration_limit,
                 input.requirements,
+                input.locks,
                 options,
             )
 

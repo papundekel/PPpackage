@@ -5,6 +5,7 @@ from pathlib import Path
 from sys import stderr
 from typing import Any
 
+from asyncstdlib import list as async_list
 from networkx import (
     MultiDiGraph,
     dfs_preorder_nodes,
@@ -13,7 +14,6 @@ from networkx import (
 )
 from PPpackage_submanager.schemes import (
     Dependency,
-    Lock,
     ManagerAndName,
     Options,
     Package,
@@ -36,27 +36,26 @@ async def fetch_install(
     install_order: Iterable[tuple[ManagerAndName, NodeData]],
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     destination_path: Path,
-    async_extra_requirements: AsyncIterable[tuple[str, Any]],
+    extra_requirements_iterable: Iterable[tuple[str, Any]],
     resolve_iteration_limit,
 ):
-    stderr.write("RECURSIVE INSTALL BEGIN\n")
+    stderr.write("Creating build context...\n")
 
     dependency_dict = {
         manager_and_name: data for manager_and_name, data in dependencies
     }
 
-    requirements_with_locks = dict[str, MutableSet[Any | Lock]]()
+    extra_requirements = dict[str, MutableSet[Any]]()
 
-    async for submanager_name, requirement in async_extra_requirements:
-        requirements_with_locks.setdefault(submanager_name, set()).add(requirement)
+    for submanager_name, requirement in extra_requirements_iterable:
+        extra_requirements.setdefault(submanager_name, set()).add(requirement)
 
+    locks = dict[str, MutableMapping[str, str]]()
     for dependency, data in dependency_dict.items():
-        requirements_with_locks.setdefault(dependency.manager, set()).add(
-            Lock(dependency.name, data["version"])
-        )
+        locks.setdefault(dependency.manager, {})[dependency.name] = data["version"]
 
     extra_graph = await resolve(
-        submanagers, resolve_iteration_limit, requirements_with_locks, {}
+        submanagers, resolve_iteration_limit, extra_requirements, locks, {}
     )
 
     for dependency, data in dependency_dict.items():
@@ -97,28 +96,25 @@ async def fetch_install(
         destination_path,
     )
 
-    stderr.write("RECURSIVE INSTALL DONE\n")
-
-    for x in (destination_path / "etc").iterdir():
-        print(x, file=stderr)
+    stderr.write("Build context created.\n")
 
 
 async def fetch_generate(
     submanagers: Mapping[str, Submanager],
     meta_options: Mapping[str, Options],
-    generators: AsyncIterable[str],
+    async_generators: AsyncIterable[str],
     dependencies: Iterable[tuple[ManagerAndName, NodeData]],
     destination_path: Path,
 ):
-    stderr.write("RECURSIVE GENERATE BEGIN\n")
+    stderr.write("Creating generators for the build context...\n")
 
-    generators_list = [generator async for generator in generators]
+    generators = await async_list(async_generators)
 
     await generate(
-        submanagers, generators_list, dependencies, meta_options, destination_path
+        submanagers, generators, dependencies, meta_options, destination_path
     )
 
-    stderr.write("RECURSIVE GENERATE DONE\n")
+    stderr.write("Build context generators created.\n")
 
 
 async def fetch_install_generate(
@@ -133,6 +129,9 @@ async def fetch_install_generate(
     generators_path: Path,
     resolve_iteration_limit: int,
 ):
+    # need to iterate requirements before generators
+    extra_requirements = await async_list(async_extra_requirements)
+
     async with TaskGroup() as group:
         group.create_task(
             fetch_install(
@@ -141,7 +140,7 @@ async def fetch_install_generate(
                 install_order,
                 dependencies,
                 installation_path,
-                async_extra_requirements,
+                extra_requirements,
                 resolve_iteration_limit,
             )
         )
@@ -221,6 +220,8 @@ async def fetch_manager(
                     resolve_iteration_limit,
                 )
 
+                stderr.write(f"Fetching again with build context...\n")
+
                 async with submanager.fetch(
                     options, package, dependencies, installation_path, generators_path
                 ) as result_second:
@@ -229,11 +230,13 @@ async def fetch_manager(
                     else:
                         raise SubmanagerCommandFailure("Fetch failed.")
 
+                stderr.write(f"Fetching done.\n")
+
     node = nodes[ManagerAndName(submanager.name, package.name)]
     node["product_id"] = id_and_info.product_id
     node["product_info"] = id_and_info.product_info
 
-    stderr.write(f"{submanager.name}: {package.name} -> {id_and_info.product_id}\n")
+    stderr.write(f"\t{submanager.name}: {package.name} -> {id_and_info.product_id}\n")
 
 
 async def fetch(
@@ -276,5 +279,7 @@ async def fetch(
                         resolve_iteration_limit,
                     )
                 )
+
+    stderr.write("Fetching done.\n")
 
     return install_order

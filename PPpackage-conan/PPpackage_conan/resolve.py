@@ -29,6 +29,7 @@ from PPpackage_submanager.utils import jinja_render_temp_file
 from PPpackage_utils.utils import (
     asubprocess_communicate,
     asubprocess_wait,
+    discard_async_iterable,
     ensure_dir_exists,
 )
 
@@ -40,7 +41,6 @@ from .utils import ResolveNode, make_conan_environment, parse_conan_graph_nodes
 
 
 async def export_package(
-    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     **template_context: Any,
@@ -60,7 +60,6 @@ async def export_package(
 
 
 async def export_leaf(
-    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     requirement_index: int,
@@ -68,7 +67,6 @@ async def export_leaf(
     requirement_partition: Mapping[str, str],
 ) -> None:
     await export_package(
-        debug,
         environment,
         template,
         requirement_index=requirement_index,
@@ -78,14 +76,12 @@ async def export_leaf(
 
 
 async def export_requirement(
-    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     index: int,
     leaf_indices: Iterable[int],
 ) -> None:
     await export_package(
-        debug,
         environment,
         template,
         index=index,
@@ -94,7 +90,6 @@ async def export_requirement(
 
 
 async def export_leaves(
-    debug: bool,
     environment: Mapping[str, str],
     template: Jinja2Template,
     requirement_index: int,
@@ -102,7 +97,6 @@ async def export_leaves(
 ) -> None:
     for index, requirement_partition in enumerate(requirement_partitions):
         await export_leaf(
-            debug,
             environment,
             template,
             requirement_index,
@@ -111,9 +105,7 @@ async def export_leaves(
         )
 
 
-async def remove_temporary_packages_from_cache(
-    debug: bool, environment: Mapping[str, str]
-) -> None:
+async def remove_temporary_packages_from_cache(environment: Mapping[str, str]) -> None:
     process = await create_subprocess_exec(
         "conan",
         "remove",
@@ -129,14 +121,11 @@ async def remove_temporary_packages_from_cache(
 
 
 async def create_requirement_partitions(
-    requirements: AsyncIterable[Requirement | Lock],
+    requirements: AsyncIterable[Requirement],
 ) -> Sequence[Mapping[str, str]]:
     requirement_partitions: MutableSequence[MutableMapping[str, str]] = []
 
     async for requirement in requirements:
-        if isinstance(requirement, Lock):
-            continue
-
         partition_available: Optional[MutableMapping[str, str]] = next(
             (
                 partition
@@ -161,12 +150,10 @@ def parse_direct_dependencies(nodes: Mapping[str, ResolveNode], node: ResolveNod
             yield nodes[dependency_id].name
 
 
-def parse_conan_graph_resolve(
-    debug: bool, conan_graph_json_bytes: bytes
-) -> ResolutionGraph:
+def parse_conan_graph_resolve(conan_graph_json_bytes: bytes) -> ResolutionGraph:
     requirement_prefix = "requirement-"
 
-    nodes = parse_conan_graph_nodes(debug, ResolveNode, conan_graph_json_bytes)
+    nodes = parse_conan_graph_nodes(ResolveNode, conan_graph_json_bytes)
 
     roots_unsorted: Sequence[tuple[int, Set[Any]]] = []
     graph: MutableSequence[ResolutionGraphNode] = []
@@ -204,7 +191,6 @@ def parse_conan_graph_resolve(
 
 
 async def create_graph(
-    debug: bool,
     environment: Mapping[str, str],
     root_template: Jinja2Template,
     profile_template: Jinja2Template,
@@ -235,7 +221,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=None,
+            stderr=DEVNULL,
             env=environment,
         )
 
@@ -243,7 +229,7 @@ async def create_graph(
             process, "Error in `conan graph info`"
         )
 
-    graph = parse_conan_graph_resolve(debug, conan_graph_json_bytes)
+    graph = parse_conan_graph_resolve(conan_graph_json_bytes)
 
     return graph
 
@@ -252,7 +238,8 @@ async def resolve(
     settings: Settings,
     state: State,
     options: Options,
-    requirements_list: AsyncIterable[AsyncIterable[Requirement | Lock]],
+    requirements_list: AsyncIterable[AsyncIterable[Requirement]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
     ensure_dir_exists(settings.cache_path)
 
@@ -283,7 +270,6 @@ async def resolve(
         async with TaskGroup() as group:
             group.create_task(
                 export_leaves(
-                    settings.debug,
                     environment,
                     leaf_template,
                     requirement_index,
@@ -293,7 +279,6 @@ async def resolve(
 
             group.create_task(
                 export_requirement(
-                    settings.debug,
                     environment,
                     requirement_template,
                     requirement_index,
@@ -303,10 +288,11 @@ async def resolve(
 
         requirement_index += 1
 
+    await discard_async_iterable(locks)
+
     requirements_length = requirement_index
 
     graph = await create_graph(
-        settings.debug,
         environment,
         root_template,
         profile_template,
@@ -315,6 +301,6 @@ async def resolve(
         requirements_length,
     )
 
-    await remove_temporary_packages_from_cache(settings.debug, environment)
+    await remove_temporary_packages_from_cache(environment)
 
     yield graph

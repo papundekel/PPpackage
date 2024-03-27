@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterable
+from logging import getLogger
 from typing import Any, Protocol, TypeVar
 
 from PPpackage_utils.validation import load_from_bytes
@@ -6,6 +7,8 @@ from pydantic import BaseModel, RootModel
 
 _TRUE_STRING = "T"
 T = TypeVar("T")
+
+logger = getLogger(__name__)
 
 
 def _dump_int(length: int) -> memoryview:
@@ -54,6 +57,7 @@ async def dump_one(output: BaseModel | Any) -> AsyncIterable[memoryview]:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
 
     output_json_string = output_wrapped.model_dump_json()
+
     output_json_bytes = output_json_string.encode()
 
     async for chunk in dump_bytes(memoryview(output_json_bytes)):
@@ -64,6 +68,7 @@ async def dump_many(
     outputs: AsyncIterable[BaseModel | Any],
 ) -> AsyncIterable[memoryview]:
     async for chunk in dump_loop(dump_one(output) async for output in outputs):
+        logger.debug(f"dump_many chunk: {bytes(chunk)}")
         yield chunk
 
 
@@ -89,6 +94,8 @@ class Reader(Protocol):
 
         line = str(line_bytes, "utf-8").strip()
 
+        logger.debug(f"line: {line}")
+
         return line
 
     async def _load_int(self) -> int:
@@ -96,12 +103,16 @@ class Reader(Protocol):
 
         length = int(line)
 
+        logger.debug(f"length: {length}")
+
         return length
 
     async def _load_bool(self) -> bool:
         line = await self._load_line()
 
         value = line == _TRUE_STRING
+
+        logger.debug(f"bool: {value}")
 
         return value
 

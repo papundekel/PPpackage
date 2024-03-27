@@ -1,7 +1,6 @@
-from collections.abc import AsyncGenerator, Iterable, Set
+from collections.abc import AsyncGenerator, Iterable, Mapping, Set
 from contextlib import asynccontextmanager
 from pathlib import Path
-from types import UnionType
 from typing import Any, AsyncIterable, TypeVar
 from typing import cast as type_cast
 
@@ -29,9 +28,9 @@ RequirementType = TypeVar("RequirementType")
 
 async def make_async_requirements(
     Requirement: type[RequirementType], requirements: Iterable[Any]
-) -> AsyncIterable[RequirementType | Lock]:
+) -> AsyncIterable[RequirementType]:
     for requirement in requirements:
-        yield load_object(Requirement | Lock, requirement)  # type: ignore
+        yield load_object(Requirement, requirement)
 
 
 class LocalSubmanager(Submanager):
@@ -55,6 +54,7 @@ class LocalSubmanager(Submanager):
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
+        locks: Mapping[str, str],
     ) -> AsyncIterable[ResolutionGraph]:
         return self.interface.resolve(
             self.settings,
@@ -64,6 +64,7 @@ class LocalSubmanager(Submanager):
                 make_async_requirements(self.interface.Requirement, requirements)
                 for requirements in requirements_list
             ),
+            make_async_iterable(Lock(name, version) for name, version in locks.items()),
         )
 
     @asynccontextmanager

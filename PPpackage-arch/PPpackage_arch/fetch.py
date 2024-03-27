@@ -1,9 +1,7 @@
-from asyncio import Lock, create_subprocess_exec, sleep
+from asyncio import Lock, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
-from os import symlink
 from pathlib import Path
-from sys import stderr
 
 from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
@@ -15,7 +13,6 @@ from PPpackage_submanager.schemes import (
     ProductIDAndInfo,
 )
 from PPpackage_utils.utils import (
-    TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
     ensure_dir_exists,
@@ -67,7 +64,7 @@ async def fetch(
             package.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=None,
+            stderr=DEVNULL,
             env=environment,
         )
 
