@@ -1,6 +1,7 @@
 from asyncio import Lock, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
+from logging import getLogger
 from pathlib import Path
 
 from PPpackage_pacman_utils.schemes import ProductInfo
@@ -21,6 +22,8 @@ from PPpackage_utils.utils import (
 
 from .settings import Settings
 from .utils import get_cache_paths
+
+logger = getLogger(__name__)
 
 
 def process_product_id(line: str):
@@ -43,6 +46,8 @@ async def fetch(
     installation_path: Path | None,
     generators_path: Path | None,
 ) -> ProductIDAndInfo | FetchRequest:
+    logger.debug(f"Fetching {package.name} {package.version}...")
+
     database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
@@ -91,8 +96,7 @@ async def fetch(
 
     line = (await process.stdout.readline()).decode().strip()
 
-    if line == "":
-        raise CommandException
+    await asubprocess_wait(process, CommandException)
 
     product_id = process_product_id(line)
 
@@ -101,6 +105,6 @@ async def fetch(
         product_info=ProductInfo(version=package.version, product_id=product_id),
     )
 
-    await asubprocess_wait(process, CommandException)
+    logger.debug(f"Fetched {package.name} {package.version}.")
 
     return id_and_info

@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from collections.abc import AsyncIterable, Iterable, Mapping, MutableMapping, MutableSet
 from itertools import chain, islice
+from logging import getLogger
 from pathlib import Path
 from sys import stderr
 from typing import Any
@@ -28,6 +29,8 @@ from .schemes import NodeData
 from .submanager import Submanager
 from .topology import create_install_topology
 from .utils import NodeData, SubmanagerCommandFailure
+
+logger = getLogger(__name__)
 
 
 async def fetch_install(
@@ -167,7 +170,7 @@ def create_dependencies(node_dependencies: Iterable[tuple[ManagerAndName, NodeDa
 
 
 def graph_successors(
-    graph: MultiDiGraph, node: Any
+    graph: MultiDiGraph, node: ManagerAndName
 ) -> Iterable[tuple[ManagerAndName, NodeData]]:
     for node in islice(dfs_preorder_nodes(graph, source=node), 1, None):
         yield node, graph.nodes[node]
@@ -187,6 +190,8 @@ async def fetch_manager(
     install_order: Iterable[tuple[ManagerAndName, NodeData]],
     resolve_iteration_limit: int,
 ):
+    logger.debug(f"Fetching {submanager_name} {package.name}...")
+
     submanager = submanagers[submanager_name]
     options = meta_options.get(submanager.name)
 
@@ -230,7 +235,7 @@ async def fetch_manager(
                     else:
                         raise SubmanagerCommandFailure("Fetch failed.")
 
-                stderr.write(f"Fetching done.\n")
+                stderr.write(f"Fetching with build context done.\n")
 
     node = nodes[ManagerAndName(submanager.name, package.name)]
     node["product_id"] = id_and_info.product_id
@@ -250,7 +255,9 @@ async def fetch(
     stderr.write("Fetching packages...\n")
 
     install_order = list(create_install_topology(graph))
-    generations = topological_generations(subgraph.reverse(copy=False))
+    generations: Iterable[Iterable[ManagerAndName]] = topological_generations(
+        subgraph.reverse(copy=False)
+    )
 
     packages_to_dependencies: MutableMapping[
         ManagerAndName, Iterable[tuple[ManagerAndName, NodeData]]
