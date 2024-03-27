@@ -17,8 +17,8 @@ from PPpackage_utils.utils import (
     asubprocess_wait,
     discard_async_iterable,
     ensure_dir_exists,
-    fakeroot,
 )
+from pycman import run_action_with_args as pacman
 
 from .settings import Settings
 from .utils import get_cache_paths
@@ -54,26 +54,24 @@ async def fetch(
 
     await discard_async_iterable(dependencies)
 
-    async with fakeroot() as environment, lock:
-        process = await create_subprocess_exec(
-            "pacman",
+    return_code = pacman(
+        "sync",
+        [
             "--dbpath",
             str(database_path),
             "--cachedir",
             str(cache_path),
-            "--noconfirm",
-            "--sync",
             "--downloadonly",
             "--nodeps",
             "--nodeps",
             package.name,
-            stdin=DEVNULL,
-            stdout=DEVNULL,
-            stderr=None,
-            env=environment,
-        )
+        ],
+    )
 
-        await asubprocess_wait(process, CommandException)
+    if return_code != 0:
+        raise CommandException(
+            f"pacman failed to fetch {package.name} {package.version}."
+        )
 
     process = await create_subprocess_exec(
         "pacman",
