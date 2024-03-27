@@ -36,7 +36,7 @@ async def resolve_requirement(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=PIPE,
+        stderr=None,
     )
 
     assert process.stdout is not None
@@ -95,7 +95,7 @@ async def resolve_versions(
         *packages,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=PIPE,
+        stderr=None,
     )
 
     stdout = await asubprocess_communicate(process, "Error in `pacinfo`.")

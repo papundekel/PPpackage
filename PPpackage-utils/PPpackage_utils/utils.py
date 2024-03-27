@@ -50,13 +50,9 @@ def TemporaryDirectory(dir=None):
 async def asubprocess_wait(
     process: Process, exception: Exception | type[Exception]
 ) -> int:
-    stderr_bytes = await process.stderr.read() if process.stderr is not None else None
-
     return_code = await process.wait()
 
     if return_code != 0:
-        if stderr_bytes is not None:
-            stderr.write(stderr_bytes.decode())
         raise exception
 
     return return_code
@@ -98,7 +94,7 @@ async def get_fakeroot_info():
             "LD_PRELOAD",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=PIPE,
+            stderr=None,
         )
 
         fakeroot_stdout = await asubprocess_communicate(process, "Error in `fakeroot`.")
@@ -122,7 +118,7 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
             "faked",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=PIPE,
+            stderr=None,
         )
 
         faked_stdout = await asubprocess_communicate(process, "Error in `faked`.")

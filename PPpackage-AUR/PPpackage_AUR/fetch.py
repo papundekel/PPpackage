@@ -97,7 +97,7 @@ async def build(
                     package.name,
                     stdin=DEVNULL,
                     stdout=file,
-                    stderr=PIPE,
+                    stderr=None,
                 )
 
                 await asubprocess_wait(process, CommandException)
@@ -133,7 +133,7 @@ async def build(
                     "makepkg",
                     stdin=DEVNULL,
                     stdout=DEVNULL,
-                    stderr=PIPE,
+                    stderr=None,
                 ) as process:
                     await asubprocess_wait(process, CommandException)
 

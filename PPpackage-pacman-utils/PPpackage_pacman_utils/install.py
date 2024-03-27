@@ -131,7 +131,7 @@ async def pacman_install(
                 str(product_path),
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=PIPE,
+                stderr=None,
                 env=environment,
             )
 

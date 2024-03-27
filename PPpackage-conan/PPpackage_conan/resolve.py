@@ -52,7 +52,7 @@ async def export_package(
             conanfile.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=PIPE,
+            stderr=None,
             env=environment,
         )
 
@@ -113,7 +113,7 @@ async def remove_temporary_packages_from_cache(environment: Mapping[str, str]) -
         "*/1.0.0@pppackage",
         stdin=DEVNULL,
         stdout=DEVNULL,
-        stderr=PIPE,
+        stderr=None,
         env=environment,
     )
 
@@ -221,7 +221,7 @@ async def create_graph(
             requirement_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=PIPE,
+            stderr=None,
             env=environment,
         )
 

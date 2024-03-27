@@ -106,7 +106,7 @@ async def generate(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=PIPE,
+            stderr=None,
             env=environment,
         )
 

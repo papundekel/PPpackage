@@ -28,7 +28,7 @@ async def install_product(
         f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=PIPE,
+        stderr=None,
         env=environment,
     )
 

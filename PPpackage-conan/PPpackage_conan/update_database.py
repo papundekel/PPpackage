@@ -18,7 +18,7 @@ async def update_database_impl(environment: Mapping[str, str]):
         "*",
         stdin=DEVNULL,
         stdout=DEVNULL,
-        stderr=PIPE,
+        stderr=None,
         env=environment,
     )
 

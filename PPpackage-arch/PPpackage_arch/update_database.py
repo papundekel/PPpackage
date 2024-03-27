@@ -23,7 +23,7 @@ async def update_database(settings: Settings, state: None):
             "--refresh",
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=PIPE,
+            stderr=None,
             env=environment,
         )
 

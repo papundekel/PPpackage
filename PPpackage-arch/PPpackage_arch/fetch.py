@@ -69,7 +69,7 @@ async def fetch(
             package.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=PIPE,
+            stderr=None,
             env=environment,
         )
 
@@ -89,7 +89,7 @@ async def fetch(
         package.name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=PIPE,
+        stderr=None,
     )
 
     assert process.stdout is not None
