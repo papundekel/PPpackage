@@ -81,14 +81,14 @@ async def fetch(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=PIPE,
             env=environment,
         )
 
         assert process.stdout is not None
         graph_json_bytes = await process.stdout.read()
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)
 
     nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 

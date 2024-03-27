@@ -52,11 +52,11 @@ async def export_package(
             conanfile.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=DEVNULL,
+            stderr=PIPE,
             env=environment,
         )
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)
 
 
 async def export_leaf(
@@ -113,11 +113,11 @@ async def remove_temporary_packages_from_cache(environment: Mapping[str, str]) -
         "*/1.0.0@pppackage",
         stdin=DEVNULL,
         stdout=DEVNULL,
-        stderr=DEVNULL,
+        stderr=PIPE,
         env=environment,
     )
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
 
 async def create_requirement_partitions(

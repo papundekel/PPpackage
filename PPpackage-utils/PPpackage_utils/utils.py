@@ -13,6 +13,7 @@ from os import environ, kill, mkfifo
 from pathlib import Path
 from shutil import move
 from signal import SIGTERM
+from sys import stderr
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import Any, Optional, TypeVar, overload
 from unittest.mock import Base
@@ -46,10 +47,16 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
-async def asubprocess_wait(process: Process, exception: Exception) -> int:
+async def asubprocess_wait(
+    process: Process, exception: Exception | type[Exception]
+) -> int:
+    stderr_bytes = await process.stderr.read() if process.stderr is not None else None
+
     return_code = await process.wait()
 
     if return_code != 0:
+        if stderr_bytes is not None:
+            stderr.write(stderr_bytes.decode())
         raise exception
 
     return return_code

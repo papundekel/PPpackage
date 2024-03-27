@@ -28,7 +28,7 @@ async def install_product(
         f"{product.name}/{product.version}:{product.product_id}",
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=PIPE,
         env=environment,
     )
 
@@ -36,7 +36,7 @@ async def install_product(
 
     output_bytes = await process.stdout.read()
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
     product_cache_path = output_bytes.decode().splitlines()[0]
 

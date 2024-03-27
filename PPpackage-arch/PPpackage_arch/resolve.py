@@ -36,7 +36,7 @@ async def resolve_requirement(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=PIPE,
     )
 
     assert process.stdout is not None
@@ -53,7 +53,7 @@ async def resolve_requirement(
 
     root = clean_graph(graph)
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
     return graph, root
 

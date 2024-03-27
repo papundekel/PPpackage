@@ -50,6 +50,7 @@ async def dump_bytes_chunked(output_bytes: memoryview) -> AsyncIterable[memoryvi
     async for chunk in dump_loop(
         dump_bytes(chunk) async for chunk in chunk_bytes(output_bytes, 2**15)
     ):
+        logger.debug("Chunking bytes...")
         yield chunk
 
 
@@ -68,7 +69,6 @@ async def dump_many(
     outputs: AsyncIterable[BaseModel | Any],
 ) -> AsyncIterable[memoryview]:
     async for chunk in dump_loop(dump_one(output) async for output in outputs):
-        logger.debug(f"dump_many chunk: {bytes(chunk)}")
         yield chunk
 
 

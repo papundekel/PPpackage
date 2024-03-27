@@ -64,11 +64,11 @@ async def fetch(
             package.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=DEVNULL,
+            stderr=PIPE,
             env=environment,
         )
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)
 
     process = await create_subprocess_exec(
         "pacman",
@@ -84,7 +84,7 @@ async def fetch(
         package.name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=PIPE,
     )
 
     assert process.stdout is not None
@@ -101,6 +101,6 @@ async def fetch(
         product_info=ProductInfo(version=package.version, product_id=product_id),
     )
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
     return id_and_info

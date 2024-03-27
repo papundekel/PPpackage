@@ -19,7 +19,7 @@ app = AsyncTyper()
 
 class LoggingFilter:
     def filter(self, record: LogRecord) -> bool:
-        return record.name.startswith("PPpackage.") or record.name.startswith("httpx")
+        return record.name.startswith("PPpackage") or record.name.startswith("httpx")
 
 
 logging_formatter = LoggingFormatter("%(name)s: %(message)s")

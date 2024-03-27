@@ -1,5 +1,5 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable
 from hashlib import sha1
 from logging import getLogger
@@ -97,10 +97,10 @@ async def build(
                     package.name,
                     stdin=DEVNULL,
                     stdout=file,
-                    stderr=DEVNULL,
+                    stderr=PIPE,
                 )
 
-                await asubprocess_wait(process, CommandException())
+                await asubprocess_wait(process, CommandException)
 
             PKGDEST = "/mnt/package"
             WORKDIR = "/mnt/build"
@@ -133,9 +133,9 @@ async def build(
                     "makepkg",
                     stdin=DEVNULL,
                     stdout=DEVNULL,
-                    stderr=None,
+                    stderr=PIPE,
                 ) as process:
-                    await asubprocess_wait(process, CommandException())
+                    await asubprocess_wait(process, CommandException)
 
                 temp_product_path = next(temp_product_path.iterdir())
                 move(temp_product_path, product_path_dir)

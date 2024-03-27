@@ -1,5 +1,5 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from sys import stderr
 
 from PPpackage_submanager.exceptions import CommandException
@@ -23,8 +23,8 @@ async def update_database(settings: Settings, state: None):
             "--refresh",
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=DEVNULL,
+            stderr=PIPE,
             env=environment,
         )
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)

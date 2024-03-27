@@ -1,5 +1,5 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from io import TextIOWrapper
@@ -131,7 +131,7 @@ async def pacman_install(
                 str(product_path),
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=DEVNULL,
+                stderr=PIPE,
                 env=environment,
             )
 
@@ -159,4 +159,4 @@ async def pacman_install(
                             f"Unknown header: {header}", "PPpackage-pacman-utils"
                         )
 
-            await asubprocess_wait(process, CommandException())
+            await asubprocess_wait(process, CommandException)
