@@ -1,17 +1,13 @@
+from ast import dump
 from contextlib import asynccontextmanager
 from pathlib import Path
 from shutil import rmtree
 from tempfile import mkdtemp
 from typing import Annotated, Generic, TypeVar
 
+from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, Request
-from PPpackage_utils.stream import (
-    Reader,
-    dump_bytes_chunked,
-    dump_many,
-    dump_many_async,
-    dump_one,
-)
+from PPpackage_utils.stream import Reader, dump_bytes_chunked, dump_many, dump_one
 from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
 from PPpackage_utils.utils import TemporaryDirectory, ensure_dir_exists
@@ -121,22 +117,19 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
         ):
             reader = HTTPRequestReader(request)
 
-            options = await reader.load_one(Options)
+            options = await reader.load_one(Options)  # type: ignore
 
             requirements_list = (
                 reader.load_many(interface.Requirement)
                 async for _ in reader.load_loop()
             )
 
-            outputs = [
-                x
-                async for x in interface.resolve(
-                    settings,  # type: ignore
-                    state,
-                    options,
-                    requirements_list,
-                )
-            ]
+            outputs = interface.resolve(
+                settings,  # type: ignore
+                state,
+                options,
+                requirements_list,
+            )
 
             return StreamingResponse(HTTP_200_OK, dump_many(outputs))
 
@@ -150,7 +143,7 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
         ):
             reader = HTTPRequestReader(request)
 
-            options = await reader.load_one(Options)
+            options = await reader.load_one(Options)  # type: ignore
 
             async with (
                 load_tar_and_extract(reader, installation_present) as installation_path,
@@ -171,15 +164,12 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
             if isinstance(output, ProductIDAndInfo):
                 return StreamingResponse(HTTP_200_OK, dump_one(output))
             else:
-
-                async def generator():
-                    async for chunk in dump_many_async(output.requirements):
-                        yield chunk
-
-                    async for chunk in dump_many_async(output.generators):
-                        yield chunk
-
-                return StreamingResponse(HTTP_422_UNPROCESSABLE_ENTITY, generator())
+                return StreamingResponse(
+                    HTTP_422_UNPROCESSABLE_ENTITY,
+                    async_chain(
+                        dump_many(output.requirements), dump_many(output.generators)
+                    ),
+                )
 
         async def generate(
             request: Request,
@@ -187,7 +177,7 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
         ):
             reader = HTTPRequestReader(request)
 
-            options = await reader.load_one(Options)
+            options = await reader.load_one(Options)  # type: ignore
             products = reader.load_many(Product)
             generators = reader.load_many(str)
 

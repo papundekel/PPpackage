@@ -1,28 +1,15 @@
-from collections.abc import AsyncIterable, Iterable
-from sys import stderr
+from collections.abc import AsyncIterable
 from typing import Any, Protocol, TypeVar
 
 from PPpackage_utils.validation import load_from_bytes
 from pydantic import BaseModel, RootModel
 
-_DEBUG_LOAD = False
-_DEBUG_DUMP = False
-
-
 _TRUE_STRING = "T"
 T = TypeVar("T")
 
 
-def chunk_bytes(data: memoryview, chunk_size: int) -> Iterable[memoryview]:
-    for i in range(0, len(data), chunk_size):
-        yield data[i : i + chunk_size]
-
-
 def _dump_int(length: int) -> memoryview:
     length_bytes = f"{length}\n".encode()
-
-    if _DEBUG_DUMP:
-        stderr.write(f"dump length: {length}\n")
 
     return memoryview(length_bytes)
 
@@ -30,139 +17,69 @@ def _dump_int(length: int) -> memoryview:
 def _dump_bool(value: bool) -> memoryview:
     value_string = _TRUE_STRING if value else "F"
 
-    bool_bytes = (value_string + "\n").encode()
-
-    if _DEBUG_DUMP:
-        stderr.write(f"dump bool: {value}\n")
+    bool_bytes = f"{value_string}\n".encode()
 
     return memoryview(bool_bytes)
 
 
-def dump_bytes(output_bytes: memoryview) -> Iterable[memoryview]:
+async def dump_loop(
+    iterable: AsyncIterable[AsyncIterable[memoryview]],
+) -> AsyncIterable[memoryview]:
+    async for obj in iterable:
+        yield _dump_bool(True)
+        async for chunk in obj:
+            yield chunk
+
+    yield _dump_bool(False)
+
+
+async def dump_bytes(output_bytes: memoryview) -> AsyncIterable[memoryview]:
     yield _dump_int(len(output_bytes))
     yield output_bytes
 
 
-def dump_loop_end():
-    end_bytes = _dump_bool(False)
-
-    if _DEBUG_DUMP:
-        stderr.write("loop}\n")
-
-    return end_bytes
+async def chunk_bytes(data: memoryview, chunk_size: int) -> AsyncIterable[memoryview]:
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
 
 
-def dump_loop(iterable: Iterable[Iterable[memoryview]]) -> Iterable[memoryview]:
-    if _DEBUG_DUMP:
-        stderr.write("loop{\n")
-
-    for obj in iterable:
-        yield _dump_bool(True)
-        yield from obj
-
-    yield dump_loop_end()
+async def dump_bytes_chunked(output_bytes: memoryview) -> AsyncIterable[memoryview]:
+    async for chunk in dump_loop(
+        dump_bytes(chunk) async for chunk in chunk_bytes(output_bytes, 2**15)
+    ):
+        yield chunk
 
 
-def dump_loop_simple(iterable: Iterable[memoryview]) -> Iterable[memoryview]:
-    yield from dump_loop([iterable])
-
-
-def dump_bytes_chunked(output_bytes: memoryview) -> Iterable[memoryview]:
-    yield from dump_loop(
-        dump_bytes(chunk) for chunk in chunk_bytes(output_bytes, 2**15)
-    )
-
-
-def dump_one(output: BaseModel | Any, loop=False) -> Iterable[memoryview]:
-    if loop:
-        yield _dump_bool(True)
-
+async def dump_one(output: BaseModel | Any) -> AsyncIterable[memoryview]:
     output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
 
-    output_json_string = output_wrapped.model_dump_json(
-        indent=4 if _DEBUG_DUMP else None
-    )
-
+    output_json_string = output_wrapped.model_dump_json()
     output_json_bytes = output_json_string.encode()
 
-    yield from dump_bytes(memoryview(output_json_bytes))
-
-    if _DEBUG_DUMP:
-        stderr.write(f"dump:\n{output_json_string}\n")
+    async for chunk in dump_bytes(memoryview(output_json_bytes)):
+        yield chunk
 
 
-def dump_many(outputs: Iterable[BaseModel | Any]) -> Iterable[memoryview]:
-    yield from dump_loop(dump_one(output) for output in outputs)
-
-
-async def dump_many_async(
+async def dump_many(
     outputs: AsyncIterable[BaseModel | Any],
 ) -> AsyncIterable[memoryview]:
-    async for output in outputs:
-        for chunk in dump_one(output):
-            yield chunk
+    async for chunk in dump_loop(dump_one(output) async for output in outputs):
+        yield chunk
 
 
 class Writer(Protocol):
-    async def write(self, data: memoryview) -> None:
-        ...
-
-    async def _write_many(self, data: Iterable[memoryview]) -> None:
-        for chunk in data:
-            await self.write(chunk)
-
-    async def _dump_bool(self, value: bool) -> None:
-        await self.write(_dump_bool(value))
-
-    async def dump_bytes(self, output_bytes: memoryview) -> None:
-        await self._write_many(dump_bytes(output_bytes))
-
-    async def dump_bytes_chunked(self, output_bytes: memoryview) -> None:
-        await self._write_many(dump_bytes_chunked(output_bytes))
-
-    async def dump_one(self, output: BaseModel | Any, loop=False) -> None:
-        await self._write_many(dump_one(output, loop))
-
-    async def dump_loop_end(self):
-        await self.write(dump_loop_end())
-
-    async def dump_loop(self, iterable: Iterable[T]) -> AsyncIterable[T]:
-        if _DEBUG_DUMP:
-            stderr.write("loop{\n")
-
-        for obj in iterable:
-            await self._dump_bool(True)
-            yield obj
-
-        await self.dump_loop_end()
-
-    async def dump_loop_async(self, iterable: AsyncIterable[T]) -> AsyncIterable[T]:
-        async for obj in iterable:
-            await self._dump_bool(True)
-            yield obj
-
-        await self.dump_loop_end()
-
-    async def dump_many(self, outputs: Iterable[BaseModel | Any]) -> None:
-        await self._write_many(dump_many(outputs))
-
-    async def dump_many_async(self, outputs: AsyncIterable[BaseModel | Any]) -> None:
-        async for chunk in dump_many_async(outputs):
-            await self.write(chunk)
+    async def write(self, data: memoryview) -> None: ...
 
 
 ModelType = TypeVar("ModelType")
 
 
 class Reader(Protocol):
-    async def readexactly(self, n: int) -> memoryview:
-        ...
+    async def readexactly(self, n: int) -> memoryview: ...
 
-    async def readuntil(self, separator: memoryview) -> memoryview:
-        ...
+    async def readuntil(self, separator: memoryview) -> memoryview: ...
 
-    def read(self) -> AsyncIterable[memoryview]:
-        ...
+    def read(self) -> AsyncIterable[memoryview]: ...
 
     async def _readline(self) -> memoryview:
         return await self.readuntil(memoryview(b"\n"))
@@ -179,18 +96,12 @@ class Reader(Protocol):
 
         length = int(line)
 
-        if _DEBUG_LOAD:
-            stderr.write(f"load length: {length}\n")
-
         return length
 
     async def _load_bool(self) -> bool:
         line = await self._load_line()
 
         value = line == _TRUE_STRING
-
-        if _DEBUG_LOAD:
-            stderr.write(f"load bool: {value}\n")
 
         return value
 

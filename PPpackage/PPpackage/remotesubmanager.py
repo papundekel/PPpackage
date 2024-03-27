@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterable, Self
 
+from asyncstdlib import chain as async_chain
 from httpx import AsyncClient as HTTPClient
 from PPpackage_submanager.schemes import (
     Dependency,
@@ -16,6 +17,7 @@ from PPpackage_submanager.schemes import (
 from PPpackage_utils.stream import dump_bytes_chunked, dump_loop, dump_many, dump_one
 from PPpackage_utils.tar import archive as tar_archive
 from PPpackage_utils.tar import extract as tar_extract
+from PPpackage_utils.utils import make_async_iterable
 from PPpackage_utils.validation import load_from_bytes
 
 from PPpackage.schemes import RemoteSubmanagerConfig
@@ -44,21 +46,24 @@ class RemoteSubmanager(Submanager):
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
     ) -> AsyncIterable[ResolutionGraph]:
-        async def content():
-            for chunk in dump_one(options):
-                yield chunk
-
-            for chunk in dump_loop(
-                (chunk for chunk in dump_many(requirements))
-                for requirements in requirements_list
-            ):
-                yield chunk
-
         async with self.client.stream(
             "POST",
             f"{self.url}/resolve",
             headers={"Authorization": f"Bearer {self.token}"},
-            content=content(),
+            content=async_chain(
+                dump_one(options),
+                dump_loop(
+                    make_async_iterable(
+                        (
+                            chunk
+                            async for chunk in dump_many(
+                                make_async_iterable(requirements)
+                            )
+                        )
+                        for requirements in requirements_list
+                    )
+                ),
+            ),
             timeout=None,
         ) as response:
             if not response.is_success:
@@ -87,21 +92,6 @@ class RemoteSubmanager(Submanager):
             tar_archive(generators_path) if generators_path is not None else None
         )
 
-        async def content():
-            for chunk in dump_one(options):
-                yield chunk
-
-            if installation is not None:
-                for chunk in dump_bytes_chunked(installation):
-                    yield chunk
-
-            if generators is not None:
-                for chunk in dump_bytes_chunked(generators):
-                    yield chunk
-
-            for chunk in dump_many(dependencies):
-                yield chunk
-
         async with self.client.stream(
             "POST",
             f"{self.url}/products",
@@ -112,7 +102,12 @@ class RemoteSubmanager(Submanager):
                 "installation_present": installation_path is not None,
                 "generators_present": generators_path is not None,
             },
-            content=content(),
+            content=async_chain(
+                dump_one(options),
+                dump_bytes_chunked(installation) if installation is not None else [],
+                dump_bytes_chunked(generators) if generators is not None else [],
+                dump_many(make_async_iterable(dependencies)),
+            ),
             timeout=None,
         ) as response:
             reader = HTTPResponseReader(response)
@@ -146,14 +141,10 @@ class RemoteSubmanager(Submanager):
             )
 
     async def install_post(self, installation: memoryview) -> str:
-        async def content():
-            for chunk in dump_bytes_chunked(installation):
-                yield chunk
-
         response = await self.client.post(
             f"{self.url}/installations",
             headers={"Authorization": f"Bearer {self.token}"},
-            content=content(),
+            content=dump_bytes_chunked(installation),
             timeout=None,
         )
 
@@ -246,21 +237,15 @@ class RemoteSubmanager(Submanager):
         generators: Set[str],
         destination_path: Path,
     ) -> None:
-        async def content():
-            for chunk in dump_one(options):
-                yield chunk
-
-            for chunk in dump_many(products):
-                yield chunk
-
-            for chunk in dump_many(generators):
-                yield chunk
-
         async with self.client.stream(
             "POST",
             f"{self.url}/generators",
             headers={"Authorization": f"Bearer {self.token}"},
-            content=content(),
+            content=async_chain(
+                dump_one(options),
+                dump_many(make_async_iterable(products)),
+                dump_many(make_async_iterable(generators)),
+            ),
             timeout=None,
         ) as response:
             if not response.is_success:

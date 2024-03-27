@@ -81,6 +81,10 @@ cleanup()
 
 
 
+mkdir -p tmp/
+
+
+
 ./init_database.py "$database_url_arch" > "$admin_token_path_arch" || cleanup 10
 ./init_database.py "$database_url_conan" > "$admin_token_path_conan" || cleanup 11
 ./init_database.py "$database_url_pp" > "$admin_token_path_pp" || cleanup 12
