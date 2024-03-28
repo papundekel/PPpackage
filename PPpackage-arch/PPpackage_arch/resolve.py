@@ -1,12 +1,19 @@
 from asyncio import TaskGroup, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from logging import getLogger
 from pathlib import Path
+from sys import stderr
 
 from networkx import MultiDiGraph, nx_pydot
 from PPpackage_arch.settings import Settings
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Options, ResolutionGraph, ResolutionGraphNode
+from PPpackage_submanager.schemes import (
+    Lock,
+    Options,
+    ResolutionGraph,
+    ResolutionGraphNode,
+)
 from PPpackage_utils.utils import asubprocess_communicate, asubprocess_wait
 from pydot import graph_from_dot_data
 
@@ -14,8 +21,10 @@ from .settings import Settings
 from .update_database import update_database
 from .utils import get_cache_paths
 
+logger = getLogger(__name__)
 
-async def resolve_pactree(
+
+async def resolve_requirement(
     database_path: Path, requirement: str
 ) -> tuple[MultiDiGraph, str]:
     process = await create_subprocess_exec(
@@ -27,7 +36,7 @@ async def resolve_pactree(
         requirement,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=None,
     )
 
     assert process.stdout is not None
@@ -44,7 +53,7 @@ async def resolve_pactree(
 
     root = clean_graph(graph)
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
     return graph, root
 
@@ -76,9 +85,9 @@ def clean_graph(graph: MultiDiGraph) -> str:
 
 
 async def resolve_versions(
-    database_path: Path, packages: Set[str]
+    database_path: Path, packages: Iterable[str]
 ) -> Mapping[str, str]:
-    process = create_subprocess_exec(
+    process = await create_subprocess_exec(
         "pacinfo",
         "--dbpath",
         str(database_path),
@@ -86,10 +95,10 @@ async def resolve_versions(
         *packages,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=None,
     )
 
-    stdout = await asubprocess_communicate(await process, "Error in `pacinfo`.")
+    stdout = await asubprocess_communicate(process, "Error in `pacinfo`.")
 
     lockfile = {
         (split_line := line.split())[0].split("/")[-1]: split_line[1].rsplit("-", 1)[0]
@@ -116,16 +125,21 @@ async def resolve(
     state: None,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
+    logger.info(f"Resolve begin, options: {options}")
+
     database_path, _ = get_cache_paths(settings.cache_path)
 
     if not database_path.exists():
+        stderr.write("arch: Creating database...\n")
         await update_database(settings, state)
+        stderr.write("arch: Created database.\n")
 
     async with TaskGroup() as group:
         tasks_list = [
             [
-                group.create_task(resolve_pactree(database_path, requirement))
+                group.create_task(resolve_requirement(database_path, requirement))
                 async for requirement in requirements
             ]
             async for requirements in requirements_list
@@ -139,6 +153,11 @@ async def resolve(
         database_path,
         {package for graphs in graphs_list for graph, _ in graphs for package in graph},
     )
+
+    async for lock in locks:
+        version = versions.get(lock.name)
+        if version is not None and version != lock.version:
+            return
 
     dependencies = resolve_dependencies(
         graph for graphs in graphs_list for graph, _ in graphs

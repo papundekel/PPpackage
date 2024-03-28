@@ -1,9 +1,10 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import AsyncIterable, Iterable, Mapping
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 from frozendict import frozendict
 from pydantic import BaseModel, BeforeValidator
-from pydantic.dataclasses import dataclass
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
 def frozen_validator(value: Any) -> Any:
@@ -19,43 +20,43 @@ FrozenAny = Annotated[Any, BeforeValidator(frozen_validator)]
 Options = Mapping[str, Any] | None
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class Product:
     name: str
     version: str
     product_id: str
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class ProductIDAndInfo:
     product_id: str
     product_info: Any
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class ManagerAndName:
     manager: str
     name: str
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class Dependency(ManagerAndName):
     product_info: Any | None
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class Package:
     name: str
     version: str
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class ManagerRequirement:
     manager: str
     requirement: Any
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class ResolutionGraphNode:
     name: str
     version: str
@@ -63,7 +64,7 @@ class ResolutionGraphNode:
     requirements: Iterable[ManagerRequirement]
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
 class ResolutionGraph:
     roots: Iterable[Iterable[str]]
     graph: Iterable[ResolutionGraphNode]
@@ -71,3 +72,15 @@ class ResolutionGraph:
 
 class UserCreated(BaseModel):
     token: str
+
+
+@dataclass(frozen=True)
+class FetchRequest:
+    requirements: AsyncIterable[tuple[str, Any]]
+    generators: AsyncIterable[str]
+
+
+@pydantic_dataclass(frozen=True)
+class Lock:
+    name: str
+    version: str

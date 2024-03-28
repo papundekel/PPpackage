@@ -1,0 +1,12 @@
+{
+    "requirements": {
+        "arch": [
+            "base-devel",
+            "python-setuptools",
+            "patch"
+        ],
+        "AUR": [
+            "conan"
+        ]
+    }
+}

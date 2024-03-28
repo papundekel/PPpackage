@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, Iterable, Set
+from collections.abc import AsyncGenerator, Iterable, Mapping, Set
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterable, TypeVar
@@ -7,6 +7,8 @@ from typing import cast as type_cast
 from PPpackage_submanager.interface import Interface, load_interface_module
 from PPpackage_submanager.schemes import (
     Dependency,
+    FetchRequest,
+    Lock,
     Options,
     Package,
     Product,
@@ -52,6 +54,7 @@ class LocalSubmanager(Submanager):
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
+        locks: Mapping[str, str],
     ) -> AsyncIterable[ResolutionGraph]:
         return self.interface.resolve(
             self.settings,
@@ -61,6 +64,7 @@ class LocalSubmanager(Submanager):
                 make_async_requirements(self.interface.Requirement, requirements)
                 for requirements in requirements_list
             ),
+            make_async_iterable(Lock(name, version) for name, version in locks.items()),
         )
 
     @asynccontextmanager
@@ -71,7 +75,7 @@ class LocalSubmanager(Submanager):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncGenerator[ProductIDAndInfo | AsyncIterable[str], None]:
+    ) -> AsyncGenerator[ProductIDAndInfo | FetchRequest, None]:
         yield await self.interface.fetch(
             self.settings,
             self.state,

@@ -7,14 +7,14 @@ services:
         command:
         -   0.0.0.0:8888
         environment:
-            DEBUG: true
             CACHE_PATH: /mnt/cache/
             CONTAINERIZER: unix:///run/podman/podman.sock
-            WORKDIR_CONTAINERIZER: ${ARCH_INSTALLATIONS?env ARCH_INSTALLATIONS not set}
-            WORKDIR_CONTAINER: /mnt/db/installations/
+            WORKDIR__CONTAINERIZER_PATH: ${ARCH_INSTALLATIONS?env ARCH_INSTALLATIONS not set}
+            WORKDIR__CONTAINER_PATH: /mnt/db/installations/
             SUBMANAGER_PACKAGE: PPpackage_arch
             DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
             INSTALLATIONS_PATH: /mnt/db/installations/
+            BUILD_CONTEXT_WORKDIR_PATH: /mnt/db/installations/
         ports:
         -   8888
         volumes:
@@ -37,11 +37,11 @@ services:
         command:
         -   0.0.0.0:8888
         environment:
-            DEBUG: true
             CACHE_PATH: /mnt/cache/
             SUBMANAGER_PACKAGE: PPpackage_conan
             DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
             INSTALLATIONS_PATH: /mnt/db/installations/
+            BUILD_CONTEXT_WORKDIR_PATH: /mnt/db/installations/
         ports:
         -   8888
         volumes:
@@ -58,12 +58,12 @@ services:
         command:
         -   0.0.0.0:8888
         environment:
-            DEBUG: true
             CACHE_PATH: /mnt/cache/
             CONTAINERIZER: unix:///run/podman/podman.sock
             SUBMANAGER_PACKAGE: PPpackage_PP
             DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
             INSTALLATIONS_PATH: /mnt/db/installations/
+            BUILD_CONTEXT_WORKDIR_PATH: /mnt/db/installations/
         ports:
         -   8888
         volumes:
@@ -80,15 +80,23 @@ services:
         command:
         -   0.0.0.0:8888
         environment:
-            DEBUG: true
             CACHE_PATH: /mnt/cache/
             CONTAINERIZER: unix:///run/podman/podman.sock
+            WORKDIR__CONTAINERIZER_PATH: ${AUR_INSTALLATIONS?env AUR_INSTALLATIONS not set}
+            WORKDIR__CONTAINER_PATH: /mnt/db/installations/
             SUBMANAGER_PACKAGE: PPpackage_AUR
             DATABASE_URL: sqlite+aiosqlite:////mnt/db/db.sqlite3
             INSTALLATIONS_PATH: /mnt/db/installations/
+            BUILD_CONTEXT_WORKDIR_PATH: /mnt/db/installations/
         ports:
         -   8888
         volumes:
+        -   type: bind
+            source: $XDG_RUNTIME_DIR/podman/podman.sock
+            target: /run/podman/podman.sock
+        -   type: bind
+            source: $AUR_INSTALLATIONS
+            target: /mnt/db/installations/
         -   type: volume
             source: aur-cache
             target: /mnt/cache/

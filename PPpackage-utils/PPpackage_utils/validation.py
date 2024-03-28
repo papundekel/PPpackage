@@ -1,12 +1,8 @@
 from inspect import isclass
 from json import loads as json_loads
-from sys import stderr
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, RootModel
-
-_DEBUG_LOAD = False
-
 
 ModelType = TypeVar("ModelType")
 
@@ -26,9 +22,6 @@ def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
 
 def load_from_bytes(Model: type[ModelType], input_json_bytes: memoryview) -> ModelType:
     input_json_string = str(input_json_bytes, encoding="utf-8")
-
-    if _DEBUG_LOAD:
-        stderr.write(f"load:\n{input_json_string}\n")
 
     input_json = json_loads(input_json_string)
 

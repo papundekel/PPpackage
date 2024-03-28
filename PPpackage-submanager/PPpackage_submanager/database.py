@@ -33,7 +33,7 @@ class Installation(SQLModel, table=True):
     user: User = Relationship(back_populates="installations")
 
     def __init__(self, path: Path):
-        super().__init__(path_raw=str(path))
+        super().__init__(path_raw=str(path))  # type: ignore
 
     @property
     def path(self):

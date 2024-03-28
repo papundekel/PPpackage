@@ -7,7 +7,13 @@ from jinja2 import Environment as Jinja2Environment
 from jinja2 import FileSystemLoader as Jinja2FileSystemLoader
 from jinja2 import select_autoescape as jinja2_select_autoescape
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
+from PPpackage_submanager.schemes import (
+    Dependency,
+    FetchRequest,
+    Options,
+    Package,
+    ProductIDAndInfo,
+)
 from PPpackage_submanager.utils import jinja_render_temp_file
 from PPpackage_utils.utils import asubprocess_wait
 from PPpackage_utils.validation import load_object
@@ -39,7 +45,7 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> ProductIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | FetchRequest:
     environment = make_conan_environment(settings.cache_path)
 
     jinja_loader = Jinja2Environment(
@@ -75,16 +81,16 @@ async def fetch(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
             env=environment,
         )
 
         assert process.stdout is not None
         graph_json_bytes = await process.stdout.read()
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)
 
-    nodes = parse_conan_graph_nodes(settings.debug, FetchNode, graph_json_bytes)
+    nodes = parse_conan_graph_nodes(FetchNode, graph_json_bytes)
 
     for node in nodes.values():
         package_name = node.name

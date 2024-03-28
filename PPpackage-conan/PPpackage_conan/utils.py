@@ -48,9 +48,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def parse_conan_graph_nodes(
-    debug: bool,
-    NodeType: type[T],
-    conan_graph_json_bytes: bytes,
+    NodeType: type[T], conan_graph_json_bytes: bytes
 ) -> Mapping[str, T]:
     conan_graph = load_from_bytes(ConanGraph, memoryview(conan_graph_json_bytes))
 

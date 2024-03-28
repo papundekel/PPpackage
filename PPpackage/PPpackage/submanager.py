@@ -1,9 +1,10 @@
-from collections.abc import AsyncIterable, Iterable, Set
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from pathlib import Path
 from typing import Any, AsyncContextManager, Final, Protocol, Self
 
 from PPpackage_submanager.schemes import (
     Dependency,
+    FetchRequest,
     Options,
     Package,
     Product,
@@ -24,6 +25,7 @@ class Submanager(Protocol):
         self,
         options: Options,
         requirements_list: Iterable[Iterable[Any]],
+        locks: Mapping[str, str],
     ) -> AsyncIterable[ResolutionGraph]: ...
 
     def fetch(
@@ -33,7 +35,7 @@ class Submanager(Protocol):
         dependencies: Iterable[Dependency],
         installation_path: Path | None,
         generators_path: Path | None,
-    ) -> AsyncContextManager[ProductIDAndInfo | AsyncIterable[str]]: ...
+    ) -> AsyncContextManager[ProductIDAndInfo | FetchRequest]: ...
 
     async def install(
         self, id: str, installation_path: Path, product: Product

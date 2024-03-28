@@ -10,5 +10,6 @@ setup(
         "PPpackage-pacman-utils",
         "pydot",
         "networkx",
+        "pyalpm",
     ],
 )

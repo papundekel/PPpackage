@@ -7,7 +7,15 @@ from typing import cast as type_cast
 
 from pydantic_settings import BaseSettings
 
-from .schemes import Dependency, Package, Product, ProductIDAndInfo, ResolutionGraph
+from .schemes import (
+    Dependency,
+    FetchRequest,
+    Lock,
+    Package,
+    Product,
+    ProductIDAndInfo,
+    ResolutionGraph,
+)
 
 RequirementType = TypeVar("RequirementType")
 SettingsType = TypeVar("SettingsType", bound=BaseSettings)
@@ -15,7 +23,13 @@ StateType = TypeVar("StateType")
 
 UpdateDatabaseCallbackType = Callable[[SettingsType, StateType], Awaitable[None]]
 ResolveCallbackType = Callable[
-    [SettingsType, StateType, Any, AsyncIterable[AsyncIterable[RequirementType]]],
+    [
+        SettingsType,
+        StateType,
+        Any,
+        AsyncIterable[AsyncIterable[RequirementType]],
+        AsyncIterable[Lock],
+    ],
     AsyncIterable[ResolutionGraph],
 ]
 FetchCallbackType = Callable[
@@ -28,7 +42,7 @@ FetchCallbackType = Callable[
         Path | None,
         Path | None,
     ],
-    Awaitable[ProductIDAndInfo | AsyncIterable[str]],
+    Awaitable[ProductIDAndInfo | FetchRequest],
 ]
 
 GenerateCallbackType = Callable[

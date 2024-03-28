@@ -1,9 +1,8 @@
-from collections.abc import Iterable, MutableSet
+from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 
 from networkx import MultiDiGraph, convert_node_labels_to_integers
-from networkx import topological_generations as base_topological_generations
 from networkx.drawing.nx_pydot import to_pydot
 from PPpackage_submanager.schemes import ManagerAndName
 from PPpackage_utils.validation import load_from_bytes
@@ -18,74 +17,9 @@ from .schemes import Input
 from .settings import Settings
 from .submanagers import Submanagers
 from .update_database import update_database
-from .utils import NodeData, SubmanagerCommandFailure
+from .utils import SubmanagerCommandFailure
 
-
-def topological_generations(
-    graph: MultiDiGraph,
-) -> Iterable[Iterable[tuple[ManagerAndName, NodeData]]]:
-    for generation in base_topological_generations(graph):
-        yield [(node, graph.nodes[node]) for node in generation]
-
-
-def install_topology_visit(
-    graph: MultiDiGraph, seen: MutableSet[ManagerAndName], node: ManagerAndName
-) -> Iterable[tuple[ManagerAndName, NodeData]]:
-    if node not in seen:
-        seen.add(node)
-
-        successor_map = {}
-        for successor in graph.successors(node):
-            successor_map.setdefault(successor.manager, []).append(successor)
-
-        successors_same_manager = successor_map.pop(node.manager, [])
-
-        for successors in successor_map.values():
-            for successor in successors:
-                yield from install_topology_visit(graph, seen, successor)
-
-        for successor in successors_same_manager:
-            yield from install_topology_visit(graph, seen, successor)
-
-        yield node, graph.nodes[node]
-
-
-def create_install_topology_iteration(
-    graph: MultiDiGraph,
-    sources: MutableSet[ManagerAndName],
-    seen: MutableSet[ManagerAndName],
-) -> Iterable[tuple[ManagerAndName, NodeData]]:
-    while len(sources) != 0:
-        node = sources.pop()
-
-        if node in seen:
-            continue
-
-        yield from install_topology_visit(graph, seen, node)
-
-
-def create_install_topology(
-    graph: MultiDiGraph,
-) -> Iterable[tuple[ManagerAndName, NodeData]]:
-    seen = set[ManagerAndName]()
-
-    sources = {node for node, d in graph.in_degree() if d == 0}
-    same_manager_sources = {
-        node
-        for node in sources
-        if all(
-            successor.manager == node.manager for successor in graph.successors(node)
-        )
-    }
-    sources = sources - same_manager_sources
-
-    same_manager_mapping = dict[str, MutableSet[ManagerAndName]]()
-    for node in same_manager_sources:
-        same_manager_mapping.setdefault(node.manager, set()).add(node)
-
-    for same_manager_sources in same_manager_mapping.values():
-        yield from create_install_topology_iteration(graph, same_manager_sources, seen)
-    yield from create_install_topology_iteration(graph, sources, seen)
+logger = getLogger(__name__)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
@@ -169,19 +103,20 @@ async def main(
                 submanagers,
                 resolve_iteration_limit,
                 input.requirements,
+                input.locks,
                 options,
             )
 
             if graph_path is not None:
                 graph_to_dot(graph, graph_path)
 
-            reversed_graph = graph.reverse(copy=False)
-
-            fetch_order = topological_generations(reversed_graph)
-            install_order = list(create_install_topology(graph))
-
-            await fetch(
-                workdir_path, submanagers, options, graph, fetch_order, install_order
+            install_order = await fetch(
+                workdir_path,
+                submanagers,
+                options,
+                graph,
+                graph,
+                resolve_iteration_limit,
             )
 
             await install(submanagers, install_order, destination_path)

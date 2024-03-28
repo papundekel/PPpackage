@@ -1,15 +1,25 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import AsyncIterable, AsyncIterator, Iterable, MutableMapping
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Set,
+)
 from contextlib import asynccontextmanager, contextmanager
 from os import environ, kill, mkfifo
 from pathlib import Path
 from shutil import move
-from shutil import rmtree as base_rmtree
 from signal import SIGTERM
 from sys import stderr
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar, overload
+from unittest.mock import Base
+
+from frozendict import frozendict
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
 class MyException(Exception):
@@ -37,7 +47,9 @@ def TemporaryDirectory(dir=None):
         yield dir_path
 
 
-async def asubprocess_wait(process: Process, exception: Exception) -> int:
+async def asubprocess_wait(
+    process: Process, exception: Exception | type[Exception]
+) -> int:
     return_code = await process.wait()
 
     if return_code != 0:
@@ -75,19 +87,17 @@ async def get_fakeroot_info():
     global _fakeroot_info
 
     if _fakeroot_info is None:
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "fakeroot",
             "printenv",
             "LD_LIBRARY_PATH",
             "LD_PRELOAD",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
         )
 
-        fakeroot_stdout = await asubprocess_communicate(
-            await process_creation, "Error in `fakeroot`."
-        )
+        fakeroot_stdout = await asubprocess_communicate(process, "Error in `fakeroot`.")
 
         ld_library_path, ld_preload = [
             line.strip() for line in fakeroot_stdout.decode().splitlines()
@@ -104,16 +114,14 @@ async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     try:
         fakeroot_info_task = get_fakeroot_info()
 
-        process_creation = create_subprocess_exec(
+        process = await create_subprocess_exec(
             "faked",
             stdin=DEVNULL,
             stdout=PIPE,
-            stderr=DEVNULL,
+            stderr=None,
         )
 
-        faked_stdout = await asubprocess_communicate(
-            await process_creation, "Error in `faked`."
-        )
+        faked_stdout = await asubprocess_communicate(process, "Error in `faked`.")
 
         key, pid_string = faked_stdout.decode().strip().split(":")
 
@@ -149,6 +157,7 @@ async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
 
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 
 async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
@@ -156,25 +165,21 @@ async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
         yield item
 
 
-def _wipe_directory_onerror(_, __, excinfo):
-    _, exc, _ = excinfo
-
-    if not isinstance(exc, FileNotFoundError):
-        raise exc
-
-
-def rmtree(path: Path, onerror=None):
+def rmtree(path: Path):
     if not path.exists():
         pass
     elif not path.is_symlink() and path.is_dir():
-        base_rmtree(path, onerror=onerror)
+        temp = BaseTemporaryDirectory()
+        temp.cleanup()
+        temp.name = str(path)
+        temp.cleanup()
     else:
         path.unlink()
 
 
 def wipe_directory(directory: Path) -> None:
     for path in directory.iterdir():
-        rmtree(path, onerror=_wipe_directory_onerror)
+        rmtree(path)
 
 
 def movetree(source: Path, destination: Path):
@@ -192,3 +197,33 @@ def movetree(source: Path, destination: Path):
 
 def get_module_path(module) -> Path:
     return Path(module.__file__)
+
+
+@overload
+def freeze(x: Mapping[T, U]) -> Mapping[T, U]: ...
+
+
+@overload
+def freeze(x: Set[T]) -> Set[T]: ...
+
+
+def freeze(x):
+    if isinstance(x, Mapping):
+        return frozendict({key: freeze(value) for key, value in x.items()})
+    elif isinstance(x, Set):
+        return frozenset(value for value in x)
+    else:
+        return x
+
+
+@pydantic_dataclass(frozen=True)
+class ContainerizerWorkdirInfo:
+    containerizer_path: Path
+    container_path: Path
+
+    def translate(self, path: Path) -> Path:
+        containerizer_path = self.containerizer_path / path.absolute().relative_to(
+            self.container_path.absolute()
+        )
+
+        return containerizer_path.absolute()

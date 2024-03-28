@@ -1,5 +1,5 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable, Iterable
 from pathlib import Path
 from typing import Any
@@ -106,10 +106,10 @@ async def generate(
             conanfile_file.name,
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=DEVNULL,
+            stderr=None,
             env=environment,
         )
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)
 
     patch_native_generators(native_generators_path, native_generators_path_suffix)

@@ -1,3 +1,7 @@
+from logging import Formatter as LoggingFormatter
+from logging import LogRecord
+from logging import StreamHandler as StreamLoggingHandler
+from logging import getLogger
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +15,21 @@ from .settings import Settings
 settings = Settings()  # type: ignore
 
 app = AsyncTyper()
+
+
+class LoggingFilter:
+    def filter(self, record: LogRecord) -> bool:
+        return record.name.startswith("PPpackage") or record.name.startswith("httpx")
+
+
+logging_formatter = LoggingFormatter("%(name)s: %(message)s")
+logging_handler = StreamLoggingHandler()
+logging_handler.setLevel("DEBUG")
+logging_handler.addFilter(LoggingFilter())
+logging_handler.setFormatter(logging_formatter)
+logger = getLogger()
+logger.setLevel("DEBUG")
+logger.addHandler(logging_handler)
 
 
 @app.command()

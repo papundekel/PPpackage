@@ -1,10 +1,9 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import Mapping
-from pathlib import Path
 
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists
+from PPpackage_utils.utils import asubprocess_wait
 
 from .lifespan import State
 from .settings import Settings
@@ -19,11 +18,11 @@ async def update_database_impl(environment: Mapping[str, str]):
         "*",
         stdin=DEVNULL,
         stdout=DEVNULL,
-        stderr=DEVNULL,
+        stderr=None,
         env=environment,
     )
 
-    await asubprocess_wait(process, CommandException())
+    await asubprocess_wait(process, CommandException)
 
 
 async def update_database(settings: Settings, state: State):

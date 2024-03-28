@@ -1,23 +1,29 @@
-from asyncio import create_subprocess_exec
+from asyncio import Lock, create_subprocess_exec
 from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import AsyncIterable
-from os import symlink
+from logging import getLogger
 from pathlib import Path
 
 from PPpackage_pacman_utils.schemes import ProductInfo
 from PPpackage_submanager.exceptions import CommandException
-from PPpackage_submanager.schemes import Dependency, Options, Package, ProductIDAndInfo
+from PPpackage_submanager.schemes import (
+    Dependency,
+    FetchRequest,
+    Options,
+    Package,
+    ProductIDAndInfo,
+)
 from PPpackage_utils.utils import (
-    TemporaryDirectory,
     asubprocess_wait,
     discard_async_iterable,
     ensure_dir_exists,
-    fakeroot,
 )
-from pydantic import RootModel
+from pycman import run_action_with_args as pacman
 
 from .settings import Settings
 from .utils import get_cache_paths
+
+logger = getLogger(__name__)
 
 
 def process_product_id(line: str):
@@ -28,6 +34,9 @@ def process_product_id(line: str):
     return f"{package_version_split[-2]}-{package_version_split[-1]}"
 
 
+lock = Lock()
+
+
 async def fetch(
     settings: Settings,
     state: None,
@@ -36,36 +45,33 @@ async def fetch(
     dependencies: AsyncIterable[Dependency],
     installation_path: Path | None,
     generators_path: Path | None,
-) -> ProductIDAndInfo | AsyncIterable[str]:
+) -> ProductIDAndInfo | FetchRequest:
+    logger.debug(f"Fetching {package.name} {package.version}...")
+
     database_path, cache_path = get_cache_paths(settings.cache_path)
 
     ensure_dir_exists(cache_path)
 
     await discard_async_iterable(dependencies)
 
-    with TemporaryDirectory() as database_path_fake:
-        symlink(database_path.absolute() / "sync", database_path_fake / "sync")
+    return_code = pacman(
+        "sync",
+        [
+            "--dbpath",
+            str(database_path),
+            "--cachedir",
+            str(cache_path),
+            "--downloadonly",
+            "--nodeps",
+            "--nodeps",
+            package.name,
+        ],
+    )
 
-        async with fakeroot() as environment:
-            process = await create_subprocess_exec(
-                "pacman",
-                "--dbpath",
-                str(database_path_fake),
-                "--cachedir",
-                str(cache_path),
-                "--noconfirm",
-                "--sync",
-                "--downloadonly",
-                "--nodeps",
-                "--nodeps",
-                package.name,
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=DEVNULL,
-                env=environment,
-            )
-
-            await asubprocess_wait(process, CommandException())
+    if return_code != 0:
+        raise CommandException(
+            f"pacman failed to fetch {package.name} {package.version}."
+        )
 
     process = await create_subprocess_exec(
         "pacman",
@@ -81,15 +87,14 @@ async def fetch(
         package.name,
         stdin=DEVNULL,
         stdout=PIPE,
-        stderr=DEVNULL,
+        stderr=None,
     )
 
     assert process.stdout is not None
 
     line = (await process.stdout.readline()).decode().strip()
 
-    if line == "":
-        raise CommandException
+    await asubprocess_wait(process, CommandException)
 
     product_id = process_product_id(line)
 
@@ -98,6 +103,6 @@ async def fetch(
         product_info=ProductInfo(version=package.version, product_id=product_id),
     )
 
-    await asubprocess_wait(process, CommandException())
+    logger.debug(f"Fetched {package.name} {package.version}.")
 
     return id_and_info

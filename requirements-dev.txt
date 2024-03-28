@@ -2,6 +2,8 @@
 
 -e ./PPpackage-submanager/
 
+-e ./PPpackage-pacman-utils/
+
 -e ./PPpackage-conan/
 -e ./PPpackage-arch/
 -e ./PPpackage-PP/

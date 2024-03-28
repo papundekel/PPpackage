@@ -1,8 +1,7 @@
-from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
 from collections.abc import AsyncIterable, MutableSequence
 
 from PPpackage_submanager.schemes import (
+    Lock,
     ManagerRequirement,
     Options,
     ResolutionGraph,
@@ -11,22 +10,7 @@ from PPpackage_submanager.schemes import (
 
 from .lifespan import State
 from .settings import Settings
-from .utils import PackageInfo, fetch_info
-
-
-async def is_package_from_aur(name: str) -> bool:
-    process = await create_subprocess_exec(
-        "pacman",
-        "-Sp",
-        name,
-        stdin=DEVNULL,
-        stdout=DEVNULL,
-        stderr=DEVNULL,
-    )
-
-    return_code = await process.wait()
-
-    return return_code != 0
+from .utils import PackageInfo, fetch_info, is_package_from_aur
 
 
 def split_version_requirement(requirement: str) -> str:
@@ -66,9 +50,9 @@ async def resolve(
     state: State,
     options: Options,
     requirements_list: AsyncIterable[AsyncIterable[str]],
+    locks: AsyncIterable[Lock],
 ) -> AsyncIterable[ResolutionGraph]:
     roots: MutableSequence[MutableSequence[str]] = []
-
     package_names_with_info = dict[str, PackageInfo]()
 
     async for requirements in requirements_list:
@@ -83,6 +67,11 @@ async def resolve(
             requirements_roots.append(package_name)
 
         roots.append(requirements_roots)
+
+    async for lock in locks:
+        package_info = package_names_with_info.get(lock.name)
+        if package_info is not None and package_info.version != lock.version:
+            return
 
     graph = [
         await create_node(name, info) for name, info in package_names_with_info.items()

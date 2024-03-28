@@ -1,6 +1,5 @@
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
-from sys import stderr
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_utils.utils import asubprocess_wait, ensure_dir_exists, fakeroot
@@ -23,8 +22,8 @@ async def update_database(settings: Settings, state: None):
             "--refresh",
             stdin=DEVNULL,
             stdout=DEVNULL,
-            stderr=DEVNULL,
+            stderr=None,
             env=environment,
         )
 
-        await asubprocess_wait(process, CommandException())
+        await asubprocess_wait(process, CommandException)

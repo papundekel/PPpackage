@@ -1,9 +1,10 @@
 from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from io import TextIOWrapper
 from pathlib import Path
+from sys import stderr
 
 from PPpackage_submanager.exceptions import CommandException
 from PPpackage_submanager.utils import containerizer_subprocess_exec
@@ -15,6 +16,7 @@ from PPpackage_utils.pipe import (
     pipe_write_string,
 )
 from PPpackage_utils.utils import (
+    ContainerizerWorkdirInfo,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
@@ -43,10 +45,10 @@ def create_necessary_container_files(root_path: Path):
 
 async def install_manager_command(
     containerizer: str,
+    workdir_info: ContainerizerWorkdirInfo,
     pipe_to_fakealpm: TextIOWrapper,
     pipe_from_fakealpm: TextIOWrapper,
     installation_path: Path,
-    containerizer_installation_path: Path,
 ):
     command = pipe_read_string("PPpackage-pacman-utils", pipe_from_fakealpm)
     args = pipe_read_strings("PPpackage-pacman-utils", pipe_from_fakealpm)
@@ -69,7 +71,7 @@ async def install_manager_command(
                 "--rm",
                 "--interactive",
                 "--rootfs",
-                str(containerizer_installation_path),
+                str(workdir_info.translate(installation_path)),
                 command,
                 *args,
                 stdin=pipe_hook,
@@ -98,16 +100,10 @@ DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
 
 async def pacman_install(
     containerizer: str,
-    workdir_containerizer: Path,
-    workdir_container: Path,
+    workdir_info: ContainerizerWorkdirInfo,
     installation_path: Path,
     product_path: Path,
 ):
-    containerizer_installation_path = (
-        workdir_containerizer
-        / installation_path.absolute().relative_to(workdir_container)
-    )
-
     database_path = installation_path / DATABASE_PATH_RELATIVE
 
     ensure_dir_exists(database_path)
@@ -135,7 +131,7 @@ async def pacman_install(
                 str(product_path),
                 stdin=DEVNULL,
                 stdout=DEVNULL,
-                stderr=DEVNULL,
+                stderr=None,
                 env=environment,
             )
 
@@ -153,14 +149,14 @@ async def pacman_install(
                     elif header == "COMMAND":
                         await install_manager_command(
                             containerizer,
+                            workdir_info,
                             pipe_to_fakealpm,
                             pipe_from_fakealpm,
                             installation_path,
-                            containerizer_installation_path,
                         )
                     else:
                         raise Exception(
                             f"Unknown header: {header}", "PPpackage-pacman-utils"
                         )
 
-        await asubprocess_wait(process, CommandException())
+            await asubprocess_wait(process, CommandException)
