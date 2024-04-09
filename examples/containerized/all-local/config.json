@@ -1,0 +1,86 @@
+{
+    "repository_drivers": {
+        "pacman": {
+            "package": "PPpackage.repository_driver.pacman"
+        },
+        "AUR": {
+            "package": "PPpackage.repository_driver.AUR"
+        },
+        "conan": {
+            "package": "PPpackage.repository_driver.conan"
+        },
+        "PP": {
+            "package": "PPpackage.repository_driver.PP"
+        }
+    },
+    "requirement_translators": {
+        "pacman": {
+            "package": "PPpackage.translator.pacman"
+        },
+        "conan": {
+            "package": "PPpackage.translator.conan"
+        },
+        "PP": {
+            "package": "PPpackage.translator.PP"
+        }
+    },
+    "installers": {
+        "pacman": {
+            "package": "PPpackage.installer.pacman",
+            "parameters": {
+                "containerizer": {
+                    "url": "unix:///run/podman/podman.sock",
+                    "path_translations": [
+                        {
+                            "containerizer": "/tmp",
+                            "container": "/mnt/workdir"
+                        },
+                        {
+                            "containerizer": "$ROOT",
+                            "container": "/mnt/root"
+                        }
+                    ]
+                }
+            }
+        },
+        "simple": {
+            "package": "PPpackage.installer.simple"
+        }
+    },
+    "repositories": [
+        {
+            "driver": "pacman",
+            "parameters": {
+                "database_path": "/mnt/repositories/database/archlinux-core",
+                "header": "core",
+                "include": "/etc/pacman.d/mirrorlist"
+            }
+        },
+        {
+            "driver": "pacman",
+            "parameters": {
+                "database_path": "/mnt/repositories/database/archlinux-extra",
+                "header": "extra",
+                "include": "/etc/pacman.d/mirrorlist"
+            }
+        },
+        {
+            "driver": "AUR"
+        },
+        {
+            "driver": "conan",
+            "parameters": {
+                "cache_path": "/mnt/repositories/cache/conan-conancenter",
+                "url": "https://center.conan.io",
+                "verify_ssl": true
+            }
+        },
+        {
+            "driver": "PP",
+            "parameters": {
+                "database_path": "/mnt/repositories/database/PP",
+                "cache_path": "/mnt/repositories/cache/PP"
+            }
+        }
+    ]
+}

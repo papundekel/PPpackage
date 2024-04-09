@@ -3,10 +3,8 @@ if [ -z "$1" ] || ([ "$1" != "docker" ] && [ "$1" != "podman" ]); then
     exit 1
 fi
 
-"$1" build --target submanager-db-init --tag docker.io/fackop/pppackage-submanager-db-init:latest . && \
-"$1" build --target submanager-create-user --tag docker.io/fackop/pppackage-submanager-create-user:latest . && \
-"$1" build --target submanager-arch --tag docker.io/fackop/pppackage-arch:latest . && \
-"$1" build --target submanager-conan --tag docker.io/fackop/pppackage-conan:latest . && \
-"$1" build --target submanager-pp --tag docker.io/fackop/pppackage-pp:latest . &&\
-"$1" build --target submanager-aur --tag docker.io/fackop/pppackage-aur:latest . &&\
-"$1" build --target metamanager --tag docker.io/fackop/pppackage:latest .
+# "$1" build --target repository-driver-pacman --tag docker.io/fackop/pppackage-repository-driver-pacman:latest . && \
+# "$1" build --target repository-driver-conan --tag docker.io/fackop/pppackage-repository-driver-conan:latest . && \
+# "$1" build --target repository-driver-pp --tag docker.io/fackop/pppackage-repository-driver-pp:latest . &&\
+# "$1" build --target repository-driver-aur --tag docker.io/fackop/pppackage-repository-driver-aur:latest . &&\
+"$1" build --target metamanager --tag docker.io/fackop/pppackage-metamanager:latest .

@@ -1,15 +1,34 @@
--e ./PPpackage-utils/
+-e ./utils/
+-e ./container-utils/
 
--e ./PPpackage-submanager/
 
--e ./PPpackage-pacman-utils/
 
--e ./PPpackage-conan/
--e ./PPpackage-arch/
--e ./PPpackage-PP/
--e ./PPpackage-AUR/
+-e ./repository-driver/interface/
 
--e ./PPpackage/
+-e ./repository-driver/server/
+
+-e ./repository-driver/conan/
+-e ./repository-driver/pacman/
+-e ./repository-driver/PP/
+-e ./repository-driver/AUR/
+
+
+
+-e ./installer/interface/
+
+-e ./installer/simple/
+-e ./installer/pacman/
+
+
+
+-e ./translator/interface/
+
+-e ./translator/pacman/
+-e ./translator/conan/
+-e ./translator/PP/
+
+
+-e ./metamanager/
 
 pre-commit
 hypercorn

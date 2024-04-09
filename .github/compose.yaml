@@ -1,61 +1,60 @@
 services:
     metamanager:
-        image: docker.io/fackop/pppackage:latest
+        image: docker.io/fackop/pppackage-metamanager:latest
         ulimits:
             nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
                 soft: 1024
                 hard: 1048576
         user: $USER
         command:
-        -   /mnt/workdir/root/
-        -   --workdir
-        -   /mnt/workdir/
-        environment:
-            submanagers__arch__package: PPpackage_arch
-            submanagers__arch__settings__cache_path: /mnt/cache/arch/
-            submanagers__arch__settings__containerizer: unix:///run/podman/podman.sock
-            submanagers__arch__settings__workdir__containerizer_path: $PWD
-            submanagers__arch__settings__workdir__container_path: /mnt/workdir/
-
-            submanagers__conan__package: PPpackage_conan
-            submanagers__conan__settings__cache_path: /mnt/cache/conan/
-
-            submanagers__PP__package: PPpackage_PP
-            submanagers__PP__settings__cache_path: /mnt/cache/PP/
-            submanagers__PP__settings__containerizer: unix:///run/podman/podman.sock
-
-            submanagers__AUR__package: PPpackage_AUR
-            submanagers__AUR__settings__cache_path: /mnt/cache/AUR/
-            submanagers__AUR__settings__containerizer: unix:///run/podman/podman.sock
-            submanagers__AUR__settings__workdir__containerizer_path: $PWD
-            submanagers__AUR__settings__workdir__container_path: /mnt/workdir/
+            - /mnt/root/
+            - --config
+            - /mnt/config.json
+            - --workdir
+            - /mnt/workdir/
         volumes:
-        -   type: bind
-            source: $PWD
-            target: /mnt/workdir/
+            - type: bind
+              source: /tmp/
+              target: /mnt/workdir/
 
-        -   type: bind
-            source: $XDG_RUNTIME_DIR/podman/podman.sock
-            target: /run/podman/podman.sock
+            - type: bind
+              source: $PWD/root/
+              target: /mnt/root/
 
-        -   type: bind
-            source: $PWD/cache/arch/
-            target: /mnt/cache/arch/
-        -   type: bind
-            source: $PWD/cache/conan/
-            target: /mnt/cache/conan/
-        -   type: bind
-            source: $PWD/cache/PP/
-            target: /mnt/cache/PP/
-        -   type: bind
-            source: $PWD/cache/AUR/
-            target: /mnt/cache/AUR/
+            - type: bind
+              source: $PWD/output/
+              target: /mnt/output/
 
-        -   type: bind
-            source: /etc/passwd
-            target: /etc/passwd
-            read_only: true
-        -   type: bind
-            source: /etc/group
-            target: /etc/group
-            read_only: true
+            - type: bind
+              source: $PWD/.github/config.json
+              target: /mnt/config.json
+
+            - type: bind
+              source: $XDG_RUNTIME_DIR/podman/podman.sock
+              target: /run/podman/podman.sock
+
+            - type: bind
+              source: $PWD/database/archlinux-core/
+              target: /mnt/repositories/database/archlinux-core/
+            - type: bind
+              source: $PWD/database/archlinux-extra/
+              target: /mnt/repositories/database/archlinux-extra/
+            - type: bind
+              source: $PWD/database/PP/
+              target: /mnt/repositories/database/PP/
+
+            - type: bind
+              source: $PWD/cache/conan/
+              target: /mnt/repositories/cache/conan/
+            - type: bind
+              source: $PWD/cache/PP/
+              target: /mnt/repositories/cache/PP/
+
+            - type: bind
+              source: /etc/passwd
+              target: /etc/passwd
+              read_only: true
+            - type: bind
+              source: /etc/group
+              target: /etc/group
+              read_only: true

@@ -50,14 +50,14 @@ jobs:
                   context: ${{ github.workspace }}
                   target: metamanager
                   load: true
-                  tags: docker.io/fackop/pppackage:latest
+                  tags: docker.io/fackop/pppackage-metamanager:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
             - name: Run PPpackage
               run: |
-                  mkdir -p cache/arch cache/conan cache/PP cache/AUR
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < input/basic.json
+                  mkdir -p root/ output/ cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
 
-            - name: See if ldconfig ran
-              run: ls -l root/etc/ld.so.cache
+            # - name: See if ldconfig ran
+            #   run: ls -l root/etc/ld.so.cache

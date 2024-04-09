@@ -1,0 +1,9 @@
+{
+    "driver": {
+        "package": "PPpackage.repository_driver.PP"
+    },
+    "parameters": {
+        "database_path": "tmp/database/PP",
+        "cache_path": "tmp/cache/PP"
+    }
+}
