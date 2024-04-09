@@ -15,7 +15,7 @@ def print_requirements(output: IO[str], requirements: RequirementInput):
         operator = " & " if requirements.operation == "and" else " | "
         i = iter(requirements.operands)
 
-        output.write(str(next(i)))
+        print_requirements(output, next(i))
 
         for operand in i:
             output.write(operator)
