@@ -1,12 +1,12 @@
 from setuptools import setup
 
 setup(
-    name="PPpackage-pacman",
-    packages=["PPpackage.pacman"],
+    name="PPpackage-repository-driver-pacman",
+    packages=["PPpackage.repository_driver.pacman"],
     version="0.1.0",
     install_requires=[
         "PPpackage-utils",
-        "PPpackage-pacman-utils",
+        "PPpackage-repository-driver-interface",
         "pydot",
         "networkx",
         "pyalpm",

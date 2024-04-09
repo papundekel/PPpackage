@@ -1,21 +1,16 @@
-from PPpackage.submanager.interface import Interface
+from collections.abc import Mapping
+from typing import Any
 
-from .fetch import fetch
-from .generate import generate
-from .install import install
-from .lifespan import lifespan
-from .resolve import resolve
-from .schemes import Requirement
-from .settings import Settings
-from .update_database import update_database
+from PPpackage.repository_driver.interface.interface import Interface
+
+from .fetch_packages import fetch_packages
+from .schemes import DriverParameters, RepositoryParameters
+from .translate_options import translate_options
 
 interface = Interface(
-    Settings=Settings,
-    Requirement=Requirement,
-    lifespan=lifespan,
-    resolve=resolve,
-    fetch=fetch,
-    install=install,
-    generate=generate,
-    update_database=update_database,
+    DriverParameters=DriverParameters,
+    RepositoryParameters=RepositoryParameters,
+    TranslatedOptions=Mapping[str, Any],
+    translate_options=translate_options,
+    fetch_packages=fetch_packages,
 )

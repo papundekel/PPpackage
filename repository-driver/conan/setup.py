@@ -4,6 +4,8 @@ setup(
     name="PPpackage-repository-driver-conan",
     packages=["PPpackage.repository_driver.conan"],
     version="0.1.0",
-    package_data={"PPpackage.repository_driver.conan": ["data/*"]},
-    install_requires=["PPpackage-utils"],
+    install_requires=[
+        "PPpackage-utils",
+        "PPpackage-repository-driver-interface",
+    ],
 )

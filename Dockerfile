@@ -57,6 +57,18 @@ RUN pip install utils/
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+COPY repository-driver/pacman/ /workdir/repository-driver/pacman
+RUN pip install repository-driver/pacman/
+
+COPY repository-driver/AUR/ /workdir/repository-driver/AUR
+RUN pip install repository-driver/AUR/
+
+COPY repository-driver/conan/ /workdir/repository-driver/conan
+RUN pip install repository-driver/conan/
+
+COPY repository-driver/PP/ /workdir/repository-driver/PP
+RUN pip install repository-driver/PP/
+
 COPY metamanager/ /workdir/metamanager
 RUN pip install metamanager/
 

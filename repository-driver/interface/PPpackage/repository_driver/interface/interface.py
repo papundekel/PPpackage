@@ -10,29 +10,34 @@ from .schemes import ResolutionLiteral, VariableToPackageVersionMapping
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
+TranslatedOptionsType = TypeVar("TranslatedOptionsType")
 
 TranslateOptionsCallbackType = Callable[
-    [DriverParametersType, RepositoryParametersType, Any], Awaitable[Any]
+    [DriverParametersType, RepositoryParametersType, Any],
+    Awaitable[TranslatedOptionsType],
 ]
 FetchPackagesCallbackType = Callable[
     [
         DriverParametersType,
         RepositoryParametersType,
-        Any,
+        TranslatedOptionsType,
     ],
     AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping],
 ]
 
 
 @dataclass(frozen=True, kw_only=True)
-class Interface(Generic[DriverParametersType, RepositoryParametersType]):
+class Interface(
+    Generic[DriverParametersType, RepositoryParametersType, TranslatedOptionsType]
+):
     DriverParameters: type[DriverParametersType]
     RepositoryParameters: type[RepositoryParametersType]
+    TranslatedOptions: type[TranslatedOptionsType]
     translate_options: TranslateOptionsCallbackType[
-        DriverParametersType, RepositoryParametersType
+        DriverParametersType, RepositoryParametersType, TranslatedOptionsType
     ]
     fetch_packages: FetchPackagesCallbackType[
-        DriverParametersType, RepositoryParametersType
+        DriverParametersType, RepositoryParametersType, TranslatedOptionsType
     ]
 
 

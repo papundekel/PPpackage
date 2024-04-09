@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AnyUrl, BaseModel
+from pydantic import BaseModel
 
 from PPpackage.utils.validation import WithVariables
 
@@ -11,6 +11,5 @@ class DriverParameters(BaseModel):
 
 
 class RepositoryParameters(BaseModel):
+    database_path: Annotated[Path, WithVariables]
     cache_path: Annotated[Path, WithVariables]
-    url: AnyUrl
-    verify_ssl: bool

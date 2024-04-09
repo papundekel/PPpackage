@@ -6,7 +6,7 @@ setup(
     version="0.1.0",
     install_requires=[
         "PPpackage-utils",
-        "PPpackage-pacman-utils",
+        "PPpackage-repository-driver-interface",
         "sqlitedict",
     ],
 )

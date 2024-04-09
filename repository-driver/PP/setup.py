@@ -1,8 +1,11 @@
 from setuptools import setup
 
 setup(
-    name="PPpackage-PP",
-    packages=["PPpackage.PP"],
+    name="PPpackage-repository-driver-PP",
+    packages=["PPpackage.repository_driver.PP"],
     version="0.1.0",
-    install_requires=["PPpackage-utils"],
+    install_requires=[
+        "PPpackage-utils",
+        "PPpackage-repository-driver-interface",
+    ],
 )
