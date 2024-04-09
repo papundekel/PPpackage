@@ -1,11 +1,13 @@
 -e ./PPpackage-utils/
 
+-e ./PPpackage-repository-driver/
+
 -e ./PPpackage-submanager/
 
 -e ./PPpackage-pacman-utils/
 
 -e ./PPpackage-conan/
--e ./PPpackage-arch/
+-e ./PPpackage-pacman/
 -e ./PPpackage-PP/
 -e ./PPpackage-AUR/
 

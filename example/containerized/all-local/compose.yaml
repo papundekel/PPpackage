@@ -1,0 +1,78 @@
+name: pppackage
+services:
+    metamanager:
+        image: docker.io/fackop/pppackage:latest
+        command:
+            - /mnt/root/
+            - --config
+            - /mnt/config.json
+            - --workdir
+            - /mnt/workdir/
+            - --generators
+            - /mnt/output/generators/
+            - --graph
+            - /mnt/output/graph.dot
+        volumes:
+            - type: bind
+              source: /tmp
+              target: /mnt/workdir/
+
+            - type: bind
+              source: $ROOT
+              target: /mnt/root/
+
+            - type: bind
+              source: $OUTPUT
+              target: /mnt/output
+
+            - type: bind
+              source: $CONFIG_PATH
+              target: /mnt/config.json
+
+            - type: bind
+              source: $XDG_RUNTIME_DIR/podman/podman.sock
+              target: /run/podman/podman.sock
+
+            - type: volume
+              source: database-archlinux-core
+              target: /mnt/repositories/database/archlinux-core/
+            - type: volume
+              source: database-archlinux-extra
+              target: /mnt/repositories/database/archlinux-extra/
+            - type: volume
+              source: database-aur
+              target: /mnt/repositories/database/AUR/
+            - type: volume
+              source: database-conan
+              target: /mnt/repositories/database/conan/
+            - type: volume
+              source: database-pp
+              target: /mnt/repositories/database/PP/
+
+            - type: volume
+              source: cache-archlinux-core
+              target: /mnt/repositories/cache/archlinux-core/
+            - type: volume
+              source: cache-archlinux-extra
+              target: /mnt/repositories/cache/archlinux-extra/
+            - type: volume
+              source: cache-aur
+              target: /mnt/repositories/cache/AUR/
+            - type: volume
+              source: cache-conan
+              target: /mnt/repositories/cache/conan/
+            - type: volume
+              source: cache-pp
+              target: /mnt/repositories/cache/PP/
+volumes:
+    database-archlinux-core:
+    database-archlinux-extra:
+    database-aur:
+    database-conan:
+    database-pp:
+
+    cache-archlinux-core:
+    cache-archlinux-extra:
+    cache-aur:
+    cache-conan:
+    cache-pp:

@@ -1,34 +1,75 @@
-from collections.abc import Mapping, Set
+from collections.abc import Iterable, Mapping, Set
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from frozendict import frozendict
-from PPpackage_submanager.schemes import FrozenAny, Options
+from PPpackage_repository_driver.schemes import BaseModuleConfig, Package, Parameters
 from pydantic import AnyUrl
-from pydantic.dataclasses import dataclass
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
-@dataclass(frozen=True)
+@pydantic_dataclass(frozen=True)
+class SimpleRequirementInput:
+    translator: str
+    value: Any
+
+
+@pydantic_dataclass(frozen=True)
+class OperatorRequirementInput:
+    operation: Literal["and"] | Literal["or"]
+    operands: Iterable["RequirementInput"]
+
+
+RequirementInput = SimpleRequirementInput | OperatorRequirementInput
+
+
+@pydantic_dataclass(frozen=True)
 class Input:
-    requirements: Mapping[str, Set[FrozenAny]]
+    requirements: RequirementInput
+    options: Any
     locks: Mapping[str, Mapping[str, str]] = frozendict()
-    options: Mapping[str, Options] | None = None
     generators: Set[str] | None = None
 
 
-@dataclass(frozen=True)
-class LocalSubmanagerConfig:
-    package: str
-    settings: Mapping
+@pydantic_dataclass(frozen=True)
+class LocalRepositoryConfig:
+    driver: str
+    parameters: Parameters = {}
 
 
-@dataclass(frozen=True)
-class RemoteSubmanagerConfig:
+@pydantic_dataclass(frozen=True)
+class RemoteRepositoryConfig:
     url: AnyUrl
-    token_path: Path
+    cache_path: Path
+
+
+@pydantic_dataclass(frozen=True)
+class RepositoryDriverConfig(BaseModuleConfig):
+    pass
+
+
+@pydantic_dataclass(frozen=True)
+class RequirementTranslatorConfig(BaseModuleConfig):
+    pass
+
+
+@pydantic_dataclass(frozen=True)
+class InstallerConfig(BaseModuleConfig):
+    pass
+
+
+@pydantic_dataclass(frozen=True)
+class Config:
+    repository_drivers: Mapping[str, RepositoryDriverConfig]
+    requirement_translators: Mapping[str, RequirementTranslatorConfig]
+    installers: Mapping[str, InstallerConfig]
+    repositories: Iterable[RemoteRepositoryConfig | LocalRepositoryConfig]
 
 
 class NodeData(TypedDict):
     version: str
     product_id: str
     product_info: Any
+
+
+ResolutionModel = Mapping[Package, str]

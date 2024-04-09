@@ -63,7 +63,7 @@ jobs:
             - name: Run PPpackage
               run: |
                   mkdir -p cache/arch cache/conan cache/PP cache/AUR
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < input/basic.json
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < example/input/basic.json
 
             - name: Build and push pppackage-submanager-db-init
               uses: docker/build-push-action@v5.1.0
@@ -85,13 +85,13 @@ jobs:
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
-            - name: Build and push pppackage-arch
+            - name: Build and push PPpackage-pacman
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
                   target: submanager-arch
                   push: true
-                  tags: docker.io/fackop/pppackage-arch:latest
+                  tags: docker.io/fackop/PPpackage-pacman:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 

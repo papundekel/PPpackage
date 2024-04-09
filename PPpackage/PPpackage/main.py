@@ -1,46 +1,43 @@
+from collections.abc import Iterable
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
+from typing import IO
 
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage_submanager.schemes import ManagerAndName
+from PPpackage_repository_driver.schemes import Package
 from PPpackage_utils.validation import load_from_bytes
 from pydantic import ValidationError
 from pydot import Dot
 
-from .fetch import fetch
-from .generate import generate
-from .install import install
+from .exceptions import SubmanagerCommandFailure
 from .resolve import resolve
-from .schemes import Input
-from .settings import Settings
-from .submanagers import Submanagers
-from .update_database import update_database
-from .utils import SubmanagerCommandFailure
+from .schemes import Config, Input, ResolutionModel
+from .submanagers import Repositories
 
 logger = getLogger(__name__)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
-    manager_to_color = {}
+    namespace_to_color = {}
 
     for node in graph.nodes():
-        if node.manager not in manager_to_color:
-            manager_to_color[node.manager] = len(manager_to_color) + 1
+        if node.namespace not in namespace_to_color:
+            namespace_to_color[node.namespace] = len(namespace_to_color) + 1
 
     graph_presentation: MultiDiGraph = convert_node_labels_to_integers(
         graph, label_attribute="node"
     )
 
     for _, data in graph_presentation.nodes(data=True):
-        node: ManagerAndName = data["node"]
+        node: Package = data["node"]
         version: str = data["version"]
 
         data.clear()
 
-        data["label"] = f'"{node.manager}\n{node.name}\n{version}"'
-        data["fillcolor"] = manager_to_color[node.manager]
+        data["label"] = f'"{node.namespace}\n{node.name}\n{version}"'
+        data["fillcolor"] = namespace_to_color[node.namespace]
 
     graph_presentation.graph.update(
         {
@@ -72,66 +69,76 @@ def log_exception(e: BaseExceptionGroup) -> None:
             stderr.write(f"ERROR: {e.message}\n")
 
 
+def parse_input(stdin: IO[bytes]) -> Input:
+    input_json_bytes = stdin.read()
+
+    try:
+        input = load_from_bytes(Input, memoryview(input_json_bytes))
+    except ValidationError as e:
+        stderr.write("ERROR: Invalid input.\n")
+        stderr.write(e.json(indent=4))
+
+        raise
+
+    return input
+
+
+def parse_config(config_path: Path) -> Config:
+    with config_path.open("rb") as f:
+        config_json_bytes = f.read()
+
+        try:
+            config = load_from_bytes(Config, memoryview(config_json_bytes))
+        except ValidationError as e:
+            stderr.write("ERROR: Invalid config.\n")
+            stderr.write(e.json(indent=4))
+
+            raise
+
+        return config
+
+
+def build_graph(model: ResolutionModel) -> MultiDiGraph:
+    return MultiDiGraph()  # TODO
+
+
+def select_best_model(models: Iterable[ResolutionModel]) -> ResolutionModel:
+    # TODO
+
+    for model in models:
+        return model
+
+    raise SubmanagerCommandFailure("No model found.")
+
+
 async def main(
     workdir_path: Path,
-    do_update_database: bool,
-    settings: Settings,
+    config_path: Path,
     destination_path: Path,
     generators_path: Path | None,
     graph_path: Path | None,
-    resolve_iteration_limit: int,
 ) -> None:
-    try:
-        async with Submanagers(settings.submanagers) as submanagers:
-            input_json_bytes = stdin.buffer.read()
+    config = parse_config(config_path)
 
-            try:
-                input = load_from_bytes(Input, memoryview(input_json_bytes))
-            except ValidationError as e:
-                stderr.write("ERROR: Invalid input.\n")
-                stderr.write(e.json(indent=4))
+    async with Repositories(
+        config.repository_drivers, config.repositories
+    ) as repositories:
+        input = parse_input(stdin.buffer)
 
-                return
+        try:
+            models = await resolve(repositories, input.requirements, input.options)
 
-            if do_update_database:
-                submanager_names = input.requirements.keys()
-                await update_database(submanagers, submanager_names)
+            model = select_best_model(models)
 
-            options = input.options if input.options is not None else {}
-
-            graph = await resolve(
-                submanagers,
-                resolve_iteration_limit,
-                input.requirements,
-                input.locks,
-                options,
-            )
+            graph = build_graph(model)
 
             if graph_path is not None:
                 graph_to_dot(graph, graph_path)
 
-            install_order = await fetch(
-                workdir_path,
-                submanagers,
-                options,
-                graph,
-                graph,
-                resolve_iteration_limit,
-            )
-
-            await install(submanagers, install_order, destination_path)
-
-            if generators_path is not None and input.generators is not None:
-                await generate(
-                    submanagers,
-                    input.generators,
-                    graph.nodes(data=True),
-                    options,
-                    generators_path,
-                )
+            # TODO fetch, install, generate
 
             stderr.write("Done.\n")
 
-    except* SubmanagerCommandFailure as e_group:
-        log_exception(e_group)
-        stderr.write("Aborting.\n")
+        except* SubmanagerCommandFailure as e_group:
+            log_exception(e_group)
+            stderr.write("Aborting.\n")

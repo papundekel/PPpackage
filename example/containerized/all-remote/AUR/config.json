@@ -1,0 +1,7 @@
+{
+    "driver": {
+        "package": "PPpackage_AUR"
+    },
+    "database_path": "/mnt/database/AUR",
+    "cache_path": "/mnt/cache/AUR"
+}

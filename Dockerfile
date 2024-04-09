@@ -81,10 +81,10 @@ RUN pip install PPpackage-pacman-utils/
 
 # -----------------------------------------------------------------------------
 
-FROM submanager-pacman as submanager-arch
+FROM submanager-pacman as repository-archlinux
 
-COPY PPpackage-arch/ /workdir/PPpackage-arch
-RUN pip install PPpackage-arch/
+COPY PPpackage-pacman/ /workdir/PPpackage-pacman
+RUN pip install PPpackage-pacman/
 
 ENTRYPOINT [ "hypercorn", "PPpackage_submanager.server:server", "--bind"]
 
@@ -159,8 +159,8 @@ COPY PPpackage-pacman-utils/PPpackage_pacman_utils/ /workdir/PPpackage-pacman-ut
 COPY PPpackage-pacman-utils/setup.py /workdir/PPpackage-pacman-utils/setup.py
 RUN pip install PPpackage-pacman-utils/
 
-COPY PPpackage-arch/ /workdir/PPpackage-arch
-RUN pip install PPpackage-arch/
+COPY PPpackage-pacman/ /workdir/PPpackage-pacman
+RUN pip install PPpackage-pacman/
 
 COPY PPpackage-conan/ /workdir/PPpackage-conan
 RUN pip install PPpackage-conan/
@@ -175,35 +175,3 @@ COPY PPpackage/ /workdir/PPpackage
 RUN pip install PPpackage/
 
 ENTRYPOINT [ "python", "-m", "PPpackage" ]
-
-# -----------------------------------------------------------------------------
-
-FROM base-python as submanager-db-init
-
-COPY PPpackage-utils/ /workdir/PPpackage-utils
-RUN pip install PPpackage-utils/
-
-COPY PPpackage-submanager/ /workdir/PPpackage-submanager
-RUN pip install PPpackage-submanager/
-
-COPY wrap_script_container.sh /workdir/wrap_script_container.sh
-COPY --chmod=774 init_database.py /workdir/init_database.py
-
-ENTRYPOINT [ "bash", "wrap_script_container.sh", "./init_database.py" ]
-
-# -----------------------------------------------------------------------------
-
-FROM base-python as submanager-create-user
-
-RUN pip install httpx
-
-COPY PPpackage-utils/ /workdir/PPpackage-utils
-RUN pip install PPpackage-utils/
-
-COPY PPpackage-submanager/ /workdir/PPpackage-submanager
-RUN pip install PPpackage-submanager/
-
-COPY wrap_script_container.sh /workdir/wrap_script_container.sh
-COPY --chmod=774 create_user.py /workdir/create_user.py
-
-ENTRYPOINT [ "bash", "wrap_script_container.sh", "./create_user.py" ]

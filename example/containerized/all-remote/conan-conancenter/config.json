@@ -1,0 +1,11 @@
+{
+    "driver": {
+        "package": "PPpackage_conan"
+    },
+    "database_path": "/mnt/database/conan-conancenter",
+    "cache_path": "/mnt/cache/conan-conancenter",
+    "parameters": {
+        "url": "https://center.conan.io",
+        "verify_ssl": true
+    }
+}

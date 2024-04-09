@@ -1,0 +1,48 @@
+{
+    "requirement_translators": {
+        "archlinux": {
+            "package": "PPpackage_translator_archlinux"
+        },
+        "conan": {
+            "package": "PPpackage_translator_conan"
+        },
+        "PP": {
+            "package": "PPpackage_translator_PP"
+        }
+    },
+    "installers": {
+        "pacman": {
+            "package": "PPpackage_installer_pacman",
+            "parameters": {
+                "containerizer": {
+                    "url": "unix://$XDG_RUNTIME_DIR/podman/podman.sock"
+                }
+            }
+        },
+        "simple": {
+            "package:": "PPpackage_installer_simple"
+        }
+    },
+    "repositories": [
+        {
+            "url": "http://archlinux-core:8880",
+            "cache_path": "tmp/cache/metamanager/archlinux-core"
+        },
+        {
+            "url": "http://archlinux-extra:8881",
+            "cache_path": "tmp/cache/metamanager/archlinux-extra"
+        },
+        {
+            "url": "http://aur:8882",
+            "cache_path": "tmp/cache/metamanager/AUR"
+        },
+        {
+            "url": "http://conan-conancenter:8883",
+            "cache_path": "tmp/cache/metamanager/conan-conancenter"
+        },
+        {
+            "url": "http://pp:8884",
+            "cache_path": "tmp/cache/metamanager/PP"
+        }
+    ]
+}

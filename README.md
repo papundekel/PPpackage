@@ -319,7 +319,7 @@ This script runs all submanagers as part of the meta-manager. Is the fastest
 with the least requirements:
 
 ```bash
-./test/all-local.sh < input/basic.json
+./test/all-local.sh < example/input/basic.json
 ```
 
 This script runs all submanagers as separate HTTP servers. It requires `hypercorn`
@@ -327,7 +327,7 @@ and sends the installation directories through the network so is slower than the
 previous option:
 
 ```bash
-./test/all-remote.sh < input/basic.json
+./test/all-remote.sh < example/input/basic.json
 ```
 
 ### Containerized
@@ -348,7 +348,7 @@ This script runs the metamanager in a container with all submanagers running
 as its parts:
 
 ```bash
-./test/containerized-all-local.sh < input/basic.json
+./test/containerized-all-local.sh < example/input/basic.json
 ```
 
 Before running containerized managers as servers, secrets used for authentication
@@ -362,5 +362,5 @@ Run the following script:
 Then its posiible to run this script which runs the metamanager in a container with all submanagers running as HTTP servers in separate containers:
 
 ```bash
-./test/containerized-all-remote.sh < input/basic.json
+./test/containerized-all-remote.sh < example/input/basic.json
 ```

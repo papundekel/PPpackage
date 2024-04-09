@@ -1,0 +1,153 @@
+name: pppackage
+services:
+    archlinux-core:
+        image: docker.io/fackop/pppackage-pacman:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+            - 0.0.0.0:8888
+        environment:
+            CONFIG_PATH: /mnt/config.json
+        ports:
+            - 8888
+        volumes:
+            - type: bind
+              source: $CONFIG_ARCHLINUX_CORE
+              target: /mnt/config.json
+            - type: volume
+              source: database-archlinux-core
+              target: /mnt/database/
+            - type: volume
+              source: cache-archlinux-core
+              target: /mnt/cache/
+    archlinux-extra:
+        image: docker.io/fackop/pppackage-pacman:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+            - 0.0.0.0:8888
+        environment:
+            CONFIG_PATH: /mnt/config.json
+        ports:
+            - 8888
+        volumes:
+            - type: bind
+              source: $CONFIG_ARCHLINUX_EXTRA
+              target: /mnt/config.json
+            - type: volume
+              source: database-archlinux-extra
+              target: /mnt/database/
+            - type: volume
+              source: cache-archlinux-extra
+              target: /mnt/cache/
+    aur:
+        image: docker.io/fackop/pppackage-aur:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+            - 0.0.0.0:8888
+        environment:
+            CONFIG_PATH: /mnt/config.json
+        ports:
+            - 8888
+        volumes:
+            - type: bind
+              source: $CONFIG_AUR
+              target: /mnt/config.json
+            - type: volume
+              source: database-aur
+              target: /mnt/database/
+            - type: volume
+              source: cache-aur
+              target: /mnt/cache/
+    conan-conancenter:
+        image: docker.io/fackop/pppackage-conan:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+            - 0.0.0.0:8888
+        environment:
+            CONFIG_PATH: /mnt/config.json
+        ports:
+            - 8888
+        volumes:
+            - type: bind
+              source: $CONFIG_CONAN_CONANCENTER
+              target: /mnt/config.json
+            - type: volume
+              source: database-conan-conancenter
+              target: /mnt/database/
+            - type: volume
+              source: cache-conan-conancenter
+              target: /mnt/cache/
+    pp:
+        image: docker.io/fackop/pppackage-pp:latest
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:8888"]
+        command:
+            - 0.0.0.0:8888
+        environment:
+            CONFIG_PATH: /mnt/config.json
+        ports:
+            - 8888
+        volumes:
+            - type: bind
+              source: $CONFIG_PP
+              target: /mnt/config.json
+            - type: volume
+              source: database-pp
+              target: /mnt/database/
+            - type: volume
+              source: cache-pp
+              target: /mnt/cache/
+    metamanager:
+        image: docker.io/fackop/pppackage:latest
+        depends_on:
+            archlinux-core:
+                condition: service_healthy
+            archlinux-extra:
+                condition: service_healthy
+            aur:
+                condition: service_healthy
+            conan-conancenter:
+                condition: service_healthy
+            pp:
+                condition: service_healthy
+        command:
+            - /mnt/root/
+            - --config
+            - /mnt/config.json
+            - --workdir
+            - /mnt/workdir/
+            - --generators
+            - /mnt/output/generators
+            - --graph
+            - /mnt/output/graph.dot
+        volumes:
+            - type: bind
+              source: /tmp
+              target: /mnt/workdir/
+            - type: bind
+              source: $ROOT
+              target: /mnt/root/
+            - type: bind
+              source: $OUTPUT
+              target: /mnt/output
+            - type: bind
+              source: $CONFIG_PATH
+              target: /mnt/config.json
+            - type: bind
+              source: $XDG_RUNTIME_DIR/podman/podman.sock
+              target: /run/podman/podman.sock
+volumes:
+    database-archlinux-core:
+    database-archlinux-extra:
+    database-aur:
+    database-conan:
+    database-pp:
+
+    cache-archlinux-core:
+    cache-archlinux-extra:
+    cache-aur:
+    cache-conan:
+    cache-pp:
