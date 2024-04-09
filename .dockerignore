@@ -12,5 +12,5 @@ Dockerfile
 input/
 podman-server/
 test/
-example/
+examples/
 images-build.sh/

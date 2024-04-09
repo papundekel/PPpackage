@@ -1,0 +1,5 @@
+{
+    "driver": {
+        "package": "PPpackage.repository_driver.AUR"
+    }
+}

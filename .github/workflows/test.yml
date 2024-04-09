@@ -42,9 +42,9 @@ jobs:
                   key: cache-AUR
 
             - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+              uses: docker/setup-buildx-action@v3.0.0s
 
-            - name: Build and push pppackage
+            - name: Build and push pppackagesd
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
@@ -55,9 +55,9 @@ jobs:
                   cache-to: type=gha,mode=max
 
             - name: Run PPpackage
-              run: |
-                  mkdir -p cache/arch cache/conan cache/PP cache/AUR
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < example/input/basic.json
+              run: |s
+                  mkdir -p cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
 
-            - name: See if ldconfig ran
-              run: ls -l root/etc/ld.so.cache
+            # - name: See if ldconfig ran
+            #   run: ls -l root/etc/ld.so.cache
