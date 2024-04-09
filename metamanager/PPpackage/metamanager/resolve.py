@@ -7,7 +7,7 @@ from .repository import Repository
 from .schemes import RequirementInput, ResolutionModel, SimpleRequirementInput
 
 
-def print_requirements(output: IO[str], requirements: RequirementInput):
+def print_requirements_recursion(output: IO[str], requirements: RequirementInput):
     if isinstance(requirements, SimpleRequirementInput):
         output.write(f"{requirements.translator}::{requirements.value}")
     else:
@@ -15,13 +15,18 @@ def print_requirements(output: IO[str], requirements: RequirementInput):
         operator = " & " if requirements.operation == "and" else " | "
         i = iter(requirements.operands)
 
-        print_requirements(output, next(i))
+        print_requirements_recursion(output, next(i))
 
         for operand in i:
             output.write(operator)
-            print_requirements(output, operand)
+            print_requirements_recursion(output, operand)
 
         output.write(")")
+
+
+def print_requirements(output: IO[str], requirements: RequirementInput):
+    print_requirements_recursion(output, requirements)
+    output.write("\n")
 
 
 async def resolve(
