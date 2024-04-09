@@ -34,7 +34,7 @@
             }
         },
         "simple": {
-            "package:": "PPpackage.installer.simple"
+            "package": "PPpackage.installer.simple"
         }
     },
     "repositories": [
