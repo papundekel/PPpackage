@@ -42,20 +42,20 @@ jobs:
                   key: cache-AUR
 
             - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0s
+              uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build and push pppackagesd
+            - name: Build and push pppackage
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
                   target: metamanager
                   load: true
-                  tags: docker.io/fackop/pppackage:latest
+                  tags: docker.io/fackop/pppackage-metamanager:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
             - name: Run PPpackage
-              run: |s
+              run: |
                   mkdir -p cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
                   USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
 
