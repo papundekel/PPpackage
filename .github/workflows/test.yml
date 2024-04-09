@@ -56,7 +56,7 @@ jobs:
 
             - name: Run PPpackage
               run: |
-                  mkdir -p cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
+                  mkdir -p root/ output/ cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
                   USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
 
             # - name: See if ldconfig ran
