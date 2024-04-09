@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterable
-from typing import Any
 
 from PPpackage.repository_driver.interface.schemes import (
     Package,

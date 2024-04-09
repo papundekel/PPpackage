@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from io import TextIOBase
-from sys import stderr
 
 from .utils import MyException
 
