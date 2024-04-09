@@ -12,8 +12,15 @@ def print_requirements(output: IO[str], requirements: RequirementInput):
         output.write(f"{requirements.translator}::{requirements.value}")
     else:
         output.write("(")
-        operand = " & " if requirements.operation == "and" else " | "
+        operator = " & " if requirements.operation == "and" else " | "
         i = iter(requirements.operands)
+
+        output.write(str(next(i)))
+
+        for operand in i:
+            output.write(operator)
+            print_requirements(output, operand)
+
         output.write(")")
 
 
