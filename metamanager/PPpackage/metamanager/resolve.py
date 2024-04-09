@@ -2,13 +2,18 @@ from collections.abc import Mapping, Set
 from sys import stderr
 from typing import IO, Any
 
+from PPpackage.repository_driver.interface.schemes import (
+    Requirements,
+    SimpleRequirement,
+)
+
 from .exceptions import SubmanagerCommandFailure
 from .repository import Repository
-from .schemes import RequirementInput, ResolutionModel, SimpleRequirementInput
+from .schemes import ResolutionModel
 
 
-def print_requirements_recursion(output: IO[str], requirements: RequirementInput):
-    if isinstance(requirements, SimpleRequirementInput):
+def print_requirements_recursion(output: IO[str], requirements: Requirements):
+    if isinstance(requirements, SimpleRequirement):
         output.write(f"{requirements.translator}::{requirements.value}")
     else:
         output.write("(")
@@ -24,14 +29,14 @@ def print_requirements_recursion(output: IO[str], requirements: RequirementInput
         output.write(")")
 
 
-def print_requirements(output: IO[str], requirements: RequirementInput):
+def print_requirements(output: IO[str], requirements: Requirements):
     print_requirements_recursion(output, requirements)
     output.write("\n")
 
 
 async def resolve(
     repositories: Mapping[str, Repository],
-    requirements: RequirementInput,
+    requirements: Requirements,
     options: Any,
 ) -> Set[ResolutionModel]:
     stderr.write("Resolving requirements...\n")

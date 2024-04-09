@@ -2,10 +2,7 @@ from collections.abc import Mapping
 from typing import Any, AsyncIterable
 
 from PPpackage.repository_driver.interface.interface import load_interface_module
-from PPpackage.repository_driver.interface.schemes import (
-    ResolutionLiteral,
-    VariableToPackageVersionMapping,
-)
+from PPpackage.repository_driver.interface.schemes import PackageVersion
 
 from PPpackage.utils.validation import load_object
 
@@ -39,7 +36,7 @@ class LocalRepository(Repository):
     def fetch_packages(
         self,
         translated_options: Any,
-    ) -> AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping]:
+    ) -> AsyncIterable[PackageVersion]:
         return self.interface.fetch_packages(
             self.driver_parameters, self.repository_parameters, translated_options
         )

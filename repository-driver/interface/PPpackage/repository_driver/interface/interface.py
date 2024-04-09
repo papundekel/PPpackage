@@ -6,7 +6,7 @@ from typing import cast as type_cast
 
 from pydantic import BaseModel
 
-from .schemes import ResolutionLiteral, VariableToPackageVersionMapping
+from .schemes import PackageVersion
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
@@ -22,7 +22,7 @@ FetchPackagesCallbackType = Callable[
         RepositoryParametersType,
         TranslatedOptionsType,
     ],
-    AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping],
+    AsyncIterable[PackageVersion],
 ]
 
 

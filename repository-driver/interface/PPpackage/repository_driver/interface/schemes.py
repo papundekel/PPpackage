@@ -1,8 +1,24 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Annotated, Any, Literal
 
+from annotated_types import Len
 from frozendict import frozendict
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+
+@pydantic_dataclass(frozen=True)
+class SimpleRequirement:
+    translator: str
+    value: Any
+
+
+@pydantic_dataclass(frozen=True)
+class OperatorRequirement:
+    operation: Literal["and"] | Literal["or"]
+    operands: Annotated[list["Requirements"], Len(1)]
+
+
+Requirements = SimpleRequirement | OperatorRequirement
 
 
 @pydantic_dataclass(frozen=True)
@@ -12,16 +28,9 @@ class Package:
 
 
 @pydantic_dataclass(frozen=True)
-class VariableToPackageVersionMapping:
-    variable: str
-    package: Package
+class PackageVersion(Package):
     version: str
-
-
-@pydantic_dataclass(frozen=True)
-class ResolutionLiteral:
-    is_true: bool
-    variable: str
+    requirements: Requirements | None
 
 
 Parameters = Mapping[str, Any]

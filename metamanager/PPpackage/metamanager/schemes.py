@@ -1,13 +1,13 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Any, TypedDict
 
-from annotated_types import Len
 from frozendict import frozendict
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
     Package,
     Parameters,
+    Requirements,
 )
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -16,23 +16,8 @@ from PPpackage.utils.validation import WithVariables
 
 
 @pydantic_dataclass(frozen=True)
-class SimpleRequirementInput:
-    translator: str
-    value: Any
-
-
-@pydantic_dataclass(frozen=True)
-class OperatorRequirementInput:
-    operation: Literal["and"] | Literal["or"]
-    operands: Annotated[list["RequirementInput"], Len(1)]
-
-
-RequirementInput = SimpleRequirementInput | OperatorRequirementInput
-
-
-@pydantic_dataclass(frozen=True)
 class Input:
-    requirements: RequirementInput
+    requirements: Requirements
     options: Any
     locks: Mapping[str, Mapping[str, str]] = frozendict()
     generators: frozenset[str] | None = None

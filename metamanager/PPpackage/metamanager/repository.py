@@ -1,10 +1,7 @@
 from collections.abc import AsyncIterable
 from typing import Any, Protocol
 
-from PPpackage.repository_driver.interface.schemes import (
-    ResolutionLiteral,
-    VariableToPackageVersionMapping,
-)
+from PPpackage.repository_driver.interface.schemes import PackageVersion
 
 
 class Repository(Protocol):
@@ -13,4 +10,4 @@ class Repository(Protocol):
     def fetch_packages(
         self,
         translated_options: Any,
-    ) -> AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping]: ...
+    ) -> AsyncIterable[PackageVersion]: ...

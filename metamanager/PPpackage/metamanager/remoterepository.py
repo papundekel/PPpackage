@@ -2,10 +2,7 @@ from logging import getLogger
 from typing import Any, AsyncIterable
 
 from httpx import AsyncClient as HTTPClient
-from PPpackage.repository_driver.interface.schemes import (
-    ResolutionLiteral,
-    VariableToPackageVersionMapping,
-)
+from PPpackage.repository_driver.interface.schemes import PackageVersion
 
 from PPpackage.utils.stream import dump_one
 
@@ -29,7 +26,7 @@ class RemoteRepository(Repository):
     async def fetch_packages(
         self,
         translated_options: Any,
-    ) -> AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping]:
+    ) -> AsyncIterable[PackageVersion]:
         async with self.client.stream(
             "GET",
             f"{self.url}/fetch-packages",
@@ -43,6 +40,4 @@ class RemoteRepository(Repository):
 
             reader = HTTPResponseReader(response)
 
-            return reader.load_many(
-                list[ResolutionLiteral] | VariableToPackageVersionMapping  # type: ignore
-            )
+            return reader.load_many(PackageVersion)
