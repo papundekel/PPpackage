@@ -13,35 +13,35 @@ mkdir -p tmp/output/
 
 
 
-CONFIG="$(pwd)/examples/native/all-remote/archlinux-core/config.json"
+CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-core/config.json"
 hypercorn \
     PPpackage.submanager.server:server \
     --bind "$address_archlinux_core" \
     &
 pid_archlinux_core=$!
 
-CONFIG="$(pwd)/examples/native/all-remote/archlinux-extra/config.json"
+CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-extra/config.json"
 hypercorn \
     PPpackage.submanager.server:server \
     --bind "$address_archlinux_extra" \
     &
 pid_archlinux_extra=$!
 
-CONFIG="$(pwd)/examples/native/all-remote/AUR/config.json"
+CONFIG_PATH="$(pwd)/examples/native/all-remote/AUR/config.json"
 hypercorn \
     PPpackage.submanager.server:server \
     --bind "$address_AUR" \
     &
 pid_AUR=$!
 
-CONFIG="$(pwd)/examples/native/all-remote/conan-conancenter/config.json"
+CONFIG_PATH="$(pwd)/examples/native/all-remote/conan-conancenter/config.json"
 hypercorn \
     PPpackage.submanager.server:server \
     --bind "$address_conan_conancenter" \
     &
 pid_conan_conancenter=$!
 
-CONFIG="$(pwd)/examples/native/all-remote/PP/config.json"
+CONFIG_PATH="$(pwd)/examples/native/all-remote/PP/config.json"
 hypercorn \
     PPpackage.submanager.server:server \
     --bind "$address_PP" \
