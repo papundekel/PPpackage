@@ -6,23 +6,30 @@ from typing import cast as type_cast
 
 from pydantic import BaseModel
 
-from .schemes import PackageVersion
+from .schemes import FetchPackageInfo, Requirement
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
 TranslatedOptionsType = TypeVar("TranslatedOptionsType")
 
+FetchPackagesCallbackType = Callable[
+    [
+        DriverParametersType,
+        RepositoryParametersType,
+    ],
+    AsyncIterable[FetchPackageInfo],
+]
 TranslateOptionsCallbackType = Callable[
     [DriverParametersType, RepositoryParametersType, Any],
     Awaitable[TranslatedOptionsType],
 ]
-FetchPackagesCallbackType = Callable[
+FetchFormulaCallbackType = Callable[
     [
         DriverParametersType,
         RepositoryParametersType,
         TranslatedOptionsType,
     ],
-    AsyncIterable[PackageVersion],
+    AsyncIterable[Requirement],
 ]
 
 
@@ -33,13 +40,12 @@ class Interface(
     DriverParameters: type[DriverParametersType]
     RepositoryParameters: type[RepositoryParametersType]
     TranslatedOptions: type[TranslatedOptionsType]
+    fetch_packages: FetchPackagesCallbackType[
+        DriverParametersType, RepositoryParametersType
+    ]
     translate_options: TranslateOptionsCallbackType[
         DriverParametersType, RepositoryParametersType, TranslatedOptionsType
     ]
-    fetch_packages: FetchPackagesCallbackType[
+    fetch_formula: FetchFormulaCallbackType[
         DriverParametersType, RepositoryParametersType, TranslatedOptionsType
     ]
-
-
-def load_interface_module(package_name: str) -> Interface:
-    return type_cast(Interface, import_module(f"{package_name}.interface").interface)

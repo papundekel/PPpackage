@@ -1,0 +1,43 @@
+{
+    "requirements": {
+        "and_": [
+            {
+                "translator": "pacman",
+                "value": "z"
+            },
+            {
+                "negated": {
+                    "translator": "conan",
+                    "value": "x"
+                }
+            },
+            {
+                "negated": {
+                    "translator": "PP",
+                    "value": "x"
+                }
+            }
+        ]
+    },
+    "options": {
+        "conan": {
+            "settings": {
+                "arch": "x86_64",
+                "build_type": "Release",
+                "compiler": "gcc",
+                "compiler.cppstd": "gnu17",
+                "compiler.libcxx": "libstdc++11",
+                "compiler.version": "13",
+                "os": "Linux"
+            },
+            "options": {
+                "zlib*:shared": "True"
+            }
+        }
+    },
+    "generators": [
+        "CMakeDeps",
+        "CMakeToolchain",
+        "versions"
+    ]
+}

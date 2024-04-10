@@ -1,7 +1,6 @@
-from collections.abc import AsyncIterable, Mapping
-from typing import Any
+from collections.abc import AsyncIterable
 
-from PPpackage.repository_driver.interface.schemes import PackageVersion
+from PPpackage.repository_driver.interface.schemes import FetchPackageInfo
 
 from .schemes import DriverParameters, RepositoryParameters
 
@@ -9,6 +8,7 @@ from .schemes import DriverParameters, RepositoryParameters
 async def fetch_packages(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: Mapping[str, Any],
-) -> AsyncIterable[PackageVersion]:
-    yield PackageVersion("conan", "x", "1.0.0", None)
+) -> AsyncIterable[FetchPackageInfo]:
+    yield FetchPackageInfo("conan-x-1.0.0", frozenset(["conan-x"]))
+    yield FetchPackageInfo("conan-x-1.0.1", frozenset(["conan-x"]))
+    yield FetchPackageInfo("conan-y-1.0.0", frozenset(["conan-y"]))

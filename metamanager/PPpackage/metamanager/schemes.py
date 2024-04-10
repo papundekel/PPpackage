@@ -1,13 +1,12 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
 from frozendict import frozendict
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
-    Package,
     Parameters,
-    Requirements,
+    Requirement,
 )
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -17,7 +16,7 @@ from PPpackage.utils.validation import WithVariables
 
 @pydantic_dataclass(frozen=True)
 class Input:
-    requirements: Requirements
+    requirements: Requirement
     options: Any
     locks: Mapping[str, Mapping[str, str]] = frozendict()
     generators: frozenset[str] | None = None
@@ -62,6 +61,3 @@ class NodeData(TypedDict):
     version: str
     product_id: str
     product_info: Any
-
-
-ResolutionModel = Mapping[Package, str]

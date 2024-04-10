@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from annotated_types import Len
 from frozendict import frozendict
@@ -13,24 +13,51 @@ class SimpleRequirement:
 
 
 @pydantic_dataclass(frozen=True)
-class OperatorRequirement:
-    operation: Literal["and"] | Literal["or"]
-    operands: Annotated[list["Requirements"], Len(1)]
-
-
-Requirements = SimpleRequirement | OperatorRequirement
+class NegatedRequirement:
+    negated: "Requirement"
 
 
 @pydantic_dataclass(frozen=True)
-class Package:
-    namespace: str
-    name: str
+class ANDRequirement:
+    and_: Annotated[list["Requirement"], Len(1)]
 
 
 @pydantic_dataclass(frozen=True)
-class PackageVersion(Package):
-    version: str
-    requirements: Requirements | None
+class ORRequirement:
+    or_: Annotated[list["Requirement"], Len(1)]
+
+
+@pydantic_dataclass(frozen=True)
+class XORRequirement:
+    xor: Annotated[list["Requirement"], Len(1)]
+
+
+@pydantic_dataclass(frozen=True)
+class EquivalenceRequirement:
+    equivalent: Annotated[list["Requirement"], Len(1)]
+
+
+@pydantic_dataclass(frozen=True)
+class ImplicationRequirement:
+    if_: "Requirement"
+    implies: "Requirement"
+
+
+Requirement = (
+    SimpleRequirement
+    | NegatedRequirement
+    | ANDRequirement
+    | ORRequirement
+    | XORRequirement
+    | ImplicationRequirement
+    | EquivalenceRequirement
+)
+
+
+@pydantic_dataclass(frozen=True)
+class FetchPackageInfo:
+    package: str
+    translator_groups: frozenset[str]
 
 
 Parameters = Mapping[str, Any]

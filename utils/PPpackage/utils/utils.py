@@ -9,12 +9,15 @@ from collections.abc import (
     Set,
 )
 from contextlib import asynccontextmanager, contextmanager
+from importlib import import_module
 from os import environ, kill, mkfifo
 from pathlib import Path
 from shutil import move
 from signal import SIGTERM
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, Optional, TypeVar, overload
+from typing import Any, Optional, TypeVar
+from typing import cast as type_cast
+from typing import overload
 
 from frozendict import frozendict
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -225,3 +228,7 @@ class ContainerizerWorkdirInfo:
         )
 
         return containerizer_path.absolute()
+
+
+def load_interface_module(Interface: type[T], package_name: str) -> T:
+    return type_cast(T, import_module(f"{package_name}.interface").interface)

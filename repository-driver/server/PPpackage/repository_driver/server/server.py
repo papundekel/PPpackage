@@ -4,17 +4,17 @@ from sys import stderr
 from typing import Annotated, Any, Generic, TypeVar
 
 from fastapi import Depends, FastAPI
-from PPpackage.repository_driver.interface.interface import load_interface_module
+from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import RepositoryConfig
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 from starlette.status import HTTP_200_OK
 
-from PPpackage.utils.http_stream import AsyncChunkReader
 from PPpackage.utils.stream import dump_many
+from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import load_from_bytes, load_object
 
-from .utils import StreamingResponse, get_reader
+from .utils import StreamingResponse
 
 RequirementType = TypeVar("RequirementType")
 
@@ -47,7 +47,7 @@ def parse_config(config_path: Path) -> RepositoryConfig:
 config = parse_config(package_settings.config_path)
 
 
-interface = load_interface_module(config.driver.package)
+interface = load_interface_module(Interface, config.driver.package)
 
 driver_parameters = load_object(interface.DriverParameters, config.driver.parameters)
 repository_parameters = load_object(interface.RepositoryParameters, config.parameters)
@@ -56,10 +56,19 @@ repository_parameters = load_object(interface.RepositoryParameters, config.param
 logger = getLogger(__name__)
 
 
-async def translate_options(reader: Annotated[AsyncChunkReader, Depends(get_reader)]):
-    logger.info("Updating database...")
+async def fetch_packages():
+    logger.info("Fetching packages...")
 
-    options = await reader.load_one(Any)  # type: ignore
+    # TODO: figure out why we need to iterate the async iterable
+    outputs = interface.fetch_packages(driver_parameters, repository_parameters)
+
+    logger.info("Fetched packages.")
+
+    return StreamingResponse(HTTP_200_OK, dump_many(outputs))
+
+
+async def translate_options(options: Any):
+    logger.info("Updating database...")
 
     translated_options = await interface.translate_options(
         driver_parameters, repository_parameters, options
@@ -70,17 +79,15 @@ async def translate_options(reader: Annotated[AsyncChunkReader, Depends(get_read
     return translated_options
 
 
-async def fetch_packages(reader: Annotated[AsyncChunkReader, Depends(get_reader)]):
-    logger.info("Fetching packages...")
-
-    translated_options = await reader.load_one(Any)  # type: ignore
+async def fetch_formula(translated_options: Any):
+    logger.info("Fetching formula...")
 
     # TODO: figure out why we need to iterate the async iterable
-    outputs = interface.fetch_packages(
+    outputs = interface.fetch_formula(
         driver_parameters, repository_parameters, translated_options
     )
 
-    logger.info("Fetched packages.")
+    logger.info("Fetched formula.")
 
     return StreamingResponse(HTTP_200_OK, dump_many(outputs))
 
@@ -89,8 +96,9 @@ class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType
     def __init__(self):
         super().__init__(debug=True, redoc_url=None)
 
-        super().post("/translate-options")(translate_options)
-        super().post("/fetch-packages")(fetch_packages)
+        super().get("/fetch-packages")(fetch_packages)
+        super().get("/translate-options")(translate_options)
+        super().get("/fetch-formula")(fetch_formula)
 
 
 server = SubmanagerServer()

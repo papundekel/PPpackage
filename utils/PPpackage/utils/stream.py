@@ -4,7 +4,7 @@ from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel, RootModel
 
-from .validation import load_from_bytes
+from .validation import load_from_bytes, wrap
 
 _TRUE_STRING = "T"
 T = TypeVar("T")
@@ -56,7 +56,7 @@ async def dump_bytes_chunked(output_bytes: memoryview) -> AsyncIterable[memoryvi
 
 
 async def dump_one(output: BaseModel | Any) -> AsyncIterable[memoryview]:
-    output_wrapped = output if isinstance(output, BaseModel) else RootModel(output)
+    output_wrapped = wrap(output)
 
     output_json_string = output_wrapped.model_dump_json()
 

@@ -15,35 +15,35 @@ mkdir -p tmp/output/
 
 CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-core/config.json"
 hypercorn \
-    PPpackage.submanager.server:server \
+    PPpackage.repository_driver.server:server \
     --bind "$address_archlinux_core" \
     &
 pid_archlinux_core=$!
 
 CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-extra/config.json"
 hypercorn \
-    PPpackage.submanager.server:server \
+    PPpackage.repository_driver.server:server \
     --bind "$address_archlinux_extra" \
     &
 pid_archlinux_extra=$!
 
 CONFIG_PATH="$(pwd)/examples/native/all-remote/AUR/config.json"
 hypercorn \
-    PPpackage.submanager.server:server \
+    PPpackage.repository_driver.server:server \
     --bind "$address_AUR" \
     &
 pid_AUR=$!
 
 CONFIG_PATH="$(pwd)/examples/native/all-remote/conan-conancenter/config.json"
 hypercorn \
-    PPpackage.submanager.server:server \
+    PPpackage.repository_driver.server:server \
     --bind "$address_conan_conancenter" \
     &
 pid_conan_conancenter=$!
 
 CONFIG_PATH="$(pwd)/examples/native/all-remote/PP/config.json"
 hypercorn \
-    PPpackage.submanager.server:server \
+    PPpackage.repository_driver.server:server \
     --bind "$address_PP" \
     &
 pid_PP=$!
@@ -70,7 +70,7 @@ done
 
 
 python \
-    -m PPpackage \
+    -m PPpackage.metamanager \
     tmp/root/ \
     --config examples/native/all-remote/config.json \
     --workdir /tmp \

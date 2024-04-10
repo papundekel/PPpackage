@@ -31,6 +31,16 @@ def load_from_bytes(Model: type[ModelType], input_json_bytes: memoryview) -> Mod
     return load_object(Model, input_json)
 
 
+def wrap(output: BaseModel | Any) -> BaseModel:
+    return output if isinstance(output, BaseModel) else RootModel(output)
+
+
+def save_object(output: BaseModel | Any) -> Any:
+    output_wrapped = wrap(output)
+
+    return output_wrapped.model_dump()
+
+
 T = TypeVar("T")
 
 

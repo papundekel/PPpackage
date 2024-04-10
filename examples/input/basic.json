@@ -1,7 +1,6 @@
 {
     "requirements": {
-        "operation": "and",
-        "operands": [
+        "and_": [
             {
                 "translator": "PP",
                 "value": "p1"

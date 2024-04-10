@@ -8,7 +8,7 @@ fi
 mkdir -p tmp/output
 
 python \
-    -m PPpackage \
+    -m PPpackage.metamanager \
     tmp/root/ \
     --config examples/native/all-local/config.json \
     --workdir /tmp \
