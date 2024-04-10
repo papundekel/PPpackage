@@ -4,6 +4,7 @@ from pathlib import Path
 from sys import stderr, stdin
 from typing import IO
 
+from asyncstdlib import max as async_max
 from networkx import MultiDiGraph
 from pydantic import ValidationError
 
@@ -60,18 +61,14 @@ def build_graph(model: Set[str]) -> MultiDiGraph:
 
 
 async def select_best_model(models: AsyncIterable[Set[str]]) -> Set[str]:
-    # TODO
-
-    model_result = None
-
-    async for model in models:
-        print(model, file=stderr)
-        model_result = model
+    model_result = await async_max(
+        (sorted(model) async for model in models), default=None
+    )
 
     if model_result is None:
         raise SubmanagerCommandFailure("No model found.")
 
-    return model_result
+    return set(model_result)
 
 
 def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
@@ -101,6 +98,8 @@ async def main(
             )
 
             model = await select_best_model(models)
+
+            print(model, file=stderr)
 
             graph = build_graph(model)
 
