@@ -1,11 +1,6 @@
-from collections.abc import AsyncIterable, Mapping
-from typing import Any
+from collections.abc import AsyncIterable
 
-from PPpackage.repository_driver.interface.schemes import (
-    Package,
-    ResolutionLiteral,
-    VariableToPackageVersionMapping,
-)
+from PPpackage.repository_driver.interface.schemes import FetchPackageInfo
 
 from .schemes import DriverParameters, RepositoryParameters
 
@@ -13,7 +8,7 @@ from .schemes import DriverParameters, RepositoryParameters
 async def fetch_packages(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: Mapping[str, Any],
-) -> AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping]:
-    yield [ResolutionLiteral(False, "x-1.0.0"), ResolutionLiteral(True, "x-1.0.0")]
-    yield VariableToPackageVersionMapping("x-1.0.0", Package("conan", "x"), "1.0.0")
+) -> AsyncIterable[FetchPackageInfo]:
+    yield FetchPackageInfo("conan-openssl-3.1.0", frozenset(["conan-openssl"]))
+    yield FetchPackageInfo("conan-openssl-3.1.1", frozenset(["conan-openssl"]))
+    yield FetchPackageInfo("conan-nameof-0.10.1", frozenset(["conan-nameof"]))

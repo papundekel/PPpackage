@@ -49,10 +49,6 @@ def StreamingResponse(
     )
 
 
-def get_reader(request: Request):
-    return AsyncChunkReader(memoryview(chunk) async for chunk in request.stream())
-
-
 @contextmanager
 def jinja_render_temp_file(
     template: Jinja2Template,

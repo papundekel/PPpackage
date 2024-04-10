@@ -13,5 +13,7 @@ setup(
         "networkx",
         "pydot",
         "httpx[http2]",
+        "python-sat[aiger, approxmc, cryptosat, pblib]",
+        "asyncstdlib",
     ],
 )

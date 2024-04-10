@@ -50,62 +50,22 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - name: Build and push pppackage
+            - name: Build pppackage-metamanager
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
                   target: metamanager
                   load: true
-                  tags: docker.io/fackop/pppackage:latest
+                  tags: docker.io/fackop/pppackage-metamanager:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
             - name: Run PPpackage
               run: |
-                  mkdir -p cache/conan cache/PP database/archlinux-core database/archlinux-extra database/PP
+                  mkdir -p root/ output/ cache/conan/ cache/PP/ database/archlinux-core/ database/archlinux-extra/ database/PP/
                   USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
 
-            - name: Build and push pppackage-repository-driver-pacman
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: submanager-arch
-                  push: true
-                  tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build and push pppackage-repository-driver-aur
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: submanager-aur
-                  push: true
-                  tags: docker.io/fackop/pppackage-repository-driver-aur:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build and push pppackage-repository-driver-conan
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: submanager-conan
-                  push: true
-                  tags: docker.io/fackop/pppackage-repository-driver-conan:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build and push pppackage-repository-driver-pp
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: submanager-pp
-                  push: true
-                  tags: docker.io/fackop/pppackage-repository-driver-pp:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build and push pppackage-metamanager
+            - name: Push pppackage-metamanager
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}

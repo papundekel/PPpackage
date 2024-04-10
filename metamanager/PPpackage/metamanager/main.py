@@ -1,65 +1,22 @@
-from collections.abc import Iterable
+from collections.abc import AsyncIterable, Iterable, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 from typing import IO
 
-from networkx import MultiDiGraph, convert_node_labels_to_integers
-from networkx.drawing.nx_pydot import to_pydot
-from PPpackage.repository_driver.interface.schemes import Package
+from asyncstdlib import max as async_max
+from networkx import MultiDiGraph
 from pydantic import ValidationError
-from pydot import Dot
 
 from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
+from .repositories import Repositories
 from .resolve import resolve
-from .schemes import Config, Input, ResolutionModel
-from .submanagers import Repositories
+from .schemes import Config, Input
+from .translators import Translators
 
 logger = getLogger(__name__)
-
-
-def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
-    namespace_to_color = {}
-
-    for node in graph.nodes():
-        if node.namespace not in namespace_to_color:
-            namespace_to_color[node.namespace] = len(namespace_to_color) + 1
-
-    graph_presentation: MultiDiGraph = convert_node_labels_to_integers(
-        graph, label_attribute="node"
-    )
-
-    for _, data in graph_presentation.nodes(data=True):
-        node: Package = data["node"]
-        version: str = data["version"]
-
-        data.clear()
-
-        data["label"] = f'"{node.namespace}\n{node.name}\n{version}"'
-        data["fillcolor"] = namespace_to_color[node.namespace]
-
-    graph_presentation.graph.update(
-        {
-            "graph": {
-                "bgcolor": "black",
-                "margin": 0,
-            },
-            "node": {
-                "colorscheme": "accent8",
-                "style": "filled",
-                "shape": "box",
-            },
-            "edge": {
-                "color": "white",
-            },
-        }
-    )
-
-    dot: Dot = to_pydot(graph_presentation)
-
-    dot.write(path)
 
 
 def log_exception(e: BaseExceptionGroup) -> None:
@@ -99,17 +56,24 @@ def parse_config(config_path: Path) -> Config:
         return config
 
 
-def build_graph(model: ResolutionModel) -> MultiDiGraph:
+def build_graph(model: Set[str]) -> MultiDiGraph:
     return MultiDiGraph()  # TODO
 
 
-def select_best_model(models: Iterable[ResolutionModel]) -> ResolutionModel:
+async def select_best_model(models: AsyncIterable[Set[str]]) -> Set[str]:
+    model_result = await async_max(
+        (sorted(model) async for model in models), default=None
+    )
+
+    if model_result is None:
+        raise SubmanagerCommandFailure("No model found.")
+
+    return set(model_result)
+
+
+def graph_to_dot(graph: MultiDiGraph, path: Path) -> None:
     # TODO
-
-    for model in models:
-        return model
-
-    raise SubmanagerCommandFailure("No model found.")
+    pass
 
 
 async def main(
@@ -121,15 +85,21 @@ async def main(
 ) -> None:
     config = parse_config(config_path)
 
+    translators = Translators(config.requirement_translators)
+
     async with Repositories(
         config.repository_drivers, config.repositories
     ) as repositories:
         input = parse_input(stdin.buffer)
 
         try:
-            models = await resolve(repositories, input.requirements, input.options)
+            models = resolve(
+                repositories, translators, input.requirements, input.options
+            )
 
-            model = select_best_model(models)
+            model = await select_best_model(models)
+
+            print(model, file=stderr)
 
             graph = build_graph(model)
 

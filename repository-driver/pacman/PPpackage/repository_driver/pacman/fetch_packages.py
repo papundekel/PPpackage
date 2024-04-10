@@ -1,10 +1,6 @@
 from collections.abc import AsyncIterable
 
-from PPpackage.repository_driver.interface.schemes import (
-    Package,
-    ResolutionLiteral,
-    VariableToPackageVersionMapping,
-)
+from PPpackage.repository_driver.interface.schemes import FetchPackageInfo
 
 from .schemes import DriverParameters, RepositoryParameters
 
@@ -12,7 +8,7 @@ from .schemes import DriverParameters, RepositoryParameters
 async def fetch_packages(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: None,
-) -> AsyncIterable[list[ResolutionLiteral] | VariableToPackageVersionMapping]:
-    yield [ResolutionLiteral(False, "x-1.0.0"), ResolutionLiteral(True, "x-1.0.0")]
-    yield VariableToPackageVersionMapping("x-1.0.0", Package("pacman", "x"), "1.0.0")
+) -> AsyncIterable[FetchPackageInfo]:
+    yield FetchPackageInfo("pacman-bash-1.0.0", frozenset(["pacman-bash"]))
+    yield FetchPackageInfo("pacman-zsh-1.0.0", frozenset(["pacman-zsh"]))
+    yield FetchPackageInfo("pacman-coreutils-1.0.0", frozenset(["pacman-coreutils"]))
