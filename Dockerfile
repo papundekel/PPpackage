@@ -69,6 +69,18 @@ RUN pip install repository-driver/conan/
 COPY repository-driver/PP/ /workdir/repository-driver/PP
 RUN pip install repository-driver/PP/
 
+COPY translator/interface/ /workdir/translator/interface
+RUN pip install translator/interface/
+
+COPY translator/pacman/ /workdir/translator/pacman
+RUN pip install translator/pacman/
+
+COPY translator/conan/ /workdir/translator/conan
+RUN pip install translator/conan/
+
+COPY translator/PP/ /workdir/translator/PP
+RUN pip install translator/PP/
+
 COPY metamanager/ /workdir/metamanager
 RUN pip install metamanager/
 
