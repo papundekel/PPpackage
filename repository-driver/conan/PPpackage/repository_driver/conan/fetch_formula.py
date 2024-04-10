@@ -17,11 +17,6 @@ async def fetch_formula(
     translated_options: Mapping[str, Any],
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
-        SimpleRequirement("noop", "conan-y-1.0.0"),
-        SimpleRequirement("conan", "x"),
-    )
-
-    yield ImplicationRequirement(
-        SimpleRequirement("noop", "conan-x-1.0.1"),
-        NegatedRequirement(SimpleRequirement("noop", "conan-x-1.0.0")),
+        SimpleRequirement("noop", "conan-openssl-3.1.0"),
+        SimpleRequirement("pacman", "sh"),
     )

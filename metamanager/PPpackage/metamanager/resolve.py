@@ -98,15 +98,16 @@ def translate_requirements(
                 RequirementVisitor(
                     simple_visitor=simple_visitor,
                     negated_visitor=Neg,
-                    and_visitor=lambda x: And(*x),
-                    or_visitor=lambda x: Or(*x),
-                    xor_visitor=lambda x: XOr(*x),
+                    and_visitor=lambda x: And(*x, merge=True),
+                    or_visitor=lambda x: Or(*x, merge=True),
+                    xor_visitor=lambda x: XOr(*x, merge=True),
                     implication_visitor=Implies,
-                    equivalence_visitor=lambda x: Equals(*x),
+                    equivalence_visitor=lambda x: Equals(*x, merge=True),
                 ),
             )
             for requirement in formula
-        )
+        ),
+        merge=True
     )
 
 
@@ -143,11 +144,13 @@ async def resolve(
 
     stderr.write("Requirements translated.\n")
 
+    print(translated_formula, file=stderr)
+
     stderr.write("Resolving...\n")
 
     packages = packages_with_groups.keys()
 
-    with Solver(bootstrap_with=translated_formula) as solver:
+    with Solver(name="glucose42", bootstrap_with=translated_formula) as solver:
         for model_integers in solver.enum_models():  # type: ignore
             model_atoms = Formula.formulas(model_integers, atoms_only=True)
 

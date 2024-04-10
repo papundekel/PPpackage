@@ -9,6 +9,6 @@ async def fetch_packages(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> AsyncIterable[FetchPackageInfo]:
-    yield FetchPackageInfo("pacman-x-1.0.0", frozenset(["pacman-x"]))
-    yield FetchPackageInfo("pacman-x-1.0.1", frozenset(["pacman-x"]))
-    yield FetchPackageInfo("pacman-y-1.0.0", frozenset(["pacman-y"]))
+    yield FetchPackageInfo("pacman-bash-1.0.0", frozenset(["pacman-bash"]))
+    yield FetchPackageInfo("pacman-zsh-1.0.0", frozenset(["pacman-zsh"]))
+    yield FetchPackageInfo("pacman-coreutils-1.0.0", frozenset(["pacman-coreutils"]))

@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 
-from pysat.formula import PYSAT_FALSE, Atom, Formula, Or
+from pysat.formula import Atom, Formula, Or
 
 from .schemes import Parameters
 
@@ -13,6 +13,6 @@ def translate_requirement(
     related_packages = grouped_packages.get(f"pacman-{requirement}")
 
     if related_packages is None:
-        return PYSAT_FALSE
+        return Atom(f"pacman-{requirement}")
 
     return Or(*(Atom(package) for package in related_packages))

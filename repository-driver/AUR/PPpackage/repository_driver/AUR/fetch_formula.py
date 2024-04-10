@@ -15,6 +15,6 @@ async def fetch_formula(
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
-        SimpleRequirement("noop", "pacman-z-1.0.0"),
-        SimpleRequirement("pacman", "y"),
+        SimpleRequirement("noop", "pacman-conan-1.0.0"),
+        SimpleRequirement("pacman", "sh"),
     )

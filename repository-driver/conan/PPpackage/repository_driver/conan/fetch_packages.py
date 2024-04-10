@@ -9,6 +9,6 @@ async def fetch_packages(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> AsyncIterable[FetchPackageInfo]:
-    yield FetchPackageInfo("conan-x-1.0.0", frozenset(["conan-x"]))
-    yield FetchPackageInfo("conan-x-1.0.1", frozenset(["conan-x"]))
-    yield FetchPackageInfo("conan-y-1.0.0", frozenset(["conan-y"]))
+    yield FetchPackageInfo("conan-openssl-3.1.0", frozenset(["conan-openssl"]))
+    yield FetchPackageInfo("conan-openssl-3.1.1", frozenset(["conan-openssl"]))
+    yield FetchPackageInfo("conan-nameof-0.10.1", frozenset(["conan-nameof"]))

@@ -2,9 +2,9 @@ from collections.abc import AsyncIterable
 
 from PPpackage.repository_driver.interface.schemes import (
     ImplicationRequirement,
-    NegatedRequirement,
     Requirement,
     SimpleRequirement,
+    XORRequirement,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -16,10 +16,11 @@ async def fetch_formula(
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
-        SimpleRequirement("noop", "pacman-y-1.0.0"),
-        SimpleRequirement("pacman", "x"),
-    )
-    yield ImplicationRequirement(
-        SimpleRequirement("noop", "pacman-x-1.0.1"),
-        NegatedRequirement(SimpleRequirement("noop", "pacman-x-1.0.0")),
+        SimpleRequirement("noop", "pacman-sh"),
+        XORRequirement(
+            [
+                SimpleRequirement("noop", "pacman-bash-1.0.0"),
+                SimpleRequirement("noop", "pacman-zsh-1.0.0"),
+            ]
+        ),
     )
