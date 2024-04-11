@@ -4,7 +4,7 @@ from typing import Any, AsyncIterable
 from httpx import AsyncClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import FetchPackageInfo, Requirement
 
-from PPpackage.utils.validation import save_object
+from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
 from .repository import Repository
@@ -33,23 +33,22 @@ class RemoteRepository(Repository):
 
             reader = HTTPResponseReader(response)
 
-            return reader.load_many(FetchPackageInfo)
+            async for package in reader.load_many(FetchPackageInfo):
+                yield package
 
     async def translate_options(self, options: Any) -> Any:
-        async with self.client.stream(
-            "GET",
-            f"{self.url}/fetch-packages",
-            params=save_object(options),
+        response = await self.client.get(
+            f"{self.url}/translate-options",
+            params={"options": options},
             timeout=None,
-        ) as response:
-            if not response.is_success:
-                raise SubmanagerCommandFailure(
-                    f"remote repository.translate_options failed {(await response.aread()).decode()}"
-                )
+        )
 
-            reader = HTTPResponseReader(response)
+        if not response.is_success:
+            raise SubmanagerCommandFailure(
+                f"remote repository.translate_options failed {(await response.aread()).decode()}"
+            )
 
-            return await reader.load_one(Any)  # type: ignore
+        return load_from_bytes(Any, memoryview(response.read()))  # type: ignore
 
     async def fetch_formula(
         self,
@@ -57,15 +56,16 @@ class RemoteRepository(Repository):
     ) -> AsyncIterable[Requirement]:
         async with self.client.stream(
             "GET",
-            f"{self.url}/fetch-packages",
-            params=save_object(translated_options),
+            f"{self.url}/fetch-formula",
+            params={"translated_options": translated_options},
             timeout=None,
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure(
-                    f"remote repository.fetch_packages failed {(await response.aread()).decode()}"
+                    f"remote repository.fetch_formula failed {(await response.aread()).decode()}"
                 )
 
             reader = HTTPResponseReader(response)
 
-            return reader.load_many(Requirement)  # type: ignore
+            async for requirement in reader.load_many(Requirement):  # type: ignore
+                yield requirement

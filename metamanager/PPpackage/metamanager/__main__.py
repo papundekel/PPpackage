@@ -17,16 +17,16 @@ app = AsyncTyper()
 
 class LoggingFilter:
     def filter(self, record: LogRecord) -> bool:
-        return record.name.startswith("PPpackage") or record.name.startswith("httpx")
+        return record.name.startswith("PPpackage")
 
 
 logging_formatter = LoggingFormatter("%(name)s: %(message)s")
 logging_handler = StreamLoggingHandler()
-logging_handler.setLevel("DEBUG")
+logging_handler.setLevel("INFO")
 logging_handler.addFilter(LoggingFilter())
 logging_handler.setFormatter(logging_formatter)
 logger = getLogger()
-logger.setLevel("DEBUG")
+logger.setLevel("INFO")
 logger.addHandler(logging_handler)
 
 

@@ -20,3 +20,8 @@ async def fetch_formula(
         SimpleRequirement("noop", "conan-openssl-3.1.0"),
         SimpleRequirement("pacman", "sh"),
     )
+
+    yield ImplicationRequirement(
+        SimpleRequirement("noop", "conan-openssl-3.1.1"),
+        NegatedRequirement(SimpleRequirement("noop", "conan-openssl-3.1.0")),
+    )

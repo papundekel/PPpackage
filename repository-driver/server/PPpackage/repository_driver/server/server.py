@@ -1,13 +1,13 @@
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Any, TypeVar
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import RepositoryConfig
 from pydantic import ValidationError
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.status import HTTP_200_OK
 
 from PPpackage.utils.stream import dump_many
@@ -24,6 +24,8 @@ StateType = TypeVar("StateType")
 
 class PackageSettings(BaseSettings):
     config_path: Path
+
+    model_config = SettingsConfigDict(case_sensitive=False)
 
 
 package_settings = PackageSettings()  # type: ignore
@@ -92,9 +94,9 @@ async def fetch_formula(translated_options: Any):
     return StreamingResponse(HTTP_200_OK, dump_many(outputs))
 
 
-class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType]):
+class SubmanagerServer(FastAPI):
     def __init__(self):
-        super().__init__(debug=True, redoc_url=None)
+        super().__init__(redoc_url=None)
 
         super().get("/fetch-packages")(fetch_packages)
         super().get("/translate-options")(translate_options)

@@ -51,10 +51,10 @@ class InstallerConfig(BaseModuleConfig):
 
 @pydantic_dataclass(frozen=True)
 class Config:
-    repository_drivers: Mapping[str, RepositoryDriverConfig]
     requirement_translators: Mapping[str, RequirementTranslatorConfig]
     installers: Mapping[str, InstallerConfig]
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
+    repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
 
 
 class NodeData(TypedDict):
