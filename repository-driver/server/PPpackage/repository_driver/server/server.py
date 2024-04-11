@@ -1,14 +1,14 @@
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Any, TypeVar
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import RepositoryConfig
 from pydantic import ValidationError
-from pydantic_settings import BaseSettings
-from starlette.status import HTTP_200_OK
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
 
 from PPpackage.utils.stream import dump_many
 from PPpackage.utils.utils import load_interface_module
@@ -24,6 +24,8 @@ StateType = TypeVar("StateType")
 
 class PackageSettings(BaseSettings):
     config_path: Path
+
+    model_config = SettingsConfigDict(case_sensitive=False)
 
 
 package_settings = PackageSettings()  # type: ignore
@@ -56,49 +58,65 @@ repository_parameters = load_object(interface.RepositoryParameters, config.param
 logger = getLogger(__name__)
 
 
-async def fetch_packages():
+async def enable_cache(request: Request, response: Response):
+    epoch = await interface.get_epoch(driver_parameters, repository_parameters)
+
+    request_epoch = request.headers.get("If-None-Match")
+
+    if request_epoch == epoch:
+        raise HTTPException(HTTP_304_NOT_MODIFIED)
+    else:
+        response.headers["Cache-Control"] = "public, no-cache, max-age=2147483648"
+        response.headers["ETag"] = epoch
+
+
+async def fetch_packages(response: Response):
     logger.info("Fetching packages...")
 
-    # TODO: figure out why we need to iterate the async iterable
     outputs = interface.fetch_packages(driver_parameters, repository_parameters)
 
     logger.info("Fetched packages.")
 
-    return StreamingResponse(HTTP_200_OK, dump_many(outputs))
+    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
 
 
 async def translate_options(options: Any):
-    logger.info("Updating database...")
+    logger.info("Translating options...")
 
     translated_options = await interface.translate_options(
         driver_parameters, repository_parameters, options
     )
 
-    logger.info("Database updated.")
+    logger.info("Options translated.")
 
     return translated_options
 
 
-async def fetch_formula(translated_options: Any):
+async def fetch_formula(response: Response, translated_options: Any):
     logger.info("Fetching formula...")
 
-    # TODO: figure out why we need to iterate the async iterable
     outputs = interface.fetch_formula(
         driver_parameters, repository_parameters, translated_options
     )
 
     logger.info("Fetched formula.")
 
-    return StreamingResponse(HTTP_200_OK, dump_many(outputs))
+    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
 
 
-class SubmanagerServer(FastAPI, Generic[SettingsType, StateType, RequirementType]):
+class SubmanagerServer(FastAPI):
     def __init__(self):
-        super().__init__(debug=True, redoc_url=None)
+        super().__init__(redoc_url=None)
 
-        super().get("/fetch-packages")(fetch_packages)
-        super().get("/translate-options")(translate_options)
-        super().get("/fetch-formula")(fetch_formula)
+        super().get("/fetch-packages", dependencies=[Depends(enable_cache)])(
+            fetch_packages
+        )
+        super().get("/translate-options", dependencies=[Depends(enable_cache)])(
+            translate_options
+        )
+        super().get("/fetch-formula", dependencies=[Depends(enable_cache)])(
+            fetch_formula
+        )
 
 
 server = SubmanagerServer()

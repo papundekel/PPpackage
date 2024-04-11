@@ -2,7 +2,7 @@ from collections.abc import AsyncIterable
 from logging import getLogger
 from typing import Any, Protocol, TypeVar
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 
 from .validation import load_from_bytes, wrap
 

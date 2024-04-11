@@ -1,7 +1,9 @@
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from httpx import AsyncClient as HTTPClient
+from anysqlite import connect as sqlite_connect
+from hishel import AsyncCacheClient as HTTPClient
+from hishel import AsyncSQLiteStorage
 
 from .localrepository import LocalRepository
 from .remoterepository import RemoteRepository
@@ -21,7 +23,16 @@ async def create_repository(
 ) -> Repository:
     if isinstance(repository_config, RemoteRepositoryConfig):
         if client is None:
-            client = await client_stack.enter_async_context(HTTPClient(http2=True))
+            client = await client_stack.enter_async_context(
+                HTTPClient(
+                    http2=True,
+                    storage=AsyncSQLiteStorage(
+                        connection=await sqlite_connect(
+                            repository_config.cache_path / "db.sqlite"
+                        )
+                    ),
+                )
+            )
 
         return RemoteRepository(repository_config, client)
     else:
@@ -34,7 +45,6 @@ async def Repositories(
     repository_configs: Iterable[RemoteRepositoryConfig | LocalRepositoryConfig],
 ) -> AsyncGenerator[Iterable[Repository], None]:
     client: HTTPClient | None = None
-
     async with AsyncExitStack() as client_stack:
         yield [
             await create_repository(client, client_stack, config, drivers)

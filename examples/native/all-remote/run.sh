@@ -11,39 +11,45 @@ address_PP="localhost:8884"
 mkdir -p tmp/
 mkdir -p tmp/output/
 
+mkdir -p tmp/cache/metamanager/archlinux-core
+mkdir -p tmp/cache/metamanager/archlinux-extra
+mkdir -p tmp/cache/metamanager/AUR
+mkdir -p tmp/cache/metamanager/conan-conancenter
+mkdir -p tmp/cache/metamanager/PP
 
 
-CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-core/config.json"
+
+CONFIG_PATH="$PWD/examples/native/all-remote/archlinux-core/config.json" \
 hypercorn \
-    PPpackage.repository_driver.server:server \
+    PPpackage.repository_driver.server.server:server \
     --bind "$address_archlinux_core" \
     &
 pid_archlinux_core=$!
 
-CONFIG_PATH="$(pwd)/examples/native/all-remote/archlinux-extra/config.json"
+CONFIG_PATH="$PWD/examples/native/all-remote/archlinux-extra/config.json" \
 hypercorn \
-    PPpackage.repository_driver.server:server \
+    PPpackage.repository_driver.server.server:server \
     --bind "$address_archlinux_extra" \
     &
 pid_archlinux_extra=$!
 
-CONFIG_PATH="$(pwd)/examples/native/all-remote/AUR/config.json"
+CONFIG_PATH="$PWD/examples/native/all-remote/AUR/config.json" \
 hypercorn \
-    PPpackage.repository_driver.server:server \
+    PPpackage.repository_driver.server.server:server \
     --bind "$address_AUR" \
     &
 pid_AUR=$!
 
-CONFIG_PATH="$(pwd)/examples/native/all-remote/conan-conancenter/config.json"
+CONFIG_PATH="$PWD/examples/native/all-remote/conan-conancenter/config.json" \
 hypercorn \
-    PPpackage.repository_driver.server:server \
+    PPpackage.repository_driver.server.server:server \
     --bind "$address_conan_conancenter" \
     &
 pid_conan_conancenter=$!
 
-CONFIG_PATH="$(pwd)/examples/native/all-remote/PP/config.json"
+CONFIG_PATH="$PWD/examples/native/all-remote/PP/config.json" \
 hypercorn \
-    PPpackage.repository_driver.server:server \
+    PPpackage.repository_driver.server.server:server \
     --bind "$address_PP" \
     &
 pid_PP=$!

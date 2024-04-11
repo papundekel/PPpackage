@@ -25,23 +25,23 @@
     },
     "repositories": [
         {
-            "url": "http://archlinux-core:8880",
+            "url": "http://localhost:8880",
             "cache_path": "tmp/cache/metamanager/archlinux-core"
         },
         {
-            "url": "http://archlinux-extra:8881",
+            "url": "http://localhost:8881",
             "cache_path": "tmp/cache/metamanager/archlinux-extra"
         },
         {
-            "url": "http://aur:8882",
+            "url": "http://localhost:8882",
             "cache_path": "tmp/cache/metamanager/AUR"
         },
         {
-            "url": "http://conan-conancenter:8883",
+            "url": "http://localhost:8883",
             "cache_path": "tmp/cache/metamanager/conan-conancenter"
         },
         {
-            "url": "http://pp:8884",
+            "url": "http://localhost:8884",
             "cache_path": "tmp/cache/metamanager/PP"
         }
     ]

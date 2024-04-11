@@ -11,3 +11,4 @@ async def fetch_packages(
 ) -> AsyncIterable[FetchPackageInfo]:
     yield FetchPackageInfo("PP-p1-1.0.0", frozenset(["PP-p1"]))
     yield FetchPackageInfo("PP-p2-1.0.0", frozenset(["PP-p2"]))
+    yield FetchPackageInfo("PP-p3-1.0.0", frozenset(["PP-p3"]))

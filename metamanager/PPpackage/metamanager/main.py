@@ -1,10 +1,10 @@
-from collections.abc import AsyncIterable, Iterable, Set
+from collections.abc import AsyncIterable, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 from typing import IO
 
-from asyncstdlib import max as async_max
+from asyncstdlib import min as async_min
 from networkx import MultiDiGraph
 from pydantic import ValidationError
 
@@ -61,8 +61,12 @@ def build_graph(model: Set[str]) -> MultiDiGraph:
 
 
 async def select_best_model(models: AsyncIterable[Set[str]]) -> Set[str]:
-    model_result = await async_max(
-        (sorted(model) async for model in models), default=None
+    # from models with the fewest packages
+    # select the lexicographically smallest
+    model_result = await async_min(
+        (sorted(model) async for model in models),
+        key=lambda x: (len(x), x),  # type: ignore
+        default=None,
     )
 
     if model_result is None:
