@@ -15,5 +15,5 @@ class Repository(Protocol):
         self, options: Any, formula: MutableSequence[Requirement]
     ) -> None:
         translated_options = await self.translate_options(options)
-        async for requirement in self.fetch_formula({}):
+        async for requirement in self.fetch_formula(translated_options):
             formula.append(requirement)

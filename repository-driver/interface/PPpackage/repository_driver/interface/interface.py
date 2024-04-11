@@ -12,6 +12,13 @@ DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
 TranslatedOptionsType = TypeVar("TranslatedOptionsType")
 
+GetEpochCallbackType = Callable[
+    [
+        DriverParametersType,
+        RepositoryParametersType,
+    ],
+    Awaitable[str],
+]
 FetchPackagesCallbackType = Callable[
     [
         DriverParametersType,
@@ -40,6 +47,7 @@ class Interface(
     DriverParameters: type[DriverParametersType]
     RepositoryParameters: type[RepositoryParametersType]
     TranslatedOptions: type[TranslatedOptionsType]
+    get_epoch: GetEpochCallbackType[DriverParametersType, RepositoryParametersType]
     fetch_packages: FetchPackagesCallbackType[
         DriverParametersType, RepositoryParametersType
     ]

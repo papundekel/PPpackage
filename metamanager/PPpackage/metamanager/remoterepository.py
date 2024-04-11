@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any, AsyncIterable
 
-from httpx import AsyncClient as HTTPClient
+from hishel import AsyncCacheClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import FetchPackageInfo, Requirement
 
 from PPpackage.utils.validation import load_from_bytes
@@ -24,6 +24,7 @@ class RemoteRepository(Repository):
         async with self.client.stream(
             "GET",
             f"{self.url}/fetch-packages",
+            headers={"Cache-Control": "no-cache"},
             timeout=None,
         ) as response:
             if not response.is_success:
@@ -40,6 +41,7 @@ class RemoteRepository(Repository):
         response = await self.client.get(
             f"{self.url}/translate-options",
             params={"options": options},
+            headers={"Cache-Control": "no-cache"},
             timeout=None,
         )
 
@@ -58,6 +60,7 @@ class RemoteRepository(Repository):
             "GET",
             f"{self.url}/fetch-formula",
             params={"translated_options": translated_options},
+            headers={"Cache-Control": "no-cache"},
             timeout=None,
         ) as response:
             if not response.is_success:
