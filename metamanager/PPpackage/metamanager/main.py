@@ -6,7 +6,7 @@ from sys import stderr, stdin
 from typing import IO, Any
 
 from asyncstdlib import min as async_min
-from hishel import AsyncCacheClient as HTTPClient
+from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
 from pydantic import ValidationError

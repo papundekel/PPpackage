@@ -6,7 +6,7 @@ from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
-from hishel import AsyncCacheClient as HTTPClient
+from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, topological_generations
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
