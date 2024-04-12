@@ -32,7 +32,7 @@ RUN ./fakealpm/build.sh fakealpm/ fakealpm/build/ /usr/local
 
 # -----------------------------------------------------------------------------
 
-FROM base as base-python
+FROM base AS base-python
 
 RUN pacman --noconfirm -S python
 
@@ -41,6 +41,66 @@ RUN python -m venv --system-site-packages $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN pip install --upgrade pip
+
+# -----------------------------------------------------------------------------
+
+FROM base-python AS repository-driver-pacman
+
+COPY utils/ /workdir/utils
+RUN pip install utils/
+
+COPY repository-driver/interface/ /workdir/repository-driver/interface
+RUN pip install repository-driver/interface/
+
+COPY repository-driver/pacman/ /workdir/repository-driver/pacman
+RUN pip install repository-driver/pacman/
+
+ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python AS repository-driver-AUR
+
+COPY utils/ /workdir/utils
+RUN pip install utils/
+
+COPY repository-driver/interface/ /workdir/repository-driver/interface
+RUN pip install repository-driver/interface/
+
+COPY repository-driver/AUR/ /workdir/repository-driver/AUR
+RUN pip install repository-driver/AUR/
+
+ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python AS repository-driver-conan
+
+COPY utils/ /workdir/utils
+RUN pip install utils/
+
+COPY repository-driver/interface/ /workdir/repository-driver/interface
+RUN pip install repository-driver/interface/
+
+COPY repository-driver/conan/ /workdir/repository-driver/conan
+RUN pip install repository-driver/conan/
+
+ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python AS repository-driver-PP
+
+COPY utils/ /workdir/utils
+RUN pip install utils/
+
+COPY repository-driver/interface/ /workdir/repository-driver/interface
+RUN pip install repository-driver/interface/
+
+COPY repository-driver/PP/ /workdir/repository-driver/PP
+RUN pip install repository-driver/PP/
+
+ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
 
 # -----------------------------------------------------------------------------
 

@@ -61,3 +61,39 @@ jobs:
 
             # - name: See if ldconfig ran
             #   run: ls -l root/etc/ld.so.cache
+
+            - name: Build pppackage-repository-driver-pacman
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-pacman
+                  tags: docker.io/fackop/repository-driver-pacman:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build pppackage-repository-driver-aur
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-aur
+                  tags: docker.io/fackop/repository-driver-aur:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build pppackage-repository-driver-conan
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-conan
+                  tags: docker.io/fackop/repository-driver-conan:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build pppackage-repository-driver-pp
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-pp
+                  tags: docker.io/fackop/repository-driver-pp:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
