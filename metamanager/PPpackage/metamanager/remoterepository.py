@@ -32,7 +32,9 @@ class RemoteRepository(Repository):
 
     async def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
         async with self.client.stream(
-            "GET", f"{self.url}/packages", headers={"Cache-Control": "no-cache"}
+            "GET",
+            f"{self.url}/packages",
+            headers={"Cache-Control": "no-cache"},
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure(
@@ -60,14 +62,11 @@ class RemoteRepository(Repository):
 
         return load_from_bytes(Any, memoryview(response.read()))  # type: ignore
 
-    async def get_formula(
-        self,
-        translated_options: Any,
-    ) -> AsyncIterable[Requirement]:
+    async def get_formula(self) -> AsyncIterable[Requirement]:
         async with self.client.stream(
             "GET",
             f"{self.url}/formula",
-            params={"translated_options": translated_options},
+            params={"translated_options": self.translated_options},
             headers={"Cache-Control": "no-cache"},
         ) as response:
             if not response.is_success:
@@ -82,7 +81,10 @@ class RemoteRepository(Repository):
                 yield requirement
 
     async def get_package_detail(self, package: str) -> PackageDetail:
-        response = await self.client.get(f"{self.url}/packages/{package}")
+        response = await self.client.get(
+            f"{self.url}/packages/{package}",
+            params={"translated_options": self.translated_options},
+        )
 
         if not response.is_success:
             raise SubmanagerCommandFailure(

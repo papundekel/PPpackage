@@ -54,6 +54,7 @@ class Config:
     requirement_translators: Mapping[str, RequirementTranslatorConfig]
     installers: Mapping[str, InstallerConfig]
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
+    product_cache_path: Annotated[Path, WithVariables]
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
 
 

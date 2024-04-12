@@ -108,13 +108,13 @@ async def get_formula(response: Response, translated_options: Any):
     return StreamingResponse(HTTP_200_OK, response.headers, dump_many(formula))
 
 
-async def get_package_detail(package: str):
+async def get_package_detail(translated_options: Any, package: str):
     stderr.write(f"Preparing package detail for {package}...\n")
 
     logger.info(f"Preparing package detail for {package}...")
 
     package_detail = await interface.get_package_detail(
-        driver_parameters, repository_parameters, package
+        driver_parameters, repository_parameters, translated_options, package
     )
 
     logger.info(f"Package detail for {package} ready.")

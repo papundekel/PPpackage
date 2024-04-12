@@ -4,6 +4,6 @@
     },
     "parameters": {
         "database_path": "tmp/database/PP",
-        "cache_path": "tmp/cache/PP"
+        "cache_path": "tmp/cache/repository/PP"
     }
 }

@@ -13,14 +13,14 @@ from PPpackage.repository_driver.interface.schemes import (
     PackageDetail,
 )
 
-from metamanager.PPpackage.metamanager.repository import Repository
-
 from .exceptions import SubmanagerCommandFailure
+from .repository import Repository
 
 
 @singledispatch
 async def fetch_package(
     product_detail: Any,
+    product_cache_path: Path,
     client: HTTPClient,
     package: str,
     repository: Repository,
@@ -31,6 +31,7 @@ async def fetch_package(
 @fetch_package.register
 async def _(
     product_detail: ArchiveProductDetail,
+    product_cache_path: Path,
     client: HTTPClient,
     package: str,
     repository: Repository,
@@ -60,25 +61,31 @@ async def _(
     return path, product_detail.installer
 
 
-async def fetch(client: HTTPClient, graph: MultiDiGraph) -> None:
+async def fetch(
+    product_cache_path: Path, client: HTTPClient, graph: MultiDiGraph
+) -> None:
     stderr.write("Fetching package products...\n")
 
-    generations: Iterable[Iterable[str]] = topological_generations(
-        graph.reverse(copy=False)
-    )
-
-    for generation in generations:
+    for generation in topological_generations(graph.reverse(copy=False)):
         async with TaskGroup() as group:
             for package in generation:
-                detail: PackageDetail = graph.nodes[package]["detail"]
-
                 node = graph.nodes[package]
 
+                detail: PackageDetail = node["detail"]
+
                 node["product"] = group.create_task(
-                    fetch_package(detail.product, client, package, node["repository"])
+                    fetch_package(
+                        detail.product,
+                        product_cache_path,
+                        client,
+                        package,
+                        node["repository"],
+                    )
                 )
 
         for package in generation:
             node = graph.nodes[package]
 
             node["product"] = node["product"].result()
+
+    stderr.write("Package products fetched.\n")

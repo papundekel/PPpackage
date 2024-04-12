@@ -10,6 +10,7 @@ from .schemes import DriverParameters, RepositoryParameters
 async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
+    translated_options: None,
     package: str,
 ) -> PackageDetail:
     if package.startswith("PP-p1"):

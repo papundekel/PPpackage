@@ -39,6 +39,6 @@ class Interface(
     ]
 
     get_package_detail: Callable[
-        [DriverParametersType, RepositoryParametersType, str],
+        [DriverParametersType, RepositoryParametersType, TranslatedOptionsType, str],
         Awaitable[PackageDetail],
     ]

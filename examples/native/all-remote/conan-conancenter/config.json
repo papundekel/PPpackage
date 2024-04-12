@@ -3,7 +3,7 @@
         "package": "PPpackage.repository_driver.conan"
     },
     "parameters": {
-        "cache_path": "tmp/cache/conan-conancenter",
+        "cache_path": "tmp/cache/repository/conan-conancenter",
         "url": "https://center.conan.io",
         "verify_ssl": true
     }

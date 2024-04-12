@@ -50,12 +50,15 @@ class LocalRepository(Repository):
             self.driver_parameters, self.repository_parameters, options
         )
 
-    def get_formula(self, translated_options: Any) -> AsyncIterable[Requirement]:
+    def get_formula(self) -> AsyncIterable[Requirement]:
         return self.interface.get_formula(
-            self.driver_parameters, self.repository_parameters, translated_options
+            self.driver_parameters, self.repository_parameters, self.translated_options
         )
 
     async def get_package_detail(self, package: str) -> PackageDetail:
         return await self.interface.get_package_detail(
-            self.driver_parameters, self.repository_parameters, package
+            self.driver_parameters,
+            self.repository_parameters,
+            self.translated_options,
+            package,
         )
