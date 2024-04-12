@@ -2,13 +2,13 @@ from asyncio import TaskGroup
 from collections.abc import AsyncIterable, Iterable, Mapping, Set
 from logging import getLogger
 from pathlib import Path
-from struct import pack
 from sys import stderr, stdin
-from typing import IO
+from typing import IO, Any
 
 from asyncstdlib import min as async_min
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
+from PPpackage.repository_driver.interface.schemes import DetailPackageInfo
 from pydantic import ValidationError
 from pydot import Dot
 
@@ -62,43 +62,38 @@ def parse_config(config_path: Path) -> Config:
         return config
 
 
-async def build_graph(
-    model: Set[str],
-    packages_with_repositories: Mapping[str, tuple[Repository, Set[str]]],
-) -> MultiDiGraph:
+async def get_package_details(graph: MultiDiGraph) -> None:
     async with TaskGroup() as group:
-        tasks = {
-            package: group.create_task(
-                packages_with_repositories[package][0].get_package_detail(package)
+        for package, data in graph.nodes.items():
+            graph.nodes[package]["detail"] = group.create_task(
+                data["repository"].get_package_detail(package)
             )
-            for package in model
-        }
 
-    results = {package: task.result() for package, task in tasks.items()}
+    for package, data in graph.nodes.items():
+        graph.nodes[package]["detail"] = data["detail"].result()
 
-    graph = MultiDiGraph()
 
-    graph.add_nodes_from(model)
-
+async def create_dependencies(graph: MultiDiGraph) -> None:
     graph.add_edges_from(
         (package, dependency)
-        for package, package_detail in results.items()
-        for dependency, dependency_detail in results.items()
+        for package, package_data in graph.nodes.items()
+        for dependency, dependency_data in graph.nodes.items()
         if (
             any(
-                interface in dependency_detail.interfaces
-                for interface in package_detail.dependencies
+                interface in dependency_data["detail"].interfaces
+                for interface in package_data["detail"].dependencies
             )
         )
     )
 
-    return graph
 
-
-async def select_best_model(models: AsyncIterable[Set[str]]) -> Set[str]:
+async def select_best_model(
+    models: AsyncIterable[Set[str]],
+    packages_to_repositories_result: Result[Mapping[str, tuple[Repository, Set[str]]]],
+) -> MultiDiGraph:
     # from models with the fewest packages
     # select the lexicographically smallest
-    model_result = await async_min(
+    model_result: list[str] | None = await async_min(
         (sorted(model) async for model in models),
         key=lambda x: (len(x), x),  # type: ignore
         default=None,
@@ -107,20 +102,25 @@ async def select_best_model(models: AsyncIterable[Set[str]]) -> Set[str]:
     if model_result is None:
         raise SubmanagerCommandFailure("No model found.")
 
-    return set(model_result)
+    graph = MultiDiGraph()
+
+    packages_to_repositories = packages_to_repositories_result.value
+
+    graph.add_nodes_from(
+        (package, {"repository": packages_to_repositories[package][0]})
+        for package in model_result
+    )
+
+    return graph
 
 
-def graph_to_dot(
-    graph: MultiDiGraph,
-    packages_with_repositories: Mapping[str, tuple[Repository, Set[str]]],
-    path: Path,
-) -> None:
-    manager_to_color = {}
+def graph_to_dot(graph: MultiDiGraph) -> Dot:
+    manager_to_color = dict[str, int]()
 
-    packages: Iterable[str] = graph.nodes()
+    packages: Iterable[tuple[str, Mapping[str, Any]]] = graph.nodes.items()
 
-    for package in packages:
-        repository_identifier = packages_with_repositories[package][0].get_identifier()
+    for package, data in packages:
+        repository_identifier = data["repository"].get_identifier()
 
         if repository_identifier not in manager_to_color:
             manager_to_color[repository_identifier] = len(manager_to_color) + 1
@@ -129,15 +129,14 @@ def graph_to_dot(
         graph, label_attribute="package"
     )
 
-    for _, data in graph_presentation.nodes(data=True):
+    for _, data in graph_presentation.nodes.items():
         package: str = data["package"]
+        repository = data["repository"]
 
         data.clear()
 
         data["label"] = package
-        data["fillcolor"] = manager_to_color[
-            packages_with_repositories[package][0].get_identifier()
-        ]
+        data["fillcolor"] = manager_to_color[repository.get_identifier()]
 
     graph_presentation.graph.update(
         {
@@ -156,15 +155,26 @@ def graph_to_dot(
         }
     )
 
-    dot: Dot = to_pydot(graph_presentation)
+    return to_pydot(graph_presentation)
 
-    dot.write(path)
+
+async def fetch(graph: MultiDiGraph) -> None:
+    pass
+
+
+async def install(installation_path: Path) -> None:
+    # TODO
+    pass
+
+
+async def generators(generators_path: Path) -> None:
+    # TODO
+    pass
 
 
 async def main(
-    workdir_path: Path,
     config_path: Path,
-    destination_path: Path,
+    installation_path: Path,
     generators_path: Path | None,
     graph_path: Path | None,
 ) -> None:
@@ -189,18 +199,24 @@ async def main(
                 packages_with_repositories_result,
             )
 
-            model = await select_best_model(models)
+            graph = await select_best_model(models, packages_with_repositories_result)
 
-            packages_with_repositories = packages_with_repositories_result.value
+            print(graph.nodes(), file=stderr)
 
-            print(model, file=stderr)
+            await get_package_details(graph)
 
-            graph = await build_graph(model, packages_with_repositories)
+            await create_dependencies(graph)
 
             if graph_path is not None:
-                graph_to_dot(graph, packages_with_repositories, graph_path)
+                graph_dot = graph_to_dot(graph)
+                graph_dot.write(graph_path)
 
-            # TODO fetch, install, generate
+            await fetch(graph)
+
+            await install(installation_path)
+
+            if generators_path is not None:
+                await generators(generators_path)
 
             stderr.write("Done.\n")
 

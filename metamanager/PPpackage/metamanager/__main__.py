@@ -32,19 +32,12 @@ logger.addHandler(logging_handler)
 
 @app.command()
 async def main_command(
-    destination_path: Path,
+    installation_path: Path,
     config_path: Annotated[Path, TyperOption("--config")],
-    workdir_path: Annotated[Path, TyperOption("--workdir")] = Path("/tmp"),
     generators_path: Annotated[Optional[Path], TyperOption("--generators")] = None,
     graph_path: Annotated[Optional[Path], TyperOption("--graph")] = None,
 ) -> None:
-    await main(
-        workdir_path,
-        config_path,
-        destination_path,
-        generators_path,
-        graph_path,
-    )
+    await main(config_path, installation_path, generators_path, graph_path)
 
 
 run(app, "PPpackage")

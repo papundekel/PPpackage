@@ -1,8 +1,10 @@
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Annotated, Any
 
 from annotated_types import Len
 from frozendict import frozendict
+from pydantic import HttpUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
@@ -81,6 +83,39 @@ class RepositoryConfig:
 
 
 @pydantic_dataclass(frozen=True)
+class TagProductDetail:
+    tag: str
+
+
+@pydantic_dataclass(frozen=True)
+class ContainerfileProductDetail:
+    containerfile: str
+
+
+@pydantic_dataclass(frozen=True)
+class MetaProductDetail:
+    meta: Requirement
+
+
+@pydantic_dataclass(frozen=True)
+class MetaOnTopProductDetail:
+    meta_on_top: Requirement
+
+
+@pydantic_dataclass(frozen=True)
+class ArchiveProductDetail:
+    archive: HttpUrl | Path
+    installer: str
+
+
+@pydantic_dataclass(frozen=True)
 class DetailPackageInfo:
     interfaces: frozenset[str]
     dependencies: frozenset[str]
+    product: (
+        TagProductDetail
+        | ContainerfileProductDetail
+        | MetaProductDetail
+        | MetaOnTopProductDetail
+        | ArchiveProductDetail
+    )

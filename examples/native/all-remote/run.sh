@@ -79,7 +79,6 @@ python \
     -m PPpackage.metamanager \
     tmp/root/ \
     --config examples/native/all-remote/config.json \
-    --workdir /tmp \
     --generators tmp/output/generators \
     --graph tmp/output/graph.dot
 

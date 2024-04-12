@@ -32,10 +32,6 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "/tmp",
-                            "container": "/mnt/workdir"
-                        },
-                        {
                             "containerizer": "$ROOT",
                             "container": "/mnt/root"
                         }

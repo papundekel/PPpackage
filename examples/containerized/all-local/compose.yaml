@@ -6,17 +6,11 @@ services:
             - /mnt/root/
             - --config
             - /mnt/config.json
-            - --workdir
-            - /mnt/workdir/
             - --generators
             - /mnt/output/generators/
             - --graph
             - /mnt/output/graph.dot
         volumes:
-            - type: bind
-              source: /tmp
-              target: /mnt/workdir/
-
             - type: bind
               source: $ROOT
               target: /mnt/root/
