@@ -1,6 +1,6 @@
 from asyncio import TaskGroup
 from collections.abc import (
-    AsyncIterable,
+    AsyncGenerator,
     Iterable,
     Mapping,
     MutableMapping,
@@ -19,30 +19,32 @@ from PPpackage.repository_driver.interface.utils import (
 from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
 from pysat.solvers import Solver
 
+from metamanager.PPpackage.metamanager.utils import Result
+
 from .repository import Repository
 from .translators import Translator
 
 
-async def repository_fetch_packages(
-    repository: Repository, packages: MutableMapping[str, Set[str]]
+async def repository_discover_packages(
+    repository: Repository, packages: MutableMapping[str, tuple[Repository, Set[str]]]
 ):
-    async for package in repository.fetch_packages():
-        packages[package.package] = package.translator_groups
+    async for package in repository.discover_packages():
+        packages[package.package] = repository, package.translator_groups
 
 
-async def fetch_packages(
+async def discover_packages(
     repositories: Iterable[Repository],
-) -> Mapping[str, Set[str]]:
-    packages = dict[str, Set[str]]()
+) -> Mapping[str, tuple[Repository, Set[str]]]:
+    packages = dict[str, tuple[Repository, Set[str]]]()
 
     async with TaskGroup() as group:
         for repository in repositories:
-            group.create_task(repository_fetch_packages(repository, packages))
+            group.create_task(repository_discover_packages(repository, packages))
 
     return packages
 
 
-async def fetch_formula(
+async def get_formula(
     repositories: Iterable[Repository], options: Any
 ) -> Iterable[Requirement]:
     formula = list[Requirement]()
@@ -50,26 +52,26 @@ async def fetch_formula(
     async with TaskGroup() as group:
         for repository in repositories:
             group.create_task(
-                repository.translate_options_and_fetch_formula(options, formula)
+                repository.translate_options_and_get_formula(options, formula)
             )
 
     return formula
 
 
-async def fetch_packages_and_formulas(
+async def discover_packages_and_formulas(
     repositories: Iterable[Repository], options: Any
-) -> tuple[Mapping[str, Set[str]], Iterable[Requirement]]:
+) -> tuple[Mapping[str, tuple[Repository, Set[str]]], Iterable[Requirement]]:
     async with TaskGroup() as group:
-        packages_task = group.create_task(fetch_packages(repositories))
-        formula_task = group.create_task(fetch_formula(repositories, options))
+        packages_task = group.create_task(discover_packages(repositories))
+        formula_task = group.create_task(get_formula(repositories, options))
 
     return packages_task.result(), formula_task.result()
 
 
-def group_packages(packages: Mapping[str, Set[str]]):
+def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
     grouped_packages = dict[str, MutableSet[str]]()
 
-    for package, translator_groups in packages.items():
+    for package, (_, translator_groups) in packages.items():
         for translator_group in translator_groups:
             grouped_packages.setdefault(translator_group, set()).add(package)
 
@@ -78,7 +80,7 @@ def group_packages(packages: Mapping[str, Set[str]]):
 
 def translate_requirements(
     translators: Mapping[str, Translator],
-    packages: Mapping[str, Set[str]],
+    packages: Mapping[str, tuple[Repository, Set[str]]],
     formula: Iterable[Requirement],
 ) -> Formula:
     grouped_packages = group_packages(packages)
@@ -122,7 +124,10 @@ async def resolve(
     translators: Mapping[str, Translator],
     requirements: Requirement,
     options: Any,
-) -> AsyncIterable[Set[str]]:
+    packages_with_repositories_result: Result[
+        Mapping[str, tuple[Repository, Set[str]]]
+    ],
+) -> AsyncGenerator[Set[str], Mapping[str, tuple[Repository, Set[str]]]]:
     stderr.write("Resolving requirements:\n")
 
     # TODO: better print
@@ -130,16 +135,19 @@ async def resolve(
 
     stderr.write("Fetching packages and formulas...\n")
 
-    packages_with_groups, formula = await fetch_packages_and_formulas(
-        repositories, options
+    packages_with_repositories_and_groups, formula = (
+        await discover_packages_and_formulas(repositories, options)
     )
+    packages_with_repositories_result.value = packages_with_repositories_and_groups
 
     stderr.write("Packages and formulas fetched.\n")
 
     stderr.write("Translating requirements...\n")
 
     translated_formula = translate_requirements(
-        translators, packages_with_groups, chain([requirements], formula)
+        translators,
+        packages_with_repositories_and_groups,
+        chain([requirements], formula),
     )
 
     stderr.write("Requirements translated.\n")
@@ -148,7 +156,7 @@ async def resolve(
 
     stderr.write("Resolving...\n")
 
-    packages = packages_with_groups.keys()
+    packages = packages_with_repositories_and_groups.keys()
 
     with Solver(name="glucose42", bootstrap_with=translated_formula) as solver:
         for model_integers in solver.enum_models():  # type: ignore

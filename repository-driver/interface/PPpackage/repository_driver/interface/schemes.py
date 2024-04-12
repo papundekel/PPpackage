@@ -55,7 +55,7 @@ Requirement = (
 
 
 @pydantic_dataclass(frozen=True)
-class FetchPackageInfo:
+class DiscoveryPackageInfo:
     package: str
     translator_groups: frozenset[str]
 
@@ -78,3 +78,9 @@ class RepositoryDriverConfig(BaseModuleConfig):
 class RepositoryConfig:
     driver: RepositoryDriverConfig
     parameters: Parameters = frozendict()
+
+
+@pydantic_dataclass(frozen=True)
+class DetailPackageInfo:
+    interfaces: frozenset[str]
+    dependencies: frozenset[str]

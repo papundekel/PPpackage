@@ -2,7 +2,11 @@ from logging import getLogger
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
-from PPpackage.repository_driver.interface.schemes import FetchPackageInfo, Requirement
+from PPpackage.repository_driver.interface.schemes import (
+    DetailPackageInfo,
+    DiscoveryPackageInfo,
+    Requirement,
+)
 
 from PPpackage.utils.validation import load_from_bytes
 
@@ -20,21 +24,22 @@ class RemoteRepository(Repository):
 
         self.url = str(config.url).rstrip("/")
 
-    async def fetch_packages(self) -> AsyncIterable[FetchPackageInfo]:
+    def get_identifier(self) -> str:
+        return self.url
+
+    async def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
         async with self.client.stream(
-            "GET",
-            f"{self.url}/fetch-packages",
-            headers={"Cache-Control": "no-cache"},
-            timeout=None,
+            "GET", f"{self.url}/packages", headers={"Cache-Control": "no-cache"}
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure(
-                    f"remote repository.fetch_packages failed {(await response.aread()).decode()}"
+                    "remote repository.discover_packages failed "
+                    f"{(await response.aread()).decode()}"
                 )
 
             reader = HTTPResponseReader(response)
 
-            async for package in reader.load_many(FetchPackageInfo):
+            async for package in reader.load_many(DiscoveryPackageInfo):
                 yield package
 
     async def translate_options(self, options: Any) -> Any:
@@ -42,33 +47,44 @@ class RemoteRepository(Repository):
             f"{self.url}/translate-options",
             params={"options": options},
             headers={"Cache-Control": "no-cache"},
-            timeout=None,
         )
 
         if not response.is_success:
             raise SubmanagerCommandFailure(
-                f"remote repository.translate_options failed {(await response.aread()).decode()}"
+                "remote repository.translate_options failed "
+                f"{(await response.aread()).decode()}"
             )
 
         return load_from_bytes(Any, memoryview(response.read()))  # type: ignore
 
-    async def fetch_formula(
+    async def get_formula(
         self,
         translated_options: Any,
     ) -> AsyncIterable[Requirement]:
         async with self.client.stream(
             "GET",
-            f"{self.url}/fetch-formula",
+            f"{self.url}/formula",
             params={"translated_options": translated_options},
             headers={"Cache-Control": "no-cache"},
-            timeout=None,
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure(
-                    f"remote repository.fetch_formula failed {(await response.aread()).decode()}"
+                    "remote repository.get_formula failed "
+                    f"{(await response.aread()).decode()}"
                 )
 
             reader = HTTPResponseReader(response)
 
             async for requirement in reader.load_many(Requirement):  # type: ignore
                 yield requirement
+
+    async def get_package_detail(self, package: str) -> DetailPackageInfo:
+        response = await self.client.get(f"{self.url}/packages/{package}")
+
+        if not response.is_success:
+            raise SubmanagerCommandFailure(
+                "remote repository.get_package_detail failed "
+                f"{(await response.aread()).decode()}"
+            )
+
+        return load_from_bytes(DetailPackageInfo, memoryview(response.read()))
