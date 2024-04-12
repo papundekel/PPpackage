@@ -1,7 +1,7 @@
 from PPpackage.repository_driver.interface.exceptions import CommandException
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
-    DetailPackageInfo,
+    PackageDetail,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -11,9 +11,9 @@ async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     package: str,
-) -> DetailPackageInfo:
+) -> PackageDetail:
     if package.startswith("PP-p1"):
-        return DetailPackageInfo(
+        return PackageDetail(
             frozenset(["p1"]),
             frozenset(),
             ArchiveProductDetail(
@@ -22,7 +22,7 @@ async def get_package_detail(
             ),
         )
     elif package.startswith("PP-p2"):
-        return DetailPackageInfo(
+        return PackageDetail(
             frozenset(["p2"]),
             frozenset(["p1"]),
             ArchiveProductDetail(
@@ -31,7 +31,7 @@ async def get_package_detail(
             ),
         )
     elif package.startswith("PP-p3"):
-        return DetailPackageInfo(
+        return PackageDetail(
             frozenset(["p3"]),
             frozenset(["p2"]),
             ArchiveProductDetail(

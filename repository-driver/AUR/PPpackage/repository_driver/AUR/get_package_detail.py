@@ -1,6 +1,6 @@
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
-    DetailPackageInfo,
+    PackageDetail,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -10,8 +10,8 @@ async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     package: str,
-) -> DetailPackageInfo:
-    return DetailPackageInfo(
+) -> PackageDetail:
+    return PackageDetail(
         frozenset(),
         frozenset(),
         ArchiveProductDetail(

@@ -1,7 +1,7 @@
 from PPpackage.repository_driver.interface.exceptions import CommandException
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
-    DetailPackageInfo,
+    PackageDetail,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -11,9 +11,9 @@ async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     package: str,
-) -> DetailPackageInfo:
+) -> PackageDetail:
     if package.startswith("conan-openssl"):
-        return DetailPackageInfo(
+        return PackageDetail(
             frozenset(),
             frozenset(["sh"]),
             ArchiveProductDetail(
@@ -22,7 +22,7 @@ async def get_package_detail(
             ),
         )
     elif package.startswith("conan-nameof"):
-        return DetailPackageInfo(
+        return PackageDetail(
             frozenset(),
             frozenset(),
             ArchiveProductDetail(

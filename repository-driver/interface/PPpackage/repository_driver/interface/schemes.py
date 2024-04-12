@@ -109,7 +109,7 @@ class ArchiveProductDetail:
 
 
 @pydantic_dataclass(frozen=True)
-class DetailPackageInfo:
+class PackageDetail:
     interfaces: frozenset[str]
     dependencies: frozenset[str]
     product: (

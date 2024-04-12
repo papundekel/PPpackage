@@ -2,8 +2,8 @@ from collections.abc import AsyncIterable, MutableSequence
 from typing import Any, Protocol
 
 from PPpackage.repository_driver.interface.schemes import (
-    DetailPackageInfo,
     DiscoveryPackageInfo,
+    PackageDetail,
     Requirement,
 )
 
@@ -24,4 +24,4 @@ class Repository(Protocol):
         async for requirement in self.get_formula(translated_options):
             formula.append(requirement)
 
-    async def get_package_detail(self, package: str) -> DetailPackageInfo: ...
+    async def get_package_detail(self, package: str) -> PackageDetail: ...

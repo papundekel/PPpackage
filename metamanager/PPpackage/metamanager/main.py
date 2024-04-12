@@ -8,7 +8,7 @@ from typing import IO, Any
 from asyncstdlib import min as async_min
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage.repository_driver.interface.schemes import DetailPackageInfo
+from PPpackage.repository_driver.interface.schemes import PackageDetail
 from pydantic import ValidationError
 from pydot import Dot
 
