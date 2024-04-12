@@ -1,43 +1,14 @@
 from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
-from importlib import import_module
 from typing import Any, Generic, TypeVar
-from typing import cast as type_cast
 
 from pydantic import BaseModel
 
-from .schemes import FetchPackageInfo, Requirement
+from .schemes import DetailPackageInfo, DiscoveryPackageInfo, Requirement
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
 TranslatedOptionsType = TypeVar("TranslatedOptionsType")
-
-GetEpochCallbackType = Callable[
-    [
-        DriverParametersType,
-        RepositoryParametersType,
-    ],
-    Awaitable[str],
-]
-FetchPackagesCallbackType = Callable[
-    [
-        DriverParametersType,
-        RepositoryParametersType,
-    ],
-    AsyncIterable[FetchPackageInfo],
-]
-TranslateOptionsCallbackType = Callable[
-    [DriverParametersType, RepositoryParametersType, Any],
-    Awaitable[TranslatedOptionsType],
-]
-FetchFormulaCallbackType = Callable[
-    [
-        DriverParametersType,
-        RepositoryParametersType,
-        TranslatedOptionsType,
-    ],
-    AsyncIterable[Requirement],
-]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -47,13 +18,27 @@ class Interface(
     DriverParameters: type[DriverParametersType]
     RepositoryParameters: type[RepositoryParametersType]
     TranslatedOptions: type[TranslatedOptionsType]
-    get_epoch: GetEpochCallbackType[DriverParametersType, RepositoryParametersType]
-    fetch_packages: FetchPackagesCallbackType[
-        DriverParametersType, RepositoryParametersType
+
+    get_epoch: Callable[
+        [DriverParametersType, RepositoryParametersType], Awaitable[str]
     ]
-    translate_options: TranslateOptionsCallbackType[
-        DriverParametersType, RepositoryParametersType, TranslatedOptionsType
+
+    discover_packages: Callable[
+        [DriverParametersType, RepositoryParametersType],
+        AsyncIterable[DiscoveryPackageInfo],
     ]
-    fetch_formula: FetchFormulaCallbackType[
-        DriverParametersType, RepositoryParametersType, TranslatedOptionsType
+
+    translate_options: Callable[
+        [DriverParametersType, RepositoryParametersType, Any],
+        Awaitable[TranslatedOptionsType],
+    ]
+
+    get_formula: Callable[
+        [DriverParametersType, RepositoryParametersType, TranslatedOptionsType],
+        AsyncIterable[Requirement],
+    ]
+
+    get_package_detail: Callable[
+        [DriverParametersType, RepositoryParametersType, str],
+        Awaitable[DetailPackageInfo],
     ]

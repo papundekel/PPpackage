@@ -58,7 +58,7 @@ repository_parameters = load_object(interface.RepositoryParameters, config.param
 logger = getLogger(__name__)
 
 
-async def enable_cache(request: Request, response: Response):
+async def enable_epoch_cache(request: Request, response: Response):
     epoch = await interface.get_epoch(driver_parameters, repository_parameters)
 
     request_epoch = request.headers.get("If-None-Match")
@@ -70,12 +70,16 @@ async def enable_cache(request: Request, response: Response):
         response.headers["ETag"] = epoch
 
 
-async def fetch_packages(response: Response):
-    logger.info("Fetching packages...")
+async def enable_permanent_cache(response: Response):
+    response.headers["Cache-Control"] = "public, max-age=2147483648"
 
-    outputs = interface.fetch_packages(driver_parameters, repository_parameters)
 
-    logger.info("Fetched packages.")
+async def discover_packages(response: Response):
+    logger.info("Discovering packages...")
+
+    outputs = interface.discover_packages(driver_parameters, repository_parameters)
+
+    logger.info("Discovered packages ready.")
 
     return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
 
@@ -92,31 +96,46 @@ async def translate_options(options: Any):
     return translated_options
 
 
-async def fetch_formula(response: Response, translated_options: Any):
-    logger.info("Fetching formula...")
+async def get_formula(response: Response, translated_options: Any):
+    logger.info("Preparing formula...")
 
-    outputs = interface.fetch_formula(
+    outputs = interface.get_formula(
         driver_parameters, repository_parameters, translated_options
     )
 
-    logger.info("Fetched formula.")
+    logger.info("Formula ready.")
 
     return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
+
+
+async def get_package_detail(package: str):
+    stderr.write(f"Preparing package detail for {package}...\n")
+
+    logger.info(f"Preparing package detail for {package}...")
+
+    outputs = await interface.get_package_detail(
+        driver_parameters, repository_parameters, package
+    )
+
+    logger.info(f"Package detail for {package} ready.")
+
+    return outputs
 
 
 class SubmanagerServer(FastAPI):
     def __init__(self):
         super().__init__(redoc_url=None)
 
-        super().get("/fetch-packages", dependencies=[Depends(enable_cache)])(
-            fetch_packages
+        super().get("/packages", dependencies=[Depends(enable_epoch_cache)])(
+            discover_packages
         )
-        super().get("/translate-options", dependencies=[Depends(enable_cache)])(
+        super().get("/translate-options", dependencies=[Depends(enable_epoch_cache)])(
             translate_options
         )
-        super().get("/fetch-formula", dependencies=[Depends(enable_cache)])(
-            fetch_formula
-        )
+        super().get("/formula", dependencies=[Depends(enable_epoch_cache)])(get_formula)
+        super().get(
+            "/packages/{package}", dependencies=[Depends(enable_permanent_cache)]
+        )(get_package_detail)
 
 
 server = SubmanagerServer()

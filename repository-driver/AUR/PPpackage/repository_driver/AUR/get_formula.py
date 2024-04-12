@@ -4,23 +4,17 @@ from PPpackage.repository_driver.interface.schemes import (
     ImplicationRequirement,
     Requirement,
     SimpleRequirement,
-    XORRequirement,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
 
 
-async def fetch_formula(
+async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
-        SimpleRequirement("noop", "pacman-sh"),
-        XORRequirement(
-            [
-                SimpleRequirement("noop", "pacman-bash-1.0.0"),
-                SimpleRequirement("noop", "pacman-zsh-1.0.0"),
-            ]
-        ),
+        SimpleRequirement("noop", "pacman-conan-1.0.0"),
+        SimpleRequirement("pacman", "sh"),
     )
