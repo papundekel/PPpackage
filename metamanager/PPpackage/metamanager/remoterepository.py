@@ -27,6 +27,9 @@ class RemoteRepository(Repository):
     def get_identifier(self) -> str:
         return self.url
 
+    def get_url(self) -> str:
+        return self.url
+
     async def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
         async with self.client.stream(
             "GET", f"{self.url}/packages", headers={"Cache-Control": "no-cache"}

@@ -6,17 +6,18 @@ from sys import stderr, stdin
 from typing import IO, Any
 
 from asyncstdlib import min as async_min
+from hishel import AsyncCacheClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage.repository_driver.interface.schemes import PackageDetail
 from pydantic import ValidationError
 from pydot import Dot
 
-from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
+from .fetch import fetch
 from .repositories import Repositories
+from .repository import Repository
 from .resolve import resolve
 from .schemes import Config, Input
 from .translators import Translators
@@ -63,14 +64,18 @@ def parse_config(config_path: Path) -> Config:
 
 
 async def get_package_details(graph: MultiDiGraph) -> None:
+    stderr.write("Fetching package details...\n")
+
     async with TaskGroup() as group:
         for package, data in graph.nodes.items():
-            graph.nodes[package]["detail"] = group.create_task(
+            data["detail"] = group.create_task(
                 data["repository"].get_package_detail(package)
             )
 
     for package, data in graph.nodes.items():
-        graph.nodes[package]["detail"] = data["detail"].result()
+        data["detail"] = data["detail"].result()
+
+    stderr.write("Package details fetched.\n")
 
 
 async def create_dependencies(graph: MultiDiGraph) -> None:
@@ -91,6 +96,8 @@ async def select_best_model(
     models: AsyncIterable[Set[str]],
     packages_to_repositories_result: Result[Mapping[str, tuple[Repository, Set[str]]]],
 ) -> MultiDiGraph:
+    stderr.write("Selecting the best model...\n")
+
     # from models with the fewest packages
     # select the lexicographically smallest
     model_result: list[str] | None = await async_min(
@@ -101,6 +108,8 @@ async def select_best_model(
 
     if model_result is None:
         raise SubmanagerCommandFailure("No model found.")
+
+    stderr.write("The best model selected.\n")
 
     graph = MultiDiGraph()
 
@@ -158,10 +167,6 @@ def graph_to_dot(graph: MultiDiGraph) -> Dot:
     return to_pydot(graph_presentation)
 
 
-async def fetch(graph: MultiDiGraph) -> None:
-    pass
-
-
 async def install(installation_path: Path) -> None:
     # TODO
     pass
@@ -211,7 +216,8 @@ async def main(
                 graph_dot = graph_to_dot(graph)
                 graph_dot.write(graph_path)
 
-            await fetch(graph)
+            async with HTTPClient(http2=True) as client:
+                await fetch(client, graph)
 
             await install(installation_path)
 

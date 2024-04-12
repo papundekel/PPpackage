@@ -108,14 +108,17 @@ class ArchiveProductDetail:
     installer: str
 
 
+ProductDetail = (
+    TagProductDetail
+    | ContainerfileProductDetail
+    | MetaProductDetail
+    | MetaOnTopProductDetail
+    | ArchiveProductDetail
+)
+
+
 @pydantic_dataclass(frozen=True)
 class PackageDetail:
     interfaces: frozenset[str]
     dependencies: frozenset[str]
-    product: (
-        TagProductDetail
-        | ContainerfileProductDetail
-        | MetaProductDetail
-        | MetaOnTopProductDetail
-        | ArchiveProductDetail
-    )
+    product: ProductDetail

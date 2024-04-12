@@ -37,6 +37,9 @@ class LocalRepository(Repository):
     def get_identifier(self) -> str:
         return self.package
 
+    def get_url(self) -> str:
+        raise NotImplementedError
+
     def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
         return self.interface.discover_packages(
             self.driver_parameters, self.repository_parameters
