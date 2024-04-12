@@ -1,4 +1,5 @@
 {
+    "product_cache_path": "/mnt/cache/product/",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"
@@ -66,7 +67,7 @@
         {
             "driver": "conan",
             "parameters": {
-                "cache_path": "/mnt/repositories/cache/conan-conancenter",
+                "cache_path": "/mnt/cache/repository/conan-conancenter",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
             }
@@ -75,7 +76,7 @@
             "driver": "PP",
             "parameters": {
                 "database_path": "/mnt/repositories/database/PP",
-                "cache_path": "/mnt/repositories/cache/PP"
+                "cache_path": "/mnt/cache/repository/PP"
             }
         }
     ]

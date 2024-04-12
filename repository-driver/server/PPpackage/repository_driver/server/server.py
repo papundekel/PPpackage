@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
@@ -109,8 +110,6 @@ async def get_formula(response: Response, translated_options: Any):
 
 
 async def get_package_detail(translated_options: Any, package: str):
-    stderr.write(f"Preparing package detail for {package}...\n")
-
     logger.info(f"Preparing package detail for {package}...")
 
     package_detail = await interface.get_package_detail(
@@ -120,6 +119,24 @@ async def get_package_detail(translated_options: Any, package: str):
     logger.info(f"Package detail for {package} ready.")
 
     return package_detail
+
+
+async def compute_product_info(
+    translated_options: Any, package: str, product_infos: Mapping[str, Any]
+):
+    logger.info(f"Computing product info for {package}...")
+
+    product_info = await interface.compute_product_info(
+        driver_parameters,
+        repository_parameters,
+        translated_options,
+        package,
+        product_infos,
+    )
+
+    logger.info(f"Product info for {package} ready.")
+
+    return product_info
 
 
 class SubmanagerServer(FastAPI):
@@ -136,6 +153,10 @@ class SubmanagerServer(FastAPI):
         super().get(
             "/packages/{package}", dependencies=[Depends(enable_permanent_cache)]
         )(get_package_detail)
+        super().get(
+            "/packages/{package}/product-info",
+            dependencies=[Depends(enable_permanent_cache)],
+        )(compute_product_info)
 
 
 server = SubmanagerServer()

@@ -3,6 +3,7 @@ from typing import Any
 
 from PPpackage.repository_driver.interface.interface import Interface
 
+from .compute_product_info import compute_product_info
 from .discover_packages import discover_packages
 from .get_epoch import get_epoch
 from .get_formula import get_formula
@@ -19,4 +20,5 @@ interface = Interface(
     discover_packages=discover_packages,
     get_formula=get_formula,
     get_package_detail=get_package_detail,
+    compute_product_info=compute_product_info,
 )

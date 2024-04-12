@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -41,4 +41,15 @@ class Interface(
     get_package_detail: Callable[
         [DriverParametersType, RepositoryParametersType, TranslatedOptionsType, str],
         Awaitable[PackageDetail],
+    ]
+
+    compute_product_info: Callable[
+        [
+            DriverParametersType,
+            RepositoryParametersType,
+            TranslatedOptionsType,
+            str,
+            Mapping[str, tuple[Any]],
+        ],
+        Awaitable[Any],
     ]
