@@ -10,13 +10,7 @@ services:
             - /mnt/root/
             - --config
             - /mnt/config.json
-            - --workdir
-            - /mnt/workdir/
         volumes:
-            - type: bind
-              source: /tmp/
-              target: /mnt/workdir/
-
             - type: bind
               source: $PWD/root/
               target: /mnt/root/

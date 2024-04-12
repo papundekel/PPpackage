@@ -1,4 +1,4 @@
-ARG AUR_TAG=paru-20240324.0.314
+ARG AUR_TAG=paru-20240407.0.316
 # -----------------------------------------------------------------------------
 
 FROM docker.io/greyltc/archlinux-aur:$AUR_TAG AS base

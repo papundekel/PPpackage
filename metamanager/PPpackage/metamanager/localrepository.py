@@ -3,8 +3,8 @@ from typing import Any, AsyncIterable
 
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
-    DetailPackageInfo,
     DiscoveryPackageInfo,
+    PackageDetail,
     Requirement,
 )
 
@@ -37,6 +37,9 @@ class LocalRepository(Repository):
     def get_identifier(self) -> str:
         return self.package
 
+    def get_url(self) -> str:
+        raise NotImplementedError
+
     def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
         return self.interface.discover_packages(
             self.driver_parameters, self.repository_parameters
@@ -52,7 +55,7 @@ class LocalRepository(Repository):
             self.driver_parameters, self.repository_parameters, translated_options
         )
 
-    async def get_package_detail(self, package: str) -> DetailPackageInfo:
+    async def get_package_detail(self, package: str) -> PackageDetail:
         return await self.interface.get_package_detail(
             self.driver_parameters, self.repository_parameters, package
         )

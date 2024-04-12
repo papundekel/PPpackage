@@ -3,8 +3,8 @@ from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import (
-    DetailPackageInfo,
     DiscoveryPackageInfo,
+    PackageDetail,
     Requirement,
 )
 
@@ -25,6 +25,9 @@ class RemoteRepository(Repository):
         self.url = str(config.url).rstrip("/")
 
     def get_identifier(self) -> str:
+        return self.url
+
+    def get_url(self) -> str:
         return self.url
 
     async def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
@@ -78,7 +81,7 @@ class RemoteRepository(Repository):
             async for requirement in reader.load_many(Requirement):  # type: ignore
                 yield requirement
 
-    async def get_package_detail(self, package: str) -> DetailPackageInfo:
+    async def get_package_detail(self, package: str) -> PackageDetail:
         response = await self.client.get(f"{self.url}/packages/{package}")
 
         if not response.is_success:
@@ -87,4 +90,4 @@ class RemoteRepository(Repository):
                 f"{(await response.aread()).decode()}"
             )
 
-        return load_from_bytes(DetailPackageInfo, memoryview(response.read()))
+        return load_from_bytes(PackageDetail, memoryview(response.read()))

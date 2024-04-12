@@ -77,11 +77,11 @@ async def enable_permanent_cache(response: Response):
 async def discover_packages(response: Response):
     logger.info("Discovering packages...")
 
-    outputs = interface.discover_packages(driver_parameters, repository_parameters)
+    packages = interface.discover_packages(driver_parameters, repository_parameters)
 
     logger.info("Discovered packages ready.")
 
-    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
+    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(packages))
 
 
 async def translate_options(options: Any):
@@ -99,13 +99,13 @@ async def translate_options(options: Any):
 async def get_formula(response: Response, translated_options: Any):
     logger.info("Preparing formula...")
 
-    outputs = interface.get_formula(
+    formula = interface.get_formula(
         driver_parameters, repository_parameters, translated_options
     )
 
     logger.info("Formula ready.")
 
-    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(outputs))
+    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(formula))
 
 
 async def get_package_detail(package: str):
@@ -113,13 +113,13 @@ async def get_package_detail(package: str):
 
     logger.info(f"Preparing package detail for {package}...")
 
-    outputs = await interface.get_package_detail(
+    package_detail = await interface.get_package_detail(
         driver_parameters, repository_parameters, package
     )
 
     logger.info(f"Package detail for {package} ready.")
 
-    return outputs
+    return package_detail
 
 
 class SubmanagerServer(FastAPI):
