@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import AnyUrl, BaseModel
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -21,3 +22,6 @@ class RepositoryParameters(BaseModel):
 class ConanRequirement:
     package: str
     version: str
+
+
+ConanOptions = Mapping[str, Any]

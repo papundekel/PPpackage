@@ -122,3 +122,7 @@ class PackageDetail:
     interfaces: frozenset[str]
     dependencies: frozenset[str]
     product: ProductDetail
+
+
+ProductInfo = Mapping[str, Any]
+DependencyProductInfos = Mapping[str, Mapping[str, Any]]

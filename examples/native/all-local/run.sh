@@ -6,6 +6,7 @@ if [ "$#" -ne 0 ]; then
 fi
 
 mkdir -p tmp/output
+mkdir -p tmp/cache/product
 
 python \
     -m PPpackage.metamanager \

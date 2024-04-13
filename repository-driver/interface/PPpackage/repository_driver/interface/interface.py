@@ -1,10 +1,10 @@
-from collections.abc import AsyncIterable, Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from .schemes import DiscoveryPackageInfo, PackageDetail, Requirement
+from .schemes import DiscoveryPackageInfo, PackageDetail, ProductInfo, Requirement
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
@@ -39,6 +39,17 @@ class Interface(
     ]
 
     get_package_detail: Callable[
-        [DriverParametersType, RepositoryParametersType, str],
+        [DriverParametersType, RepositoryParametersType, TranslatedOptionsType, str],
         Awaitable[PackageDetail],
+    ]
+
+    compute_product_info: Callable[
+        [
+            DriverParametersType,
+            RepositoryParametersType,
+            TranslatedOptionsType,
+            str,
+            Mapping[str, Mapping[str, Any]],
+        ],
+        Awaitable[ProductInfo],
     ]

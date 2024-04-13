@@ -1,18 +1,22 @@
+from collections.abc import Mapping
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
-from typing import Any, TypeVar
+from typing import Annotated, Any, TypeVar
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from PPpackage.repository_driver.interface.interface import Interface
-from PPpackage.repository_driver.interface.schemes import RepositoryConfig
+from PPpackage.repository_driver.interface.schemes import (
+    DependencyProductInfos,
+    RepositoryConfig,
+)
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
 
 from PPpackage.utils.stream import dump_many
 from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import load_from_bytes, load_object
+from PPpackage.utils.validation import load_from_bytes, load_from_string, load_object
 
 from .utils import StreamingResponse
 
@@ -74,6 +78,16 @@ async def enable_permanent_cache(response: Response):
     response.headers["Cache-Control"] = "public, max-age=2147483648"
 
 
+ModelType = TypeVar("ModelType")
+
+
+def load_model_from_query(model: type[ModelType], alias: str):
+    def dependency(parameter: Annotated[str, Query(alias=alias)]) -> ModelType:
+        return load_from_string(model, parameter)
+
+    return dependency
+
+
 async def discover_packages(response: Response):
     logger.info("Discovering packages...")
 
@@ -84,7 +98,9 @@ async def discover_packages(response: Response):
     return StreamingResponse(HTTP_200_OK, response.headers, dump_many(packages))
 
 
-async def translate_options(options: Any):
+async def translate_options(
+    options: Annotated[Any, Depends(load_model_from_query(Any, "options"))]  # type: ignore
+):
     logger.info("Translating options...")
 
     translated_options = await interface.translate_options(
@@ -96,7 +112,12 @@ async def translate_options(options: Any):
     return translated_options
 
 
-async def get_formula(response: Response, translated_options: Any):
+async def get_formula(
+    response: Response,
+    translated_options: Annotated[
+        Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
+    ],
+):
     logger.info("Preparing formula...")
 
     formula = interface.get_formula(
@@ -108,18 +129,48 @@ async def get_formula(response: Response, translated_options: Any):
     return StreamingResponse(HTTP_200_OK, response.headers, dump_many(formula))
 
 
-async def get_package_detail(package: str):
-    stderr.write(f"Preparing package detail for {package}...\n")
-
+async def get_package_detail(
+    translated_options: Annotated[
+        Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
+    ],
+    package: str,
+):
     logger.info(f"Preparing package detail for {package}...")
 
     package_detail = await interface.get_package_detail(
-        driver_parameters, repository_parameters, package
+        driver_parameters, repository_parameters, translated_options, package
     )
 
     logger.info(f"Package detail for {package} ready.")
 
     return package_detail
+
+
+async def compute_product_info(
+    translated_options: Annotated[
+        Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
+    ],
+    package: str,
+    dependency_product_infos: Annotated[
+        DependencyProductInfos,
+        Depends(
+            load_model_from_query(DependencyProductInfos, "dependency_product_infos")
+        ),
+    ],
+):
+    logger.info(f"Computing product info for {package}...")
+
+    product_info = await interface.compute_product_info(
+        driver_parameters,
+        repository_parameters,
+        translated_options,
+        package,
+        dependency_product_infos,
+    )
+
+    logger.info(f"Product info for {package} ready.")
+
+    return product_info
 
 
 class SubmanagerServer(FastAPI):
@@ -136,6 +187,10 @@ class SubmanagerServer(FastAPI):
         super().get(
             "/packages/{package}", dependencies=[Depends(enable_permanent_cache)]
         )(get_package_detail)
+        super().get(
+            "/packages/{package}/product-info",
+            dependencies=[Depends(enable_permanent_cache)],
+        )(compute_product_info)
 
 
 server = SubmanagerServer()

@@ -11,6 +11,7 @@ from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
 from pydantic import ValidationError
 from pydot import Dot
+from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import load_from_bytes
 
@@ -68,9 +69,8 @@ async def get_package_details(graph: MultiDiGraph) -> None:
 
     async with TaskGroup() as group:
         for package, data in graph.nodes.items():
-            data["detail"] = group.create_task(
-                data["repository"].get_package_detail(package)
-            )
+            repository: Repository = data["repository"]
+            data["detail"] = group.create_task(repository.get_package_detail(package))
 
     for package, data in graph.nodes.items():
         data["detail"] = data["detail"].result()
@@ -217,7 +217,12 @@ async def main(
                 graph_dot.write(graph_path)
 
             async with HTTPClient(http2=True) as client:
-                await fetch(client, graph)
+                with SqliteDict(
+                    config.product_cache_path / "mapping-db.sqlite"
+                ) as product_cache_mapping:
+                    await fetch(
+                        product_cache_mapping, config.product_cache_path, client, graph
+                    )
 
             await install(installation_path)
 

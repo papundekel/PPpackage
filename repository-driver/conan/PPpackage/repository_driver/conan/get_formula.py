@@ -1,5 +1,4 @@
-from collections.abc import AsyncIterable, Mapping
-from typing import Any
+from typing import AsyncIterable
 
 from PPpackage.repository_driver.interface.schemes import (
     ImplicationRequirement,
@@ -8,13 +7,13 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
 )
 
-from .schemes import DriverParameters, RepositoryParameters
+from .schemes import ConanOptions, DriverParameters, RepositoryParameters
 
 
 async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: Mapping[str, Any],
+    translated_options: ConanOptions,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
         SimpleRequirement("noop", "conan-openssl-3.1.0"),
