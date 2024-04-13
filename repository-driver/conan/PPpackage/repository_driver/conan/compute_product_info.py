@@ -1,14 +1,19 @@
 from collections.abc import Mapping
 from typing import Any
 
-from .schemes import DriverParameters, RepositoryParameters
+from PPpackage.repository_driver.interface.schemes import (
+    DependencyProductInfos,
+    ProductInfo,
+)
+
+from .schemes import ConanOptions, DriverParameters, RepositoryParameters
 
 
 async def compute_product_info(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: Mapping[str, Any],
+    translated_options: ConanOptions,
     package: str,
-    product_infos: Mapping[str, tuple[Any]],
-) -> Any:
-    return None
+    dependency_product_infos: DependencyProductInfos,
+) -> ProductInfo:
+    return {}

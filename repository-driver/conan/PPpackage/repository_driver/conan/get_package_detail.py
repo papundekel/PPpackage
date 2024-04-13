@@ -1,19 +1,16 @@
-from collections.abc import Mapping
-from typing import Any
-
 from PPpackage.repository_driver.interface.exceptions import CommandException
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
 )
 
-from .schemes import DriverParameters, RepositoryParameters
+from .schemes import ConanOptions, DriverParameters, RepositoryParameters
 
 
 async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: Mapping[str, Any],
+    translated_options: ConanOptions,
     package: str,
 ) -> PackageDetail:
     if package.startswith("conan-openssl"):

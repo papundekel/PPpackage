@@ -11,6 +11,7 @@ from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
 from pydantic import ValidationError
 from pydot import Dot
+from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import load_from_bytes
 
@@ -216,7 +217,12 @@ async def main(
                 graph_dot.write(graph_path)
 
             async with HTTPClient(http2=True) as client:
-                await fetch(config.product_cache_path, client, graph)
+                with SqliteDict(
+                    config.product_cache_path / "mapping-db.sqlite"
+                ) as product_cache_mapping:
+                    await fetch(
+                        product_cache_mapping, config.product_cache_path, client, graph
+                    )
 
             await install(installation_path)
 

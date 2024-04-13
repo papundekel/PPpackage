@@ -1,16 +1,20 @@
-from collections.abc import Iterable, Mapping
+from asyncio import Task
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
 from frozendict import frozendict
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
+    PackageDetail,
     Parameters,
+    ProductInfo,
     Requirement,
 )
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import WithVariables
 
 
@@ -59,6 +63,8 @@ class Config:
 
 
 class NodeData(TypedDict):
-    version: str
-    product_id: str
-    product_info: Any
+    repository: Repository
+    detail: PackageDetail
+    product_task: Task[tuple[Path, str]]
+    product: tuple[Path, str]
+    product_info: ProductInfo
