@@ -1,5 +1,3 @@
-from collections.abc import Mapping
-from json import dumps as json_dumps
 from logging import getLogger
 from typing import Any, AsyncIterable
 

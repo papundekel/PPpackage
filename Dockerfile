@@ -59,7 +59,7 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 # -----------------------------------------------------------------------------
 
-FROM base-python AS repository-driver-AUR
+FROM base-python AS repository-driver-aur
 
 COPY utils/ /workdir/utils
 RUN pip install utils/
@@ -89,7 +89,7 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 # -----------------------------------------------------------------------------
 
-FROM base-python AS repository-driver-PP
+FROM base-python AS repository-driver-pp
 
 COPY utils/ /workdir/utils
 RUN pip install utils/
@@ -114,6 +114,8 @@ COPY --from=fakealpm /usr/local/lib/libfakealpm.so /usr/local/lib/libfakealpm.so
 COPY utils/ /workdir/utils
 RUN pip install utils/
 
+
+
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
@@ -129,6 +131,8 @@ RUN pip install repository-driver/conan/
 COPY repository-driver/PP/ /workdir/repository-driver/PP
 RUN pip install repository-driver/PP/
 
+
+
 COPY translator/interface/ /workdir/translator/interface
 RUN pip install translator/interface/
 
@@ -140,6 +144,19 @@ RUN pip install translator/conan/
 
 COPY translator/PP/ /workdir/translator/PP
 RUN pip install translator/PP/
+
+
+
+COPY installer/interface/ /workdir/installer/interface
+RUN pip install installer/interface/
+
+COPY installer/pacman/ /workdir/installer/pacman
+RUN pip install installer/pacman/
+
+COPY installer/simple/ /workdir/installer/simple
+RUN pip install installer/simple/
+
+
 
 COPY metamanager/ /workdir/metamanager
 RUN pip install metamanager/

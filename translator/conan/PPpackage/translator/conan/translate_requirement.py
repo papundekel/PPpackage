@@ -5,7 +5,7 @@ from pysat.formula import And, Atom, Formula, Or
 from .schemes import Parameters, Requirement
 
 
-def translate_requirement(
+async def translate_requirement(
     parameters: Parameters,
     grouped_packages: Mapping[str, Iterable[str]],
     requirement: Requirement,

@@ -16,8 +16,8 @@ from .schemes import (
 
 
 async def create_repository(
-    client: HTTPClient | None,
     client_stack: AsyncExitStack,
+    client: HTTPClient | None,
     repository_config: LocalRepositoryConfig | RemoteRepositoryConfig,
     drivers: Mapping[str, RepositoryDriverConfig],
 ) -> Repository:
@@ -47,6 +47,6 @@ async def Repositories(
     client: HTTPClient | None = None
     async with AsyncExitStack() as client_stack:
         yield [
-            await create_repository(client, client_stack, config, drivers)
+            await create_repository(client_stack, client, config, drivers)
             for config in repository_configs
         ]

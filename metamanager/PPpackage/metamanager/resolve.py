@@ -1,16 +1,19 @@
 from asyncio import TaskGroup
 from collections.abc import (
-    AsyncGenerator,
+    AsyncIterable,
     Iterable,
     Mapping,
     MutableMapping,
     MutableSet,
     Set,
 )
-from itertools import chain
 from sys import stderr
 from typing import Any, cast
 
+from asyncstdlib import chain as async_chain
+from asyncstdlib import min as async_min
+from asyncstdlib import sync as make_async
+from networkx import MultiDiGraph
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
     RequirementVisitor,
@@ -19,7 +22,7 @@ from PPpackage.repository_driver.interface.utils import (
 from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
 from pysat.solvers import Solver
 
-from metamanager.PPpackage.metamanager.utils import Result
+from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 
 from .repository import Repository
 from .translators import Translator
@@ -56,26 +59,10 @@ async def discover_packages(
 
 async def get_formula(
     repositories: Iterable[Repository], options: Any
-) -> Iterable[Requirement]:
-    formula = list[Requirement]()
-
-    async with TaskGroup() as group:
-        for repository in repositories:
-            group.create_task(
-                repository.translate_options_and_get_formula(options, formula)
-            )
-
-    return formula
-
-
-async def discover_packages_and_formulas(
-    repositories: Iterable[Repository], options: Any
-) -> tuple[Mapping[str, tuple[Repository, Set[str]]], Iterable[Requirement]]:
-    async with TaskGroup() as group:
-        packages_task = group.create_task(discover_packages(repositories))
-        formula_task = group.create_task(get_formula(repositories, options))
-
-    return packages_task.result(), formula_task.result()
+) -> AsyncIterable[Requirement]:
+    for repository in repositories:
+        async for requirement in repository.translate_options_and_get_formula(options):
+            yield requirement
 
 
 def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
@@ -88,39 +75,43 @@ def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
     return grouped_packages
 
 
-def translate_requirements(
+async def translate_requirements(
     translators: Mapping[str, Translator],
     packages: Mapping[str, tuple[Repository, Set[str]]],
-    formula: Iterable[Requirement],
+    formula: AsyncIterable[Requirement],
 ) -> Formula:
     grouped_packages = group_packages(packages)
 
-    def simple_visitor(r: SimpleRequirement):
+    async def simple_visitor(r: SimpleRequirement):
         if r.translator == "noop":
             return Atom(r.value)
 
-        return translators[r.translator].translate_requirement(
+        return await translators[r.translator].translate_requirement(
             grouped_packages, r.value
         )
 
-    return And(
-        *(
-            visit_requirements(
-                requirement,
-                RequirementVisitor(
-                    simple_visitor=simple_visitor,
-                    negated_visitor=Neg,
-                    and_visitor=lambda x: And(*x, merge=True),
-                    or_visitor=lambda x: Or(*x, merge=True),
-                    xor_visitor=lambda x: XOr(*x, merge=True),
-                    implication_visitor=Implies,
-                    equivalence_visitor=lambda x: Equals(*x, merge=True),
-                ),
+    async with TaskGroup() as group:
+        tasks = [
+            group.create_task(
+                visit_requirements(
+                    requirement,
+                    RequirementVisitor(
+                        simple_visitor=simple_visitor,
+                        negated_visitor=make_async(Neg),
+                        and_visitor=make_async(lambda x: And(*x, merge=True)),
+                        or_visitor=make_async(lambda x: Or(*x, merge=True)),
+                        xor_visitor=make_async(lambda x: XOr(*x, merge=True)),
+                        implication_visitor=make_async(Implies),
+                        equivalence_visitor=make_async(
+                            lambda x: Equals(*x, merge=True)
+                        ),
+                    ),
+                )
             )
-            for requirement in formula
-        ),
-        merge=True
-    )
+            async for requirement in formula
+        ]
+
+    return And(*(task.result() for task in tasks), merge=True)
 
 
 def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
@@ -129,49 +120,61 @@ def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
     return packages & set_variables
 
 
+async def enumerate_models(packages: Set[str], formula: Formula):
+    with Solver(bootstrap_with=formula) as solver:
+        for model_integers in solver.enum_models():  # type: ignore
+            model_atoms = Formula.formulas(model_integers, atoms_only=True)
+
+            yield process_model(packages, model_atoms)
+
+
+async def select_best_model(
+    models: AsyncIterable[Set[str]],
+    packages_to_repositories: Mapping[str, tuple[Repository, Set[str]]],
+) -> MultiDiGraph:
+    # from models with the fewest packages
+    # select the lexicographically smallest
+    model_result: list[str] | None = await async_min(
+        (sorted(model) async for model in models),
+        key=lambda x: (len(x), x),  # type: ignore
+        default=None,
+    )
+
+    if model_result is None:
+        raise SubmanagerCommandFailure("No model found.")
+
+    graph = MultiDiGraph()
+
+    graph.add_nodes_from(
+        (package, {"repository": packages_to_repositories[package][0]})
+        for package in model_result
+    )
+
+    return graph
+
+
 async def resolve(
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
     requirements: Requirement,
     options: Any,
-    packages_with_repositories_result: Result[
-        Mapping[str, tuple[Repository, Set[str]]]
-    ],
-) -> AsyncGenerator[Set[str], Mapping[str, tuple[Repository, Set[str]]]]:
-    stderr.write("Resolving requirements:\n")
-
-    # TODO: better print
-    print(requirements, file=stderr)
-
-    stderr.write("Fetching packages and formulas...\n")
-
-    packages_to_repositories_and_groups, formula = await discover_packages_and_formulas(
-        repositories, options
-    )
-    packages_with_repositories_result.value = packages_to_repositories_and_groups
-
-    stderr.write("Packages and formulas fetched.\n")
-
+) -> MultiDiGraph:
     stderr.write("Translating requirements...\n")
 
-    translated_formula = translate_requirements(
-        translators, packages_to_repositories_and_groups, chain([requirements], formula)
+    packages_to_repositories_and_groups = await discover_packages(repositories)
+    packages = packages_to_repositories_and_groups.keys()
+    formula = get_formula(repositories, options)
+
+    translated_formula = await translate_requirements(
+        translators,
+        packages_to_repositories_and_groups,
+        async_chain([requirements], formula),
     )
-
-    stderr.write("Requirements translated.\n")
-
-    print(translated_formula, file=stderr)
 
     stderr.write("Resolving...\n")
 
-    packages = packages_to_repositories_and_groups.keys()
+    models = enumerate_models(packages, translated_formula)
 
-    with Solver(bootstrap_with=translated_formula) as solver:
-        for model_integers in solver.enum_models():  # type: ignore
-            model_atoms = Formula.formulas(model_integers, atoms_only=True)
+    graph = await select_best_model(models, packages_to_repositories_and_groups)
 
-            model = process_model(packages, model_atoms)
-
-            yield model
-
-    stderr.write("Resolution done.\n")
+    return graph

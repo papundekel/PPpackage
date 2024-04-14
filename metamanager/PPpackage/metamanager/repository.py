@@ -25,11 +25,11 @@ class Repository(Protocol):
     def get_formula(self) -> AsyncIterable[Requirement]: ...
 
     async def translate_options_and_get_formula(
-        self, options: Any, formula: MutableSequence[Requirement]
-    ) -> None:
+        self, options: Any
+    ) -> AsyncIterable[Requirement]:
         self.translated_options = await self._translate_options(options)
         async for requirement in self.get_formula():
-            formula.append(requirement)
+            yield requirement
 
     async def get_package_detail(self, package: str) -> PackageDetail: ...
 
