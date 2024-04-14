@@ -12,6 +12,7 @@ from sys import stderr
 from typing import Any, cast
 
 from asyncstdlib import min as async_min
+from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
@@ -90,39 +91,43 @@ def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
     return grouped_packages
 
 
-def translate_requirements(
+async def translate_requirements(
     translators: Mapping[str, Translator],
     packages: Mapping[str, tuple[Repository, Set[str]]],
     formula: Iterable[Requirement],
 ) -> Formula:
     grouped_packages = group_packages(packages)
 
-    def simple_visitor(r: SimpleRequirement):
+    async def simple_visitor(r: SimpleRequirement):
         if r.translator == "noop":
             return Atom(r.value)
 
-        return translators[r.translator].translate_requirement(
+        return await translators[r.translator].translate_requirement(
             grouped_packages, r.value
         )
 
-    return And(
-        *(
-            visit_requirements(
-                requirement,
-                RequirementVisitor(
-                    simple_visitor=simple_visitor,
-                    negated_visitor=Neg,
-                    and_visitor=lambda x: And(*x, merge=True),
-                    or_visitor=lambda x: Or(*x, merge=True),
-                    xor_visitor=lambda x: XOr(*x, merge=True),
-                    implication_visitor=Implies,
-                    equivalence_visitor=lambda x: Equals(*x, merge=True),
-                ),
+    async with TaskGroup() as group:
+        operand_tasks = [
+            group.create_task(
+                visit_requirements(
+                    requirement,
+                    RequirementVisitor(
+                        simple_visitor=simple_visitor,
+                        negated_visitor=make_async(Neg),
+                        and_visitor=make_async(lambda x: And(*x, merge=True)),
+                        or_visitor=make_async(lambda x: Or(*x, merge=True)),
+                        xor_visitor=make_async(lambda x: XOr(*x, merge=True)),
+                        implication_visitor=make_async(Implies),
+                        equivalence_visitor=make_async(
+                            lambda x: Equals(*x, merge=True)
+                        ),
+                    ),
+                )
             )
             for requirement in formula
-        ),
-        merge=True
-    )
+        ]
+
+    return And(*[await task for task in operand_tasks], merge=True)
 
 
 def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
@@ -179,7 +184,7 @@ async def resolve(
 
     stderr.write("Translating requirements...\n")
 
-    translated_formula = translate_requirements(
+    translated_formula = await translate_requirements(
         translators, packages_to_repositories_and_groups, chain([requirements], formula)
     )
 

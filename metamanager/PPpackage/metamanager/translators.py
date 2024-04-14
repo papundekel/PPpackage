@@ -19,12 +19,12 @@ class Translator:
         self.interface = interface
         self.parameters = load_object(interface.Parameters, config.parameters)
 
-    def translate_requirement(
+    async def translate_requirement(
         self, grouped_packages: Mapping[str, Iterable[str]], requirement_unparsed: Any
     ) -> Formula:
         requirement = load_object(self.interface.Requirement, requirement_unparsed)
 
-        return self.interface.translate_requirement(
+        return await self.interface.translate_requirement(
             self.parameters, grouped_packages, requirement
         )
 

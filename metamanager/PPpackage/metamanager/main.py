@@ -15,6 +15,7 @@ from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
 from .fetch import fetch
+from .install import install
 from .repositories import Repositories
 from .resolve import resolve
 from .schemes import Config, Input, NodeData
@@ -68,8 +69,9 @@ def get_package_details(graph: MultiDiGraph) -> None:
     stderr.write("Fetching package details...\n")
 
     for package, node_data in get_graph_items(graph):
-        repository = node_data["repository"]
-        node_data["detail"] = create_task(repository.get_package_detail(package))
+        node_data["detail"] = create_task(
+            node_data["repository"].get_package_detail(package)
+        )
 
 
 async def create_dependencies(graph: MultiDiGraph) -> None:
@@ -128,11 +130,6 @@ def graph_to_dot(graph: MultiDiGraph) -> Dot:
     )
 
     return to_pydot(graph_presentation)
-
-
-async def install(installation_path: Path) -> None:
-    # TODO
-    pass
 
 
 async def generators(generators_path: Path) -> None:

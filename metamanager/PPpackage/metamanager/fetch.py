@@ -146,10 +146,7 @@ async def fetch_package_or_cache(
     node_data: NodeData,
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> tuple[Path, str]:
-    repository = node_data["repository"]
-    product_info = await node_data["product_info"]
-
-    product_info_hash = hash_product_info(package, product_info)
+    product_info_hash = hash_product_info(package, await node_data["product_info"])
 
     if product_info_hash not in cache_mapping:
         product_path = Path(mkdtemp(dir=cache_path)) / "product"
@@ -157,7 +154,7 @@ async def fetch_package_or_cache(
             (await node_data["detail"]).product,
             client,
             package,
-            repository,
+            node_data["repository"],
             dependencies,
             product_path,
         )
@@ -204,5 +201,3 @@ async def fetch(cache_path: Path, graph: MultiDiGraph) -> None:
                             dependencies,
                         )
                     )
-
-    stderr.write("Package products fetched.\n")
