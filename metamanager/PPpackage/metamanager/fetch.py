@@ -1,4 +1,4 @@
-from asyncio import TaskGroup
+from asyncio import create_task
 from collections.abc import Iterable, MutableMapping
 from functools import singledispatch
 from hashlib import sha1
@@ -15,6 +15,7 @@ from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
     ProductDetail,
+    ProductInfo,
 )
 from pydantic import AnyUrl
 from sqlitedict import SqliteDict
@@ -104,18 +105,37 @@ async def _(
     return product_detail.installer
 
 
-def create_dependency_product_infos(
+async def create_dependency_product_infos(
     dependencies: Iterable[tuple[str, NodeData]]
 ) -> DependencyProductInfos:
     dependency_product_infos = dict[str, MutableMapping[str, Any]]()
 
     for dependency, node_data in dependencies:
-        for interface in node_data["detail"].interfaces:
-            dependency_product_infos.setdefault(interface, {})[dependency] = node_data[
-                "product_info"
-            ].get(interface)
+        for interface in (await node_data["detail"]).interfaces:
+            dependency_product_infos.setdefault(interface, {})[dependency] = (
+                await node_data["product_info"]
+            ).get(interface)
 
     return dependency_product_infos
+
+
+async def compute_product_info(
+    package: str, repository: Repository, dependencies: Iterable[tuple[str, NodeData]]
+) -> ProductInfo:
+    dependency_product_infos = await create_dependency_product_infos(dependencies)
+
+    product_info = await repository.compute_product_info(
+        package, dependency_product_infos
+    )
+
+    return product_info
+
+
+def hash_product_info(package: str, product_info: ProductInfo) -> str:
+    hasher = sha1()
+    hasher.update(package.encode())
+    hasher.update(save_to_string(product_info).encode())
+    return hasher.hexdigest()
 
 
 async def fetch_package_or_cache(
@@ -127,22 +147,14 @@ async def fetch_package_or_cache(
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> tuple[Path, str]:
     repository = node_data["repository"]
-    dependency_product_infos = create_dependency_product_infos(dependencies)
+    product_info = await node_data["product_info"]
 
-    product_info = await repository.compute_product_info(
-        package, dependency_product_infos
-    )
-    node_data["product_info"] = product_info
-
-    hasher = sha1()
-    hasher.update(package.encode())
-    hasher.update(save_to_string(product_info).encode())
-    product_info_hash = hasher.hexdigest()
+    product_info_hash = hash_product_info(package, product_info)
 
     if product_info_hash not in cache_mapping:
         product_path = Path(mkdtemp(dir=cache_path)) / "product"
         installer = await fetch_package(
-            node_data["detail"].product,
+            (await node_data["detail"]).product,
             client,
             package,
             repository,
@@ -165,32 +177,32 @@ def graph_successors(
         yield successor, graph.nodes[successor]
 
 
-async def fetch(
-    cache_mapping: SqliteDict, cache_path: Path, client: HTTPClient, graph: MultiDiGraph
-) -> None:
+async def fetch(cache_path: Path, graph: MultiDiGraph) -> None:
     stderr.write("Fetching package products...\n")
 
-    for generation in topological_generations(graph.reverse(copy=False)):
-        async with TaskGroup() as group:
-            for package in generation:
-                node_data: NodeData = graph.nodes[package]
+    async with HTTPClient(http2=True) as client:
+        with SqliteDict(cache_path / "mapping-db.sqlite") as cache_mapping:
+            for generation in topological_generations(graph.reverse(copy=False)):
+                for package in generation:
+                    node_data: NodeData = graph.nodes[package]
 
-                dependencies = graph_successors(graph, package)
+                    dependencies = graph_successors(graph, package)
 
-                node_data["product_task"] = group.create_task(
-                    fetch_package_or_cache(
-                        cache_mapping,
-                        cache_path,
-                        client,
-                        package,
-                        node_data,
-                        dependencies,
+                    node_data["product_info"] = create_task(
+                        compute_product_info(
+                            package, node_data["repository"], dependencies
+                        )
                     )
-                )
 
-        for package in generation:
-            node_data = graph.nodes[package]
-
-            node_data["product"] = node_data["product_task"].result()
+                    node_data["product"] = create_task(
+                        fetch_package_or_cache(
+                            cache_mapping,
+                            cache_path,
+                            client,
+                            package,
+                            node_data,
+                            dependencies,
+                        )
+                    )
 
     stderr.write("Package products fetched.\n")

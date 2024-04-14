@@ -1,28 +1,24 @@
-from asyncio import TaskGroup
-from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from asyncio import create_task
+from collections.abc import Iterable, Mapping
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 from typing import IO, Any
 
-from asyncstdlib import min as async_min
-from httpx import AsyncClient as HTTPClient
+from asyncstdlib import any as async_any
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
 from pydantic import ValidationError
 from pydot import Dot
-from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
 from .fetch import fetch
 from .repositories import Repositories
-from .repository import Repository
 from .resolve import resolve
-from .schemes import Config, Input
+from .schemes import Config, Input, NodeData
 from .translators import Translators
-from .utils import Result
 
 logger = getLogger(__name__)
 
@@ -64,63 +60,30 @@ def parse_config(config_path: Path) -> Config:
         return config
 
 
-async def get_package_details(graph: MultiDiGraph) -> None:
+def get_graph_items(graph: MultiDiGraph) -> Iterable[tuple[str, NodeData]]:
+    return graph.nodes.items()
+
+
+def get_package_details(graph: MultiDiGraph) -> None:
     stderr.write("Fetching package details...\n")
 
-    async with TaskGroup() as group:
-        for package, data in graph.nodes.items():
-            repository: Repository = data["repository"]
-            data["detail"] = group.create_task(repository.get_package_detail(package))
-
-    for package, data in graph.nodes.items():
-        data["detail"] = data["detail"].result()
-
-    stderr.write("Package details fetched.\n")
+    for package, node_data in get_graph_items(graph):
+        repository = node_data["repository"]
+        node_data["detail"] = create_task(repository.get_package_detail(package))
 
 
 async def create_dependencies(graph: MultiDiGraph) -> None:
-    graph.add_edges_from(
+    edges = [
         (package, dependency)
-        for package, package_data in graph.nodes.items()
-        for dependency, dependency_data in graph.nodes.items()
-        if (
-            any(
-                interface in dependency_data["detail"].interfaces
-                for interface in package_data["detail"].dependencies
-            )
+        for package, package_data in get_graph_items(graph)
+        for dependency, dependency_data in get_graph_items(graph)
+        if await async_any(
+            interface in (await dependency_data["detail"]).interfaces
+            for interface in (await package_data["detail"]).dependencies
         )
-    )
+    ]
 
-
-async def select_best_model(
-    models: AsyncIterable[Set[str]],
-    packages_to_repositories_result: Result[Mapping[str, tuple[Repository, Set[str]]]],
-) -> MultiDiGraph:
-    stderr.write("Selecting the best model...\n")
-
-    # from models with the fewest packages
-    # select the lexicographically smallest
-    model_result: list[str] | None = await async_min(
-        (sorted(model) async for model in models),
-        key=lambda x: (len(x), x),  # type: ignore
-        default=None,
-    )
-
-    if model_result is None:
-        raise SubmanagerCommandFailure("No model found.")
-
-    stderr.write("The best model selected.\n")
-
-    graph = MultiDiGraph()
-
-    packages_to_repositories = packages_to_repositories_result.value
-
-    graph.add_nodes_from(
-        (package, {"repository": packages_to_repositories[package][0]})
-        for package in model_result
-    )
-
-    return graph
+    graph.add_edges_from(edges)
 
 
 def graph_to_dot(graph: MultiDiGraph) -> Dot:
@@ -193,22 +156,17 @@ async def main(
         input = parse_input(stdin.buffer)
 
         try:
-            packages_with_repositories_result = Result[
-                Mapping[str, tuple[Repository, Set[str]]]
-            ]()
-            models = resolve(
+            graph = await resolve(
                 repositories,
                 translators,
                 input.requirements,
                 input.options,
-                packages_with_repositories_result,
             )
 
-            graph = await select_best_model(models, packages_with_repositories_result)
+            for package in sorted(graph.nodes):
+                stderr.write(f"\t{package}\n")
 
-            print(graph.nodes(), file=stderr)
-
-            await get_package_details(graph)
+            get_package_details(graph)
 
             await create_dependencies(graph)
 
@@ -216,13 +174,7 @@ async def main(
                 graph_dot = graph_to_dot(graph)
                 graph_dot.write(graph_path)
 
-            async with HTTPClient(http2=True) as client:
-                with SqliteDict(
-                    config.product_cache_path / "mapping-db.sqlite"
-                ) as product_cache_mapping:
-                    await fetch(
-                        product_cache_mapping, config.product_cache_path, client, graph
-                    )
+            await fetch(config.product_cache_path, graph)
 
             await install(installation_path)
 

@@ -1,6 +1,6 @@
 from asyncio import TaskGroup
 from collections.abc import (
-    AsyncGenerator,
+    AsyncIterable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -11,6 +11,8 @@ from itertools import chain
 from sys import stderr
 from typing import Any, cast
 
+from asyncstdlib import min as async_min
+from networkx import MultiDiGraph
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
     RequirementVisitor,
@@ -19,7 +21,7 @@ from PPpackage.repository_driver.interface.utils import (
 from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
 from pysat.solvers import Solver
 
-from metamanager.PPpackage.metamanager.utils import Result
+from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 
 from .repository import Repository
 from .translators import Translator
@@ -129,28 +131,51 @@ def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
     return packages & set_variables
 
 
+async def enumerate_models(packages: Set[str], formula: Formula):
+    with Solver(bootstrap_with=formula) as solver:
+        for model_integers in solver.enum_models():  # type: ignore
+            model_atoms = Formula.formulas(model_integers, atoms_only=True)
+
+            yield process_model(packages, model_atoms)
+
+
+async def select_best_model(
+    models: AsyncIterable[Set[str]],
+    packages_to_repositories: Mapping[str, tuple[Repository, Set[str]]],
+) -> MultiDiGraph:
+    # from models with the fewest packages
+    # select the lexicographically smallest
+    model_result: list[str] | None = await async_min(
+        (sorted(model) async for model in models),
+        key=lambda x: (len(x), x),  # type: ignore
+        default=None,
+    )
+
+    if model_result is None:
+        raise SubmanagerCommandFailure("No model found.")
+
+    graph = MultiDiGraph()
+
+    graph.add_nodes_from(
+        (package, {"repository": packages_to_repositories[package][0]})
+        for package in model_result
+    )
+
+    return graph
+
+
 async def resolve(
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
     requirements: Requirement,
     options: Any,
-    packages_with_repositories_result: Result[
-        Mapping[str, tuple[Repository, Set[str]]]
-    ],
-) -> AsyncGenerator[Set[str], Mapping[str, tuple[Repository, Set[str]]]]:
-    stderr.write("Resolving requirements:\n")
-
-    # TODO: better print
-    print(requirements, file=stderr)
-
+) -> MultiDiGraph:
     stderr.write("Fetching packages and formulas...\n")
 
     packages_to_repositories_and_groups, formula = await discover_packages_and_formulas(
         repositories, options
     )
-    packages_with_repositories_result.value = packages_to_repositories_and_groups
-
-    stderr.write("Packages and formulas fetched.\n")
+    packages = packages_to_repositories_and_groups.keys()
 
     stderr.write("Translating requirements...\n")
 
@@ -158,20 +183,10 @@ async def resolve(
         translators, packages_to_repositories_and_groups, chain([requirements], formula)
     )
 
-    stderr.write("Requirements translated.\n")
-
-    print(translated_formula, file=stderr)
-
     stderr.write("Resolving...\n")
 
-    packages = packages_to_repositories_and_groups.keys()
+    models = enumerate_models(packages, translated_formula)
 
-    with Solver(bootstrap_with=translated_formula) as solver:
-        for model_integers in solver.enum_models():  # type: ignore
-            model_atoms = Formula.formulas(model_integers, atoms_only=True)
+    graph = await select_best_model(models, packages_to_repositories_and_groups)
 
-            model = process_model(packages, model_atoms)
-
-            yield model
-
-    stderr.write("Resolution done.\n")
+    return graph

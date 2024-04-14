@@ -1,5 +1,4 @@
-from asyncio import Task
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
@@ -64,7 +63,6 @@ class Config:
 
 class NodeData(TypedDict):
     repository: Repository
-    detail: PackageDetail
-    product_task: Task[tuple[Path, str]]
-    product: tuple[Path, str]
-    product_info: ProductInfo
+    detail: Awaitable[PackageDetail]
+    product: Awaitable[tuple[Path, str]]
+    product_info: Awaitable[ProductInfo]
