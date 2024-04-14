@@ -3,10 +3,11 @@ from typing import Any
 
 from pysat.formula import Formula
 
-from metamanager.PPpackage.metamanager.schemes import RequirementTranslatorConfig
 from PPpackage.translator.interface.interface import Interface
 from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import load_object
+
+from .schemes import RequirementTranslatorConfig
 
 
 class Translator:

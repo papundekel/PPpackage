@@ -146,6 +146,8 @@ async def fetch_package_or_cache(
     node_data: NodeData,
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> tuple[Path, str]:
+    stderr.write(f"\t{package}\n")
+
     product_info_hash = hash_product_info(package, await node_data["product_info"])
 
     if product_info_hash not in cache_mapping:
@@ -174,30 +176,28 @@ def graph_successors(
         yield successor, graph.nodes[successor]
 
 
-async def fetch(cache_path: Path, graph: MultiDiGraph) -> None:
+def fetch(
+    cache_mapping: SqliteDict, client: HTTPClient, cache_path: Path, graph: MultiDiGraph
+) -> None:
     stderr.write("Fetching package products...\n")
 
-    async with HTTPClient(http2=True) as client:
-        with SqliteDict(cache_path / "mapping-db.sqlite") as cache_mapping:
-            for generation in topological_generations(graph.reverse(copy=False)):
-                for package in generation:
-                    node_data: NodeData = graph.nodes[package]
+    for generation in topological_generations(graph.reverse(copy=False)):
+        for package in generation:
+            node_data: NodeData = graph.nodes[package]
 
-                    dependencies = graph_successors(graph, package)
+            dependencies = graph_successors(graph, package)
 
-                    node_data["product_info"] = create_task(
-                        compute_product_info(
-                            package, node_data["repository"], dependencies
-                        )
-                    )
+            node_data["product_info"] = create_task(
+                compute_product_info(package, node_data["repository"], dependencies)
+            )
 
-                    node_data["product"] = create_task(
-                        fetch_package_or_cache(
-                            cache_mapping,
-                            cache_path,
-                            client,
-                            package,
-                            node_data,
-                            dependencies,
-                        )
-                    )
+            node_data["product"] = create_task(
+                fetch_package_or_cache(
+                    cache_mapping,
+                    cache_path,
+                    client,
+                    package,
+                    node_data,
+                    dependencies,
+                )
+            )

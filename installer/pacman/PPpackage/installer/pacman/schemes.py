@@ -1,7 +1,12 @@
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
-@dataclass(frozen=True)
+class Parameters(BaseModel):
+    pass
+
+
+@pydantic_dataclass(frozen=True)
 class ProductInfo:
     version: str
     product_id: str

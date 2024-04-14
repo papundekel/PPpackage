@@ -1,21 +1,24 @@
 from asyncio import create_task
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
-from typing import IO, Any
+from typing import IO
 
 from asyncstdlib import any as async_any
+from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
 from pydantic import ValidationError
 from pydot import Dot
+from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
 from .fetch import fetch
 from .install import install
+from .installers import Installers
 from .repositories import Repositories
 from .resolve import resolve
 from .schemes import Config, Input, NodeData
@@ -91,9 +94,7 @@ async def create_dependencies(graph: MultiDiGraph) -> None:
 def graph_to_dot(graph: MultiDiGraph) -> Dot:
     manager_to_color = dict[str, int]()
 
-    packages: Iterable[tuple[str, Mapping[str, Any]]] = graph.nodes.items()
-
-    for package, data in packages:
+    for package, data in get_graph_items(graph):
         repository_identifier = data["repository"].get_identifier()
 
         if repository_identifier not in manager_to_color:
@@ -146,40 +147,42 @@ async def main(
     config = parse_config(config_path)
 
     translators = Translators(config.requirement_translators)
+    installers = Installers(config.installers)
 
-    async with Repositories(
-        config.repository_drivers, config.repositories
-    ) as repositories:
-        input = parse_input(stdin.buffer)
+    input = parse_input(stdin.buffer)
 
-        try:
+    try:
+        async with Repositories(
+            config.repository_drivers, config.repositories
+        ) as repositories:
             graph = await resolve(
-                repositories,
-                translators,
-                input.requirements,
-                input.options,
+                repositories, translators, input.requirements, input.options
             )
 
-            for package in sorted(graph.nodes):
-                stderr.write(f"\t{package}\n")
+        for package in sorted(graph.nodes):
+            stderr.write(f"\t{package}\n")
 
-            get_package_details(graph)
+        get_package_details(graph)
 
-            await create_dependencies(graph)
+        await create_dependencies(graph)
 
-            if graph_path is not None:
-                graph_dot = graph_to_dot(graph)
-                graph_dot.write(graph_path)
+        if graph_path is not None:
+            graph_dot = graph_to_dot(graph)
+            graph_dot.write(graph_path)
 
-            await fetch(config.product_cache_path, graph)
+        async with HTTPClient(http2=True) as client:
+            with SqliteDict(
+                config.product_cache_path / "mapping-db.sqlite"
+            ) as cache_mapping:
+                fetch(cache_mapping, client, config.product_cache_path, graph)
 
-            await install(installation_path)
+                await install(installers, graph, installation_path)
 
-            if generators_path is not None:
-                await generators(generators_path)
+        if generators_path is not None:
+            await generators(generators_path)
 
             stderr.write("Done.\n")
 
-        except* SubmanagerCommandFailure as e_group:
-            log_exception(e_group)
-            stderr.write("Aborting.\n")
+    except* SubmanagerCommandFailure as e_group:
+        log_exception(e_group)
+        stderr.write("Aborting.\n")

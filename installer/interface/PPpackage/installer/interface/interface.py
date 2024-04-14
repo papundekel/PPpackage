@@ -1,9 +1,9 @@
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
-from pysat.formula import Formula
 
 ParametersType = TypeVar("ParametersType", bound=BaseModel)
 
@@ -12,6 +12,6 @@ ParametersType = TypeVar("ParametersType", bound=BaseModel)
 class Interface(Generic[ParametersType]):
     Parameters: type[ParametersType]
     install: Callable[
-        [ParametersType, Mapping[str, Iterable[str]]],
+        [ParametersType, Path, Path],
         Awaitable[None],
     ]
