@@ -7,10 +7,10 @@ from collections.abc import (
     MutableSet,
     Set,
 )
-from itertools import chain
 from sys import stderr
 from typing import Any, cast
 
+from asyncstdlib import chain as async_chain
 from asyncstdlib import min as async_min
 from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
@@ -59,26 +59,10 @@ async def discover_packages(
 
 async def get_formula(
     repositories: Iterable[Repository], options: Any
-) -> Iterable[Requirement]:
-    formula = list[Requirement]()
-
-    async with TaskGroup() as group:
-        for repository in repositories:
-            group.create_task(
-                repository.translate_options_and_get_formula(options, formula)
-            )
-
-    return formula
-
-
-async def discover_packages_and_formulas(
-    repositories: Iterable[Repository], options: Any
-) -> tuple[Mapping[str, tuple[Repository, Set[str]]], Iterable[Requirement]]:
-    async with TaskGroup() as group:
-        packages_task = group.create_task(discover_packages(repositories))
-        formula_task = group.create_task(get_formula(repositories, options))
-
-    return packages_task.result(), formula_task.result()
+) -> AsyncIterable[Requirement]:
+    for repository in repositories:
+        async for requirement in repository.translate_options_and_get_formula(options):
+            yield requirement
 
 
 def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
@@ -94,7 +78,7 @@ def group_packages(packages: Mapping[str, tuple[Repository, Set[str]]]):
 async def translate_requirements(
     translators: Mapping[str, Translator],
     packages: Mapping[str, tuple[Repository, Set[str]]],
-    formula: Iterable[Requirement],
+    formula: AsyncIterable[Requirement],
 ) -> Formula:
     grouped_packages = group_packages(packages)
 
@@ -107,7 +91,7 @@ async def translate_requirements(
         )
 
     async with TaskGroup() as group:
-        operand_tasks = [
+        tasks = [
             group.create_task(
                 visit_requirements(
                     requirement,
@@ -124,10 +108,10 @@ async def translate_requirements(
                     ),
                 )
             )
-            for requirement in formula
+            async for requirement in formula
         ]
 
-    return And(*[await task for task in operand_tasks], merge=True)
+    return And(*(task.result() for task in tasks), merge=True)
 
 
 def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
@@ -175,17 +159,16 @@ async def resolve(
     requirements: Requirement,
     options: Any,
 ) -> MultiDiGraph:
-    stderr.write("Fetching packages and formulas...\n")
-
-    packages_to_repositories_and_groups, formula = await discover_packages_and_formulas(
-        repositories, options
-    )
-    packages = packages_to_repositories_and_groups.keys()
-
     stderr.write("Translating requirements...\n")
 
+    packages_to_repositories_and_groups = await discover_packages(repositories)
+    packages = packages_to_repositories_and_groups.keys()
+    formula = get_formula(repositories, options)
+
     translated_formula = await translate_requirements(
-        translators, packages_to_repositories_and_groups, chain([requirements], formula)
+        translators,
+        packages_to_repositories_and_groups,
+        async_chain([requirements], formula),
     )
 
     stderr.write("Resolving...\n")
