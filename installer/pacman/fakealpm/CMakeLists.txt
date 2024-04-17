@@ -4,10 +4,17 @@ project(fakealpm)
 
 include(GNUInstallDirs)
 
-add_library(fakealpm SHARED "fakealpm.cpp")
+add_executable(fakealpm "fakealpm.cpp")
+target_link_libraries(fakealpm PUBLIC "alpm")
 target_compile_options(fakealpm PUBLIC "-Wall" "-Wextra" "-pedantic" "-Werror")
 target_compile_features(fakealpm PUBLIC cxx_std_23)
 set_target_properties(fakealpm PROPERTIES EXPORT_COMPILE_COMMANDS ON)
-target_include_directories(fakealpm PUBLIC "/usr/share/libalpm-pp/usr/include/")
 
-install(TARGETS fakealpm DESTINATION ${CMAKE_INSTALL_LIBDIR})
+add_executable(fakealpm-executable "executable.cpp")
+target_compile_options(fakealpm-executable PUBLIC "-Wall" "-Wextra" "-pedantic"
+                                                  "-Werror")
+target_compile_features(fakealpm-executable PUBLIC cxx_std_23)
+set_target_properties(fakealpm-executable PROPERTIES EXPORT_COMPILE_COMMANDS ON)
+
+install(TARGETS fakealpm DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS fakealpm-executable DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,27 +1,23 @@
-from asyncio import create_subprocess_exec
-from asyncio.subprocess import DEVNULL
-from collections.abc import MutableMapping
+from asyncio import Lock, create_subprocess_exec
 from contextlib import contextmanager
-from io import TextIOWrapper
 from pathlib import Path
+from sys import stderr
+
+from asyncstdlib import list as async_list
 
 from PPpackage.container_utils.run import run as container_run
-
+from PPpackage.container_utils.translate import translate
 from PPpackage.installer.interface.exceptions import InstallerException
-from PPpackage.utils.pipe import (
-    pipe_read_line_maybe,
-    pipe_read_string,
-    pipe_read_strings,
-    pipe_write_int,
-    pipe_write_string,
-)
+from PPpackage.utils.asyncio_stream import start_unix_server
+from PPpackage.utils.stream import Reader, Writer, dump_one
 from PPpackage.utils.utils import (
-    ContainerizerWorkdirInfo,
+    TemporaryDirectory,
     TemporaryPipe,
     asubprocess_wait,
     ensure_dir_exists,
-    fakeroot,
 )
+
+from .schemes import ContainerizerConfig, Parameters
 
 
 @contextmanager
@@ -44,108 +40,68 @@ def create_necessary_container_files(root_path: Path):
 
 
 async def install_manager_command(
-    containerizer_url: str,
-    workdir_info: ContainerizerWorkdirInfo,
-    pipe_to_fakealpm: TextIOWrapper,
-    pipe_from_fakealpm: TextIOWrapper,
+    containerizer_config: ContainerizerConfig,
     installation_path: Path,
+    reader: Reader,
+    writer: Writer,
 ):
-    command = pipe_read_string(pipe_from_fakealpm)
-    args = pipe_read_strings(pipe_from_fakealpm)
+    command = await reader.load_one(str)
+    args = reader.load_many(str)
 
     with TemporaryPipe() as pipe_hook_path:
-        args = [*args][1:]
+        args = await async_list(args)
 
-        pipe_write_string(pipe_to_fakealpm, str(pipe_hook_path))
-        pipe_to_fakealpm.flush()
+        await writer.write(dump_one(str(pipe_hook_path)))
 
         with (
             pipe_hook_path.open("rb") as pipe_hook,
             create_necessary_container_files(installation_path),
         ):
             return_code = container_run(
-                containerizer_url,
-                stdin=pipe_hook,
-                image="",
-                command=[command, *args],
-                rootfs=str(workdir_info.translate(installation_path)),
+                containerizer_config.url,
+                [command, *args],
+                stdin=pipe_hook.read(),
+                rootfs=str(
+                    translate(containerizer_config.path_translations, installation_path)
+                ),
             )
 
-    pipe_write_int(pipe_to_fakealpm, return_code)
-    pipe_to_fakealpm.flush()
-
-
-def create_environment(
-    environment: MutableMapping[str, str],
-    pipe_from_fakealpm_path: Path,
-    pipe_to_fakealpm_path: Path,
-):
-    environment["LD_LIBRARY_PATH"] += ":/usr/share/libalpm-pp/usr/lib/"
-    environment["LD_PRELOAD"] += f":/usr/local/lib/libfakealpm.so"
-    environment["PP_PIPE_FROM_FAKEALPM_PATH"] = str(pipe_from_fakealpm_path)
-    environment["PP_PIPE_TO_FAKEALPM_PATH"] = str(pipe_to_fakealpm_path)
+    await writer.write(dump_one(return_code))
 
 
 DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
 
 
-async def pacman_install(
-    containerizer_url: str,
-    workdir_info: ContainerizerWorkdirInfo,
-    installation_path: Path,
-    product_path: Path,
-):
+lock = Lock()
+
+
+async def install(parameters: Parameters, product_path: Path, installation_path: Path):
     database_path = installation_path / DATABASE_PATH_RELATIVE
 
     ensure_dir_exists(database_path)
 
-    with (
-        TemporaryPipe() as pipe_from_fakealpm_path,
-        TemporaryPipe() as pipe_to_fakealpm_path,
-    ):
-        async with fakeroot() as environment:
-            create_environment(
-                environment, pipe_from_fakealpm_path, pipe_to_fakealpm_path
-            )
+    with TemporaryDirectory() as server_socket_directory_path:
+        server_socket_path = server_socket_directory_path / "server.sock"
 
+        server = await start_unix_server(
+            lambda reader, writer: install_manager_command(
+                parameters.containerizer, installation_path, reader, writer
+            ),
+            server_socket_path,
+        )
+
+        await server.start_serving()
+
+        async with lock:
             process = await create_subprocess_exec(
-                "pacman",
-                "--noconfirm",
-                "--needed",
-                "--dbpath",
-                str(database_path),
-                "--root",
+                "/usr/local/bin/fakealpm",
+                "/usr/local/bin/fakealpm-executable",
+                str(server_socket_path),
                 str(installation_path),
-                "--upgrade",
-                "--nodeps",
-                "--nodeps",
+                str(database_path),
                 str(product_path),
-                stdin=DEVNULL,
-                stdout=DEVNULL,
-                stderr=None,
-                env=environment,
             )
-
-            with (
-                open(pipe_from_fakealpm_path, "r") as pipe_from_fakealpm,
-                open(pipe_to_fakealpm_path, "w") as pipe_to_fakealpm,
-            ):
-                while True:
-                    header = pipe_read_line_maybe(pipe_from_fakealpm)
-
-                    if header is None:
-                        break
-                    elif header == "COMMAND":
-                        await install_manager_command(
-                            containerizer_url,
-                            workdir_info,
-                            pipe_to_fakealpm,
-                            pipe_from_fakealpm,
-                            installation_path,
-                        )
-                    else:
-                        raise Exception(
-                            f"Unknown header: {header}", "PPpackage-pacman-utils"
-                        )
 
             await asubprocess_wait(process, InstallerException)
+
+        server.close()

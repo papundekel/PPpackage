@@ -3,20 +3,28 @@ from typing import cast as type_cast
 
 from podman import PodmanClient
 from podman.api.client import APIClient
+from pydantic import AnyUrl
 
 
-def run(url: str, stdin: IO | None = None, *args, **kwargs) -> int:
-    with PodmanClient(base_url=url) as client:
+def run(
+    url: AnyUrl,
+    command: list[str],
+    image: str | None = None,
+    stdin: IO | bytes | None = None,
+    **kwargs,
+) -> int:
+    with PodmanClient(base_url=str(url)) as client:
         container = client.containers.create(
-            *args, **kwargs, stdin_open=stdin is not None
+            image if image is not None else "",
+            command,
+            **kwargs,
+            stdin_open=stdin is not None,
         )
 
         container.start()
 
         if stdin is not None:
-            api_client = type_cast(APIClient, container.client)
-
-            api_client.post(
+            type_cast(APIClient, container.client).post(
                 f"/containers/{container.id}/attach",
                 params={"stdin": "true", "stdout": "false", "stderr": "false"},
                 data=stdin,

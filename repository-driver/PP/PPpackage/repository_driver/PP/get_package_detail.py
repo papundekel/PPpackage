@@ -18,7 +18,7 @@ async def get_package_detail(
             frozenset(["p1"]),
             frozenset(),
             ArchiveProductDetail(
-                "https://archlinux.org/packages/extra/x86_64/drumkv1/download/",  # type: ignore
+                "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
                 "pacman",
             ),
         )
@@ -27,7 +27,7 @@ async def get_package_detail(
             frozenset(["p2"]),
             frozenset(["p1"]),
             ArchiveProductDetail(
-                "https://archlinux.org/packages/extra/x86_64/adios2/download/",  # type: ignore
+                "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
                 "pacman",
             ),
         )
@@ -36,7 +36,7 @@ async def get_package_detail(
             frozenset(["p3"]),
             frozenset(["p2"]),
             ArchiveProductDetail(
-                "https://archlinux.org/packages/extra/x86_64/aida-x-vst3/download/",  # type: ignore
+                "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
                 "pacman",
             ),
         )
