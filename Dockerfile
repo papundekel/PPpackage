@@ -105,6 +105,9 @@ COPY --from=fakealpm /usr/local/bin/fakealpm-executable /usr/local/bin/fakealpm-
 COPY utils/ /workdir/utils
 RUN pip install utils/
 
+COPY container-utils/ /workdir/container-utils
+RUN pip install container-utils/
+
 
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
