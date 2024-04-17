@@ -1,106 +1,187 @@
 #include <alpm.h>
 
-#include <charconv>
-#include <climits>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fcntl.h>
-#include <fstream>
-#include <iostream>
-#include <linux/limits.h>
-#include <string>
-#include <string_view>
+#include <dlfcn.h>
 #include <unistd.h>
 
-static FILE* pipe_from_fakealpm;
-static FILE* pipe_to_fakealpm;
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <iterator>
+#include <span>
+#include <vector>
 
-[[gnu::constructor]] static void pipes_ctr()
+static const char* executable_path = nullptr;
+static const char* server_path = nullptr;
+
+extern "C" int chroot(const char*)
 {
-    const auto pipe_from_fakealpm_path =
-        std::getenv("PP_PIPE_FROM_FAKEALPM_PATH");
-    const auto pipe_to_fakealpm_path = std::getenv("PP_PIPE_TO_FAKEALPM_PATH");
-
-    pipe_from_fakealpm = std::fopen(pipe_from_fakealpm_path, "w");
-    pipe_to_fakealpm = std::fopen(pipe_to_fakealpm_path, "r");
+    return 0;
 }
 
-[[gnu::destructor]] static void pipes_dtr()
+extern "C" int execv(const char* command, char* const* argv)
 {
-    std::fclose(pipe_from_fakealpm);
-    std::fclose(pipe_to_fakealpm);
-}
+    static int (*original)(const char*, char* const[]) = nullptr;
 
-static void write_string(const char* str)
-{
-    std::fprintf(pipe_from_fakealpm, "%zu\n%s", std::strlen(str), str);
-}
-
-static auto read_int()
-{
-    char buffer[64] = {0};
-    std::fgets(buffer, sizeof(buffer), pipe_to_fakealpm);
-
-    int value = 0;
-    std::from_chars(buffer, buffer + sizeof(buffer), value, 10);
-    return value;
-}
-
-static std::string read_string()
-{
-    const auto length = read_int();
-
-    std::string str(length, '\0');
-    std::fread(str.data(), 1, length, pipe_to_fakealpm);
-
-    return str;
-}
-
-extern "C" int _alpm_run_chroot(alpm_handle_t*,
-                                const char* command,
-                                char* const argv[],
-                                _alpm_cb_io stdin_cb,
-                                void* stdin_ctx)
-{
-    std::fprintf(stderr, "Executing command %s...", command);
-
-    std::fprintf(pipe_from_fakealpm, "COMMAND\n");
-
-    write_string(command);
-
-    for (const auto* arg = argv; *arg != nullptr; ++arg)
+    if (!original)
     {
-        write_string(*arg);
+        original =
+            (int (*)(const char*, char* const[]))dlsym(RTLD_NEXT, "execv");
     }
-    std::fprintf(pipe_from_fakealpm, "-1\n");
-    std::fflush(pipe_from_fakealpm);
 
-    const auto pipe_hook_path = read_string();
+    const auto arguments =
+        std::span(argv,
+                  std::ranges::find(argv, std::unreachable_sentinel, nullptr));
 
-    const auto pipe_hook = std::fopen(pipe_hook_path.c_str(), "w");
+    auto new_arguments = std::vector<char*>(arguments.size() + 3);
+    new_arguments[0] = arguments[0];
+    new_arguments[1] = const_cast<char*>(server_path);
+    new_arguments[2] = const_cast<char*>(command);
+    std::ranges::copy(arguments.subspan(1), new_arguments.begin() + 3);
+    new_arguments.back() = nullptr;
 
-    if (stdin_cb != nullptr)
+    const auto return_code = original(executable_path, new_arguments.data());
+
+    return return_code;
+}
+
+class AlpmException : public std::exception
+{
+    alpm_errno_t error;
+
+public:
+    AlpmException(alpm_handle_t* handle)
+        : error(alpm_errno(handle))
+    {}
+
+    const char* what() const noexcept override
     {
-        char buffer[PIPE_BUF];
-        while (true)
+        return alpm_strerror(error);
+    }
+};
+
+// static void log(void*, alpm_loglevel_t, const char* fmt, va_list va_args)
+// {
+//     vfprintf(stderr, fmt, va_args);
+// }
+
+class Handle
+{
+    alpm_handle_t* handle;
+
+public:
+    Handle(std::filesystem::path root, std::filesystem::path db)
+        : handle(alpm_initialize(root.c_str(), db.c_str(), nullptr))
+    {
+        if (handle == nullptr)
         {
-            const auto read = stdin_cb(buffer, sizeof(buffer), stdin_ctx);
+            throw AlpmException(handle);
+        }
 
-            if (read == 0)
-                break;
+        // alpm_option_set_logcb(handle, log, nullptr);
+    }
 
-            std::fwrite(buffer, 1, read, pipe_hook);
+    operator alpm_handle_t*() const
+    {
+        return handle;
+    }
+
+    ~Handle()
+    {
+        alpm_release(handle);
+    }
+};
+
+class Transaction
+{
+    const Handle& handle;
+
+public:
+    Transaction(const Handle& handle)
+        : handle(handle)
+    {
+        const auto return_code = alpm_trans_init(handle, 0);
+
+        if (return_code == -1)
+        {
+            throw AlpmException(handle);
         }
     }
 
-    std::fclose(pipe_hook);
+    void add_package(const std::filesystem::path archive_path)
+    {
+        alpm_pkg_t* package;
 
-    const auto return_value = read_int();
+        const auto pkg_load_return_code =
+            alpm_pkg_load(handle,
+                          archive_path.c_str(),
+                          true,
+                          ALPM_SIG_PACKAGE_UNKNOWN_OK,
+                          &package);
 
-    const auto message = return_value == 0 ? "success" : "failure";
+        if (pkg_load_return_code == -1)
+        {
+            throw AlpmException(handle);
+        }
 
-    std::fprintf(stderr, " %s\n", message);
+        const auto add_pkg_return_code = alpm_add_pkg(handle, package);
 
-    return return_value;
+        if (add_pkg_return_code == -1)
+        {
+            throw AlpmException(handle);
+        }
+    }
+
+    void prepare_and_commit()
+    {
+        alpm_list_t* missing_deps;
+        const auto prepare_return_code =
+            alpm_trans_prepare(handle, &missing_deps);
+
+        if (prepare_return_code == -1)
+        {
+            throw AlpmException(handle);
+        }
+
+        alpm_list_t* data;
+        const auto commit_return_code = alpm_trans_commit(handle, &data);
+
+        if (commit_return_code == -1)
+        {
+            throw AlpmException(handle);
+        }
+    }
+
+    ~Transaction()
+    {
+        alpm_trans_release(handle);
+    }
+};
+
+int main(int, char** argv)
+{
+    const auto executable_path = argv[1];
+    const auto server_path = argv[2];
+    const auto installation_path = argv[3];
+    const auto database_path = argv[4];
+    const auto archive_path = argv[5];
+
+    ::executable_path = executable_path;
+    ::server_path = server_path;
+
+    try
+    {
+        const auto handle = Handle(installation_path, database_path);
+
+        auto transaction = Transaction(handle);
+
+        transaction.add_package(archive_path);
+        transaction.prepare_and_commit();
+    }
+    catch (const AlpmException& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
 }

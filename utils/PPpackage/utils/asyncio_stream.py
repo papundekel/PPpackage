@@ -31,8 +31,9 @@ class AsyncioWriter(Writer):
     def __init__(self, writer: StreamWriter):
         self._writer = writer
 
-    async def write(self, data: memoryview) -> None:
-        self._writer.write(data)
+    async def write(self, data: AsyncIterable[memoryview]) -> None:
+        async for chunk in data:
+            self._writer.write(chunk)
         await self._writer.drain()
 
 

@@ -43,7 +43,7 @@ async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTP
     async with client.stream("GET", str(source_url), follow_redirects=True) as response:
         if not response.is_success:
             raise SubmanagerCommandFailure(
-                f"Failed to fetch archive {source_url}."
+                f"Failed to fetch archive {source_url}.\n"
                 f"{(await response.aread()).decode()}"
             )
 

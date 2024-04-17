@@ -42,19 +42,6 @@ async def dump_bytes(output_bytes: memoryview) -> AsyncIterable[memoryview]:
     yield output_bytes
 
 
-async def chunk_bytes(data: memoryview, chunk_size: int) -> AsyncIterable[memoryview]:
-    for i in range(0, len(data), chunk_size):
-        yield data[i : i + chunk_size]
-
-
-async def dump_bytes_chunked(output_bytes: memoryview) -> AsyncIterable[memoryview]:
-    async for chunk in dump_loop(
-        dump_bytes(chunk) async for chunk in chunk_bytes(output_bytes, 2**15)
-    ):
-        logger.debug("Chunking bytes...")
-        yield chunk
-
-
 async def dump_one(output: BaseModel | Any) -> AsyncIterable[memoryview]:
     output_wrapped = wrap(output)
 
@@ -74,7 +61,7 @@ async def dump_many(
 
 
 class Writer(Protocol):
-    async def write(self, data: memoryview) -> None: ...
+    async def write(self, data: AsyncIterable[memoryview]) -> None: ...
 
 
 ModelType = TypeVar("ModelType")
@@ -150,7 +137,3 @@ class Reader(Protocol):
     async def load_many(self, Model: type[ModelType]) -> AsyncIterable[ModelType]:
         async for _ in self.load_loop():
             yield await self.load_one(Model)
-
-    async def dump_bytes_chunked(self, writer: Writer) -> None:
-        async for _ in self.load_loop():
-            await writer.write(await self.load_bytes())

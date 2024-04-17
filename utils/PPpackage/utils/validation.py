@@ -59,14 +59,12 @@ def save_to_string(output: BaseModel | Any) -> str:
 T = TypeVar("T")
 
 
-def substitute_environment_variables(value_or_path: str | Path):
-    value = value_or_path if isinstance(value_or_path, str) else str(value_or_path)
+def substitute_environment_variables(value: Any):
+    value_string = str(value)
 
-    substituted_value = Template(value).safe_substitute(environ)
+    substituted_value = Template(value_string).safe_substitute(environ)
 
-    return (
-        substituted_value if isinstance(value_or_path, str) else Path(substituted_value)
-    )
+    return type(value)(substituted_value)
 
 
 WithVariables = AfterValidator(substitute_environment_variables)

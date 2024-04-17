@@ -16,7 +16,7 @@ async def get_package_detail(
         frozenset(),
         frozenset(),
         ArchiveProductDetail(
-            "https://archlinux.org/packages/extra/x86_64/percona-server/download/",  # type: ignore
+            "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
             "pacman",
         ),
     )

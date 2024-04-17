@@ -1,4 +1,4 @@
-from asyncio import create_subprocess_exec
+from asyncio import create_subprocess_exec, create_task
 from asyncio.subprocess import DEVNULL, PIPE, Process
 from collections.abc import (
     AsyncIterable,
@@ -113,7 +113,7 @@ async def get_fakeroot_info():
 async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
     pid = None
     try:
-        fakeroot_info_task = get_fakeroot_info()
+        fakeroot_info_task = create_task(get_fakeroot_info())
 
         process = await create_subprocess_exec(
             "faked",

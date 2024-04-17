@@ -10,22 +10,13 @@ RUN pacman --noconfirm -Syu
 
 # -----------------------------------------------------------------------------
 
-FROM base AS libalpm-pp
-
-RUN pacman --noconfirm -S meson
-
-COPY --chown=ab:ab installer/pacman/libalpm-pp/ /workdir/libalpm-pp
-RUN cd libalpm-pp/ && ./PKGBUILD.sh < PKGBUILD.template > PKGBUILD && sudo --user ab makepkg --skippgpcheck --install --noconfirm
-
-# -----------------------------------------------------------------------------
-
 FROM base AS fakealpm
 
 RUN pacman --noconfirm -S cmake
 RUN pacman --noconfirm -S gcc
 RUN pacman --noconfirm -S ninja
-
-COPY --from=libalpm-pp /usr/share/libalpm-pp /usr/share/libalpm-pp
+RUN pacman --noconfirm -S boost
+RUN pacman --noconfirm -S nlohmann-json
 
 COPY installer/pacman/fakealpm/ /workdir/fakealpm
 RUN ./fakealpm/build.sh fakealpm/ fakealpm/build/ /usr/local
@@ -108,11 +99,14 @@ FROM base-python AS metamanager
 
 ARG USER=root
 
-COPY --from=libalpm-pp /usr/share/libalpm-pp /usr/share/libalpm-pp
-COPY --from=fakealpm /usr/local/lib/libfakealpm.so /usr/local/lib/libfakealpm.so
+COPY --from=fakealpm /usr/local/bin/fakealpm /usr/local/bin/fakealpm
+COPY --from=fakealpm /usr/local/bin/fakealpm-executable /usr/local/bin/fakealpm-executable
 
 COPY utils/ /workdir/utils
 RUN pip install utils/
+
+COPY container-utils/ /workdir/container-utils
+RUN pip install container-utils/
 
 
 
