@@ -22,10 +22,7 @@ async def discover_packages(
         database.servers = repository_parameters.mirrorlist
 
         for package in database.pkgcache:
-            full_name: str = package.name
-            package_name = full_name.rsplit("-1", 3)[0]
-
             yield DiscoveryPackageInfo(
-                f"pacman-{full_name}",
-                frozenset([f"pacman-{package_name}"]),
+                f"pacman-{package.name}-{package.version}-{package.arch}",
+                frozenset([f"pacman-{package.name}"]),
             )

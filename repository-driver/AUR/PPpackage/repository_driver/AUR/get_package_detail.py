@@ -1,3 +1,5 @@
+from pydantic import AnyUrl
+
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
@@ -15,8 +17,5 @@ async def get_package_detail(
     return PackageDetail(
         frozenset(),
         frozenset(),
-        ArchiveProductDetail(
-            "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
-            "pacman",
-        ),
+        ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
     )

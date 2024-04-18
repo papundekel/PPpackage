@@ -1,4 +1,4 @@
-from asyncio import create_task
+from asyncio import TaskGroup, create_task
 from collections.abc import Iterable
 from logging import getLogger
 from pathlib import Path
@@ -110,7 +110,7 @@ def graph_to_dot(graph: MultiDiGraph) -> Dot:
 
         data.clear()
 
-        data["label"] = package
+        data["label"] = f'"{package}"'
         data["fillcolor"] = manager_to_color[repository.get_identifier()]
 
     graph_presentation.graph.update(

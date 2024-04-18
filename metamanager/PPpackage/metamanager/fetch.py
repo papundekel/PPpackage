@@ -11,15 +11,15 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from pydantic import AnyUrl
+from sqlitedict import SqliteDict
+
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
     ProductDetail,
     ProductInfo,
 )
-from pydantic import AnyUrl
-from sqlitedict import SqliteDict
-
 from PPpackage.utils.validation import save_to_string
 
 from .exceptions import SubmanagerCommandFailure

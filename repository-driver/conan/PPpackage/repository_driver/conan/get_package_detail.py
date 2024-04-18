@@ -1,3 +1,5 @@
+from pydantic import AnyUrl
+
 from PPpackage.repository_driver.interface.exceptions import CommandException
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
@@ -17,19 +19,13 @@ async def get_package_detail(
         return PackageDetail(
             frozenset(),
             frozenset(["sh"]),
-            ArchiveProductDetail(
-                "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
-                "pacman",
-            ),
+            ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
         )
     elif package.startswith("conan-nameof"):
         return PackageDetail(
             frozenset(),
             frozenset(),
-            ArchiveProductDetail(
-                "https://archlinux.org/packages/core/any/iana-etc/download/",  # type: ignore
-                "pacman",
-            ),
+            ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
         )
 
     raise CommandException
