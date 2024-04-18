@@ -4,7 +4,7 @@
     },
     "parameters": {
         "database_path": "tmp/database/archlinux-core",
-        "header": "core",
+        "repository": "core",
         "mirrorlist": [
             "https://geo.mirror.pkgbuild.com/core/os/x86_64"
         ]

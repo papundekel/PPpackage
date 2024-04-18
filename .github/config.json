@@ -49,7 +49,7 @@
             "driver": "pacman",
             "parameters": {
                 "database_path": "/mnt/repositories/database/archlinux-core",
-                "header": "core",
+                "repository": "core",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/core/os/x86_64"
                 ]
@@ -59,7 +59,7 @@
             "driver": "pacman",
             "parameters": {
                 "database_path": "/mnt/repositories/database/archlinux-extra",
-                "header": "extra",
+                "repository": "extra",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
                 ]
