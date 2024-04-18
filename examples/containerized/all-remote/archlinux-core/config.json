@@ -5,6 +5,8 @@
     "parameters": {
         "database_path": "/mnt/database/",
         "header": "core",
-        "include": "/etc/pacman.d/mirrorlist"
+        "mirrorlist": [
+            "https://geo.mirror.pkgbuild.com/core/os/x86_64"
+        ]
     }
 }

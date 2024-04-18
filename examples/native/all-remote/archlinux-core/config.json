@@ -5,6 +5,8 @@
     "parameters": {
         "database_path": "tmp/database/archlinux-core",
         "header": "core",
-        "include": "/etc/pacman.d/mirrorlist"
+        "mirrorlist": [
+            "https://geo.mirror.pkgbuild.com/core/os/x86_64"
+        ]
     }
 }
