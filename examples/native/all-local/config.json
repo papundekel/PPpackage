@@ -43,16 +43,20 @@
             "driver": "pacman",
             "parameters": {
                 "database_path": "tmp/database/archlinux-core",
-                "header": "core",
-                "include": "/etc/pacman.d/mirrorlist"
+                "repository": "core",
+                "mirrorlist": [
+                    "http://ftp.sh.cvut.cz/arch/core/os/x86_64"
+                ]
             }
         },
         {
             "driver": "pacman",
             "parameters": {
                 "database_path": "tmp/database/archlinux-extra",
-                "header": "extra",
-                "include": "/etc/pacman.d/mirrorlist"
+                "repository": "extra",
+                "mirrorlist": [
+                    "http://ftp.sh.cvut.cz/arch/core/os/x86_64"
+                ]
             }
         },
         {

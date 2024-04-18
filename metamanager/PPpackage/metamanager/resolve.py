@@ -5,12 +5,16 @@ from collections.abc import (
     Mapping,
     MutableMapping,
     MutableSet,
+    Sequence,
     Set,
 )
+from itertools import chain
 from sys import stderr
-from typing import Any, cast
+from typing import Any
+from typing import cast as type_cast
 
 from asyncstdlib import chain as async_chain
+from asyncstdlib import islice as async_islice
 from asyncstdlib import min as async_min
 from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
@@ -114,18 +118,55 @@ async def translate_requirements(
     return And(*(task.result() for task in tasks), merge=True)
 
 
-def process_model(packages: Set[str], model: Iterable[Atom | Neg]) -> Set[str]:
-    set_variables = {cast(str, atom.object) for atom in model if isinstance(atom, Atom)}
+def generate_smaller_models(
+    model: Sequence[Atom | Neg],
+) -> Iterable[Sequence[Atom | Neg]]:
+    for i in range(len(model)):
+        literal = model[i]
+        if isinstance(literal, Atom):
+            yield list(
+                chain(
+                    model[:i],
+                    [type_cast(Neg, Neg(literal))],
+                    model[i + 1 :],
+                )
+            )
+
+
+def minimize_model(
+    formula: Formula, model: Sequence[Atom | Neg]
+) -> Sequence[Atom | Neg]:
+    while True:
+        smaller_model = next(
+            (x for x in generate_smaller_models(model) if formula.satisfied(x)),
+            None,
+        )
+
+        if smaller_model is None:
+            break
+
+        model = smaller_model
+
+    return model
+
+
+def process_model(packages: Set[str], model: Sequence[Atom | Neg]) -> Set[str]:
+    set_variables = {
+        type_cast(str, atom.object) for atom in model if isinstance(atom, Atom)
+    }
 
     return packages & set_variables
 
 
 async def enumerate_models(packages: Set[str], formula: Formula):
-    with Solver(bootstrap_with=formula) as solver:
+    with Solver(bootstrap_with=formula, name="glucose421") as solver:
         for model_integers in solver.enum_models():  # type: ignore
             model_atoms = Formula.formulas(model_integers, atoms_only=True)
 
-            yield process_model(packages, model_atoms)
+            # minimized_model_atoms = minimize_model(formula, model_atoms)
+            minimized_model_atoms = model_atoms
+
+            yield process_model(packages, minimized_model_atoms)
 
 
 async def select_best_model(
@@ -135,7 +176,7 @@ async def select_best_model(
     # from models with the fewest packages
     # select the lexicographically smallest
     model_result: list[str] | None = await async_min(
-        (sorted(model) async for model in models),
+        (sorted(model) async for model in async_islice(models, None, 1)),  # type: ignore
         key=lambda x: (len(x), x),  # type: ignore
         default=None,
     )

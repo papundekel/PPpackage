@@ -1,6 +1,3 @@
-from collections.abc import Mapping
-from typing import Any
-
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
     ProductInfo,

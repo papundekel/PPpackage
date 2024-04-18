@@ -41,4 +41,4 @@ async def get_package_detail(
             ),
         )
 
-    raise CommandException
+    raise CommandException(f"Package {package} not found")
