@@ -21,7 +21,4 @@ async def install(
 
                 installer = installers[installer_identifier]
 
-                t = group.create_task(
-                    installer.install(product_path, installation_path)
-                )
-                await t
+                group.create_task(installer.install(product_path, installation_path))
