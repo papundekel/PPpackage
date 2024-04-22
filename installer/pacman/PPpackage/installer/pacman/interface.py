@@ -1,6 +1,3 @@
-from pathlib import Path
-from sys import stderr
-
 from PPpackage.installer.interface.interface import Interface
 
 from .install import install

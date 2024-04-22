@@ -177,7 +177,7 @@ async def select_best_model(
     # select the lexicographically smallest
     model_result: list[str] | None = await async_min(
         (sorted(model) async for model in async_islice(models, None, 1)),  # type: ignore
-        key=lambda x: (len(x), x),  # type: ignore
+        key=lambda x: (len(x), x) if x is not None else None,  # type: ignore
         default=None,
     )
 

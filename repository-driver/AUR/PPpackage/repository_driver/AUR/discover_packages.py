@@ -8,4 +8,4 @@ from .schemes import DriverParameters, RepositoryParameters
 async def discover_packages(
     driver_parameters: DriverParameters, repository_parameters: RepositoryParameters
 ) -> AsyncIterable[DiscoveryPackageInfo]:
-    yield DiscoveryPackageInfo("pacman-conan-1.0.0", frozenset(["pacman-conan"]))
+    yield DiscoveryPackageInfo("pacman-conan-1.0.0-1-any", frozenset(["pacman-conan"]))

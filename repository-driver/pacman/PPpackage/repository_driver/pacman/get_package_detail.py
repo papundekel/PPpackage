@@ -1,12 +1,12 @@
 from itertools import chain
 
-from pyalpm import Handle
-from pydantic import AnyUrl
-
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
 )
+from pyalpm import Handle
+from pydantic import AnyUrl
+
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -38,9 +38,7 @@ async def get_package_detail(
                     (strip_version(provide) for provide in alpm_package.provides),
                 )
             ),
-            frozenset(
-                [strip_version(dependency) for dependency in alpm_package.depends]
-            ),
+            frozenset(strip_version(dependency) for dependency in alpm_package.depends),
             ArchiveProductDetail(
                 AnyUrl(
                     f"https://archive.archlinux.org/packages/{alpm_name[0]}/{alpm_name}/{full_name}.pkg.tar.zst"

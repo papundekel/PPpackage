@@ -1,21 +1,15 @@
 from asyncio import Lock, create_subprocess_exec
 from contextlib import contextmanager
 from pathlib import Path
-from sys import stderr
 
 from asyncstdlib import list as async_list
-
 from PPpackage.container_utils.run import run as container_run
 from PPpackage.container_utils.translate import translate
+
 from PPpackage.installer.interface.exceptions import InstallerException
 from PPpackage.utils.asyncio_stream import start_unix_server
 from PPpackage.utils.stream import Reader, Writer, dump_one
-from PPpackage.utils.utils import (
-    TemporaryDirectory,
-    TemporaryPipe,
-    asubprocess_wait,
-    ensure_dir_exists,
-)
+from PPpackage.utils.utils import TemporaryDirectory, TemporaryPipe
 
 from .schemes import ContainerizerConfig, Parameters
 
@@ -26,8 +20,8 @@ def create_necessary_container_files(root_path: Path):
     containerenv_path = root_path / "run" / ".containerenv"
 
     try:
-        ensure_dir_exists(hostname_path.parent)
-        ensure_dir_exists(containerenv_path.parent)
+        hostname_path.parent.mkdir(parents=True, exist_ok=True)
+        containerenv_path.parent.mkdir(parents=True, exist_ok=True)
 
         hostname_path.touch()
         containerenv_path.touch()
@@ -78,7 +72,7 @@ lock = Lock()
 async def install(parameters: Parameters, product_path: Path, installation_path: Path):
     database_path = installation_path / DATABASE_PATH_RELATIVE
 
-    ensure_dir_exists(database_path)
+    database_path.mkdir(parents=True, exist_ok=True)
 
     with TemporaryDirectory() as server_socket_directory_path:
         server_socket_path = server_socket_directory_path / "server.sock"
@@ -102,6 +96,10 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
                 str(product_path),
             )
 
-            await asubprocess_wait(process, InstallerException)
+            return_code = await process.wait()
+            if return_code != 0:
+                raise InstallerException(
+                    f"fakealpm exited with non-zero return code: {return_code}"
+                )
 
         server.close()

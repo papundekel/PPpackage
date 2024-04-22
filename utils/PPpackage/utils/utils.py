@@ -1,43 +1,15 @@
-from asyncio import create_subprocess_exec, create_task
-from asyncio.subprocess import DEVNULL, PIPE, Process
-from collections.abc import (
-    AsyncIterable,
-    AsyncIterator,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    Set,
-)
-from contextlib import asynccontextmanager, contextmanager
+from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from contextlib import contextmanager
 from importlib import import_module
-from os import environ, kill, mkfifo
+from os import mkfifo
 from pathlib import Path
 from shutil import move
-from signal import SIGTERM
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 from typing import cast as type_cast
 from typing import overload
 
 from frozendict import frozendict
-from pydantic.dataclasses import dataclass as pydantic_dataclass
-
-
-class MyException(Exception):
-    pass
-
-
-class STDERRException(Exception):
-    def __init__(self, message: str, stderr: str) -> None:
-        super().__init__(message)
-        self.stderr = stderr
-
-    def __str__(self) -> str:
-        return f"{super().__str__()}\n{self.stderr}"
-
-
-def ensure_dir_exists(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
 
 
 @contextmanager
@@ -46,100 +18,6 @@ def TemporaryDirectory(dir=None):
         dir_path = Path(dir_path_string)
 
         yield dir_path
-
-
-async def asubprocess_wait(
-    process: Process, exception: Exception | type[Exception]
-) -> int:
-    return_code = await process.wait()
-
-    if return_code != 0:
-        raise exception
-
-    return return_code
-
-
-async def asubprocess_communicate(
-    process: Process,
-    error_message: str,
-    input: Optional[bytes] = None,
-) -> bytes:
-    stdout, stderr = await process.communicate(input)
-
-    if process.returncode != 0:
-        if stderr is not None:
-            raise STDERRException(error_message, stderr.decode())
-        else:
-            raise MyException(error_message)
-
-    return stdout
-
-
-class FakerootInfo:
-    def __init__(self, ld_library_path, ld_preload):
-        self.ld_library_path = ld_library_path
-        self.ld_preload = ld_preload
-
-
-_fakeroot_info = None
-
-
-async def get_fakeroot_info():
-    global _fakeroot_info
-
-    if _fakeroot_info is None:
-        process = await create_subprocess_exec(
-            "fakeroot",
-            "printenv",
-            "LD_LIBRARY_PATH",
-            "LD_PRELOAD",
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=None,
-        )
-
-        fakeroot_stdout = await asubprocess_communicate(process, "Error in `fakeroot`.")
-
-        ld_library_path, ld_preload = [
-            line.strip() for line in fakeroot_stdout.decode().splitlines()
-        ]
-
-        _fakeroot_info = FakerootInfo(ld_library_path, ld_preload)
-
-    return _fakeroot_info
-
-
-@asynccontextmanager
-async def fakeroot() -> AsyncIterator[MutableMapping[str, str]]:
-    pid = None
-    try:
-        fakeroot_info_task = create_task(get_fakeroot_info())
-
-        process = await create_subprocess_exec(
-            "faked",
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=None,
-        )
-
-        faked_stdout = await asubprocess_communicate(process, "Error in `faked`.")
-
-        key, pid_string = faked_stdout.decode().strip().split(":")
-
-        pid = int(pid_string)
-
-        fakeroot_info = await fakeroot_info_task
-
-        environment = environ.copy()
-
-        environment["FAKEROOTKEY"] = key
-        environment["LD_LIBRARY_PATH"] = fakeroot_info.ld_library_path
-        environment["LD_PRELOAD"] = fakeroot_info.ld_preload
-
-        yield environment
-    finally:
-        if pid is not None:
-            kill(pid, SIGTERM)
 
 
 @contextmanager
@@ -196,10 +74,6 @@ def movetree(source: Path, destination: Path):
             move(source_item, destination_item)
 
 
-def get_module_path(module) -> Path:
-    return Path(module.__file__)
-
-
 @overload
 def freeze(x: Mapping[T, U]) -> Mapping[T, U]: ...
 
@@ -215,19 +89,6 @@ def freeze(x):
         return frozenset(value for value in x)
     else:
         return x
-
-
-@pydantic_dataclass(frozen=True)
-class ContainerizerWorkdirInfo:
-    containerizer_path: Path
-    container_path: Path
-
-    def translate(self, path: Path) -> Path:
-        containerizer_path = self.containerizer_path / path.absolute().relative_to(
-            self.container_path.absolute()
-        )
-
-        return containerizer_path.absolute()
 
 
 def load_interface_module(Interface: type[T], package_name: str) -> T:
