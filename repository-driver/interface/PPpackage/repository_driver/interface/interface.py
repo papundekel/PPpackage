@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from turtle import update
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
