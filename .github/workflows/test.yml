@@ -89,7 +89,7 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: repository-driver-pacman
-                  tags: docker.io/fackop/repository-driver-pacman:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -98,7 +98,7 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: repository-driver-aur
-                  tags: docker.io/fackop/repository-driver-aur:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-aur:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -107,7 +107,7 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: repository-driver-conan
-                  tags: docker.io/fackop/repository-driver-conan:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-conan:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -116,6 +116,6 @@ jobs:
               with:
                   context: ${{ github.workspace }}
                   target: repository-driver-pp
-                  tags: docker.io/fackop/repository-driver-pp:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-pp:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
