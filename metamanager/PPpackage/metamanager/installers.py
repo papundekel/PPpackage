@@ -20,7 +20,7 @@ class Installer:
         self.parameters = load_object(interface.Parameters, config.parameters)
 
     async def install(self, product_path: Path, installation_path: Path) -> None:
-        print(f"Installing {product_path}...", file=stderr)
+        stderr.write(f"Installing {product_path}...")
         await self.interface.install(self.parameters, product_path, installation_path)
 
 
