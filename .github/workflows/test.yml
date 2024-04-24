@@ -39,10 +39,10 @@ jobs:
             - name: Run PPpackage
               run: |
                   mkdir -p root/ output/ cache/product/ cache/repository/conan/ cache/repository/PP/ database/archlinux-core/ database/archlinux-extra/ database/PP/
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic.json
+                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic-just-arch.json
 
-            # - name: See if ldconfig ran
-            #   run: ls -l root/etc/ld.so.cache
+            - name: See if ldconfig ran
+              run: ls -l root/etc/ld.so.cache
 
             - name: Build pppackage-repository-driver-pacman
               uses: docker/build-push-action@v5.1.0

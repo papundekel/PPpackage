@@ -1,15 +1,18 @@
 from logging import getLogger
+from pathlib import Path
+from tempfile import mkdtemp
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
+
 from PPpackage.repository_driver.interface.schemes import (
+    ArchiveProductDetail,
     DependencyProductInfos,
-    DiscoveryPackageInfo,
     PackageDetail,
     ProductInfo,
     Requirement,
+    TranslatorInfo,
 )
-
 from PPpackage.utils.validation import load_from_bytes, save_to_string
 
 from .exceptions import SubmanagerCommandFailure
@@ -32,21 +35,21 @@ class RemoteRepository(Repository):
     def get_url(self) -> str:
         return self.url
 
-    async def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
+    async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
         async with self.client.stream(
             "GET",
-            f"{self.url}/packages",
+            f"{self.url}/translator-info",
             headers={"Cache-Control": "no-cache"},
         ) as response:
             if not response.is_success:
                 raise SubmanagerCommandFailure(
-                    "remote repository.discover_packages failed "
+                    "remote repository.fetch_translator_data failed "
                     f"{(await response.aread()).decode()}"
                 )
 
             reader = HTTPResponseReader(response)
 
-            async for package in reader.load_many(DiscoveryPackageInfo):
+            async for package in reader.load_many(TranslatorInfo):
                 yield package
 
     async def _translate_options(self, options: Any) -> Any:
@@ -82,11 +85,14 @@ class RemoteRepository(Repository):
             async for requirement in reader.load_many(Requirement):  # type: ignore
                 yield requirement
 
-    async def get_package_detail(self, package: str) -> PackageDetail:
+    async def get_package_detail(self, package: str) -> PackageDetail | None:
         response = await self.client.get(
             f"{self.url}/packages/{package}",
             params={"translated_options": save_to_string(self.translated_options)},
         )
+
+        if response.status_code == 404:
+            return None
 
         if not response.is_success:
             raise SubmanagerCommandFailure(
@@ -94,7 +100,29 @@ class RemoteRepository(Repository):
                 f"{(await response.aread()).decode()}"
             )
 
-        return load_from_bytes(PackageDetail, memoryview(response.read()))
+        reader = HTTPResponseReader(response)
+
+        package_detail = await reader.load_one(PackageDetail)
+
+        if (
+            package_detail is not None
+            and isinstance(package_detail.product, ArchiveProductDetail)
+            and isinstance(package_detail.product.archive, Path)
+        ):
+            archive_bytes = await reader.load_bytes_chunked()
+
+            archive_directory_path = Path(mkdtemp())
+            archive_path = archive_directory_path / "archive"
+            with archive_path.open("wb") as file:
+                file.write(archive_bytes)
+
+            return PackageDetail(
+                package_detail.interfaces,
+                package_detail.dependencies,
+                ArchiveProductDetail(archive_path, package_detail.product.installer),
+            )
+
+        return package_detail
 
     async def compute_product_info(
         self, package: str, dependency_product_infos: DependencyProductInfos

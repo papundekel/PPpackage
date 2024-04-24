@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 
-from pysat.formula import And, Atom, Formula, Or
+from pysat.formula import Formula, Or
 
 from .schemes import Parameters, Requirement
 
@@ -10,9 +10,4 @@ async def translate_requirement(
     grouped_packages: Mapping[str, Iterable[str]],
     requirement: Requirement,
 ) -> Formula:
-    related_packages = grouped_packages.get(f"conan-{requirement.package}")
-
-    if related_packages is None:
-        return And(Atom(None), ~Atom(None))
-
-    return Or(*(Atom(package) for package in related_packages))
+    return Or()

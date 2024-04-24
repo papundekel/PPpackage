@@ -13,9 +13,5 @@ async def get_package_detail(
     repository_parameters: RepositoryParameters,
     translated_options: None,
     package: str,
-) -> PackageDetail:
-    return PackageDetail(
-        frozenset(),
-        frozenset(),
-        ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
-    )
+) -> PackageDetail | None:
+    return None

@@ -1,11 +1,10 @@
-from asyncio import TaskGroup, create_task
-from collections.abc import Iterable
+from asyncio import TaskGroup
+from collections.abc import Iterable, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 from typing import IO
 
-from asyncstdlib import any as async_any
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
@@ -13,6 +12,7 @@ from pydantic import ValidationError
 from pydot import Dot
 from sqlitedict import SqliteDict
 
+from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import load_from_bytes
 
 from .exceptions import SubmanagerCommandFailure
@@ -68,23 +68,45 @@ def get_graph_items(graph: MultiDiGraph) -> Iterable[tuple[str, NodeData]]:
     return graph.nodes.items()
 
 
-def get_package_details(graph: MultiDiGraph) -> None:
+async def get_package_detail(
+    repositories: Iterable[Repository], graph: MultiDiGraph, variable: str
+) -> None:
+    async with TaskGroup() as group:
+        tasks = [
+            group.create_task(repository.get_package_detail(variable))
+            for repository in repositories
+        ]
+
+    for repository, task in zip(repositories, tasks):
+        package_detail = task.result()
+
+        if package_detail is not None:
+            graph.add_node(variable, repository=repository, detail=package_detail)
+            break
+
+
+async def get_package_details(
+    repositories: Iterable[Repository], model: Set[str]
+) -> MultiDiGraph:
     stderr.write("Fetching package details...\n")
 
-    for package, node_data in get_graph_items(graph):
-        node_data["detail"] = create_task(
-            node_data["repository"].get_package_detail(package)
-        )
+    graph = MultiDiGraph()
+
+    async with TaskGroup() as group:
+        for variable in model:
+            group.create_task(get_package_detail(repositories, graph, variable))
+
+    return graph
 
 
-async def create_dependencies(graph: MultiDiGraph) -> None:
+def create_dependencies(graph: MultiDiGraph) -> None:
     edges = [
         (package, dependency)
         for package, package_data in get_graph_items(graph)
         for dependency, dependency_data in get_graph_items(graph)
-        if await async_any(
-            interface in (await dependency_data["detail"]).interfaces
-            for interface in (await package_data["detail"]).dependencies
+        if any(
+            interface in dependency_data["detail"].interfaces
+            for interface in package_data["detail"].dependencies
         )
     ]
 
@@ -155,28 +177,30 @@ async def main(
         async with Repositories(
             config.repository_drivers, config.repositories
         ) as repositories:
-            graph = await resolve(
+            model = await resolve(
                 repositories, translators, input.requirements, input.options
             )
 
-        for package in sorted(graph.nodes):
-            stderr.write(f"\t{package}\n")
+            graph = await get_package_details(repositories, model)
 
-        get_package_details(graph)
+            for package in sorted(graph.nodes):
+                stderr.write(f"\t{package}\n")
 
-        await create_dependencies(graph)
+            create_dependencies(graph)
 
-        if graph_path is not None:
-            graph_dot = graph_to_dot(graph)
-            graph_dot.write(graph_path)
+            if graph_path is not None:
+                graph_dot = graph_to_dot(graph)
+                graph_dot.write(graph_path)
 
-        async with HTTPClient(http2=True) as client:
-            with SqliteDict(
-                config.product_cache_path / "mapping-db.sqlite"
-            ) as cache_mapping:
-                fetch(cache_mapping, client, config.product_cache_path, graph)
+            async with HTTPClient(http2=True) as archive_client:
+                with SqliteDict(
+                    config.product_cache_path / "mapping-db.sqlite"
+                ) as cache_mapping:
+                    fetch(
+                        cache_mapping, archive_client, config.product_cache_path, graph
+                    )
 
-                await install(installers, graph, installation_path)
+                    await install(installers, graph, installation_path)
 
         if generators_path is not None:
             await generators(generators_path)

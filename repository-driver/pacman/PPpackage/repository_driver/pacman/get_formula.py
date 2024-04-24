@@ -1,6 +1,4 @@
-from collections.abc import AsyncIterable
-
-from pyalpm import Handle
+from collections.abc import AsyncIterable, MutableSequence
 
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
@@ -9,10 +7,12 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
+from pyalpm import Handle
+
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
-from .utils import strip_version
+from .utils import package_provides
 
 
 async def get_formula(
@@ -20,7 +20,7 @@ async def get_formula(
     repository_parameters: RepositoryParameters,
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
-    provides = dict[str, list[str]]()
+    provides = dict[str | tuple[str, str], MutableSequence[str]]()
 
     with TemporaryDirectory() as root_directory_path:
         handle = Handle(
@@ -30,7 +30,7 @@ async def get_formula(
         database = handle.register_syncdb("database", 0)
 
         for package in database.pkgcache:
-            full_name = f"pacman-{package.name}-{package.version}-{package.arch}"
+            full_name = f"pacman-{package.name}-{package.version}"
 
             if len(package.depends) != 0:
                 yield ImplicationRequirement(
@@ -46,12 +46,16 @@ async def get_formula(
                     ),
                 )
 
-            for provide in package.provides:
-                provides.setdefault(strip_version(provide), []).append(full_name)
+            for provide in package_provides(package.provides):
+                provides.setdefault(provide, []).append(full_name)
 
     for provide, packages in provides.items():
+        variable_string = (
+            provide if isinstance(provide, str) else f"{provide[0]}-{provide[1]}"
+        )
+
         yield ImplicationRequirement(
-            SimpleRequirement("noop", f"pacman-{provide}"),
+            SimpleRequirement("noop", f"pacman-{variable_string}"),
             (
                 XORRequirement(
                     [SimpleRequirement("noop", package) for package in packages]

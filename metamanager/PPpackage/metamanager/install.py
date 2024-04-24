@@ -14,7 +14,6 @@ async def install(
     for generation in topological_generations(graph.reverse(copy=False)):
         async with TaskGroup() as group:
             for package in generation:
-                print(f"Installing {package}...")
                 node_data: NodeData = graph.nodes[package]
 
                 product_path, installer_identifier = await node_data["product"]

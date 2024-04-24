@@ -10,5 +10,6 @@ setup(
         "pydot",
         "networkx",
         "pyalpm",
+        "httpx",
     ],
 )

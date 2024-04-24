@@ -1,18 +1,18 @@
 from collections.abc import AsyncIterable
-from sys import stderr
 
-from PPpackage.repository_driver.interface.schemes import DiscoveryPackageInfo
+from PPpackage.repository_driver.interface.schemes import TranslatorInfo
 from pyalpm import Handle
 
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
+from .utils import package_provides
 
 
-async def discover_packages(
+async def fetch_translator_data(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-) -> AsyncIterable[DiscoveryPackageInfo]:
+) -> AsyncIterable[TranslatorInfo]:
     with TemporaryDirectory() as root_directory_path:
         handle = Handle(
             str(root_directory_path), str(repository_parameters.database_path)
@@ -22,7 +22,14 @@ async def discover_packages(
         database.servers = repository_parameters.mirrorlist
 
         for package in database.pkgcache:
-            yield DiscoveryPackageInfo(
-                f"pacman-{package.name}-{package.version}-{package.arch}",
-                frozenset([f"pacman-{package.name}"]),
+            yield TranslatorInfo(
+                f"pacman-{package.name}",
+                package.version,
             )
+
+            for provide in package_provides(package.provides):
+                match provide:
+                    case (library, version):
+                        yield TranslatorInfo(f"pacman-{library}", version)
+                    case str():
+                        yield TranslatorInfo(f"pacman-{provide}", "")

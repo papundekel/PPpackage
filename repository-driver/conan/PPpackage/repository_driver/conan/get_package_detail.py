@@ -1,6 +1,5 @@
 from pydantic import AnyUrl
 
-from PPpackage.repository_driver.interface.exceptions import CommandException
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
@@ -14,18 +13,5 @@ async def get_package_detail(
     repository_parameters: RepositoryParameters,
     translated_options: ConanOptions,
     package: str,
-) -> PackageDetail:
-    if package.startswith("conan-openssl"):
-        return PackageDetail(
-            frozenset(),
-            frozenset(["sh"]),
-            ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
-        )
-    elif package.startswith("conan-nameof"):
-        return PackageDetail(
-            frozenset(),
-            frozenset(),
-            ArchiveProductDetail(AnyUrl("https://google.com"), "simple"),
-        )
-
-    raise CommandException
+) -> PackageDetail | None:
+    return None

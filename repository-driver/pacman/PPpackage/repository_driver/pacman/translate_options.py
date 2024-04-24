@@ -7,5 +7,5 @@ async def translate_options(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     options: Any,
-):
+) -> None:
     return None

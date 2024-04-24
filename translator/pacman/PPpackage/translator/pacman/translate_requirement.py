@@ -41,57 +41,55 @@ def parse_requirement(requirement: str) -> tuple[str, Comparison, str]:
     return requirement, Comparison.ANY, ""
 
 
-def parse_package_version(package_version: str) -> str:
-    tokens = package_version.rsplit("-", 3)
-
-    if len(tokens) != 4:
-        raise Exception(f"Invalid package version: {package_version}")
-
-    return tokens[1]
-
-
-def version_less(version_left: str, version_right: str) -> bool:
-    compare_code = alpm_vercmp(version_left, version_right)
-
-    return compare_code < 0
-
-
 def version_compare(
     version_left: str, comparison: Comparison, version_right: str
 ) -> bool:
+    if comparison == Comparison.ANY:
+        return True
+
+    if version_left == "":
+        return False
+
+    cmp = alpm_vercmp(version_left, version_right)
+
     match comparison:
         case Comparison.EQUAL:
-            return version_left == version_right
+            return cmp == 0
         case Comparison.GREATER:
-            return version_less(version_right, version_left)
+            return cmp > 0
         case Comparison.GREATER_EQUAL:
-            return not version_less(version_left, version_right)
+            return cmp >= 0
         case Comparison.LESS:
-            return version_less(version_left, version_right)
+            return cmp < 0
         case Comparison.LESS_EQUAL:
-            return not version_less(version_right, version_left)
-        case Comparison.ANY:
-            return True
+            return cmp <= 0
+
+
+def make_variable(package: str, version: str) -> str:
+    if version == "":
+        return f"pacman-{package}"
+
+    return f"pacman-{package}-{version}"
 
 
 async def translate_requirement(
     parameters: Parameters,
-    grouped_packages: Mapping[str, Iterable[str]],
+    data: Mapping[str, Iterable[str]],
     requirement: str,
 ) -> Formula:
-    package, comparison, version = parse_requirement(requirement)
+    package, comparison, required_version = parse_requirement(requirement)
 
-    related_packages = grouped_packages.get(f"pacman-{package}")
-
-    if related_packages is None:
-        return Atom(f"pacman-{package}")
+    versions = data.get(f"pacman-{package}", [])
 
     result = Or(
         *(
-            Atom(package)
-            for package in related_packages
-            if version_compare(parse_package_version(package), comparison, version)
+            Atom(make_variable(package, version))
+            for version in versions
+            if version_compare(version, comparison, required_version)
         )
     )
+
+    if result == Or():
+        print(f"Requirement {requirement} is not satisfied", file=stderr)
 
     return result

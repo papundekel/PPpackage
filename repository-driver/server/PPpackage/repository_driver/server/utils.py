@@ -36,7 +36,7 @@ def HTTP400Exception():
 def StreamingResponse(
     status_code: int,
     headers: Mapping[str, str],
-    generator: Iterable[memoryview] | AsyncIterable[memoryview],
+    generator: AsyncIterable[memoryview],
 ):
     if isinstance(generator, Iterable):
         generator_wrapped = (bytes(chunk) for chunk in generator)
