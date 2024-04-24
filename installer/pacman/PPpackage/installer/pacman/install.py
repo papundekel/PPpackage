@@ -1,6 +1,7 @@
 from asyncio import Lock, create_subprocess_exec
 from contextlib import contextmanager
 from pathlib import Path
+from sys import stderr
 
 from asyncstdlib import list as async_list
 from PPpackage.container_utils.run import run as container_run
@@ -51,6 +52,7 @@ async def install_manager_command(
             pipe_hook_path.open("rb") as pipe_hook,
             create_necessary_container_files(installation_path),
         ):
+            print(f"Running {command} {args} in container", file=stderr)
             return_code = container_run(
                 containerizer_config.url,
                 [command, *args],
