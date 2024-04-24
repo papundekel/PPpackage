@@ -56,21 +56,23 @@ jobs:
               run: >
                   docker run --rm
                   --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
+                  --mount type=bind,source=${{ github.workspace }}/examples/pacman-repository.json,target=/mnt/pacman-repository.json
                   --env REPOSITORY=core
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
-                  --repository examples/pacman-repository.json
+                  --repository /mnt/pacman-repository.json
 
             - name: Update archlinux extra database
               run: >
                   docker run --rm
                   --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
+                  --mount type=bind,source=${{ github.workspace }}/examples/pacman-repository.json,target=/mnt/pacman-repository.json
                   --env REPOSITORY=extra
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
-                  --repository examples/pacman-repository.json
+                  --repository /mnt/pacman-repository.json
 
             - name: Run PPpackage
               run: >
