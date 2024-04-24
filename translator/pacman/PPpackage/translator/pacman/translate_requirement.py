@@ -89,7 +89,4 @@ async def translate_requirement(
         )
     )
 
-    if result == Or():
-        print(f"Requirement {requirement} is not satisfied", file=stderr)
-
     return result

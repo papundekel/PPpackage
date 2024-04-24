@@ -45,12 +45,6 @@
                     "package": "openssl",
                     "version": "[>=3.1.1]"
                 }
-            },
-            {
-                "negated": {
-                    "translator": "noop",
-                    "value": "pacman-openssl-1.1-1.1.1.w-1-x86_64"
-                }
             }
         ]
     },

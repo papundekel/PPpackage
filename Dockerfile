@@ -43,6 +43,9 @@ RUN pip install utils/
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+COPY repository-driver/server/ /workdir/repository-driver/server
+RUN pip install repository-driver/server/
+
 COPY repository-driver/pacman/ /workdir/repository-driver/pacman
 RUN pip install repository-driver/pacman/
 
@@ -57,6 +60,9 @@ RUN pip install utils/
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
+
+COPY repository-driver/server/ /workdir/repository-driver/server
+RUN pip install repository-driver/server/
 
 COPY repository-driver/AUR/ /workdir/repository-driver/AUR
 RUN pip install repository-driver/AUR/
@@ -73,6 +79,9 @@ RUN pip install utils/
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+COPY repository-driver/server/ /workdir/repository-driver/server
+RUN pip install repository-driver/server/
+
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
 
@@ -88,10 +97,44 @@ RUN pip install utils/
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+COPY repository-driver/server/ /workdir/repository-driver/server
+RUN pip install repository-driver/server/
+
 COPY repository-driver/PP/ /workdir/repository-driver/PP
 RUN pip install repository-driver/PP/
 
 ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
+
+# -----------------------------------------------------------------------------
+
+FROM base-python AS updater
+
+COPY utils/ /workdir/utils
+RUN pip install utils/
+
+COPY repository-driver/interface/ /workdir/repository-driver/interface
+RUN pip install repository-driver/interface/
+
+COPY repository-driver/update/ /workdir/repository-driver/update
+RUN pip install repository-driver/update/
+
+
+
+COPY repository-driver/pacman/ /workdir/repository-driver/pacman
+RUN pip install repository-driver/pacman/
+
+COPY repository-driver/AUR/ /workdir/repository-driver/AUR
+RUN pip install repository-driver/AUR/
+
+COPY repository-driver/conan/ /workdir/repository-driver/conan
+RUN pip install repository-driver/conan/
+
+COPY repository-driver/PP/ /workdir/repository-driver/PP
+RUN pip install repository-driver/PP/
+
+
+
+ENTRYPOINT [ "python", "-m", "PPpackage.repository_driver.update" ]
 
 # -----------------------------------------------------------------------------
 

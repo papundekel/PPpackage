@@ -7,6 +7,8 @@
 
 -e ./repository-driver/server/
 
+-e ./repository-driver/update/
+
 -e ./repository-driver/conan/
 -e ./repository-driver/pacman/
 -e ./repository-driver/PP/

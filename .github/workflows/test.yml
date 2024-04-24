@@ -36,10 +36,48 @@ jobs:
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
-            - name: Run PPpackage
+            - name: Build pppackage-updater
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: updater
+                  load: true
+                  tags: docker.io/fackop/pppackage-updater:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Create directories
               run: |
-                  mkdir -p root/ output/ cache/product/ cache/repository/conan/ cache/repository/PP/ database/archlinux-core/ database/archlinux-extra/ database/PP/
-                  USER="$(id -u):$(id -g)" docker compose --file .github/compose.yaml run --rm -T metamanager < examples/input/basic-just-arch.json
+                  mkdir -p root/ output/
+                  mkdir -p cache/product/ cache/repository/conan/ cache/repository/PP/
+                  mkdir -p database/archlinux-core/ database/archlinux-extra/
+
+            - name: Update archlinux core database
+              run: >
+                  docker run --rm
+                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
+                  --env REPOSITORY=core
+                  --env DATABASE_PATH=/mnt/database/
+                  docker.io/fackop/pppackage-updater:latest
+                  PPpackage.repository_driver.pacman
+                  --repository examples/pacman-repository.json
+
+            - name: Update archlinux extra database
+              run: >
+                  docker run --rm
+                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
+                  --env REPOSITORY=extra
+                  --env DATABASE_PATH=/mnt/database/
+                  docker.io/fackop/pppackage-updater:latest
+                  PPpackage.repository_driver.pacman
+                  --repository examples/pacman-repository.json
+
+            - name: Run PPpackage
+              run: >
+                  USER="$(id -u):$(id -g)" docker compose
+                  --file .github/compose.yaml
+                  run --rm
+                  -T metamanager < examples/input/basic-just-arch.json
 
             - name: See if ldconfig ran
               run: ls -l root/etc/ld.so.cache
