@@ -6,6 +6,8 @@ services:
             - /mnt/root/
             - --config
             - /mnt/config.json
+        environment:
+            CONTAINERIZER_ROOT: $PWD/root/
         volumes:
             - type: bind
               source: $PWD/root/
