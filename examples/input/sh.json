@@ -3,7 +3,7 @@
         "and_": [
             {
                 "translator": "pacman",
-                "value": "iana-etc"
+                "value": "sh"
             }
         ]
     },

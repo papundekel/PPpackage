@@ -4,10 +4,10 @@ from typing import Any, AsyncIterable
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
-    DiscoveryPackageInfo,
     PackageDetail,
     ProductInfo,
     Requirement,
+    TranslatorInfo,
 )
 
 from PPpackage.utils.utils import load_interface_module
@@ -42,8 +42,8 @@ class LocalRepository(Repository):
     def get_url(self) -> None:
         return None
 
-    def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]:
-        return self.interface.discover_packages(
+    def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
+        return self.interface.fetch_translator_data(
             self.driver_parameters, self.repository_parameters
         )
 
@@ -57,7 +57,7 @@ class LocalRepository(Repository):
             self.driver_parameters, self.repository_parameters, self.translated_options
         )
 
-    async def get_package_detail(self, package: str) -> PackageDetail:
+    async def get_package_detail(self, package: str) -> PackageDetail | None:
         return await self.interface.get_package_detail(
             self.driver_parameters,
             self.repository_parameters,

@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
 from frozendict import frozendict
+from pydantic import AnyUrl
+from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
     PackageDetail,
@@ -10,17 +14,13 @@ from PPpackage.repository_driver.interface.schemes import (
     ProductInfo,
     Requirement,
 )
-from pydantic import AnyUrl
-from pydantic.dataclasses import dataclass as pydantic_dataclass
-
-from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import WithVariables
 
 
 @pydantic_dataclass(frozen=True)
 class Input:
     requirements: Requirement
-    options: Any
+    options: Any = None
     locks: Mapping[str, Mapping[str, str]] = frozendict()
     generators: frozenset[str] | None = None
 
@@ -63,6 +63,6 @@ class Config:
 
 class NodeData(TypedDict):
     repository: Repository
-    detail: Awaitable[PackageDetail]
+    detail: PackageDetail
     product: Awaitable[tuple[Path, str]]
     product_info: Awaitable[ProductInfo]

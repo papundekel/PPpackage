@@ -1,20 +1,21 @@
-from collections.abc import Mapping
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
 from typing import Annotated, Any, TypeVar
 
+from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from PPpackage.repository_driver.interface.interface import Interface
-from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
-    RepositoryConfig,
-)
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
 
-from PPpackage.utils.stream import dump_many
+from PPpackage.repository_driver.interface.interface import Interface
+from PPpackage.repository_driver.interface.schemes import (
+    ArchiveProductDetail,
+    DependencyProductInfos,
+    RepositoryConfig,
+)
+from PPpackage.utils.stream import dump_bytes_chunked, dump_many, dump_one
 from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import load_from_bytes, load_from_string, load_object
 
@@ -88,14 +89,16 @@ def load_model_from_query(model: type[ModelType], alias: str):
     return dependency
 
 
-async def discover_packages(response: Response):
-    logger.info("Discovering packages...")
+async def fetch_translator_data(response: Response):
+    logger.info("Preparing translator data...")
 
-    packages = interface.discover_packages(driver_parameters, repository_parameters)
+    translator_data = interface.fetch_translator_data(
+        driver_parameters, repository_parameters
+    )
 
-    logger.info("Discovered packages ready.")
+    logger.info("Translator data ready.")
 
-    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(packages))
+    return StreamingResponse(HTTP_200_OK, response.headers, dump_many(translator_data))
 
 
 async def translate_options(
@@ -130,6 +133,7 @@ async def get_formula(
 
 
 async def get_package_detail(
+    response: Response,
     translated_options: Annotated[
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
@@ -142,6 +146,23 @@ async def get_package_detail(
     )
 
     logger.info(f"Package detail for {package} ready.")
+
+    if (
+        package_detail is not None
+        and isinstance(package_detail.product, ArchiveProductDetail)
+        and isinstance(package_detail.product.archive, Path)
+    ):
+        # TODO: iterate file chunks
+        with package_detail.product.archive.open("rb") as file:
+            archive_bytes = memoryview(file.read())
+
+            return StreamingResponse(
+                HTTP_200_OK,
+                response.headers,
+                async_chain(
+                    dump_one(package_detail), dump_bytes_chunked(archive_bytes)
+                ),
+            )
 
     return package_detail
 
@@ -177,8 +198,8 @@ class SubmanagerServer(FastAPI):
     def __init__(self):
         super().__init__(redoc_url=None)
 
-        super().get("/packages", dependencies=[Depends(enable_epoch_cache)])(
-            discover_packages
+        super().get("/translator-data", dependencies=[Depends(enable_epoch_cache)])(
+            fetch_translator_data
         )
         super().get("/translate-options", dependencies=[Depends(enable_epoch_cache)])(
             translate_options

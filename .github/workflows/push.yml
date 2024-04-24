@@ -42,7 +42,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: repository-driver-pacman
                   push: true
-                  tags: docker.io/fackop/repository-driver-pacman:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -52,7 +52,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: repository-driver-aur
                   push: true
-                  tags: docker.io/fackop/repository-driver-aur:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-aur:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -62,7 +62,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: repository-driver-conan
                   push: true
-                  tags: docker.io/fackop/repository-driver-conan:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-conan:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -72,6 +72,16 @@ jobs:
                   context: ${{ github.workspace }}
                   target: repository-driver-pp
                   push: true
-                  tags: docker.io/fackop/repository-driver-pp:latest
+                  tags: docker.io/fackop/pppackage-repository-driver-pp:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Push pppackage-updater
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: updater
+                  push: true
+                  tags: docker.io/fackop/pppackage-updater:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max

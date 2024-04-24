@@ -1,12 +1,12 @@
-from collections.abc import AsyncIterable, Mapping, MutableSequence
+from collections.abc import AsyncIterable
 from typing import Any, Protocol
 
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
-    DiscoveryPackageInfo,
     PackageDetail,
     ProductInfo,
     Requirement,
+    TranslatorInfo,
 )
 from pydantic import AnyUrl
 
@@ -18,7 +18,7 @@ class Repository(Protocol):
 
     def get_url(self) -> AnyUrl | None: ...
 
-    def discover_packages(self) -> AsyncIterable[DiscoveryPackageInfo]: ...
+    def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]: ...
 
     async def _translate_options(self, options: Any) -> Any: ...
 
@@ -31,7 +31,7 @@ class Repository(Protocol):
         async for requirement in self.get_formula():
             yield requirement
 
-    async def get_package_detail(self, package: str) -> PackageDetail: ...
+    async def get_package_detail(self, package: str) -> PackageDetail | None: ...
 
     async def compute_product_info(
         self, package: str, dependency_product_infos: DependencyProductInfos

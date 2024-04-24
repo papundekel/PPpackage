@@ -33,7 +33,7 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "$ROOT",
+                            "containerizer": "$CONTAINERIZER_ROOT",
                             "container": "/mnt/root"
                         }
                     ]
@@ -49,16 +49,18 @@
             "driver": "pacman",
             "parameters": {
                 "database_path": "/mnt/repositories/database/archlinux-core",
-                "header": "core",
-                "include": "/etc/pacman.d/mirrorlist"
+                "mirrorlist": [
+                    "https://geo.mirror.pkgbuild.com/core/os/x86_64"
+                ]
             }
         },
         {
             "driver": "pacman",
             "parameters": {
                 "database_path": "/mnt/repositories/database/archlinux-extra",
-                "header": "extra",
-                "include": "/etc/pacman.d/mirrorlist"
+                "mirrorlist": [
+                    "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
+                ]
             }
         },
         {

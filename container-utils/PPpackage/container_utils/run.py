@@ -1,4 +1,3 @@
-from typing import IO
 from typing import cast as type_cast
 
 from podman import PodmanClient
@@ -10,7 +9,7 @@ def run(
     url: AnyUrl,
     command: list[str],
     image: str | None = None,
-    stdin: IO | bytes | None = None,
+    stdin: bytes | None = None,
     **kwargs,
 ) -> int:
     with PodmanClient(base_url=str(url)) as client:

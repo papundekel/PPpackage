@@ -4,8 +4,6 @@
 #include <charconv>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
-#include <nlohmann/json_fwd.hpp>
 #include <string>
 #include <string_view>
 
@@ -115,62 +113,51 @@ public:
 
 int main(int, char** argv)
 {
-    try
+    const auto server_path = argv[1];
+    const auto command = argv[2];
+
+    boost::asio::io_context io_context;
+
+    stream_protocol::socket socket(io_context);
+    stream_protocol::endpoint endpoint(server_path);
+    socket.connect(endpoint);
+
+    write_string(socket, command);
+
+    for (const auto* arg = argv + 3; *arg != nullptr; ++arg)
     {
-        const auto server_path = argv[1];
-        const auto command = argv[2];
+        socket.send(boost::asio::buffer("T\n"sv), {});
+        write_string(socket, *arg);
+    }
+    socket.send(boost::asio::buffer("F\n"sv), {});
 
-        boost::asio::io_context io_context;
+    auto socket_buffer = Buffer();
 
-        stream_protocol::socket socket(io_context);
-        stream_protocol::endpoint endpoint(server_path);
-        socket.connect(endpoint);
+    const auto pipe_hook_path_string = socket_buffer.read_string(socket);
+    const auto pipe_hook_path_json =
+        nlohmann::json::parse(pipe_hook_path_string);
+    const auto pipe_hook_path = pipe_hook_path_json.get<std::string>();
 
-        write_string(socket, command);
+    const auto pipe_hook = std::fopen(pipe_hook_path.c_str(), "wb");
 
-        for (const auto* arg = argv + 3; *arg != nullptr; ++arg)
+    char buffer[256];
+    while (true)
+    {
+        const auto read = fread(buffer, 1, sizeof(buffer), stdin);
+
+        if (read == 0)
         {
-            socket.send(boost::asio::buffer("T\n"sv), {});
-            write_string(socket, *arg);
-        }
-        socket.send(boost::asio::buffer("F\n"sv), {});
-
-        auto socket_buffer = Buffer();
-
-        const auto pipe_hook_path_string = socket_buffer.read_string(socket);
-        const auto pipe_hook_path_json =
-            nlohmann::json::parse(pipe_hook_path_string);
-        const auto pipe_hook_path = pipe_hook_path_json.get<std::string>();
-
-        const auto pipe_hook = std::fopen(pipe_hook_path.c_str(), "wb");
-
-        char buffer[256];
-        while (true)
-        {
-            const auto read = fread(buffer, 1, sizeof(buffer), stdin);
-
-            if (read == 0)
-            {
-                break;
-            }
-
-            std::fwrite(buffer, 1, read, pipe_hook);
+            break;
         }
 
-        std::fclose(pipe_hook);
-
-        const auto return_value_string = socket_buffer.read_string(socket);
-        const auto return_value_json =
-            nlohmann::json::parse(return_value_string);
-        const auto return_value = return_value_json.get<int>();
-
-        return return_value;
+        std::fwrite(buffer, 1, read, pipe_hook);
     }
-    catch (const std::exception& e)
-    {
-        std::ofstream log("/tmp/fakealpm.log");
-        log << e.what() << std::endl;
 
-        return 1;
-    }
+    std::fclose(pipe_hook);
+
+    const auto return_value_string = socket_buffer.read_string(socket);
+    const auto return_value_json = nlohmann::json::parse(return_value_string);
+    const auto return_value = return_value_json.get<int>();
+
+    return return_value;
 }

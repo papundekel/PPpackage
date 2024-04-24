@@ -12,5 +12,5 @@ class DriverParameters(BaseModel):
 
 class RepositoryParameters(BaseModel):
     database_path: Annotated[Path, WithVariables]
-    header: str
-    include: Path
+    mirrorlist: list[Annotated[str, WithVariables]]
+    repository: Annotated[str, WithVariables] | None = None

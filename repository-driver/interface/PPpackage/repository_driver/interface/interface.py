@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from .schemes import DiscoveryPackageInfo, PackageDetail, ProductInfo, Requirement
+from .schemes import PackageDetail, ProductInfo, Requirement, TranslatorInfo
 
 DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
 RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
@@ -19,13 +19,15 @@ class Interface(
     RepositoryParameters: type[RepositoryParametersType]
     TranslatedOptions: type[TranslatedOptionsType]
 
+    update: Callable[[DriverParametersType, RepositoryParametersType], Awaitable[None]]
+
     get_epoch: Callable[
         [DriverParametersType, RepositoryParametersType], Awaitable[str]
     ]
 
-    discover_packages: Callable[
+    fetch_translator_data: Callable[
         [DriverParametersType, RepositoryParametersType],
-        AsyncIterable[DiscoveryPackageInfo],
+        AsyncIterable[TranslatorInfo],
     ]
 
     translate_options: Callable[
@@ -40,7 +42,7 @@ class Interface(
 
     get_package_detail: Callable[
         [DriverParametersType, RepositoryParametersType, TranslatedOptionsType, str],
-        Awaitable[PackageDetail],
+        Awaitable[PackageDetail | None],
     ]
 
     compute_product_info: Callable[

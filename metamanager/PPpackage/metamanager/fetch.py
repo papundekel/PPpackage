@@ -11,15 +11,15 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from pydantic import AnyUrl
+from sqlitedict import SqliteDict
+
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
     ProductDetail,
     ProductInfo,
 )
-from pydantic import AnyUrl
-from sqlitedict import SqliteDict
-
 from PPpackage.utils.validation import save_to_string
 
 from .exceptions import SubmanagerCommandFailure
@@ -111,7 +111,7 @@ async def create_dependency_product_infos(
     dependency_product_infos = dict[str, MutableMapping[str, Any]]()
 
     for dependency, node_data in dependencies:
-        for interface in (await node_data["detail"]).interfaces:
+        for interface in node_data["detail"].interfaces:
             dependency_product_infos.setdefault(interface, {})[dependency] = (
                 await node_data["product_info"]
             ).get(interface)
@@ -151,9 +151,9 @@ async def fetch_package_or_cache(
     product_info_hash = hash_product_info(package, await node_data["product_info"])
 
     if product_info_hash not in cache_mapping:
-        product_path = Path(mkdtemp(dir=cache_path)) / "product"
+        product_path = Path(mkdtemp(dir=cache_path, prefix=package)) / "product"
         installer = await fetch_package(
-            (await node_data["detail"]).product,
+            node_data["detail"].product,
             client,
             package,
             node_data["repository"],

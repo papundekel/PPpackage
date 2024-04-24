@@ -4,7 +4,9 @@
     },
     "parameters": {
         "database_path": "tmp/database/archlinux-extra",
-        "header": "extra",
-        "include": "/etc/pacman.d/mirrorlist"
+        "repository": "extra",
+        "mirrorlist": [
+            "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
+        ]
     }
 }

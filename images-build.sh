@@ -7,4 +7,5 @@ fi
 "$1" build --target repository-driver-conan --tag docker.io/fackop/pppackage-repository-driver-conan:latest . && \
 "$1" build --target repository-driver-pp --tag docker.io/fackop/pppackage-repository-driver-pp:latest . &&\
 "$1" build --target repository-driver-aur --tag docker.io/fackop/pppackage-repository-driver-aur:latest . &&\
+"$1" build --target updater --tag docker.io/fackop/pppackage-updater:latest . &&\
 "$1" build --target metamanager --tag docker.io/fackop/pppackage-metamanager:latest .

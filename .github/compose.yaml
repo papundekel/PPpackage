@@ -1,15 +1,13 @@
 services:
     metamanager:
         image: docker.io/fackop/pppackage-metamanager:latest
-        ulimits:
-            nofile: # fakeroot issue https://github.com/moby/moby/issues/27195
-                soft: 1024
-                hard: 1048576
         user: $USER
         command:
             - /mnt/root/
             - --config
             - /mnt/config.json
+        environment:
+            CONTAINERIZER_ROOT: $PWD/root/
         volumes:
             - type: bind
               source: $PWD/root/

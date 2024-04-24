@@ -15,6 +15,6 @@ async def get_formula(
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
-        SimpleRequirement("noop", "pacman-conan-1.0.0"),
+        SimpleRequirement("noop", "pacman-conan-1.0.0-1-any"),
         SimpleRequirement("pacman", "sh"),
     )

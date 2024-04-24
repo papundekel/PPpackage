@@ -57,9 +57,9 @@ Requirement = (
 
 
 @pydantic_dataclass(frozen=True)
-class DiscoveryPackageInfo:
-    package: str
-    translator_groups: frozenset[str]
+class TranslatorInfo:
+    group: str
+    symbol: str
 
 
 Parameters = Mapping[str, Any]
