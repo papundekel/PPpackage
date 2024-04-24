@@ -76,7 +76,7 @@ jobs:
 
             - name: Run PPpackage
               run: >
-                  USER="$(id -u):$(id -g)" docker compose
+                  USER="$(id -u):$(id -g)" ROOT="$(pwd)/root" docker compose
                   --file .github/compose.yaml
                   run --rm
                   -T metamanager < examples/input/basic-just-arch.json

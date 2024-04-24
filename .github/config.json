@@ -33,7 +33,7 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "$PWD/root",
+                            "containerizer": "$ROOT",
                             "container": "/mnt/root"
                         }
                     ]
