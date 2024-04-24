@@ -52,7 +52,10 @@ async def install_manager_command(
             pipe_hook_path.open("rb") as pipe_hook,
             create_necessary_container_files(installation_path),
         ):
-            print(f"Running {command} {args} in container", file=stderr)
+            print(
+                f"Running {command} {args} in container {translate(containerizer_config.path_translations, installation_path)}",
+                file=stderr,
+            )
             return_code = container_run(
                 containerizer_config.url,
                 [command, *args],
