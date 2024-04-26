@@ -4,5 +4,5 @@ setup(
     name="PPpackage-translator-conan",
     packages=["PPpackage.translator.conan"],
     version="0.1.0",
-    install_requires=["PPpackage-translator-interface"],
+    install_requires=["PPpackage-translator-interface", "conan"],
 )
