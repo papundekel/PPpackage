@@ -46,7 +46,7 @@ async def translate_requirement(
 
     versions = data.get(f"pacman-{package}", [])
 
-    result = Or(
+    return Or(
         *(
             Atom(
                 f"pacman-{package}-{version}" if version != "" else f"pacman-{package}"
@@ -60,5 +60,3 @@ async def translate_requirement(
             )
         )
     )
-
-    return result
