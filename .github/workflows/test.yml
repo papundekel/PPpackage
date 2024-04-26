@@ -50,7 +50,7 @@ jobs:
               run: |
                   mkdir -p root/ output/
                   mkdir -p cache/product/ cache/repository/conan/ cache/repository/PP/
-                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/PP/
+                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/conan-conancenter/ database/PP/
 
             - name: Update archlinux core database
               run: >
