@@ -48,7 +48,7 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/repositories/database/archlinux-core",
+                "database_path": "/mnt/repositories/database/archlinux-core/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/core/os/x86_64"
                 ]
@@ -57,7 +57,7 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/repositories/database/archlinux-extra",
+                "database_path": "/mnt/repositories/database/archlinux-extra/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
                 ]
@@ -69,7 +69,7 @@
         {
             "driver": "conan",
             "parameters": {
-                "cache_path": "/mnt/cache/repository/conan-conancenter",
+                "database_path": "/mnt/repositories/database/conan-conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
             }

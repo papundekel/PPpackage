@@ -17,7 +17,3 @@ def package_provides(provides: Iterable[str]) -> Iterable[tuple[str, str] | str]
             yield tokens[0], tokens[1]
         else:
             yield provide
-
-
-def Database(repository_parameters: RepositoryParameters) -> SqliteDict:
-    return SqliteDict(repository_parameters.database_path / "database.sqlite")
