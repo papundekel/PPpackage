@@ -37,3 +37,4 @@ async def update(
             )
 
         database["epoch"] = epoch + 1
+        database.commit()
