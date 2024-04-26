@@ -53,7 +53,7 @@
             "parameters": {
                 "database_path": "tmp/database/archlinux-extra",
                 "mirrorlist": [
-                    "http://ftp.sh.cvut.cz/arch/core/os/x86_64"
+                    "http://ftp.sh.cvut.cz/arch/extra/os/x86_64"
                 ]
             }
         },

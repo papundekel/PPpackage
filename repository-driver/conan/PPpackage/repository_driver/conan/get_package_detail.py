@@ -1,9 +1,4 @@
-from pydantic import AnyUrl
-
-from PPpackage.repository_driver.interface.schemes import (
-    ArchiveProductDetail,
-    PackageDetail,
-)
+from PPpackage.repository_driver.interface.schemes import PackageDetail
 
 from .schemes import ConanOptions, DriverParameters, RepositoryParameters
 
