@@ -4,18 +4,17 @@ from conan.api.conan_api import ConanAPI
 from conan.internal.conan_app import ConanApp
 from conans.client.conanfile.configure import run_configure_method
 from conans.client.graph.profile_node_definer import initialize_conanfile_profile
-from conans.model.options import Options
+from conans.model.options import Options as ConanOptions
 from conans.model.profile import Profile
 from conans.model.recipe_ref import RecipeReference
 from conans.model.requires import Requirement
-
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     MetaOnTopProductDetail,
     PackageDetail,
 )
 
-from .schemes import ConanOptions, DriverParameters, RepositoryParameters
+from .schemes import DriverParameters, Options, RepositoryParameters
 
 
 def get_requirements(
@@ -28,7 +27,7 @@ def get_requirements(
     host_profile = Profile()  # TODO
 
     initialize_conanfile_profile(conanfile, build_profile, host_profile, "host", False)
-    run_configure_method(conanfile, Options(), host_profile.options, revision)
+    run_configure_method(conanfile, ConanOptions(), host_profile.options, revision)
 
     return conanfile.requires.values()
 
@@ -36,7 +35,7 @@ def get_requirements(
 async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: ConanOptions,
+    translated_options: Options,
     full_package_name: str,
 ) -> PackageDetail | None:
     tokens = full_package_name.split("conan-", 1)

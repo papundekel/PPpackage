@@ -7,13 +7,13 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
 )
 
-from .schemes import ConanOptions, DriverParameters, RepositoryParameters
+from .schemes import DriverParameters, Options, RepositoryParameters
 
 
 async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: ConanOptions,
+    translated_options: Options,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(
         SimpleRequirement("noop", "conan-openssl-3.1.0"),

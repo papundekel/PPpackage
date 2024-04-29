@@ -3,13 +3,13 @@ from PPpackage.repository_driver.interface.schemes import (
     ProductInfo,
 )
 
-from .schemes import ConanOptions, DriverParameters, RepositoryParameters
+from .schemes import DriverParameters, Options, RepositoryParameters
 
 
 async def compute_product_info(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    translated_options: ConanOptions,
+    translated_options: Options,
     package: str,
     dependency_product_infos: DependencyProductInfos,
 ) -> ProductInfo:

@@ -12,7 +12,10 @@ jobs:
         steps:
             - uses: actions/checkout@v4.1.1
 
-            - uses: gacts/install-podman@v1.1.0
+            - name: Install podman
+              uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+              with:
+                  packages: podman
 
             - name: Download seccomp.json
               run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
