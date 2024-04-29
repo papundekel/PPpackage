@@ -15,7 +15,7 @@ class DriverParameters(BaseModel):
 class RepositoryParameters(BaseModel):
     database_path: Annotated[Path, WithVariables]
     url: AnyUrl
-    verify_ssl: bool
+    verify_ssl: bool = True
 
 
 @pydantic_dataclass
@@ -24,4 +24,4 @@ class ConanRequirement:
     version: str
 
 
-ConanOptions = Mapping[str, Any]
+type ConanOptions = Mapping[str, Any]

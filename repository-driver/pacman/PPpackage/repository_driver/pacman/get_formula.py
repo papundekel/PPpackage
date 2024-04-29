@@ -1,5 +1,7 @@
 from collections.abc import AsyncIterable, MutableSequence
 
+from pyalpm import Handle
+
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     ImplicationRequirement,
@@ -7,8 +9,6 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
-from pyalpm import Handle
-
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -30,14 +30,10 @@ async def get_formula(
         database = handle.register_syncdb("database", 0)
 
         for package in database.pkgcache:
-            full_name = f"pacman-{package.name}-{package.version}"
-
+            full_name = f"pacman-real-{package.name}-{package.version}"
             if len(package.depends) != 0:
                 yield ImplicationRequirement(
-                    SimpleRequirement(
-                        "noop",
-                        full_name,
-                    ),
+                    SimpleRequirement("noop", full_name),
                     ANDRequirement(
                         [
                             SimpleRequirement("pacman", dependency)
@@ -55,7 +51,7 @@ async def get_formula(
         )
 
         yield ImplicationRequirement(
-            SimpleRequirement("noop", f"pacman-{variable_string}"),
+            SimpleRequirement("noop", f"pacman-virtual-{variable_string}"),
             (
                 XORRequirement(
                     [SimpleRequirement("noop", package) for package in packages]

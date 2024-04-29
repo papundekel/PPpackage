@@ -1,13 +1,12 @@
 from collections.abc import AsyncIterable
 from logging import getLogger
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
 from .validation import load_from_bytes, wrap
 
 _TRUE_STRING = "T"
-T = TypeVar("T")
 
 logger = getLogger(__name__)
 
@@ -76,9 +75,6 @@ class Writer(Protocol):
     async def write(self, data: AsyncIterable[memoryview]) -> None: ...
 
 
-ModelType = TypeVar("ModelType")
-
-
 class Reader(Protocol):
     async def readexactly(self, n: int) -> memoryview: ...
 
@@ -132,7 +128,7 @@ class Reader(Protocol):
 
         return memoryview(buffer)
 
-    async def load_one(self, Model: type[ModelType]) -> ModelType:
+    async def load_one[T](self, Model: type[T]) -> T:
         input_bytes = await self.load_bytes()
 
         return load_from_bytes(Model, input_bytes)
@@ -146,6 +142,6 @@ class Reader(Protocol):
 
             yield
 
-    async def load_many(self, Model: type[ModelType]) -> AsyncIterable[ModelType]:
+    async def load_many[T](self, Model: type[T]) -> AsyncIterable[T]:
         async for _ in self.load_loop():
             yield await self.load_one(Model)

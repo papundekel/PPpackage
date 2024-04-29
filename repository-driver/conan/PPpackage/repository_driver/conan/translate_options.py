@@ -8,4 +8,12 @@ async def translate_options(
     repository_parameters: RepositoryParameters,
     options: Any,
 ) -> ConanOptions:
-    return {}
+    try:
+        conan_options = options["conan"]
+
+        if not isinstance(conan_options, dict):
+            raise Exception
+
+        return conan_options
+    except:
+        return {}

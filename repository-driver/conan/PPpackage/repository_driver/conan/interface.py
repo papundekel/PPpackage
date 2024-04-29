@@ -12,7 +12,7 @@ from .update import update
 interface = Interface(
     DriverParameters=DriverParameters,
     RepositoryParameters=RepositoryParameters,
-    TranslatedOptions=ConanOptions,
+    TranslatedOptions=ConanOptions,  # type: ignore
     update=update,
     get_epoch=get_epoch,
     translate_options=translate_options,

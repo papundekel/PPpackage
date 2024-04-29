@@ -17,5 +17,6 @@ setup(
         "asyncstdlib",
         "sqlitedict",
         "hishel[sqlite]",
+        "pysat",
     ],
 )

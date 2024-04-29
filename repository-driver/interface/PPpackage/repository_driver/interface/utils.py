@@ -1,11 +1,10 @@
 from asyncio import TaskGroup
-from collections.abc import AsyncIterable, Awaitable, Iterable
+from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import Callable
 
 from .schemes import (
     ANDRequirement,
-    EquivalenceRequirement,
     ImplicationRequirement,
     NegatedRequirement,
     ORRequirement,
@@ -14,11 +13,9 @@ from .schemes import (
     XORRequirement,
 )
 
-T = TypeVar("T")
-
 
 @dataclass(frozen=True)
-class RequirementVisitor(Generic[T]):
+class RequirementVisitor[T]:
     simple_visitor: Callable[[SimpleRequirement], Awaitable[T]]
     negated_visitor: Callable[[T], Awaitable[T]]
     and_visitor: Callable[[Iterable[T]], Awaitable[T]]
@@ -28,9 +25,9 @@ class RequirementVisitor(Generic[T]):
     equivalence_visitor: Callable[[Iterable[T]], Awaitable[T]]
 
 
-async def visit_requirements(
-    requirement: Requirement, visitor: RequirementVisitor[T]
-) -> T:
+async def visit_requirements[
+    T
+](requirement: Requirement, visitor: RequirementVisitor[T]) -> T:
     if isinstance(requirement, SimpleRequirement):
         return await visitor.simple_visitor(requirement)
     elif isinstance(requirement, NegatedRequirement):

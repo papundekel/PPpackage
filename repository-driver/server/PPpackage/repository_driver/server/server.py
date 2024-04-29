@@ -1,7 +1,7 @@
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any
 
 from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -20,11 +20,6 @@ from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import load_from_bytes, load_from_string, load_object
 
 from .utils import StreamingResponse
-
-RequirementType = TypeVar("RequirementType")
-
-SettingsType = TypeVar("SettingsType", bound=BaseSettings)
-StateType = TypeVar("StateType")
 
 
 class PackageSettings(BaseSettings):
@@ -79,10 +74,7 @@ async def enable_permanent_cache(response: Response):
     response.headers["Cache-Control"] = "public, max-age=2147483648"
 
 
-ModelType = TypeVar("ModelType")
-
-
-def load_model_from_query(model: type[ModelType], alias: str):
+def load_model_from_query[ModelType](model: type[ModelType], alias: str):
     def dependency(parameter: Annotated[str, Query(alias=alias)]) -> ModelType:
         return load_from_string(model, parameter)
 

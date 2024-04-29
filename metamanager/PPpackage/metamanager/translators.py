@@ -21,7 +21,7 @@ class Translator:
         self.parameters = load_object(interface.Parameters, config.parameters)
 
     async def translate_requirement(
-        self, data: Mapping[str, Iterable[str]], requirement_unparsed: Any
+        self, data: Mapping[str, Iterable[dict[str, str]]], requirement_unparsed: Any
     ) -> Formula:
         requirement = load_object(self.interface.Requirement, requirement_unparsed)
 

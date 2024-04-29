@@ -23,13 +23,15 @@ async def fetch_translator_data(
 
         for package in database.pkgcache:
             yield TranslatorInfo(
-                f"pacman-{package.name}",
-                package.version,
+                f"pacman-real-{package.name}",
+                {"version": package.version},
             )
 
             for provide in package_provides(package.provides):
                 match provide:
                     case library, version:
-                        yield TranslatorInfo(f"pacman-{library}", version)
+                        yield TranslatorInfo(
+                            f"pacman-virtual-{library}", {"version": version}
+                        )
                     case str():
-                        yield TranslatorInfo(f"pacman-{provide}", "")
+                        yield TranslatorInfo(f"pacman-virtual-{provide}", {})

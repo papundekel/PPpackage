@@ -9,27 +9,31 @@ from .schemes import Parameters, Requirement
 
 async def translate_requirement(
     parameters: Parameters,
-    data: Mapping[str, Iterable[str]],
+    data: Mapping[str, Iterable[dict[str, str]]],
     requirement: Requirement,
 ) -> Formula:
-    versions = data.get(f"conan-{requirement.package}", [])
+    symbols = data.get(f"conan-{requirement.package}", [])
 
     if requirement.version.startswith("[") and requirement.version.endswith("]"):
         version_range = VersionRange(requirement.version[1:-1])
 
         return Or(
             *(
-                Atom(f"conan-{requirement.package}/{version}")
-                for version in versions
-                if version_range.contains(Version(version.rsplit("#", 1)[0]), False)
+                Atom(
+                    f"conan-{requirement.package}/{symbol['version']}#{symbol['revision']}"
+                )
+                for symbol in symbols
+                if version_range.contains(Version(symbol["version"]), False)
             )
         )
     elif requirement.version.find("#") == -1:
         return Or(
             *(
-                Atom(f"conan-{requirement.package}/{version}")
-                for version in versions
-                if version.startswith(f"{requirement.version}#")
+                Atom(
+                    f"conan-{requirement.package}/{symbol['version']}#{symbol['revision']}"
+                )
+                for symbol in symbols
+                if symbol["version"] == requirement.version
             )
         )
     else:

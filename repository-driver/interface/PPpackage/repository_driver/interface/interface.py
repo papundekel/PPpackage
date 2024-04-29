@@ -1,20 +1,18 @@
 from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel
 
 from .schemes import PackageDetail, ProductInfo, Requirement, TranslatorInfo
 
-DriverParametersType = TypeVar("DriverParametersType", bound=BaseModel)
-RepositoryParametersType = TypeVar("RepositoryParametersType", bound=BaseModel)
-TranslatedOptionsType = TypeVar("TranslatedOptionsType")
-
 
 @dataclass(frozen=True, kw_only=True)
-class Interface(
-    Generic[DriverParametersType, RepositoryParametersType, TranslatedOptionsType]
-):
+class Interface[
+    DriverParametersType: BaseModel,
+    RepositoryParametersType: BaseModel,
+    TranslatedOptionsType,
+]:
     DriverParameters: type[DriverParametersType]
     RepositoryParameters: type[RepositoryParametersType]
     TranslatedOptions: type[TranslatedOptionsType]

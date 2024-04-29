@@ -2,16 +2,13 @@ from inspect import isclass
 from json import dumps as json_dumps
 from json import loads as json_loads
 from os import environ
-from pathlib import Path
 from string import Template
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import AfterValidator, BaseModel, RootModel
 
-ModelType = TypeVar("ModelType")
 
-
-def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
+def load_object[T](Model: type[T], input_json: Any) -> T:
     ModelWrapped = (
         Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
     )
@@ -24,13 +21,13 @@ def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
         return input  # type: ignore
 
 
-def load_from_string(Model: type[ModelType], input_json_string: str) -> ModelType:
+def load_from_string[T](Model: type[T], input_json_string: str) -> T:
     input_json = json_loads(input_json_string)
 
     return load_object(Model, input_json)
 
 
-def load_from_bytes(Model: type[ModelType], input_json_bytes: memoryview) -> ModelType:
+def load_from_bytes[T](Model: type[T], input_json_bytes: memoryview) -> T:
     input_json_string = str(input_json_bytes, encoding="utf-8")
 
     return load_from_string(Model, input_json_string)
@@ -54,9 +51,6 @@ def save_to_string(output: BaseModel | Any) -> str:
     output_json_string = json_dumps(output_json, sort_keys=True, separators=(",", ":"))
 
     return output_json_string
-
-
-T = TypeVar("T")
 
 
 def substitute_environment_variables(value: Any):

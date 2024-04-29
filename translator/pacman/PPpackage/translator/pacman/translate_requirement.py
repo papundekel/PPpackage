@@ -1,5 +1,7 @@
 from collections.abc import Callable, Iterable, Mapping
+from itertools import chain
 from operator import eq, ge, gt, le, lt
+from sys import stderr
 
 from pyalpm import vercmp as alpm_vercmp
 from pysat.formula import Atom, Formula, Or
@@ -25,11 +27,11 @@ def parse_requirement(
 
 
 def version_compare(
-    version_left: str,
+    version_left: str | None,
     comparison: Callable[[int, int], bool],
     version_right: str,
 ) -> bool:
-    if version_left == "":
+    if version_left is None:
         return False
 
     cmp = alpm_vercmp(version_left, version_right)
@@ -37,26 +39,42 @@ def version_compare(
     return comparison(cmp, 0)
 
 
+def create_atoms(
+    package: str,
+    prefix: str,
+    symbols: Iterable[dict[str, str]],
+    requirement_expression: tuple[Callable[[int, int], bool], str] | None,
+) -> Iterable[Formula]:
+    for symbol in symbols:
+        if requirement_expression is None or version_compare(
+            symbol.get("version"),
+            requirement_expression[0],
+            requirement_expression[1],
+        ):
+            yield Atom(
+                f"pacman-{prefix}-{package}-{symbol['version']}"
+                if "version" in symbol
+                else f"pacman-{prefix}-{package}"
+            )
+
+
 async def translate_requirement(
     parameters: Parameters,
-    data: Mapping[str, Iterable[str]],
+    data: Mapping[str, Iterable[dict[str, str]]],
     requirement: str,
 ) -> Formula:
     package, requirement_expression = parse_requirement(requirement)
 
-    versions = data.get(f"pacman-{package}", [])
+    real_symbols = data.get(f"pacman-real-{package}", [])
+    virtual_symbols = data.get(f"pacman-virtual-{package}", [])
 
     return Or(
         *(
-            Atom(
-                f"pacman-{package}-{version}" if version != "" else f"pacman-{package}"
-            )
-            for version in versions
-            if requirement_expression is None
-            or version_compare(
-                version,
-                requirement_expression[0],
-                requirement_expression[1],
+            chain(
+                create_atoms(package, "real", real_symbols, requirement_expression),
+                create_atoms(
+                    package, "virtual", virtual_symbols, requirement_expression
+                ),
             )
         )
     )

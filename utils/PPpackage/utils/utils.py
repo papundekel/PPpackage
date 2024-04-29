@@ -1,11 +1,10 @@
-from collections.abc import AsyncIterable, Iterable, Mapping, Set
+from collections.abc import Mapping, Set
 from contextlib import contextmanager
 from importlib import import_module
 from os import mkfifo
 from pathlib import Path
 from shutil import move
 from tempfile import TemporaryDirectory as BaseTemporaryDirectory
-from typing import Any, TypeVar
 from typing import cast as type_cast
 from typing import overload
 
@@ -28,20 +27,6 @@ def TemporaryPipe(dir=None):
         mkfifo(pipe_path)
 
         yield pipe_path
-
-
-async def discard_async_iterable(async_iterable: AsyncIterable[Any]) -> None:
-    async for _ in async_iterable:
-        pass
-
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-
-async def make_async_iterable(iterable: Iterable[T]) -> AsyncIterable[T]:
-    for item in iterable:
-        yield item
 
 
 def rmtree(path: Path):
@@ -75,11 +60,11 @@ def movetree(source: Path, destination: Path):
 
 
 @overload
-def freeze(x: Mapping[T, U]) -> Mapping[T, U]: ...
+def freeze[T, U](x: Mapping[T, U]) -> Mapping[T, U]: ...
 
 
 @overload
-def freeze(x: Set[T]) -> Set[T]: ...
+def freeze[T](x: Set[T]) -> Set[T]: ...
 
 
 def freeze(x):
@@ -91,5 +76,5 @@ def freeze(x):
         return x
 
 
-def load_interface_module(Interface: type[T], package_name: str) -> T:
+def load_interface_module[T](Interface: type[T], package_name: str) -> T:
     return type_cast(T, import_module(f"{package_name}.interface").interface)

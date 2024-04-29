@@ -8,4 +8,4 @@ from .schemes import DriverParameters, RepositoryParameters
 async def fetch_translator_data(
     driver_parameters: DriverParameters, repository_parameters: RepositoryParameters
 ) -> AsyncIterable[TranslatorInfo]:
-    yield TranslatorInfo("pacman-conan", "1.0.0-1-any")
+    yield TranslatorInfo("pacman-real-conan", {"version": "1.0.0-1-any"})
