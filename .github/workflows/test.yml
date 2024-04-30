@@ -58,6 +58,9 @@ jobs:
             - name: Update archlinux core database
               run: >
                   docker run --rm
+                  --user $USER
+                  --mount type=bind,source=/etc/passwd,target=/etc/passwd
+                  --mount type=bind,source=/etc/group,target=/etc/group
                   --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=core
@@ -69,6 +72,9 @@ jobs:
             - name: Update archlinux extra database
               run: >
                   docker run --rm
+                  --user $USER
+                  --mount type=bind,source=/etc/passwd,target=/etc/passwd
+                  --mount type=bind,source=/etc/group,target=/etc/group
                   --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=extra
@@ -80,6 +86,9 @@ jobs:
             - name: Update conancenter database
               run: >
                   docker run --rm
+                  --user $USER
+                  --mount type=bind,source=/etc/passwd,target=/etc/passwd
+                  --mount type=bind,source=/etc/group,target=/etc/group
                   --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-conancenter.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
@@ -90,6 +99,9 @@ jobs:
             - name: Create default conan profile
               run: >
                   docker run --rm
+                  --user $USER
+                  --mount type=bind,source=/etc/passwd,target=/etc/passwd
+                  --mount type=bind,source=/etc/group,target=/etc/group
                   --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
                   --env CONAN_HOME=/mnt/database/cache/
                   --entrypoint conan
