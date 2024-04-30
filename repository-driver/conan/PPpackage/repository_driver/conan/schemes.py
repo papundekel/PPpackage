@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Annotated
 
 from pydantic import AnyUrl, BaseModel
-from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from PPpackage.utils.validation import WithVariables
 
@@ -18,12 +17,6 @@ class RepositoryParameters(BaseModel):
     verify_ssl: bool = True
 
 
-@pydantic_dataclass
-class ConanRequirement:
-    package: str
-    version: str
-
-
 type ConanOptions = Mapping[str, str]
 type ConanSettings = Mapping[str, str]
 
@@ -31,3 +24,9 @@ type ConanSettings = Mapping[str, str]
 class Options(BaseModel):
     options: ConanOptions
     settings: ConanSettings
+
+
+class ConanProductInfo(BaseModel):
+    version: str
+    revision: str
+    package_id: str

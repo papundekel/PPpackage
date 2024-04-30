@@ -5,19 +5,19 @@ from typing import Annotated, Any
 
 from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from pydantic import ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
-
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
     RepositoryConfig,
 )
+from pydantic import ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
+
 from PPpackage.utils.stream import dump_bytes_chunked, dump_many, dump_one
 from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import load_from_bytes, load_from_string, load_object
+from PPpackage.utils.validation import validate_json, validate_python
 
 from .utils import StreamingResponse
 
@@ -36,7 +36,7 @@ def parse_config(config_path: Path) -> RepositoryConfig:
         config_json_bytes = f.read()
 
         try:
-            config = load_from_bytes(RepositoryConfig, memoryview(config_json_bytes))
+            config = validate_json(RepositoryConfig, config_json_bytes)
         except ValidationError as e:
             stderr.write("ERROR: Invalid config.\n")
             stderr.write(e.json(indent=4))
@@ -51,8 +51,12 @@ config = parse_config(package_settings.config_path)
 
 interface = load_interface_module(Interface, config.driver.package)
 
-driver_parameters = load_object(interface.DriverParameters, config.driver.parameters)
-repository_parameters = load_object(interface.RepositoryParameters, config.parameters)
+driver_parameters = validate_python(
+    interface.DriverParameters, config.driver.parameters
+)
+repository_parameters = validate_python(
+    interface.RepositoryParameters, config.parameters
+)
 
 
 logger = getLogger(__name__)
@@ -74,9 +78,9 @@ async def enable_permanent_cache(response: Response):
     response.headers["Cache-Control"] = "public, max-age=2147483648"
 
 
-def load_model_from_query[ModelType](model: type[ModelType], alias: str):
-    def dependency(parameter: Annotated[str, Query(alias=alias)]) -> ModelType:
-        return load_from_string(model, parameter)
+def load_model_from_query[T](Model: type[T], alias: str):
+    def dependency(parameter: Annotated[str, Query(alias=alias)]) -> T:
+        return validate_json(Model, parameter)
 
     return dependency
 
@@ -167,7 +171,7 @@ async def compute_product_info(
     dependency_product_infos: Annotated[
         DependencyProductInfos,
         Depends(
-            load_model_from_query(DependencyProductInfos, "dependency_product_infos")
+            load_model_from_query(DependencyProductInfos, "dependency_product_infos")  # type: ignore
         ),
     ],
 ):

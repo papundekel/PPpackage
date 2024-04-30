@@ -2,12 +2,12 @@ from itertools import chain
 from pathlib import Path
 from tempfile import mkdtemp
 
-from pyalpm import Handle
-
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
 )
+from pyalpm import Handle
+
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -69,10 +69,16 @@ async def get_package_detail(
         return PackageDetail(
             frozenset(
                 chain(
-                    [name],
-                    (strip_version(provide) for provide in alpm_package.provides),
+                    [f"pacman-{name}"],
+                    (
+                        f"pacman-{strip_version(provide)}"
+                        for provide in alpm_package.provides
+                    ),
                 )
             ),
-            frozenset(strip_version(dependency) for dependency in alpm_package.depends),
+            frozenset(
+                f"pacman-{strip_version(dependency)}"
+                for dependency in alpm_package.depends
+            ),
             ArchiveProductDetail(archive_path, "pacman"),
         )

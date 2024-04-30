@@ -108,7 +108,7 @@ class ArchiveProductDetail:
     installer: str
 
 
-ProductDetail = (
+type ProductDetail = (
     TagProductDetail
     | ContainerfileProductDetail
     | MetaProductDetail
@@ -124,5 +124,5 @@ class PackageDetail:
     product: ProductDetail
 
 
-ProductInfo = Mapping[str, Any]
-DependencyProductInfos = Mapping[str, Mapping[str, Any]]
+type ProductInfo = Mapping[str, Any]
+type DependencyProductInfos = Mapping[str, Mapping[str, Any]]

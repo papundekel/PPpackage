@@ -11,7 +11,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 
 from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import load_object
+from PPpackage.utils.validation import validate_python
 
 from .repository import Repository
 from .schemes import LocalRepositoryConfig, RepositoryDriverConfig
@@ -29,10 +29,10 @@ class LocalRepository(Repository):
 
         self.package = driver_config.package
         self.interface = interface
-        self.driver_parameters = load_object(
+        self.driver_parameters = validate_python(
             interface.DriverParameters, driver_config.parameters
         )
-        self.repository_parameters = load_object(
+        self.repository_parameters = validate_python(
             interface.RepositoryParameters, repository_config.parameters
         )
 

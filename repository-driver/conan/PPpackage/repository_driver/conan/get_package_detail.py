@@ -1,13 +1,6 @@
-from collections.abc import Iterable
-
 from conan.api.conan_api import ConanAPI
 from conan.internal.conan_app import ConanApp
-from conans.client.conanfile.configure import run_configure_method
-from conans.client.graph.profile_node_definer import initialize_conanfile_profile
-from conans.model.options import Options as ConanOptions
-from conans.model.profile import Profile
 from conans.model.recipe_ref import RecipeReference
-from conans.model.requires import Requirement
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     MetaOnTopProductDetail,
@@ -15,21 +8,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 
 from .schemes import DriverParameters, Options, RepositoryParameters
-
-
-def get_requirements(
-    app: ConanApp, revision: RecipeReference, layout
-) -> Iterable[Requirement]:
-    conanfile_path = layout.conanfile()
-    conanfile = app.loader.load_basic(conanfile_path)
-
-    build_profile = Profile()  # TODO
-    host_profile = Profile()  # TODO
-
-    initialize_conanfile_profile(conanfile, build_profile, host_profile, "host", False)
-    run_configure_method(conanfile, ConanOptions(), host_profile.options, revision)
-
-    return conanfile.requires.values()
+from .utils import PREFIX, get_requirements
 
 
 async def get_package_detail(
@@ -38,26 +17,21 @@ async def get_package_detail(
     translated_options: Options,
     full_package_name: str,
 ) -> PackageDetail | None:
-    tokens = full_package_name.split("conan-", 1)
-
-    if len(tokens) != 2 or len(tokens[0]) != 0:
+    if not full_package_name.startswith(PREFIX):
         return None
 
-    revision = RecipeReference.loads(tokens[1])
+    revision = RecipeReference.loads(full_package_name[len(PREFIX) :])
 
-    api = ConanAPI(str(repository_parameters.database_path / "cache"))
+    api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
     app = ConanApp(api)
 
-    try:
-        layout = app.cache.recipe_layout(revision)
-    except:
+    requirements = get_requirements(api, app, revision)
+
+    if requirements is None:
         return None
 
     return PackageDetail(
-        frozenset([str(revision.name)]),
-        frozenset(
-            str(requirement.ref.name)
-            for requirement in get_requirements(app, revision, layout)
-        ),
+        frozenset([f"conan-{revision.name}"]),
+        frozenset(f"conan-{requirement.ref.name}" for requirement in requirements),
         MetaOnTopProductDetail(ANDRequirement([])),  # TODO:build requirements
     )

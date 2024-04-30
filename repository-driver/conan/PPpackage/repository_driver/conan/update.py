@@ -45,7 +45,9 @@ async def update(
     repository_parameters: RepositoryParameters,
 ) -> None:
     with update_epoch(repository_parameters.database_path / "database.sqlite"):
-        api = ConanAPI(str(repository_parameters.database_path / "cache"))
+        api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
+        app = ConanApp(api)
+
         remote = Remote(
             "",
             url=str(repository_parameters.url),
@@ -53,7 +55,6 @@ async def update(
         )
 
         recipes = api.search.recipes("*", remote)
-        app = ConanApp(api)
 
         with ThreadPoolExecutor(cpu_count() * 16) as executor:
             futures = list[Future]()

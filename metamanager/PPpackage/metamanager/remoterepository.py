@@ -4,7 +4,6 @@ from tempfile import mkdtemp
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
-
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
@@ -13,7 +12,8 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
-from PPpackage.utils.validation import load_from_bytes, save_to_string
+
+from PPpackage.utils.validation import dump_json
 
 from .exceptions import SubmanagerCommandFailure
 from .repository import Repository
@@ -55,7 +55,7 @@ class RemoteRepository(Repository):
     async def _translate_options(self, options: Any) -> Any:
         response = await self.client.get(
             f"{self.url}/translate-options",
-            params={"options": save_to_string(options)},
+            params={"options": dump_json(options)},
             headers={"Cache-Control": "no-cache"},
         )
 
@@ -71,7 +71,7 @@ class RemoteRepository(Repository):
         async with self.client.stream(
             "GET",
             f"{self.url}/formula",
-            params={"translated_options": save_to_string(self.translated_options)},
+            params={"translated_options": dump_json(self.translated_options)},
             headers={"Cache-Control": "no-cache"},
         ) as response:
             if not response.is_success:
@@ -88,7 +88,7 @@ class RemoteRepository(Repository):
     async def get_package_detail(self, package: str) -> PackageDetail | None:
         response = await self.client.get(
             f"{self.url}/packages/{package}",
-            params={"translated_options": save_to_string(self.translated_options)},
+            params={"translated_options": dump_json(self.translated_options)},
         )
 
         if response.status_code == 404:
@@ -130,8 +130,8 @@ class RemoteRepository(Repository):
         response = await self.client.get(
             f"{self.url}/packages/{package}/product-info",
             params={
-                "translated_options": save_to_string(self.translated_options),
-                "dependency_product_infos": save_to_string(dependency_product_infos),
+                "translated_options": dump_json(self.translated_options),
+                "dependency_product_infos": dump_json(dependency_product_infos),
             },
         )
 
@@ -141,4 +141,4 @@ class RemoteRepository(Repository):
                 f"{(await response.aread()).decode()}"
             )
 
-        return load_from_bytes(ProductInfo, memoryview(response.read()))
+        return load_from_bytes(ProductInfo, memoryview(response.read()))  # type: ignore

@@ -4,7 +4,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from .validation import load_from_bytes, wrap
+from .validation import validate_python, wrap_instance
 
 _TRUE_STRING = "T"
 
@@ -54,11 +54,11 @@ async def dump_bytes_chunked(output_bytes: memoryview) -> AsyncIterable[memoryvi
 
 
 async def dump_one(output: BaseModel | Any) -> AsyncIterable[memoryview]:
-    output_wrapped = wrap(output)
+    output_wrapped = wrap_instance(output)
 
-    output_json_string = output_wrapped.model_dump_json()
+    output_json = output_wrapped.model_dump_json()
 
-    output_json_bytes = output_json_string.encode()
+    output_json_bytes = output_json.encode()
 
     async for chunk in dump_bytes(memoryview(output_json_bytes)):
         yield chunk
@@ -131,7 +131,9 @@ class Reader(Protocol):
     async def load_one[T](self, Model: type[T]) -> T:
         input_bytes = await self.load_bytes()
 
-        return load_from_bytes(Model, input_bytes)
+        input = validate_python(Model, input_bytes)
+
+        return input
 
     async def load_loop(self):
         while True:

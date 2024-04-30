@@ -1,7 +1,5 @@
 from typing import Any
 
-from PPpackage.utils.validation import load_object
-
 from .schemes import DriverParameters, Options, RepositoryParameters
 
 
@@ -13,6 +11,6 @@ async def translate_options(
     try:
         conan_options = options["conan"]
 
-        return load_object(Options, conan_options)
+        return Options.model_validate(conan_options)
     except:
         return Options(settings={}, options={})
