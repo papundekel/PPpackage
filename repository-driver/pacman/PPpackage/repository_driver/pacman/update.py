@@ -12,10 +12,7 @@ async def update(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> None:
-    with (
-        update_epoch(repository_parameters.database_path / "database.sqlite"),
-        TemporaryDirectory() as root_directory_path,
-    ):
+    with TemporaryDirectory() as root_directory_path:
         handle = Handle(
             str(root_directory_path), str(repository_parameters.database_path)
         )
@@ -32,3 +29,5 @@ async def update(
             sync_database_path / f"{repository_parameters.repository}.db",
             sync_database_path / "database.db",
         )
+
+    update_epoch(repository_parameters.database_path / "database.sqlite")
