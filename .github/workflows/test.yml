@@ -143,6 +143,7 @@ jobs:
               with:
                   pattern: image-*
                   path: /tmp/
+                  merge-multiple: true
 
             - name: Load images
               run: |
