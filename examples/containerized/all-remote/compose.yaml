@@ -48,7 +48,7 @@ services:
             - type: bind
               source: $CONFIG_AUR
               target: /mnt/config.json
-    conan-conancenter:
+    conancenter:
         image: docker.io/fackop/pppackage-repository-driver-conan:latest
         healthcheck:
             test: ["CMD", "curl", "http://localhost:8888"]
@@ -60,10 +60,10 @@ services:
             - 8888
         volumes:
             - type: bind
-              source: $CONFIG_CONAN_CONANCENTER
+              source: $CONFIG_CONANCENTER
               target: /mnt/config.json
             - type: volume
-              source: cache-conan-conancenter
+              source: cache-conancenter
               target: /mnt/cache/
     pp:
         image: docker.io/fackop/pppackage-repository-driver-pp:latest
@@ -94,7 +94,7 @@ services:
                 condition: service_healthy
             aur:
                 condition: service_healthy
-            conan-conancenter:
+            conancenter:
                 condition: service_healthy
             pp:
                 condition: service_healthy

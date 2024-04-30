@@ -63,7 +63,7 @@
         {
             "driver": "conan",
             "parameters": {
-                "database_path": "tmp/database/conan-conancenter/",
+                "database_path": "tmp/database/conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
             }

@@ -70,7 +70,7 @@
         {
             "driver": "conan",
             "parameters": {
-                "cache_path": "/mnt/repositories/cache/conan-conancenter",
+                "cache_path": "/mnt/repositories/cache/conancenter",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
             }
