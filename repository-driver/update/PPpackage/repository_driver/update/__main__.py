@@ -6,7 +6,7 @@ from typer import Option as TyperOption
 
 from PPpackage.utils.cli import AsyncTyper, run
 from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import load_from_bytes
+from PPpackage.utils.validation import validate_json
 
 app = AsyncTyper()
 
@@ -16,7 +16,7 @@ def load_parameters(Parameters: type, path: Path | None):
         return Parameters()
 
     with path.open("rb") as file:
-        return load_from_bytes(Parameters, memoryview(file.read()))
+        return validate_json(Parameters, file.read())
 
 
 @app.command()

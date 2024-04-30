@@ -7,7 +7,7 @@ from .schemes import Parameters
 
 async def translate_requirement(
     parameters: Parameters,
-    grouped_packages: Mapping[str, Iterable[str]],
+    grouped_packages: Mapping[str, Iterable[dict[str, str]]],
     requirement: str,
 ) -> Formula:
     return Or()

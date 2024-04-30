@@ -4,7 +4,7 @@ from sys import stderr
 
 from PPpackage.installer.interface.interface import Interface
 from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import load_object
+from PPpackage.utils.validation import validate_python
 
 from .schemes import InstallerConfig
 
@@ -17,7 +17,7 @@ class Installer:
         interface = load_interface_module(Interface, config.package)
 
         self.interface = interface
-        self.parameters = load_object(interface.Parameters, config.parameters)
+        self.parameters = validate_python(interface.Parameters, config.parameters)
 
     async def install(self, product_path: Path, installation_path: Path) -> None:
         stderr.write(f"Installing {product_path}...\n")

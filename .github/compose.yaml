@@ -36,12 +36,12 @@ services:
               source: $PWD/database/archlinux-extra/
               target: /mnt/repositories/database/archlinux-extra/
             - type: bind
+              source: $PWD/database/conancenter/
+              target: /mnt/repositories/database/conancenter/
+            - type: bind
               source: $PWD/database/PP/
               target: /mnt/repositories/database/PP/
 
-            - type: bind
-              source: $PWD/cache/repository/conan/
-              target: /mnt/cache/repository/conan/
             - type: bind
               source: $PWD/cache/repository/PP/
               target: /mnt/cache/repository/PP/

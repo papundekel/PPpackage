@@ -43,8 +43,8 @@
             "url": "http://AUR:8888"
         },
         {
-            "name": "conan-conancenter",
-            "url": "http://conan-conancenter:8888"
+            "name": "conancenter",
+            "url": "http://conancenter:8888"
         },
         {
             "name": "PP",

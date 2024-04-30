@@ -1,14 +1,11 @@
 from asyncio.queues import Queue as BaseQueue
 from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
-from typing import TypeVar
 
-T = TypeVar("T")
-
-Queue = BaseQueue[T | None]
+type Queue[T] = BaseQueue[T | None]
 
 
-async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
+async def queue_iterate[T](queue: Queue[T]) -> AsyncIterable[T]:
     while True:
         value = await queue.get()
 
@@ -19,7 +16,7 @@ async def queue_iterate(queue: Queue[T]) -> AsyncIterable[T]:
 
 
 @asynccontextmanager
-async def queue_put_loop(queue: Queue[T]):
+async def queue_put_loop[T](queue: Queue[T]):
     try:
         yield
     finally:

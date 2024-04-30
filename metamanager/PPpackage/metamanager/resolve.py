@@ -4,6 +4,7 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
+    MutableSequence,
     MutableSet,
     Sequence,
     Set,
@@ -19,15 +20,15 @@ from asyncstdlib import islice as async_islice
 from asyncstdlib import min as async_min
 from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
+from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
+from pysat.solvers import Solver
+
+from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
     RequirementVisitor,
     visit_requirements,
 )
-from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
-from pysat.solvers import Solver
-
-from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 
 from .repository import Repository
 from .translators import Translator
@@ -35,16 +36,16 @@ from .translators import Translator
 
 async def repository_fetch_translator_data(
     repository: Repository,
-    translator_info: MutableMapping[str, MutableSet[str]],
+    translator_info: MutableMapping[str, MutableSequence[dict[str, str]]],
 ):
     async for info in repository.fetch_translator_data():
-        translator_info.setdefault(info.group, set()).add(info.symbol)
+        translator_info.setdefault(info.group, []).append(info.symbol)
 
 
 async def fetch_translator_data(
     repositories: Iterable[Repository],
-) -> Mapping[str, Set[str]]:
-    translator_info = dict[str, MutableSet[str]]()
+) -> Mapping[str, Iterable[dict[str, str]]]:
+    translator_info = dict[str, MutableSequence[dict[str, str]]]()
 
     async with TaskGroup() as group:
         for repository in repositories:
@@ -65,7 +66,7 @@ async def get_formula(
 
 async def translate_requirements(
     translators: Mapping[str, Translator],
-    translator_data: Mapping[str, Set[str]],
+    translator_data: Mapping[str, Iterable[dict[str, str]]],
     formula: AsyncIterable[Requirement],
 ) -> Formula:
     async def simple_visitor(r: SimpleRequirement):

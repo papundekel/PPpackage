@@ -2,33 +2,33 @@ from itertools import chain
 from pathlib import Path
 from tempfile import mkdtemp
 
-from pyalpm import Handle
-
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
 )
+from pyalpm import Handle
+
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
 from .utils import strip_version
+
+PREFIX = "pacman-real-"
 
 
 async def get_package_detail(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
-    package: str,
+    full_package_name: str,
 ) -> PackageDetail | None:
-    if not package.startswith("pacman-"):
+    if not full_package_name.startswith(PREFIX):
         return None
 
-    full_name = package[len("pacman-") :]
-
-    tokens = full_name.rsplit("-", 2)
+    tokens = full_package_name[len(PREFIX) :].rsplit("-", 2)
 
     if len(tokens) != 3:
-        return None
+        raise Exception(f"Invalid package name: {full_package_name}")
 
     name, version_no_pkgrel, pkgrel = tokens
     version = f"{version_no_pkgrel}-{pkgrel}"
@@ -69,10 +69,16 @@ async def get_package_detail(
         return PackageDetail(
             frozenset(
                 chain(
-                    [name],
-                    (strip_version(provide) for provide in alpm_package.provides),
+                    [f"pacman-{name}"],
+                    (
+                        f"pacman-{strip_version(provide)}"
+                        for provide in alpm_package.provides
+                    ),
                 )
             ),
-            frozenset(strip_version(dependency) for dependency in alpm_package.depends),
+            frozenset(
+                f"pacman-{strip_version(dependency)}"
+                for dependency in alpm_package.depends
+            ),
             ArchiveProductDetail(archive_path, "pacman"),
         )

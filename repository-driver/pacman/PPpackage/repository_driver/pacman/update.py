@@ -4,6 +4,7 @@ from pyalpm import Handle
 
 from PPpackage.utils.utils import TemporaryDirectory
 
+from .epoch import update as update_epoch
 from .schemes import DriverParameters, RepositoryParameters
 
 
@@ -11,16 +12,19 @@ async def update(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> None:
-    with TemporaryDirectory() as root_directory_path:
+    with (
+        update_epoch(repository_parameters.database_path / "database.sqlite"),
+        TemporaryDirectory() as root_directory_path,
+    ):
         handle = Handle(
             str(root_directory_path), str(repository_parameters.database_path)
         )
 
-        database = handle.register_syncdb(repository_parameters.repository, 0)
+        alpm_database = handle.register_syncdb(repository_parameters.repository, 0)
 
-        database.servers = repository_parameters.mirrorlist
+        alpm_database.servers = repository_parameters.mirrorlist
 
-        database.update(True)
+        alpm_database.update(True)
 
         sync_database_path = repository_parameters.database_path / "sync"
 

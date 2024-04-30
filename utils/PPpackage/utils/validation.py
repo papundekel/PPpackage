@@ -1,62 +1,60 @@
 from inspect import isclass
 from json import dumps as json_dumps
-from json import loads as json_loads
 from os import environ
-from pathlib import Path
 from string import Template
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import AfterValidator, BaseModel, RootModel
 
-ModelType = TypeVar("ModelType")
 
-
-def load_object(Model: type[ModelType], input_json: Any) -> ModelType:
-    ModelWrapped = (
-        Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
-    )
-
-    input = ModelWrapped.model_validate(input_json)
-
-    if isinstance(input, RootModel):
-        return input.root
-    else:
-        return input  # type: ignore
-
-
-def load_from_string(Model: type[ModelType], input_json_string: str) -> ModelType:
-    input_json = json_loads(input_json_string)
-
-    return load_object(Model, input_json)
-
-
-def load_from_bytes(Model: type[ModelType], input_json_bytes: memoryview) -> ModelType:
-    input_json_string = str(input_json_bytes, encoding="utf-8")
-
-    return load_from_string(Model, input_json_string)
-
-
-def wrap(output: BaseModel | Any) -> BaseModel:
+def wrap_instance(output: Any) -> BaseModel:
     return output if isinstance(output, BaseModel) else RootModel(output)
 
 
-def save_object(output: BaseModel | Any) -> Any:
-    output_wrapped = wrap(output)
-
-    return output_wrapped.model_dump()
+def unwrap_instance(output: Any) -> Any:
+    return output.root if isinstance(output, RootModel) else output
 
 
-def save_to_string(output: BaseModel | Any) -> str:
-    output_wrapped = wrap(output)
-
-    output_json = output_wrapped.model_dump()
-
-    output_json_string = json_dumps(output_json, sort_keys=True, separators=(",", ":"))
-
-    return output_json_string
+def wrap_model[T](Model: type[T]):
+    return (
+        Model if isclass(Model) and issubclass(Model, BaseModel) else RootModel[Model]
+    )
 
 
-T = TypeVar("T")
+def validate_python[T](Model: type[T], input_python: Any) -> T:
+    ModelWrapped = wrap_model(Model)
+
+    input_wrapped = ModelWrapped.model_validate(input_python)
+
+    input = unwrap_instance(input_wrapped)
+
+    return input
+
+
+def validate_json[T](Model: type[T], input_json: str | bytes) -> T:
+    ModelWrapped = wrap_model(Model)
+
+    input_wrapped = ModelWrapped.model_validate_json(input_json)
+
+    input = unwrap_instance(input_wrapped)
+
+    return input
+
+
+def dump_python(output: Any) -> Any:
+    output_wrapped = wrap_instance(output)
+
+    output_python = output_wrapped.model_dump()
+
+    return output_python
+
+
+def dump_json(output: Any) -> str:
+    output_python = dump_python(output)
+
+    output_json = json_dumps(output_python, sort_keys=True, separators=(",", ":"))
+
+    return output_json
 
 
 def substitute_environment_variables(value: Any):

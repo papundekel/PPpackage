@@ -1,9 +1,8 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import AnyUrl, BaseModel
-from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from PPpackage.utils.validation import WithVariables
 
@@ -13,15 +12,21 @@ class DriverParameters(BaseModel):
 
 
 class RepositoryParameters(BaseModel):
-    cache_path: Annotated[Path, WithVariables]
+    database_path: Annotated[Path, WithVariables]
     url: AnyUrl
-    verify_ssl: bool
+    verify_ssl: bool = True
 
 
-@pydantic_dataclass
-class ConanRequirement:
-    package: str
+type ConanOptions = Mapping[str, str]
+type ConanSettings = Mapping[str, str]
+
+
+class Options(BaseModel):
+    options: ConanOptions
+    settings: ConanSettings
+
+
+class ConanProductInfo(BaseModel):
     version: str
-
-
-ConanOptions = Mapping[str, Any]
+    revision: str
+    package_id: str

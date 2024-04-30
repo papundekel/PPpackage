@@ -21,12 +21,12 @@ class NegatedRequirement:
 
 @pydantic_dataclass(frozen=True)
 class ANDRequirement:
-    and_: Annotated[list["Requirement"], Len(1)]
+    and_: list["Requirement"]
 
 
 @pydantic_dataclass(frozen=True)
 class ORRequirement:
-    or_: Annotated[list["Requirement"], Len(1)]
+    or_: list["Requirement"]
 
 
 @pydantic_dataclass(frozen=True)
@@ -59,7 +59,7 @@ Requirement = (
 @pydantic_dataclass(frozen=True)
 class TranslatorInfo:
     group: str
-    symbol: str
+    symbol: dict[str, str]
 
 
 Parameters = Mapping[str, Any]
@@ -89,7 +89,7 @@ class TagProductDetail:
 
 @pydantic_dataclass(frozen=True)
 class ContainerfileProductDetail:
-    containerfile: str
+    containerfile: bytes
 
 
 @pydantic_dataclass(frozen=True)
@@ -108,7 +108,7 @@ class ArchiveProductDetail:
     installer: str
 
 
-ProductDetail = (
+type ProductDetail = (
     TagProductDetail
     | ContainerfileProductDetail
     | MetaProductDetail
@@ -124,5 +124,5 @@ class PackageDetail:
     product: ProductDetail
 
 
-ProductInfo = Mapping[str, Any]
-DependencyProductInfos = Mapping[str, Mapping[str, Any]]
+type ProductInfo = Mapping[str, Any]
+type DependencyProductInfos = Mapping[str, Mapping[str, Any]]

@@ -13,7 +13,7 @@ from pydot import Dot
 from sqlitedict import SqliteDict
 
 from metamanager.PPpackage.metamanager.repository import Repository
-from PPpackage.utils.validation import load_from_bytes
+from PPpackage.utils.validation import validate_json
 
 from .exceptions import SubmanagerCommandFailure
 from .fetch import fetch
@@ -39,7 +39,7 @@ def parse_input(stdin: IO[bytes]) -> Input:
     input_json_bytes = stdin.read()
 
     try:
-        input = load_from_bytes(Input, memoryview(input_json_bytes))
+        input = validate_json(Input, input_json_bytes)
     except ValidationError as e:
         stderr.write("ERROR: Invalid input.\n")
         stderr.write(e.json(indent=4))
@@ -54,7 +54,7 @@ def parse_config(config_path: Path) -> Config:
         config_json_bytes = f.read()
 
         try:
-            config = load_from_bytes(Config, memoryview(config_json_bytes))
+            config = validate_json(Config, config_json_bytes)
         except ValidationError as e:
             stderr.write("ERROR: Invalid config.\n")
             stderr.write(e.json(indent=4))

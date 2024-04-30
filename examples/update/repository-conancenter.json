@@ -1,0 +1,5 @@
+{
+    "database_path": "$DATABASE_PATH",
+    "url": "https://center.conan.io",
+    "verify_ssl": true
+}

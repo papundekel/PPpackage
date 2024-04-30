@@ -3,7 +3,7 @@
 address_archlinux_core="localhost:8880"
 address_archlinux_extra="localhost:8881"
 address_AUR="localhost:8882"
-address_conan_conancenter="localhost:8883"
+address_conancenter="localhost:8883"
 address_PP="localhost:8884"
 
 
@@ -14,7 +14,7 @@ mkdir -p tmp/output/
 mkdir -p tmp/cache/metamanager/archlinux-core
 mkdir -p tmp/cache/metamanager/archlinux-extra
 mkdir -p tmp/cache/metamanager/AUR
-mkdir -p tmp/cache/metamanager/conan-conancenter
+mkdir -p tmp/cache/metamanager/conancenter
 mkdir -p tmp/cache/metamanager/PP
 
 
@@ -40,12 +40,12 @@ hypercorn \
     &
 pid_AUR=$!
 
-CONFIG_PATH="$PWD/examples/native/all-remote/conan-conancenter/config.json" \
+CONFIG_PATH="$PWD/examples/native/all-remote/conancenter/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \
-    --bind "$address_conan_conancenter" \
+    --bind "$address_conancenter" \
     &
-pid_conan_conancenter=$!
+pid_conancenter=$!
 
 CONFIG_PATH="$PWD/examples/native/all-remote/PP/config.json" \
 hypercorn \
@@ -62,7 +62,7 @@ do
         curl "http://$address_archlinux_core" 2>/dev/null >/dev/null && \
         curl "http://$address_archlinux_extra" 2>/dev/null >/dev/null && \
         curl "http://$address_AUR" 2>/dev/null >/dev/null && \
-        curl "http://$address_conan_conancenter" 2>/dev/null >/dev/null && \
+        curl "http://$address_conancenter" 2>/dev/null >/dev/null && \
         curl "http://$address_PP" 2>/dev/null >/dev/null
     then
 		break
@@ -87,5 +87,5 @@ python \
 kill -s TERM $pid_archlinux_core
 kill -s TERM $pid_archlinux_extra
 kill -s TERM $pid_AUR
-kill -s TERM $pid_conan_conancenter
+kill -s TERM $pid_conancenter
 kill -s TERM $pid_PP

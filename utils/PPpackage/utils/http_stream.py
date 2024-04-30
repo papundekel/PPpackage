@@ -50,7 +50,7 @@ class AsyncChunkReader(Reader):
 
 class HTTPWriter(Writer):
     def __init__(self):
-        self._queue = Queue[memoryview]()
+        self._queue = Queue[memoryview]()  # type: ignore
 
     async def write(self, data: memoryview) -> None:
         await self._queue.put(data)
