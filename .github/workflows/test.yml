@@ -6,9 +6,121 @@ on:
             - main
 
 jobs:
+    build-metamanager:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build image
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: metamanager
+                  tags: docker.io/fackop/pppackage-metamanager:latest
+                  outputs: type=docker,dest=/tmp/images/metamanager.tar
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Upload image artifact
+              uses: actions/upload-artifact@v4.3.3
+              with:
+                  name: image-metamanager
+                  path: /tmp/images/metamanager.tar
+    build-updater:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build image
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: updater
+                  tags: docker.io/fackop/pppackage-updater:latest
+                  outputs: type=docker,dest=/tmp/images/updater.tar
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Upload image artifact
+              uses: actions/upload-artifact@v4.3.3
+              with:
+                  name: image-updater
+                  path: /tmp/images/updater.tar
+    build-repo-pacman:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build pppackage-repository-driver-pacman
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-pacman
+                  tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+    build-repo-aur:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build pppackage-repository-driver-aur
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-aur
+                  tags: docker.io/fackop/pppackage-repository-driver-aur:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+    build-repo-conan:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build pppackage-repository-driver-conan
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-conan
+                  tags: docker.io/fackop/pppackage-repository-driver-conan:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+    build-repo-pp:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build pppackage-repository-driver-pp
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: repository-driver-pp
+                  tags: docker.io/fackop/pppackage-repository-driver-pp:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
     build:
         runs-on: ubuntu-latest
-
+        needs:
+            - build-metamanager
+            - build-updater
         steps:
             - uses: actions/checkout@v4.1.1
 
@@ -26,18 +138,16 @@ jobs:
                   path: ${{ github.workspace }}/cache/product
                   key: cache-products
 
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
-
-            - name: Build pppackage-metamanager
-              uses: docker/build-push-action@v5.1.0
+            - name: Download image artifacts
+              uses: actions/download-artifact@v4.1.7
               with:
-                  context: ${{ github.workspace }}
-                  target: metamanager
-                  load: true
-                  tags: docker.io/fackop/pppackage-metamanager:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+                  name: image-*
+                  path: /tmp/images/
+
+            - name: Load images
+              run: |
+                  docker load --input /tmp/images/metamanager.tar
+                  docker load --input /tmp/images/updater.tar
 
             - name: Build pppackage-updater
               uses: docker/build-push-action@v5.1.0
@@ -109,39 +219,3 @@ jobs:
 
             - name: See if ldconfig ran
               run: ls -l root/etc/ld.so.cache
-
-            - name: Build pppackage-repository-driver-pacman
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: repository-driver-pacman
-                  tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build pppackage-repository-driver-aur
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: repository-driver-aur
-                  tags: docker.io/fackop/pppackage-repository-driver-aur:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build pppackage-repository-driver-conan
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: repository-driver-conan
-                  tags: docker.io/fackop/pppackage-repository-driver-conan:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Build pppackage-repository-driver-pp
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: repository-driver-pp
-                  tags: docker.io/fackop/pppackage-repository-driver-pp:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
