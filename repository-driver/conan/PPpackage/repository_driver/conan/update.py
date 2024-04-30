@@ -44,27 +44,26 @@ async def update(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> None:
-    with update_epoch(repository_parameters.database_path / "database.sqlite"):
-        api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
-        app = ConanApp(api)
+    api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
+    app = ConanApp(api)
 
-        remote = Remote(
-            "",
-            url=str(repository_parameters.url),
-            verify_ssl=repository_parameters.verify_ssl,
-        )
+    remote = Remote(
+        "",
+        url=str(repository_parameters.url),
+        verify_ssl=repository_parameters.verify_ssl,
+    )
 
-        recipes = api.search.recipes("*", remote)
+    recipes = api.search.recipes("*", remote)
 
-        with ThreadPoolExecutor(cpu_count() * 16) as executor:
-            futures = list[Future]()
+    with ThreadPoolExecutor(cpu_count() * 16) as executor:
+        futures = list[Future]()
 
-            for revisions in executor.map(
-                lambda recipe: fetch_revisions(api, remote, recipe), recipes
-            ):
-                futures.append(
-                    executor.submit(download_recipes, app, remote, revisions)
-                )
+        for revisions in executor.map(
+            lambda recipe: fetch_revisions(api, remote, recipe), recipes
+        ):
+            futures.append(executor.submit(download_recipes, app, remote, revisions))
 
-            for future in futures:
-                future.result()
+        for future in futures:
+            future.result()
+
+    update_epoch(repository_parameters.database_path / "database.sqlite")
