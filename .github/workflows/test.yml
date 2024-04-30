@@ -207,6 +207,3 @@ jobs:
                   --file .github/compose.yaml
                   run --rm
                   -T metamanager < examples/input/basic-arch-conan.json
-
-            - name: See if ldconfig ran
-              run: ls -l root/etc/ld.so.cache
