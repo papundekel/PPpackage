@@ -149,16 +149,6 @@ jobs:
                   docker load --input /tmp/images/metamanager.tar
                   docker load --input /tmp/images/updater.tar
 
-            - name: Build pppackage-updater
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: updater
-                  load: true
-                  tags: docker.io/fackop/pppackage-updater:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
             - name: Create directories
               run: |
                   mkdir -p root/ output/
