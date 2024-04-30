@@ -12,11 +12,6 @@ jobs:
         steps:
             - uses: actions/checkout@v4.1.1
 
-            - uses: gacts/install-podman@v1.1.0
-
-            - name: Download seccomp.json
-              run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
