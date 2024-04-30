@@ -87,6 +87,15 @@ jobs:
                   PPpackage.repository_driver.conan
                   --repository /mnt/repository.json
 
+            - name: Create default conan profile
+              run: >
+                  docker run --rm
+                  --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
+                  --env CONAN_HOME=/mnt/database/cache/
+                  --entrypoint conan
+                  docker.io/fackop/pppackage-updater:latest
+                  profile detect
+
             - name: Run PPpackage
               run: >
                   USER="$(id -u):$(id -g)" docker compose
