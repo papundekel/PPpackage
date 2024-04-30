@@ -141,7 +141,7 @@ jobs:
             - name: Download image artifacts
               uses: actions/download-artifact@v4.1.7
               with:
-                  name: image-*
+                  pattern: image-*
                   path: /tmp/
 
             - name: Load images
