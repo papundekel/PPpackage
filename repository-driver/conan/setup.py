@@ -7,5 +7,6 @@ setup(
     install_requires=[
         "PPpackage-utils",
         "PPpackage-repository-driver-interface",
+        "conan",
     ],
 )
