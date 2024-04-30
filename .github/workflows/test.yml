@@ -20,7 +20,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: metamanager
                   tags: docker.io/fackop/pppackage-metamanager:latest
-                  outputs: type=docker,dest=/tmp/images/metamanager.tar
+                  outputs: type=docker,dest=/tmp/image-metamanager.tar
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -28,7 +28,7 @@ jobs:
               uses: actions/upload-artifact@v4.3.3
               with:
                   name: image-metamanager
-                  path: /tmp/images/metamanager.tar
+                  path: /tmp/image-metamanager.tar
     build-updater:
         runs-on: ubuntu-latest
         steps:
@@ -43,7 +43,7 @@ jobs:
                   context: ${{ github.workspace }}
                   target: updater
                   tags: docker.io/fackop/pppackage-updater:latest
-                  outputs: type=docker,dest=/tmp/images/updater.tar
+                  outputs: type=docker,dest=/tmp/image-updater.tar
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -51,7 +51,7 @@ jobs:
               uses: actions/upload-artifact@v4.3.3
               with:
                   name: image-updater
-                  path: /tmp/images/updater.tar
+                  path: /tmp/image-updater.tar
     build-repo-pacman:
         runs-on: ubuntu-latest
         steps:
@@ -142,12 +142,12 @@ jobs:
               uses: actions/download-artifact@v4.1.7
               with:
                   name: image-*
-                  path: /tmp/images/
+                  path: /tmp/
 
             - name: Load images
               run: |
-                  docker load --input /tmp/images/metamanager.tar
-                  docker load --input /tmp/images/updater.tar
+                  docker load --input /tmp/image-metamanager.tar
+                  docker load --input /tmp/image-updater.tar
 
             - name: Create directories
               run: |
