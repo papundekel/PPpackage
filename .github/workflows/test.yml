@@ -9,15 +9,12 @@ jobs:
     build-metamanager:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build image
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: metamanager
                   tags: docker.io/fackop/pppackage-metamanager:latest
                   outputs: type=docker,dest=/tmp/image-metamanager.tar
@@ -32,15 +29,12 @@ jobs:
     build-updater:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build image
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: updater
                   tags: docker.io/fackop/pppackage-updater:latest
                   outputs: type=docker,dest=/tmp/image-updater.tar
@@ -55,15 +49,12 @@ jobs:
     build-repo-pacman:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build pppackage-repository-driver-pacman
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: repository-driver-pacman
                   tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
                   cache-from: type=gha
@@ -71,15 +62,12 @@ jobs:
     build-repo-aur:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build pppackage-repository-driver-aur
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: repository-driver-aur
                   tags: docker.io/fackop/pppackage-repository-driver-aur:latest
                   cache-from: type=gha
@@ -87,15 +75,12 @@ jobs:
     build-repo-conan:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build pppackage-repository-driver-conan
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: repository-driver-conan
                   tags: docker.io/fackop/pppackage-repository-driver-conan:latest
                   cache-from: type=gha
@@ -103,15 +88,12 @@ jobs:
     build-repo-pp:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4.1.1
-
             - name: Set up buildx
               uses: docker/setup-buildx-action@v3.0.0
 
             - name: Build pppackage-repository-driver-pp
               uses: docker/build-push-action@v5.1.0
               with:
-                  context: ${{ github.workspace }}
                   target: repository-driver-pp
                   tags: docker.io/fackop/pppackage-repository-driver-pp:latest
                   cache-from: type=gha
