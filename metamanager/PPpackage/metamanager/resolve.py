@@ -26,8 +26,7 @@ from PPpackage.repository_driver.interface.utils import (
 from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
 from pysat.solvers import Solver
 
-from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
-
+from .exceptions import SubmanagerCommandFailure
 from .repository import Repository
 from .translators import Translator
 

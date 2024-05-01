@@ -12,7 +12,6 @@ from pydantic import ValidationError
 from pydot import Dot
 from sqlitedict import SqliteDict
 
-from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import validate_json
 
 from .exceptions import SubmanagerCommandFailure
@@ -20,6 +19,7 @@ from .fetch import fetch
 from .install import install
 from .installers import Installers
 from .repositories import Repositories
+from .repository import Repository
 from .resolve import resolve
 from .schemes import Config, Input
 from .schemes.node import NodeData
