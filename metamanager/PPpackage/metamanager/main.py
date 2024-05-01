@@ -12,7 +12,6 @@ from pydantic import ValidationError
 from pydot import Dot
 from sqlitedict import SqliteDict
 
-from metamanager.PPpackage.metamanager.repository import Repository
 from PPpackage.utils.validation import validate_json
 
 from .exceptions import SubmanagerCommandFailure
@@ -20,6 +19,7 @@ from .fetch import fetch
 from .install import install
 from .installers import Installers
 from .repositories import Repositories
+from .repository import Repository
 from .resolve import resolve
 from .schemes import Config, Input
 from .schemes.node import NodeData
@@ -190,10 +190,14 @@ async def main(
             create_dependencies(graph)
 
             if graph_path is not None:
+                graph_path.parent.mkdir(parents=True, exist_ok=True)
+
                 graph_dot = graph_to_dot(graph)
                 graph_dot.write(graph_path)
 
             async with HTTPClient(http2=True) as archive_client:
+                config.product_cache_path.mkdir(parents=True, exist_ok=True)
+
                 with SqliteDict(
                     config.product_cache_path / "mapping.db"
                 ) as cache_mapping:

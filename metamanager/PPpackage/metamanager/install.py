@@ -4,8 +4,8 @@ from pathlib import Path
 
 from networkx import MultiDiGraph, topological_generations
 
-from metamanager.PPpackage.metamanager.installers import Installer
-from metamanager.PPpackage.metamanager.schemes.node import NodeData
+from .installers import Installer
+from .schemes.node import NodeData
 
 
 async def install(

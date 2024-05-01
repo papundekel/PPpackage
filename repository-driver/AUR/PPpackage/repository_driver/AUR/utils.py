@@ -21,7 +21,7 @@ def parse_package_name(full_package_name: str) -> tuple[str, str]:
     tokens = full_package_name[len(PREFIX) :].rsplit("-", 2)
 
     if len(tokens) != 3:
-        raise Exception(f"Invalid package: {full_package_name}")
+        raise Exception(f"Invalid package name: {full_package_name}")
 
     name, version_no_pkgrel, pkgrel = tokens
     version = f"{version_no_pkgrel}-{pkgrel}"

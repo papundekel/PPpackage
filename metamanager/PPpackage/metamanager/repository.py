@@ -63,6 +63,8 @@ class Repository:
         return self.interface.get_url()
 
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
+        self.config.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
+
         with SqliteDict(
             self.config.translator_data_cache_path
         ) as translator_data_cache:
@@ -89,6 +91,8 @@ class Repository:
         )
 
     async def get_formula(self) -> AsyncIterable[Requirement]:
+        self.config.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
+
         with SqliteDict(self.config.formula_cache_path) as formula_cache:
             serialized_translated_options = dump_json(self.translated_options)
             cache_key = f"{self.epoch}-{serialized_translated_options}"
