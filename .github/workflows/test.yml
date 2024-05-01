@@ -142,7 +142,7 @@ jobs:
               run: |
                   mkdir -p root/ output/
                   mkdir -p cache/product/ cache/formula/ cache/translator-data/
-                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/conancenter/ database/PP/
+                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
 
             - name: Update archlinux core database
               run: >

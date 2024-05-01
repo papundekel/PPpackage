@@ -37,7 +37,7 @@ services:
               target: /mnt/repositories/database/archlinux-extra/
             - type: bind
               source: $PWD/database/AUR/
-              target: /mnt/repositories/database/PP/
+              target: /mnt/repositories/database/AUR/
             - type: bind
               source: $PWD/database/conancenter/
               target: /mnt/repositories/database/conancenter/
