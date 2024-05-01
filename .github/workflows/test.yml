@@ -187,6 +187,7 @@ jobs:
                   --repository /mnt/repository.json
 
             - name: Create default conan profile
+              if: steps.check_conancenter.outputs.files_exists == 'false'
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
