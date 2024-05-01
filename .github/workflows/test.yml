@@ -116,7 +116,7 @@ jobs:
                   tags: docker.io/fackop/pppackage-repository-driver-pp:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
-    build:
+    test:
         runs-on: ubuntu-latest
         needs:
             - build-metamanager

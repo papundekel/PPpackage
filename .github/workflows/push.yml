@@ -6,9 +6,8 @@ on:
             - main
 
 jobs:
-    build:
+    build-metamanager:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v4.1.1
 
@@ -21,7 +20,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - name: Push pppackage-metamanager
+            - name: Build image
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
@@ -30,8 +29,44 @@ jobs:
                   tags: docker.io/fackop/pppackage-metamanager:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+    build-updater:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-            - name: Push pppackage-repository-driver-pacman
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3.0.0
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build image
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  context: ${{ github.workspace }}
+                  target: updater
+                  push: true
+                  tags: docker.io/fackop/pppackage-updater:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+    build-repo-pacman:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
+
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3.0.0
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build pppackage-repository-driver-pacman
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
@@ -40,8 +75,21 @@ jobs:
                   tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+    build-repo-aur:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-            - name: Push pppackage-repository-driver-aur
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3.0.0
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build pppackage-repository-driver-aur
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
@@ -50,8 +98,21 @@ jobs:
                   tags: docker.io/fackop/pppackage-repository-driver-aur:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+    build-repo-conan:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-            - name: Push pppackage-repository-driver-conan
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3.0.0
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build pppackage-repository-driver-conan
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
@@ -60,23 +121,26 @@ jobs:
                   tags: docker.io/fackop/pppackage-repository-driver-conan:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+    build-repo-pp:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-            - name: Push pppackage-repository-driver-pp
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3.0.0
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build pppackage-repository-driver-pp
               uses: docker/build-push-action@v5.1.0
               with:
                   context: ${{ github.workspace }}
                   target: repository-driver-pp
                   push: true
                   tags: docker.io/fackop/pppackage-repository-driver-pp:latest
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-            - name: Push pppackage-updater
-              uses: docker/build-push-action@v5.1.0
-              with:
-                  context: ${{ github.workspace }}
-                  target: updater
-                  push: true
-                  tags: docker.io/fackop/pppackage-updater:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
