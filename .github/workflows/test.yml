@@ -114,11 +114,17 @@ jobs:
             - name: Download seccomp.json
               run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
 
-            - name: Cache
+            - name: Cache caches
               uses: actions/cache@v4.0.2
               with:
                   path: ${{ github.workspace }}/cache/
                   key: cache
+
+            - name: Cache databases
+              uses: actions/cache@v4.0.2
+              with:
+                  path: ${{ github.workspace }}/database/
+                  key: database
 
             - name: Download image artifacts
               uses: actions/download-artifact@v4.1.7
@@ -162,7 +168,14 @@ jobs:
                   PPpackage.repository_driver.pacman
                   --repository /mnt/repository.json
 
+            - name: Check if conancenter database exists
+              id: check_conancenter
+              uses: andstor/file-existence-action@v3.0.0
+              with:
+                  files: database/conancenter/cache/
+
             - name: Update conancenter database
+              if: steps.check_conancenter.outputs.files_exists == 'false'
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
