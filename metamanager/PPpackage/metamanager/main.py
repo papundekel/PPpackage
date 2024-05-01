@@ -190,10 +190,14 @@ async def main(
             create_dependencies(graph)
 
             if graph_path is not None:
+                graph_path.parent.mkdir(parents=True, exist_ok=True)
+
                 graph_dot = graph_to_dot(graph)
                 graph_dot.write(graph_path)
 
             async with HTTPClient(http2=True) as archive_client:
+                config.product_cache_path.mkdir(parents=True, exist_ok=True)
+
                 with SqliteDict(
                     config.product_cache_path / "mapping.db"
                 ) as cache_mapping:

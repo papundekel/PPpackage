@@ -17,6 +17,7 @@ async def update(
     repository_parameters: RepositoryParameters,
 ) -> None:
     database_path = repository_parameters.database_path
+    database_path.mkdir(parents=True, exist_ok=True)
 
     async with HTTPClient(
         http2=True,
