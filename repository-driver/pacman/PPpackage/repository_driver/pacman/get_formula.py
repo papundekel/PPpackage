@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterable, MutableSequence
 
-from pyalpm import Handle
-
+from PPpackage.repository_driver.interface.exceptions import EpochException
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     ImplicationRequirement,
@@ -9,8 +8,11 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
+from pyalpm import Handle
+
 from PPpackage.utils.utils import TemporaryDirectory
 
+from .get_epoch import get_epoch
 from .schemes import DriverParameters, RepositoryParameters
 from .utils import package_provides
 
@@ -18,8 +20,12 @@ from .utils import package_provides
 async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
+    epoch: str,
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
+    if epoch != await get_epoch(driver_parameters, repository_parameters):
+        raise EpochException
+
     provides = dict[str | tuple[str, str], MutableSequence[str]]()
 
     with TemporaryDirectory() as root_directory_path:

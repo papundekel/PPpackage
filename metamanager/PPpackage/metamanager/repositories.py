@@ -7,7 +7,7 @@ from hishel import AsyncSQLiteStorage
 
 from .localrepository import LocalRepository
 from .remoterepository import RemoteRepository
-from .repository import Repository
+from .repository import Repository, RepositoryInterface
 from .schemes import (
     LocalRepositoryConfig,
     RemoteRepositoryConfig,
@@ -20,7 +20,7 @@ async def create_repository(
     client: HTTPClient | None,
     repository_config: LocalRepositoryConfig | RemoteRepositoryConfig,
     drivers: Mapping[str, RepositoryDriverConfig],
-) -> Repository:
+) -> RepositoryInterface:
     if isinstance(repository_config, RemoteRepositoryConfig):
         if client is None:
             client = await client_stack.enter_async_context(
@@ -47,6 +47,9 @@ async def Repositories(
     client: HTTPClient | None = None
     async with AsyncExitStack() as client_stack:
         yield [
-            await create_repository(client_stack, client, config, drivers)
+            await Repository.create(
+                config,
+                await create_repository(client_stack, client, config, drivers),
+            )
             for config in repository_configs
         ]

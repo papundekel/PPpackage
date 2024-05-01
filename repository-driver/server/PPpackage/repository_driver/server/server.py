@@ -62,8 +62,14 @@ repository_parameters = validate_python(
 logger = getLogger(__name__)
 
 
-async def enable_epoch_cache(request: Request, response: Response):
+async def get_epoch():
     epoch = await interface.get_epoch(driver_parameters, repository_parameters)
+
+    return epoch
+
+
+async def enable_epoch_cache(request: Request, response: Response):
+    epoch = await get_epoch()
 
     request_epoch = request.headers.get("If-None-Match")
 
@@ -85,11 +91,11 @@ def load_model_from_query[T](Model: type[T], alias: str):
     return dependency
 
 
-async def fetch_translator_data(response: Response):
+async def fetch_translator_data(response: Response, epoch: str):
     logger.info("Preparing translator data...")
 
     translator_data = interface.fetch_translator_data(
-        driver_parameters, repository_parameters
+        driver_parameters, repository_parameters, epoch
     )
 
     logger.info("Translator data ready.")
@@ -98,12 +104,13 @@ async def fetch_translator_data(response: Response):
 
 
 async def translate_options(
-    options: Annotated[Any, Depends(load_model_from_query(Any, "options"))]  # type: ignore
+    epoch: str,
+    options: Annotated[Any, Depends(load_model_from_query(Any, "options"))],  # type: ignore
 ):
     logger.info("Translating options...")
 
     translated_options = await interface.translate_options(
-        driver_parameters, repository_parameters, options
+        driver_parameters, repository_parameters, epoch, options
     )
 
     logger.info("Options translated.")
@@ -113,6 +120,7 @@ async def translate_options(
 
 async def get_formula(
     response: Response,
+    epoch: str,
     translated_options: Annotated[
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
@@ -120,7 +128,7 @@ async def get_formula(
     logger.info("Preparing formula...")
 
     formula = interface.get_formula(
-        driver_parameters, repository_parameters, translated_options
+        driver_parameters, repository_parameters, epoch, translated_options
     )
 
     logger.info("Formula ready.")
@@ -194,6 +202,7 @@ class SubmanagerServer(FastAPI):
     def __init__(self):
         super().__init__(redoc_url=None)
 
+        super().get("/epoch")(get_epoch)
         super().get("/translator-data", dependencies=[Depends(enable_epoch_cache)])(
             fetch_translator_data
         )

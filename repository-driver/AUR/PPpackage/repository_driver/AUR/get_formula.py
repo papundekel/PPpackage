@@ -12,6 +12,7 @@ from .schemes import DriverParameters, RepositoryParameters
 async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
+    epoch: str,
     translated_options: None,
 ) -> AsyncIterable[Requirement]:
     yield ImplicationRequirement(

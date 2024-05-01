@@ -24,17 +24,17 @@ class Interface[
     ]
 
     fetch_translator_data: Callable[
-        [DriverParametersType, RepositoryParametersType],
+        [DriverParametersType, RepositoryParametersType, str],
         AsyncIterable[TranslatorInfo],
     ]
 
     translate_options: Callable[
-        [DriverParametersType, RepositoryParametersType, Any],
+        [DriverParametersType, RepositoryParametersType, str, Any],
         Awaitable[TranslatedOptionsType],
     ]
 
     get_formula: Callable[
-        [DriverParametersType, RepositoryParametersType, TranslatedOptionsType],
+        [DriverParametersType, RepositoryParametersType, str, TranslatedOptionsType],
         AsyncIterable[Requirement],
     ]
 

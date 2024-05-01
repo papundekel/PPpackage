@@ -5,12 +5,10 @@ from collections.abc import (
     Mapping,
     MutableMapping,
     MutableSequence,
-    MutableSet,
     Sequence,
     Set,
 )
 from itertools import chain
-from re import S
 from sys import stderr
 from typing import Any
 from typing import cast as type_cast
@@ -20,15 +18,15 @@ from asyncstdlib import islice as async_islice
 from asyncstdlib import min as async_min
 from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
-from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
-from pysat.solvers import Solver
-
-from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
     RequirementVisitor,
     visit_requirements,
 )
+from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
+from pysat.solvers import Solver
+
+from metamanager.PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 
 from .repository import Repository
 from .translators import Translator
@@ -56,11 +54,18 @@ async def fetch_translator_data(
     return translator_info
 
 
-async def get_formula(
-    repositories: Iterable[Repository], options: Any
-) -> AsyncIterable[Requirement]:
+async def translate_options(
+    repositories: Iterable[Repository],
+    options: Any,
+) -> None:
+    async with TaskGroup() as group:
+        for repository in repositories:
+            group.create_task(repository.translate_options(options))
+
+
+async def get_formula(repositories: Iterable[Repository]) -> AsyncIterable[Requirement]:
     for repository in repositories:
-        async for requirement in repository.translate_options_and_get_formula(options):
+        async for requirement in repository.get_formula():
             yield requirement
 
 
@@ -181,12 +186,14 @@ async def resolve(
 ) -> Set[str]:
     stderr.write("Translating requirements...\n")
 
-    translator_data = await fetch_translator_data(repositories)
+    async with TaskGroup() as group:
+        translator_data_task = group.create_task(fetch_translator_data(repositories))
+        group.create_task(translate_options(repositories, options))
 
-    formula = get_formula(repositories, options)
+    formula = get_formula(repositories)
 
     translated_formula = await translate_requirements(
-        translators, translator_data, async_chain([requirements], formula)
+        translators, translator_data_task.result(), async_chain([requirements], formula)
     )
 
     stderr.write("Resolving...\n")
