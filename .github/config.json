@@ -52,7 +52,9 @@
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/core/os/x86_64"
                 ]
-            }
+            },
+            "formula_cache_path": "/mnt/cache/formula/archlinux-core.db",
+            "translator_data_cache_path": "/mnt/cache/translator-data/archlinux-core.db"
         },
         {
             "driver": "pacman",
@@ -61,10 +63,14 @@
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
                 ]
-            }
+            },
+            "formula_cache_path": "/mnt/cache/formula/archlinux-extra.db",
+            "translator_data_cache_path": "/mnt/cache/translator-data/archlinux-extra.db"
         },
         {
-            "driver": "AUR"
+            "driver": "AUR",
+            "formula_cache_path": "/mnt/cache/formula/AUR.db",
+            "translator_data_cache_path": "/mnt/cache/translator-data/AUR.db"
         },
         {
             "driver": "conan",
@@ -72,14 +78,18 @@
                 "database_path": "/mnt/repositories/database/conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
-            }
+            },
+            "formula_cache_path": "/mnt/cache/formula/conancenter.db",
+            "translator_data_cache_path": "/mnt/cache/translator-data/conancenter.db"
         },
         {
             "driver": "PP",
             "parameters": {
                 "database_path": "/mnt/repositories/database/PP",
                 "cache_path": "/mnt/cache/repository/PP"
-            }
+            },
+            "formula_cache_path": "/mnt/cache/formula/PP.db",
+            "translator_data_cache_path": "/mnt/cache/translator-data/PP.db"
         }
     ]
 }
