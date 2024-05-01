@@ -24,19 +24,19 @@ class AsyncChunkReader(Reader):
 
         self._buffer += chunk
 
-    def _pop_buffer(self, count: int) -> memoryview:
+    def _pop_buffer(self, count: int) -> bytes:
         chunk = self._buffer[:count]
         del self._buffer[:count]
 
-        return memoryview(chunk)
+        return chunk
 
-    async def readexactly(self, count: int) -> memoryview:
+    async def readexactly(self, count: int) -> bytes:
         while len(self._buffer) < count:
             await self._fill_buffer()
 
         return self._pop_buffer(count)
 
-    async def readuntil(self, separator: memoryview) -> memoryview:
+    async def readuntil(self, separator: memoryview) -> bytes:
         start = 0
         while (index := self._buffer.find(separator, start)) == -1:
             start = len(self._buffer)
