@@ -1,3 +1,5 @@
+from itertools import chain
+
 from conan.api.conan_api import ConanAPI
 from conan.internal.conan_app import ConanApp
 from conans.model.recipe_ref import RecipeReference
@@ -48,16 +50,21 @@ async def get_package_detail(
         ),
         MetaOnTopProductDetail(
             ANDRequirement(
-                [
-                    SimpleRequirement(
-                        "conan",
-                        {
-                            "package": str(requirement.ref.name),
-                            "version": str(requirement.ref.version),
-                        },
+                list(
+                    chain(
+                        [SimpleRequirement("pacman", "conan")],
+                        (
+                            SimpleRequirement(
+                                "conan",
+                                {
+                                    "package": str(requirement.ref.name),
+                                    "version": str(requirement.ref.version),
+                                },
+                            )
+                            for requirement in build_requirements
+                        ),
                     )
-                    for requirement in build_requirements
-                ]
+                )
             )
         ),
     )
