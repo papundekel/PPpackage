@@ -11,11 +11,11 @@ class AsyncioReader(Reader):
     def __init__(self, reader: StreamReader):
         self._reader = reader
 
-    async def readexactly(self, count: int) -> memoryview:
-        return memoryview(await self._reader.readexactly(count))
+    async def readexactly(self, count: int) -> bytes:
+        return await self._reader.readexactly(count)
 
-    async def readuntil(self, separator: memoryview) -> memoryview:
-        return memoryview(await self._reader.readuntil(separator))
+    async def readuntil(self, separator: memoryview) -> bytes:
+        return await self._reader.readuntil(separator)
 
     async def read(self) -> AsyncIterable[memoryview]:
         while True:

@@ -4,7 +4,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from .validation import validate_python, wrap_instance
+from .validation import validate_json, wrap_instance
 
 _TRUE_STRING = "T"
 
@@ -76,13 +76,13 @@ class Writer(Protocol):
 
 
 class Reader(Protocol):
-    async def readexactly(self, n: int) -> memoryview: ...
+    async def readexactly(self, n: int) -> bytes: ...
 
-    async def readuntil(self, separator: memoryview) -> memoryview: ...
+    async def readuntil(self, separator: memoryview) -> bytes: ...
 
     def read(self) -> AsyncIterable[memoryview]: ...
 
-    async def _readline(self) -> memoryview:
+    async def _readline(self) -> bytes:
         return await self.readuntil(memoryview(b"\n"))
 
     async def _load_line(self) -> str:
@@ -112,7 +112,7 @@ class Reader(Protocol):
 
         return value
 
-    async def load_bytes(self) -> memoryview:
+    async def load_bytes(self) -> bytes:
         length = await self._load_int()
 
         if length == 0:
@@ -131,7 +131,7 @@ class Reader(Protocol):
     async def load_one[T](self, Model: type[T]) -> T:
         input_bytes = await self.load_bytes()
 
-        input = validate_python(Model, input_bytes)
+        input = validate_json(Model, input_bytes)
 
         return input
 
