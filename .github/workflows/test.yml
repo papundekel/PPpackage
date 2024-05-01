@@ -168,6 +168,17 @@ jobs:
                   PPpackage.repository_driver.pacman
                   --repository /mnt/repository.json
 
+            - name: Update AUR database
+              run: >
+                  docker run --rm
+                  --user $(id -u):$(id -g)
+                  --mount type=bind,source=${{ github.workspace }}/database/AUR/,target=/mnt/database/
+                  --mount type=bind,source=${{ github.workspace }}/examples/update/repository-AUR.json,target=/mnt/repository.json
+                  --env DATABASE_PATH=/mnt/database/
+                  docker.io/fackop/pppackage-updater:latest
+                  PPpackage.repository_driver.AUR
+                  --repository /mnt/repository.json
+
             - name: Check if conancenter database exists
               id: check_conancenter
               uses: andstor/file-existence-action@v3.0.0
@@ -202,7 +213,7 @@ jobs:
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
                   run --rm
-                  -T metamanager < examples/input/basic-arch-conan.json
+                  -T metamanager < examples/input/basic-pacman-AUR-conan.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache

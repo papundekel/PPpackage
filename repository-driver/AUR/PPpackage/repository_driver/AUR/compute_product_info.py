@@ -4,13 +4,27 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 
 from .schemes import DriverParameters, RepositoryParameters
+from .utils import PREFIX, parse_package_name
 
 
 async def compute_product_info(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
-    package: str,
+    full_package_name: str,
     dependency_product_infos: DependencyProductInfos,
 ) -> ProductInfo:
-    return {}
+    if not full_package_name.startswith(PREFIX):
+        raise Exception(f"Invalid package name: {full_package_name}")
+
+    name, version = parse_package_name(full_package_name)
+
+    return {
+        f"pacman-{name}": {
+            "version": f"{version}",
+            "dependency_versions": {
+                dependency[len(PREFIX) :]: next(iter(product_infos.values()))["version"]
+                for dependency, product_infos in dependency_product_infos.items()
+            },
+        }
+    }

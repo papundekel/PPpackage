@@ -1,4 +1,9 @@
+from pathlib import Path
+from typing import Annotated
+
 from pydantic import BaseModel
+
+from PPpackage.utils.validation import WithVariables
 
 
 class DriverParameters(BaseModel):
@@ -6,4 +11,13 @@ class DriverParameters(BaseModel):
 
 
 class RepositoryParameters(BaseModel):
-    pass
+    database_path: Annotated[Path, WithVariables]
+
+
+class AURPackage(BaseModel):
+    Name: str
+    Version: str
+    Provides: list[str] = []
+    Conflicts: list[str] = []
+    Depends: list[str] = []
+    MakeDepends: list[str] = []

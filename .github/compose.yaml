@@ -36,11 +36,11 @@ services:
               source: $PWD/database/archlinux-extra/
               target: /mnt/repositories/database/archlinux-extra/
             - type: bind
+              source: $PWD/database/AUR/
+              target: /mnt/repositories/database/PP/
+            - type: bind
               source: $PWD/database/conancenter/
               target: /mnt/repositories/database/conancenter/
-            - type: bind
-              source: $PWD/database/PP/
-              target: /mnt/repositories/database/PP/
 
             - type: bind
               source: /etc/passwd

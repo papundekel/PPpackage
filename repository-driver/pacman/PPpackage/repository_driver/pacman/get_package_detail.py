@@ -11,9 +11,7 @@ from pyalpm import Handle
 from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
-from .utils import strip_version
-
-PREFIX = "pacman-real-"
+from .utils import PREFIX, parse_package_name, strip_version
 
 
 async def get_package_detail(
@@ -25,13 +23,7 @@ async def get_package_detail(
     if not full_package_name.startswith(PREFIX):
         return None
 
-    tokens = full_package_name[len(PREFIX) :].rsplit("-", 2)
-
-    if len(tokens) != 3:
-        raise Exception(f"Invalid package name: {full_package_name}")
-
-    name, version_no_pkgrel, pkgrel = tokens
-    version = f"{version_no_pkgrel}-{pkgrel}"
+    name, version = parse_package_name(full_package_name)
 
     with TemporaryDirectory() as root_directory_path:
         handle = Handle(

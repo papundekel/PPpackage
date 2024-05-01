@@ -69,6 +69,9 @@
         },
         {
             "driver": "AUR",
+            "parameters": {
+                "database_path": "/mnt/repositories/database/AUR/"
+            },
             "formula_cache_path": "/mnt/cache/formula/AUR.db",
             "translator_data_cache_path": "/mnt/cache/translator-data/AUR.db"
         },
