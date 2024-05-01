@@ -1,5 +1,3 @@
-mkdir -p tmp/output
-
 PODMAN_COMPOSE_PROVIDER=podman-compose \
 CONFIG_PATH=$(pwd)/examples/containerized/all-remote/config.json \
 CONFIG_ARCHLINUX_CORE=$(pwd)/examples/containerized/all-remote/archlinux-core/config.json \

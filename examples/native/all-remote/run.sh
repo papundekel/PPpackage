@@ -8,17 +8,6 @@ address_PP="localhost:8884"
 
 
 
-mkdir -p tmp/
-mkdir -p tmp/output/
-
-mkdir -p tmp/cache/metamanager/archlinux-core
-mkdir -p tmp/cache/metamanager/archlinux-extra
-mkdir -p tmp/cache/metamanager/AUR
-mkdir -p tmp/cache/metamanager/conancenter
-mkdir -p tmp/cache/metamanager/PP
-
-
-
 CONFIG_PATH="$PWD/examples/native/all-remote/archlinux-core/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \

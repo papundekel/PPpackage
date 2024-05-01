@@ -138,12 +138,6 @@ jobs:
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
 
-            - name: Create directories
-              run: |
-                  mkdir -p root/ output/
-                  mkdir -p cache/product/ cache/formula/ cache/translator-data/
-                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
-
             - name: Update archlinux core database
               run: >
                   docker run --rm

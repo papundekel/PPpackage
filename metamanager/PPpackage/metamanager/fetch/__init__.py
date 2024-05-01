@@ -1,5 +1,5 @@
 from asyncio import create_task
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable, MutableMapping, Set
 from functools import singledispatch
 from hashlib import sha1
 from itertools import islice
@@ -39,12 +39,12 @@ from .meta_on_top import _
 
 
 async def create_dependency_product_infos(
-    dependencies: Iterable[tuple[str, NodeData]]
+    interface_dependencies: Set[str], dependencies: Iterable[tuple[str, NodeData]]
 ) -> DependencyProductInfos:
     dependency_product_infos = dict[str, MutableMapping[str, Any]]()
 
     for dependency, node_data in dependencies:
-        for interface in node_data["detail"].interfaces:
+        for interface in node_data["detail"].interfaces & interface_dependencies:
             dependency_product_infos.setdefault(interface, {})[dependency] = (
                 await node_data["product_info"]
             ).get(interface)
@@ -53,9 +53,14 @@ async def create_dependency_product_infos(
 
 
 async def compute_product_info(
-    package: str, repository: Repository, dependencies: Iterable[tuple[str, NodeData]]
+    package: str,
+    interface_dependencies: Set[str],
+    repository: Repository,
+    dependencies: Iterable[tuple[str, NodeData]],
 ) -> ProductInfo:
-    dependency_product_infos = await create_dependency_product_infos(dependencies)
+    dependency_product_infos = await create_dependency_product_infos(
+        interface_dependencies, dependencies
+    )
 
     product_info = await repository.compute_product_info(
         package, dependency_product_infos
@@ -123,7 +128,12 @@ def fetch(
             dependencies = graph_successors(graph, package)
 
             node_data["product_info"] = create_task(
-                compute_product_info(package, node_data["repository"], dependencies)
+                compute_product_info(
+                    package,
+                    node_data["detail"].dependencies,
+                    node_data["repository"],
+                    dependencies,
+                )
             )
 
             node_data["product"] = create_task(
