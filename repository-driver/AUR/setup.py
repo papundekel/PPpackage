@@ -9,6 +9,5 @@ setup(
         "PPpackage-repository-driver-interface",
         "sqlitedict",
         "hishel[sqlite]",
-        "gzip",
     ],
 )
