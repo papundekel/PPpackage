@@ -132,11 +132,11 @@ jobs:
             - name: Download seccomp.json
               run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
 
-            - name: Cache products
+            - name: Cache
               uses: actions/cache@v4.0.2
               with:
-                  path: ${{ github.workspace }}/cache/product
-                  key: cache-products
+                  path: ${{ github.workspace }}/cache/
+                  key: cache
 
             - name: Download image artifacts
               uses: actions/download-artifact@v4.1.7
@@ -153,7 +153,7 @@ jobs:
             - name: Create directories
               run: |
                   mkdir -p root/ output/
-                  mkdir -p cache/product/ cache/repository/conan/ cache/repository/PP/
+                  mkdir -p cache/product/ cache/formula/ cache/translator-data/
                   mkdir -p database/archlinux-core/ database/archlinux-extra/ database/conancenter/ database/PP/
 
             - name: Update archlinux core database

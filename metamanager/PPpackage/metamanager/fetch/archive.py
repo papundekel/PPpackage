@@ -9,7 +9,7 @@ from pydantic import AnyUrl
 
 from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes import NodeData
+from PPpackage.metamanager.schemes.node import NodeData
 
 from . import fetch_package
 

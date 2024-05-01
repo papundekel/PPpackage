@@ -21,7 +21,8 @@ from .install import install
 from .installers import Installers
 from .repositories import Repositories
 from .resolve import resolve
-from .schemes import Config, Input, NodeData
+from .schemes import Config, Input
+from .schemes.node import NodeData
 from .translators import Translators
 
 logger = getLogger(__name__)
@@ -194,7 +195,7 @@ async def main(
 
             async with HTTPClient(http2=True) as archive_client:
                 with SqliteDict(
-                    config.product_cache_path / "mapping-db.sqlite"
+                    config.product_cache_path / "mapping.db"
                 ) as cache_mapping:
                     fetch(
                         cache_mapping, archive_client, config.product_cache_path, graph

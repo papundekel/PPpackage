@@ -5,7 +5,7 @@ from httpx import AsyncClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import MetaOnTopProductDetail
 
 from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes import NodeData
+from PPpackage.metamanager.schemes.node import NodeData
 
 from . import fetch_package
 

@@ -2,7 +2,11 @@ from setuptools import setup
 
 setup(
     name="PPpackage-metamanager",
-    packages=["PPpackage.metamanager", "PPpackage.metamanager.fetch"],
+    packages=[
+        "PPpackage.metamanager",
+        "PPpackage.metamanager.fetch",
+        "PPpackage.metamanager.schemes",
+    ],
     version="0.1.0",
     install_requires=[
         "PPpackage-utils",

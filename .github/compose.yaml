@@ -26,8 +26,8 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/cache/product/
-              target: /mnt/cache/product/
+              source: $PWD/cache/
+              target: /mnt/cache/
 
             - type: bind
               source: $PWD/database/archlinux-core/
@@ -41,10 +41,6 @@ services:
             - type: bind
               source: $PWD/database/PP/
               target: /mnt/repositories/database/PP/
-
-            - type: bind
-              source: $PWD/cache/repository/PP/
-              target: /mnt/cache/repository/PP/
 
             - type: bind
               source: /etc/passwd

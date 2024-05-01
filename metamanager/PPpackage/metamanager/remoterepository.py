@@ -13,17 +13,17 @@ from PPpackage.repository_driver.interface.schemes import (
     TranslatorInfo,
 )
 
-from PPpackage.utils.validation import dump_json
+from PPpackage.utils.validation import dump_json, validate_json
 
 from .exceptions import SubmanagerCommandFailure
-from .repository import Repository
+from .repository import RepositoryInterface
 from .schemes import RemoteRepositoryConfig
 from .utils import HTTPResponseReader
 
 logger = getLogger(__name__)
 
 
-class RemoteRepository(Repository):
+class RemoteRepository(RepositoryInterface):
     def __init__(self, config: RemoteRepositoryConfig, client: HTTPClient):
         self.client = client
 
@@ -34,6 +34,17 @@ class RemoteRepository(Repository):
 
     def get_url(self) -> str:
         return self.url
+
+    async def get_epoch(self) -> str:
+        response = await self.client.get(f"{self.url}/epoch")
+
+        if not response.is_success:
+            raise SubmanagerCommandFailure(
+                "remote repository.get_epoch failed "
+                f"{(await response.aread()).decode()}"
+            )
+
+        return validate_json(str, memoryview(response.read()))
 
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
         async with self.client.stream(
@@ -52,7 +63,7 @@ class RemoteRepository(Repository):
             async for package in reader.load_many(TranslatorInfo):
                 yield package
 
-    async def _translate_options(self, options: Any) -> Any:
+    async def translate_options(self, options: Any) -> Any:
         response = await self.client.get(
             f"{self.url}/translate-options",
             params={"options": dump_json(options)},
@@ -65,13 +76,13 @@ class RemoteRepository(Repository):
                 f"{(await response.aread()).decode()}"
             )
 
-        return load_from_bytes(Any, memoryview(response.read()))  # type: ignore
+        return validate_json(Any, memoryview(response.read()))  # type: ignore
 
-    async def get_formula(self) -> AsyncIterable[Requirement]:
+    async def get_formula(self, translated_options: Any) -> AsyncIterable[Requirement]:
         async with self.client.stream(
             "GET",
             f"{self.url}/formula",
-            params={"translated_options": dump_json(self.translated_options)},
+            params={"translated_options": dump_json(translated_options)},
             headers={"Cache-Control": "no-cache"},
         ) as response:
             if not response.is_success:
@@ -85,10 +96,12 @@ class RemoteRepository(Repository):
             async for requirement in reader.load_many(Requirement):  # type: ignore
                 yield requirement
 
-    async def get_package_detail(self, package: str) -> PackageDetail | None:
+    async def get_package_detail(
+        self, translated_options: Any, package: str
+    ) -> PackageDetail | None:
         response = await self.client.get(
             f"{self.url}/packages/{package}",
-            params={"translated_options": dump_json(self.translated_options)},
+            params={"translated_options": dump_json(translated_options)},
         )
 
         if response.status_code == 404:
@@ -125,12 +138,15 @@ class RemoteRepository(Repository):
         return package_detail
 
     async def compute_product_info(
-        self, package: str, dependency_product_infos: DependencyProductInfos
+        self,
+        translated_options: Any,
+        package: str,
+        dependency_product_infos: DependencyProductInfos,
     ) -> ProductInfo:
         response = await self.client.get(
             f"{self.url}/packages/{package}/product-info",
             params={
-                "translated_options": dump_json(self.translated_options),
+                "translated_options": dump_json(translated_options),
                 "dependency_product_infos": dump_json(dependency_product_infos),
             },
         )
@@ -141,4 +157,4 @@ class RemoteRepository(Repository):
                 f"{(await response.aread()).decode()}"
             )
 
-        return load_from_bytes(ProductInfo, memoryview(response.read()))  # type: ignore
+        return validate_json(ProductInfo, memoryview(response.read()))  # type: ignore

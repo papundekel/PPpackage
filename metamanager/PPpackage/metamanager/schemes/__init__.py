@@ -1,19 +1,16 @@
-from collections.abc import Awaitable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any
 
 from frozendict import frozendict
+from PPpackage.repository_driver.interface.schemes import (
+    BaseModuleConfig,
+    Parameters,
+    Requirement,
+)
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from metamanager.PPpackage.metamanager.repository import Repository
-from PPpackage.repository_driver.interface.schemes import (
-    BaseModuleConfig,
-    PackageDetail,
-    Parameters,
-    ProductInfo,
-    Requirement,
-)
 from PPpackage.utils.validation import WithVariables
 
 
@@ -26,13 +23,19 @@ class Input:
 
 
 @pydantic_dataclass(frozen=True)
-class LocalRepositoryConfig:
+class RepositoryConfig:
+    formula_cache_path: Annotated[Path, WithVariables]
+    translator_data_cache_path: Annotated[Path, WithVariables]
+
+
+@pydantic_dataclass(frozen=True)
+class LocalRepositoryConfig(RepositoryConfig):
     driver: str
     parameters: Parameters = frozendict()
 
 
 @pydantic_dataclass(frozen=True)
-class RemoteRepositoryConfig:
+class RemoteRepositoryConfig(RepositoryConfig):
     url: AnyUrl
     cache_path: Annotated[Path, WithVariables]
 
@@ -59,10 +62,3 @@ class Config:
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
     product_cache_path: Annotated[Path, WithVariables]
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
-
-
-class NodeData(TypedDict):
-    repository: Repository
-    detail: PackageDetail
-    product: Awaitable[tuple[Path, str]]
-    product_info: Awaitable[ProductInfo]

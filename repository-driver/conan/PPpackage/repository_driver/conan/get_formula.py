@@ -4,12 +4,14 @@ from typing import AsyncIterable
 from conan.api.conan_api import ConanAPI
 from conan.internal.conan_app import ConanApp
 from conans.model.recipe_ref import RecipeReference
+from PPpackage.repository_driver.interface.exceptions import EpochException
 from PPpackage.repository_driver.interface.schemes import (
     ImplicationRequirement,
     Requirement,
     SimpleRequirement,
 )
 
+from .get_epoch import get_epoch
 from .schemes import DriverParameters, Options, RepositoryParameters
 from .utils import get_requirements
 
@@ -25,8 +27,12 @@ def get_revisions(api: ConanAPI, recipe: RecipeReference) -> Iterable[RecipeRefe
 async def get_formula(
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
+    epoch: str,
     translated_options: Options,
 ) -> AsyncIterable[Requirement]:
+    if epoch != await get_epoch(driver_parameters, repository_parameters):
+        raise EpochException
+
     api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
     app = ConanApp(api)
 

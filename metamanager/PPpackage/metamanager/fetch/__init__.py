@@ -18,7 +18,7 @@ from PPpackage.repository_driver.interface.schemes import (
 from sqlitedict import SqliteDict
 
 from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes import NodeData
+from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.utils.validation import dump_json
 
 
