@@ -18,8 +18,9 @@
 
 -e ./installer/interface/
 
--e ./installer/simple/
 -e ./installer/pacman/
+-e ./installer/conan/
+-e ./installer/simple/
 
 
 

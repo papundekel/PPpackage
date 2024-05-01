@@ -34,6 +34,9 @@
                 }
             }
         },
+        "conan": {
+            "package": "PPpackage.installer.conan"
+        },
         "simple": {
             "package": "PPpackage.installer.simple"
         }
