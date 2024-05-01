@@ -190,6 +190,9 @@ RUN pip install installer/interface/
 COPY installer/pacman/ /workdir/installer/pacman
 RUN pip install installer/pacman/
 
+COPY installer/conan/ /workdir/installer/conan
+RUN pip install installer/conan/
+
 COPY installer/simple/ /workdir/installer/simple
 RUN pip install installer/simple/
 
