@@ -1,7 +1,6 @@
 from collections.abc import Callable, Iterable, Mapping
 from itertools import chain
 from operator import eq, ge, gt, le, lt
-from sys import stderr
 
 from pyalpm import vercmp as alpm_vercmp
 from pysat.formula import Atom, Formula, Or
