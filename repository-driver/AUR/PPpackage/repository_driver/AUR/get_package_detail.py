@@ -16,14 +16,14 @@ from .state import State
 from .utils import PREFIX, parse_package_name, strip_version, transaction
 
 
-async def query_version(connection: Connection, name: str) -> str:
+async def query_version(connection: Connection, name: str) -> str | None:
     async with connection.execute(
         "SELECT version FROM packages WHERE name = ?", (name,)
     ) as cursor:
         row = await cursor.fetchone()
 
         if row is None:
-            raise Exception(f"Package not found: {name}")
+            return None
 
         return row[0]
 
@@ -72,6 +72,9 @@ async def get_package_detail(
 
     async with transaction(connection):
         package_version = await query_version(connection, name)
+
+        if package_version is None:
+            return None
 
         if package_version != version:
             return None
