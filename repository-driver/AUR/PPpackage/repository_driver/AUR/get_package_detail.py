@@ -13,14 +13,19 @@ from PPpackage.repository_driver.interface.schemes import (
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
-from .utils import PREFIX, fetch_one, parse_package_name, strip_version, transaction
+from .utils import PREFIX, parse_package_name, strip_version, transaction
 
 
 async def query_version(connection: Connection, name: str) -> str:
     async with connection.execute(
         "SELECT version FROM packages WHERE name = ?", (name,)
     ) as cursor:
-        return (await fetch_one(cursor))[0]
+        row = await cursor.fetchone()
+
+        if row is None:
+            raise Exception(f"Package not found: {name}")
+
+        return row[0]
 
 
 async def query_provides(connection: Connection, name: str) -> AsyncIterable[str]:
