@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Mapping
+from sys import stderr
 from typing import Any
 
 from pysat.formula import Formula

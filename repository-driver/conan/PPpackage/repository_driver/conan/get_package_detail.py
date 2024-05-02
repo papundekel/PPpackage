@@ -1,7 +1,5 @@
 from itertools import chain
 
-from conan.api.conan_api import ConanAPI
-from conan.internal.conan_app import ConanApp
 from conans.model.recipe_ref import RecipeReference
 from conans.model.requires import Requirement
 from PPpackage.repository_driver.interface.schemes import (
@@ -12,10 +10,12 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 
 from .schemes import DriverParameters, Options, RepositoryParameters
+from .state import State
 from .utils import PREFIX, get_requirements
 
 
 async def get_package_detail(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: Options,
@@ -26,10 +26,7 @@ async def get_package_detail(
 
     revision = RecipeReference.loads(full_package_name[len(PREFIX) :])
 
-    api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
-    app = ConanApp(api)
-
-    requirements = get_requirements(api, app, revision)
+    requirements = get_requirements(state.api, state.app, revision)
 
     if requirements is None:
         return None

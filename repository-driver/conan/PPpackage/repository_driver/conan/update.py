@@ -8,13 +8,17 @@ from conan.internal.conan_app import ConanApp
 from conans.errors import ConanException
 from conans.model.recipe_ref import RecipeReference
 
+from PPpackage.utils.rwlock import write as rwlock_write
+
 from .epoch import update as update_epoch
 from .schemes import DriverParameters, RepositoryParameters
+from .state import State
 
 
 def fetch_revisions(
     api: ConanAPI, remote: Remote, recipe: RecipeReference
 ) -> Sequence[RecipeReference]:
+    # takes too long
     # return api.list.recipe_revisions(recipe, remote)
     return [api.list.latest_recipe_revision(recipe, remote)]
 
@@ -41,29 +45,30 @@ def download_recipes(
 
 
 async def update(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> None:
-    api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
-    app = ConanApp(api)
-
     remote = Remote(
         "",
         url=str(repository_parameters.url),
         verify_ssl=repository_parameters.verify_ssl,
     )
 
-    recipes = api.search.recipes("*", remote)
+    async with rwlock_write(state.coroutine_lock, state.file_lock):
+        recipes = state.api.search.recipes("*", remote)
 
-    with ThreadPoolExecutor(cpu_count() * 16) as executor:
-        futures = list[Future]()
+        with ThreadPoolExecutor(cpu_count() * 16) as executor:
+            futures = list[Future]()
 
-        for revisions in executor.map(
-            lambda recipe: fetch_revisions(api, remote, recipe), recipes
-        ):
-            futures.append(executor.submit(download_recipes, app, remote, revisions))
+            for revisions in executor.map(
+                lambda recipe: fetch_revisions(state.api, remote, recipe), recipes
+            ):
+                futures.append(
+                    executor.submit(download_recipes, state.app, remote, revisions)
+                )
 
-        for future in futures:
-            future.result()
+            for future in futures:
+                future.result()
 
-    update_epoch(repository_parameters.database_path / "database.sqlite")
+        update_epoch(repository_parameters.database_path / "epoch")

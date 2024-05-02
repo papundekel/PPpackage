@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Set
+from collections.abc import AsyncIterable, Callable, Mapping, Set
 from contextlib import contextmanager
 from importlib import import_module
 from os import mkfifo
@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory as BaseTemporaryDirectory
 from typing import cast as type_cast
 from typing import overload
 
+from asyncstdlib import chain as async_chain
 from frozendict import frozendict
 
 
@@ -78,3 +79,32 @@ def freeze(x):
 
 def load_interface_module[T](Interface: type[T], package_name: str) -> T:
     return type_cast(T, import_module(f"{package_name}.interface").interface)
+
+
+class Result[T]:
+    def __init__(self):
+        self.value = None
+
+    def set(self, value: T) -> None:
+        self.value = value
+
+    def get(self) -> T:
+        if self.value is None:
+            raise ValueError("Result not set")
+
+        return self.value
+
+
+async def iterable_with_result[
+    R, T
+](f: Callable[[Result[R]], AsyncIterable[T]]) -> tuple[R, AsyncIterable[T]]:
+    result = Result[R]()
+
+    i = aiter(f(result))
+
+    try:
+        first = await anext(i)
+    except StopAsyncIteration:
+        return result.get(), async_chain()
+    else:
+        return result.get(), async_chain([first], i)

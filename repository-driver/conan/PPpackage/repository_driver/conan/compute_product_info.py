@@ -2,7 +2,6 @@ from collections.abc import Mapping
 from itertools import chain
 from typing import Any
 
-from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
@@ -10,6 +9,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 
 from .schemes import ConanProductInfo, DriverParameters, Options, RepositoryParameters
+from .state import State
 from .utils import PREFIX
 
 
@@ -26,6 +26,7 @@ def create_ref(dependency: str, product_infos: Mapping[str, Any]):
 
 
 async def compute_product_info(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: Options,
@@ -37,7 +38,7 @@ async def compute_product_info(
 
     revision = RecipeReference.loads(package[len(PREFIX) :])
 
-    api = ConanAPI(str(repository_parameters.database_path.absolute() / "cache"))
+    api = state.api
 
     build_profile = api.profiles.get_profile([api.profiles.get_default_build()])  # TODO
     host_profile = api.profiles.get_profile([api.profiles.get_default_host()])  # TODO

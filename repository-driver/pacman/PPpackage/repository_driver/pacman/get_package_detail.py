@@ -1,20 +1,17 @@
 from itertools import chain
-from pathlib import Path
-from tempfile import mkdtemp
 
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     PackageDetail,
 )
-from pyalpm import Handle
-
-from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
+from .state import State
 from .utils import PREFIX, parse_package_name, strip_version
 
 
 async def get_package_detail(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
@@ -25,52 +22,43 @@ async def get_package_detail(
 
     name, version = parse_package_name(full_package_name)
 
-    with TemporaryDirectory() as root_directory_path:
-        handle = Handle(
-            str(root_directory_path), str(repository_parameters.database_path)
+    package = state.database.get_pkg(name)
+
+    if package is None:
+        return None
+
+    if package.version != version:
+        return None
+
+    transaction = state.handle.init_transaction(
+        downloadonly=True, nodeps=True, nodepversion=True
+    )
+
+    try:
+        transaction.add_pkg(package)
+        transaction.prepare()
+        transaction.commit()
+    finally:
+        transaction.release()
+
+    archive_path = (
+        state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.zst"
+    )
+
+    if not archive_path.exists():
+        archive_path = (
+            state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.xz"
         )
 
-        cachedir_path = Path(mkdtemp())
-        handle.add_cachedir(str(cachedir_path))
-
-        database = handle.register_syncdb("database", 0)
-
-        alpm_package = database.get_pkg(name)
-
-        if alpm_package is None:
-            return None
-
-        if alpm_package.version != version:
-            return None
-
-        database.servers = repository_parameters.mirrorlist
-
-        transaction = handle.init_transaction(
-            downloadonly=True, nodeps=True, nodepversion=True
-        )
-
-        try:
-            transaction.add_pkg(alpm_package)
-            transaction.prepare()
-            transaction.commit()
-        finally:
-            transaction.release()
-
-        archive_path = next(cachedir_path.iterdir())
-
-        return PackageDetail(
-            frozenset(
-                chain(
-                    [f"pacman-{name}"],
-                    (
-                        f"pacman-{strip_version(provide)}"
-                        for provide in alpm_package.provides
-                    ),
-                )
-            ),
-            frozenset(
-                f"pacman-{strip_version(dependency)}"
-                for dependency in alpm_package.depends
-            ),
-            ArchiveProductDetail(archive_path, "pacman"),
-        )
+    return PackageDetail(
+        frozenset(
+            chain(
+                [f"pacman-{name}"],
+                (f"pacman-{strip_version(provide)}" for provide in package.provides),
+            )
+        ),
+        frozenset(
+            f"pacman-{strip_version(dependency)}" for dependency in package.depends
+        ),
+        ArchiveProductDetail(archive_path, "pacman"),
+    )

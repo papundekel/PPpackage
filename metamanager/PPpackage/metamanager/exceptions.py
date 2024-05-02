@@ -3,3 +3,7 @@ class SubmanagerCommandFailure(Exception):
         super().__init__()
 
         self.message = message
+
+
+class EpochException(Exception):
+    pass

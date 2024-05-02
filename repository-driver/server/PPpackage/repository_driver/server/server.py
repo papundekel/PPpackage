@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+from functools import partial
 from logging import getLogger
 from pathlib import Path
 from sys import stderr
@@ -5,18 +7,18 @@ from typing import Annotated, Any
 
 from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from pydantic import ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
+
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
     RepositoryConfig,
 )
-from pydantic import ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
-
 from PPpackage.utils.stream import dump_bytes_chunked, dump_many, dump_one
-from PPpackage.utils.utils import load_interface_module
+from PPpackage.utils.utils import iterable_with_result, load_interface_module
 from PPpackage.utils.validation import validate_json, validate_python
 
 from .utils import StreamingResponse
@@ -62,15 +64,7 @@ repository_parameters = validate_python(
 logger = getLogger(__name__)
 
 
-async def get_epoch():
-    epoch = await interface.get_epoch(driver_parameters, repository_parameters)
-
-    return epoch
-
-
-async def enable_epoch_cache(request: Request, response: Response):
-    epoch = await get_epoch()
-
+def epoch_cache(request: Request, response: Response, epoch: str):
     request_epoch = request.headers.get("If-None-Match")
 
     if request_epoch == epoch:
@@ -91,12 +85,25 @@ def load_model_from_query[T](Model: type[T], alias: str):
     return dependency
 
 
-async def fetch_translator_data(response: Response, epoch: str):
+def get_state(request: Request):
+    return request.state.state
+
+
+async def fetch_translator_data(
+    request: Request, response: Response, state: Annotated[Any, Depends(get_state)]
+):
     logger.info("Preparing translator data...")
 
-    translator_data = interface.fetch_translator_data(
-        driver_parameters, repository_parameters, epoch
+    epoch, translator_data = await iterable_with_result(
+        partial(
+            interface.fetch_translator_data,
+            state,
+            driver_parameters,
+            repository_parameters,
+        )
     )
+
+    epoch_cache(request, response, epoch)
 
     logger.info("Translator data ready.")
 
@@ -104,14 +111,18 @@ async def fetch_translator_data(response: Response, epoch: str):
 
 
 async def translate_options(
-    epoch: str,
+    request: Request,
+    response: Response,
+    state: Annotated[Any, Depends(get_state)],
     options: Annotated[Any, Depends(load_model_from_query(Any, "options"))],  # type: ignore
 ):
     logger.info("Translating options...")
 
-    translated_options = await interface.translate_options(
-        driver_parameters, repository_parameters, epoch, options
+    epoch, translated_options = await interface.translate_options(
+        state, driver_parameters, repository_parameters, options
     )
+
+    epoch_cache(request, response, epoch)
 
     logger.info("Options translated.")
 
@@ -119,17 +130,26 @@ async def translate_options(
 
 
 async def get_formula(
+    request: Request,
     response: Response,
-    epoch: str,
+    state: Annotated[Any, Depends(get_state)],
     translated_options: Annotated[
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
 ):
     logger.info("Preparing formula...")
 
-    formula = interface.get_formula(
-        driver_parameters, repository_parameters, epoch, translated_options
+    epoch, formula = await iterable_with_result(
+        partial(
+            interface.get_formula,
+            state,
+            driver_parameters,
+            repository_parameters,
+            translated_options,
+        )
     )
+
+    epoch_cache(request, response, epoch)
 
     logger.info("Formula ready.")
 
@@ -138,6 +158,7 @@ async def get_formula(
 
 async def get_package_detail(
     response: Response,
+    state: Annotated[Any, Depends(get_state)],
     translated_options: Annotated[
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
@@ -146,7 +167,7 @@ async def get_package_detail(
     logger.info(f"Preparing package detail for {package}...")
 
     package_detail = await interface.get_package_detail(
-        driver_parameters, repository_parameters, translated_options, package
+        state, driver_parameters, repository_parameters, translated_options, package
     )
 
     logger.info(f"Package detail for {package} ready.")
@@ -172,6 +193,7 @@ async def get_package_detail(
 
 
 async def compute_product_info(
+    state: Annotated[Any, Depends(get_state)],
     translated_options: Annotated[
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
@@ -186,6 +208,7 @@ async def compute_product_info(
     logger.info(f"Computing product info for {package}...")
 
     product_info = await interface.compute_product_info(
+        state,
         driver_parameters,
         repository_parameters,
         translated_options,
@@ -198,18 +221,20 @@ async def compute_product_info(
     return product_info
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with interface.lifespan(driver_parameters, repository_parameters) as state:
+        yield {"state": state}
+
+
 class SubmanagerServer(FastAPI):
     def __init__(self):
-        super().__init__(redoc_url=None)
+        super().__init__(redoc_url=None, lifespan=lifespan)
 
-        super().get("/epoch")(get_epoch)
-        super().get("/translator-data", dependencies=[Depends(enable_epoch_cache)])(
-            fetch_translator_data
-        )
-        super().get("/translate-options", dependencies=[Depends(enable_epoch_cache)])(
-            translate_options
-        )
-        super().get("/formula", dependencies=[Depends(enable_epoch_cache)])(get_formula)
+        super().get("/translator-data")(fetch_translator_data)
+        super().get("/translate-options")(translate_options)
+        super().head("/translate-options")(translate_options)
+        super().get("/formula")(get_formula)
         super().get(
             "/packages/{package}", dependencies=[Depends(enable_permanent_cache)]
         )(get_package_detail)

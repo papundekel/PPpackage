@@ -4,6 +4,7 @@ from tempfile import mkdtemp
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
+
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,
     DependencyProductInfos,
@@ -12,7 +13,7 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
-
+from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json, validate_json
 
 from .exceptions import SubmanagerCommandFailure
@@ -36,7 +37,7 @@ class RemoteRepository(RepositoryInterface):
         return self.url
 
     async def get_epoch(self) -> str:
-        response = await self.client.get(f"{self.url}/epoch")
+        response = await self.client.head(f"{self.url}/translate-options")
 
         if not response.is_success:
             raise SubmanagerCommandFailure(
@@ -44,9 +45,11 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return validate_json(str, memoryview(response.read()))
+        return response.headers["ETag"]
 
-    async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
+    async def fetch_translator_data(
+        self, epoch_result: Result[str]
+    ) -> AsyncIterable[TranslatorInfo]:
         async with self.client.stream(
             "GET",
             f"{self.url}/translator-info",
@@ -58,12 +61,14 @@ class RemoteRepository(RepositoryInterface):
                     f"{(await response.aread()).decode()}"
                 )
 
+            epoch_result.set(response.headers["ETag"])
+
             reader = HTTPResponseReader(response)
 
             async for package in reader.load_many(TranslatorInfo):
                 yield package
 
-    async def translate_options(self, options: Any) -> Any:
+    async def translate_options(self, options: Any) -> tuple[str, Any]:
         response = await self.client.get(
             f"{self.url}/translate-options",
             params={"options": dump_json(options)},
@@ -76,9 +81,11 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return validate_json(Any, memoryview(response.read()))  # type: ignore
+        return response.headers["ETag"], validate_json(Any, memoryview(response.read()))  # type: ignore
 
-    async def get_formula(self, translated_options: Any) -> AsyncIterable[Requirement]:
+    async def get_formula(
+        self, translated_options: Any, epoch_result: Result[str]
+    ) -> AsyncIterable[Requirement]:
         async with self.client.stream(
             "GET",
             f"{self.url}/formula",
@@ -90,6 +97,8 @@ class RemoteRepository(RepositoryInterface):
                     "remote repository.get_formula failed "
                     f"{(await response.aread()).decode()}"
                 )
+
+            epoch_result.set(response.headers["ETag"])
 
             reader = HTTPResponseReader(response)
 

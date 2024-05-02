@@ -1,27 +1,19 @@
 from shutil import move
 
-from pyalpm import Handle
-
-from PPpackage.utils.utils import TemporaryDirectory
+from PPpackage.utils.rwlock import write as rwlock_write
 
 from .epoch import update as update_epoch
 from .schemes import DriverParameters, RepositoryParameters
+from .state import State
 
 
 async def update(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
 ) -> None:
-    with TemporaryDirectory() as root_directory_path:
-        handle = Handle(
-            str(root_directory_path), str(repository_parameters.database_path)
-        )
-
-        alpm_database = handle.register_syncdb(repository_parameters.repository, 0)
-
-        alpm_database.servers = repository_parameters.mirrorlist
-
-        alpm_database.update(True)
+    async with rwlock_write(state.coroutine_lock, state.file_lock):
+        state.database.update(True)
 
         sync_database_path = repository_parameters.database_path / "sync"
 
@@ -30,4 +22,4 @@ async def update(
             sync_database_path / "database.db",
         )
 
-    update_epoch(repository_parameters.database_path / "database.sqlite")
+        update_epoch(repository_parameters.database_path / "epoch")

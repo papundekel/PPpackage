@@ -7,8 +7,8 @@ setup(
     install_requires=[
         "PPpackage-utils",
         "PPpackage-repository-driver-interface",
-        "sqlitedict",
         "httpx[http2]",
         "hishel[sqlite]",
+        "aiosqlite",
     ],
 )

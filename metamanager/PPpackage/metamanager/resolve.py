@@ -18,13 +18,14 @@ from asyncstdlib import islice as async_islice
 from asyncstdlib import min as async_min
 from asyncstdlib import sync as make_async
 from networkx import MultiDiGraph
+from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
+from pysat.solvers import Solver
+
 from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
 from PPpackage.repository_driver.interface.utils import (
     RequirementVisitor,
     visit_requirements,
 )
-from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
-from pysat.solvers import Solver
 
 from .exceptions import SubmanagerCommandFailure
 from .repository import Repository
@@ -183,13 +184,15 @@ async def resolve(
     requirements: Requirement,
     options: Any,
 ) -> Set[str]:
-    stderr.write("Translating requirements...\n")
+    stderr.write("Fetching translator data and translating options...\n")
 
     async with TaskGroup() as group:
         translator_data_task = group.create_task(fetch_translator_data(repositories))
         group.create_task(translate_options(repositories, options))
 
     formula = get_formula(repositories)
+
+    stderr.write("Fetching formula and translating requirements...\n")
 
     translated_formula = await translate_requirements(
         translators, translator_data_task.result(), async_chain([requirements], formula)

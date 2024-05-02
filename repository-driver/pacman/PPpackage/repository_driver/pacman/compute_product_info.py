@@ -4,15 +4,14 @@ from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
     ProductInfo,
 )
-from pyalpm import Handle
-
-from PPpackage.utils.utils import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
+from .state import State
 from .utils import PREFIX, parse_package_name, strip_version
 
 
 async def compute_product_info(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
@@ -24,22 +23,15 @@ async def compute_product_info(
 
     name, version = parse_package_name(full_package_name)
 
-    with TemporaryDirectory() as root_directory_path:
-        handle = Handle(
-            str(root_directory_path), str(repository_parameters.database_path)
-        )
+    package = state.database.get_pkg(name)
 
-        database = handle.register_syncdb("database", 0)
+    if package is None:
+        raise Exception(f"Invalid package: {full_package_name}")
 
-        package = database.get_pkg(name)
+    if package.version != version:
+        raise Exception(f"Invalid package: {full_package_name}")
 
-        if package is None:
-            raise Exception(f"Invalid package: {full_package_name}")
-
-        if package.version != version:
-            raise Exception(f"Invalid package: {full_package_name}")
-
-        return {
-            f"pacman-{strip_version(provide)}": {"version": f"{version}"}
-            for provide in chain([name], package.provides)
-        }
+    return {
+        f"pacman-{strip_version(provide)}": {"version": f"{version}"}
+        for provide in chain([name], package.provides)
+    }

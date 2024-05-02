@@ -8,5 +8,7 @@ setup(
         "PPpackage-utils",
         "PPpackage-repository-driver-interface",
         "conan",
+        "fasteners",
+        "aiorwlock",
     ],
 )

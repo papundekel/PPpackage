@@ -1,15 +1,12 @@
 from datetime import datetime
 from pathlib import Path
 
-from sqlitedict import SqliteDict
+
+def get(path: Path) -> str:
+    with path.open("r") as file:
+        return file.read()
 
 
-def get(database_path: Path):
-    with SqliteDict(database_path) as database:
-        return str(database["epoch"])
-
-
-def update(database_path: Path):
-    with SqliteDict(database_path) as database:
-        database["epoch"] = str(datetime.now())
-        database.commit()
+def update(path: Path):
+    with path.open("w") as file:
+        file.write(str(datetime.now()))
