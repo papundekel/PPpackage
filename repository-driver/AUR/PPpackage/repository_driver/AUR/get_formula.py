@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterable, MutableSequence
 
 from aiosqlite import Connection
-
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     ImplicationRequirement,
@@ -9,8 +8,10 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
+
 from PPpackage.utils.utils import Result
 
+from .epoch import get as get_epoch
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import transaction
@@ -56,6 +57,8 @@ async def get_formula(
     connection = state.connection
 
     async with transaction(connection):
+        epoch_result.set(await get_epoch(connection))
+
         async for (
             package_name,
             package_version,

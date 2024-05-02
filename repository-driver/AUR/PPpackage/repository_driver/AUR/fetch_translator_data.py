@@ -1,10 +1,11 @@
 from collections.abc import AsyncIterable
 
 from aiosqlite import Connection
-
 from PPpackage.repository_driver.interface.schemes import TranslatorInfo
+
 from PPpackage.utils.utils import Result
 
+from .epoch import get as get_epoch
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import parse_provide, transaction
@@ -31,6 +32,8 @@ async def fetch_translator_data(
     connection = state.connection
 
     async with transaction(connection):
+        epoch_result.set(await get_epoch(connection))
+
         async for package_name, package_version in query_packages(connection):
             yield TranslatorInfo(
                 f"pacman-real-{package_name}",
