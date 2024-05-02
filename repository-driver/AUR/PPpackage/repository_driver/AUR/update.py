@@ -22,6 +22,10 @@ async def create_database_epoch(connection: Connection):
         """
     )
 
+    await connection.execute("DELETE FROM epochs")
+
+    await connection.execute("INSERT INTO epochs VALUES (?)", ("",))
+
 
 async def create_database_packages(
     connection: Connection, insert_packages: list[tuple[str, str]]
