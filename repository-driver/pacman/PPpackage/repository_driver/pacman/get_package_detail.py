@@ -1,6 +1,4 @@
 from itertools import chain
-from pathlib import Path
-from tempfile import mkdtemp
 
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveProductDetail,

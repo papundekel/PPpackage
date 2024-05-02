@@ -1,9 +1,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from sys import stderr
 
 from aiorwlock import RWLock
-from conan.api.conan_api import ConanAPI
-from conan.internal.conan_app import ConanApp
 from fasteners import InterProcessReaderWriterLock
 from pyalpm import Handle
 
@@ -18,6 +17,8 @@ async def lifespan(
     driver_parameters: DriverParameters, repository_parameters: RepositoryParameters
 ) -> AsyncIterator[State]:
     database_path = repository_parameters.database_path
+
+    database_path.mkdir(parents=True, exist_ok=True)
 
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")

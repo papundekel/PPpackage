@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable
 from contextlib import asynccontextmanager
 
 from aiosqlite import Connection, Cursor

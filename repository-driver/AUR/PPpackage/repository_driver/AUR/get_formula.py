@@ -2,7 +2,6 @@ from collections.abc import AsyncIterable, MutableSequence
 
 from aiosqlite import Connection
 from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
     ImplicationRequirement,
     Requirement,
     SimpleRequirement,
