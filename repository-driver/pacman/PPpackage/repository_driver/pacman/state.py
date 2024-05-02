@@ -3,7 +3,7 @@ from pathlib import Path
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
-from pyalpm import Handle
+from pyalpm import DB, Handle
 
 
 @dataclass(frozen=True)
@@ -12,3 +12,4 @@ class State:
     file_lock: InterProcessReaderWriterLock
     handle: Handle
     cache_directory_path: Path
+    database: DB

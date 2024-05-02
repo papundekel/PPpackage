@@ -22,17 +22,13 @@ async def get_package_detail(
 
     name, version = parse_package_name(full_package_name)
 
-    database = state.handle.register_syncdb("database", 0)
-
-    package = database.get_pkg(name)
+    package = state.database.get_pkg(name)
 
     if package is None:
         return None
 
     if package.version != version:
         return None
-
-    database.servers = repository_parameters.mirrorlist
 
     transaction = state.handle.init_transaction(
         downloadonly=True, nodeps=True, nodepversion=True

@@ -7,7 +7,6 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
-
 from PPpackage.utils.rwlock import read as rwlock_read
 from PPpackage.utils.utils import Result
 
@@ -29,9 +28,7 @@ async def get_formula(
     async with rwlock_read(state.coroutine_lock, state.file_lock):
         epoch_result.set(get_epoch(repository_parameters.database_path / "epoch"))
 
-        database = state.handle.register_syncdb("database", 0)
-
-        for package in database.pkgcache:
+        for package in state.database.pkgcache:
             full_name = f"pacman-real-{package.name}-{package.version}"
             if len(package.depends) != 0:
                 yield ImplicationRequirement(

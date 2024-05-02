@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from sys import stderr
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
@@ -31,4 +30,10 @@ async def lifespan(
 
         handle.add_cachedir(str(cache_directory_path))
 
-        yield State(coroutine_lock, file_lock, handle, cache_directory_path)
+        repository = repository_parameters.repository
+        database = handle.register_syncdb(
+            repository if repository is not None else "database", 0
+        )
+        database.servers = repository_parameters.mirrorlist
+
+        yield State(coroutine_lock, file_lock, handle, cache_directory_path, database)

@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterable
 
 from PPpackage.repository_driver.interface.schemes import TranslatorInfo
-
 from PPpackage.utils.rwlock import read as rwlock_read
 from PPpackage.utils.utils import Result
 
@@ -20,10 +19,7 @@ async def fetch_translator_data(
     async with rwlock_read(state.coroutine_lock, state.file_lock):
         epoch_result.set(get_epoch(repository_parameters.database_path / "epoch"))
 
-        database = state.handle.register_syncdb("database", 0)
-        database.servers = repository_parameters.mirrorlist
-
-        for package in database.pkgcache:
+        for package in state.database.pkgcache:
             yield TranslatorInfo(
                 f"pacman-real-{package.name}",
                 {"version": package.version},

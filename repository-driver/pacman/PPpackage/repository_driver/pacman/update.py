@@ -13,11 +13,7 @@ async def update(
     repository_parameters: RepositoryParameters,
 ) -> None:
     async with rwlock_write(state.coroutine_lock, state.file_lock):
-        database = state.handle.register_syncdb(repository_parameters.repository, 0)
-
-        database.servers = repository_parameters.mirrorlist
-
-        database.update(True)
+        state.database.update(True)
 
         sync_database_path = repository_parameters.database_path / "sync"
 
