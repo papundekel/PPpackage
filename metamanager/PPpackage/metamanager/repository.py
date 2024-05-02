@@ -1,6 +1,9 @@
 from collections.abc import AsyncIterable
 from typing import Any, Protocol
 
+from pydantic import AnyUrl
+from sqlitedict import SqliteDict
+
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
     PackageDetail,
@@ -8,11 +11,10 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
-from pydantic import AnyUrl
-from sqlitedict import SqliteDict
-
+from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json
 
+from .exceptions import EpochException
 from .schemes import RepositoryConfig
 
 
@@ -23,12 +25,14 @@ class RepositoryInterface(Protocol):
 
     async def get_epoch(self) -> str: ...
 
-    def fetch_translator_data(self, epoch: str) -> AsyncIterable[TranslatorInfo]: ...
+    def fetch_translator_data(
+        self, epoch_result: Result[str]
+    ) -> AsyncIterable[TranslatorInfo]: ...
 
-    async def translate_options(self, epoch: str, options: Any) -> Any: ...
+    async def translate_options(self, options: Any) -> tuple[str, Any]: ...
 
     def get_formula(
-        self, epoch: str, translated_options: Any
+        self, translated_options: Any, epoch_result: Result[str]
     ) -> AsyncIterable[Requirement]: ...
 
     async def get_package_detail(
@@ -75,9 +79,14 @@ class Repository:
             except KeyError:
                 translator_data = []
 
-                async for info in self.interface.fetch_translator_data(self.epoch):
+                epoch_result = Result[str]()
+
+                async for info in self.interface.fetch_translator_data(epoch_result):
                     yield info
                     translator_data.append(info)
+
+                if epoch_result.get() != self.epoch:
+                    raise EpochException()
 
                 translator_data_cache[cache_key] = translator_data
                 translator_data_cache.commit()
@@ -86,9 +95,12 @@ class Repository:
                     yield requirement
 
     async def translate_options(self, options: Any) -> None:
-        self.translated_options = await self.interface.translate_options(
-            self.epoch, options
-        )
+        epoch, translated_options = await self.interface.translate_options(options)
+
+        if epoch != self.epoch:
+            raise EpochException()
+
+        self.translated_options = translated_options
 
     async def get_formula(self) -> AsyncIterable[Requirement]:
         self.config.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,11 +114,16 @@ class Repository:
             except KeyError:
                 formula = []
 
+                epoch_result = Result[str]()
+
                 async for requirement in self.interface.get_formula(
-                    self.epoch, self.translated_options
+                    self.translated_options, epoch_result
                 ):
                     yield requirement
                     formula.append(requirement)
+
+                if epoch_result.get() != self.epoch:
+                    raise EpochException()
 
                 formula_cache[cache_key] = formula
                 formula_cache.commit()

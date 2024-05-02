@@ -1,16 +1,28 @@
-from sys import stderr
+from collections.abc import AsyncIterable
+
+from aiosqlite import Connection
 
 from PPpackage.repository_driver.interface.schemes import (
     DependencyProductInfos,
     ProductInfo,
 )
-from sqlitedict import SqliteDict
 
-from .schemes import AURPackage, DriverParameters, RepositoryParameters
-from .utils import PREFIX, parse_package_name, strip_version
+from .schemes import DriverParameters, RepositoryParameters
+from .state import State
+from .utils import PREFIX, parse_package_name, strip_version, transaction
+
+
+async def query_provides(connection: Connection, name: str) -> AsyncIterable[str]:
+    async with transaction(connection):
+        async with connection.execute(
+            "SELECT provide FROM provides WHERE name = ?", (name,)
+        ) as cursor:
+            async for row in cursor:
+                yield row[0]
 
 
 async def compute_product_info(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
@@ -22,17 +34,9 @@ async def compute_product_info(
 
     name, version = parse_package_name(full_package_name)
 
-    print(f"{full_package_name}: {dependency_product_infos}", file=stderr)
-
-    with SqliteDict(
-        repository_parameters.database_path / "database.sqlite",
-        tablename="packages",
-    ) as database:
-        package: AURPackage = database[name]
-
     return {
         f"pacman-{strip_version(provide)}": {"version": f"{version}"}
-        for provide in package.Provides
+        async for provide in query_provides(state.connection, full_package_name)
     } | {
         f"pacman-{name}": {
             "version": f"{version}",

@@ -1,15 +1,14 @@
 from datetime import datetime
-from pathlib import Path
 
-from sqlitedict import SqliteDict
+from aiosqlite import Connection
 
-
-def get(database_path: Path):
-    with SqliteDict(database_path) as database:
-        return str(database["epoch"])
+from .utils import fetch_one
 
 
-def update(database_path: Path):
-    with SqliteDict(database_path) as database:
-        database["epoch"] = str(datetime.now())
-        database.commit()
+async def get(connection: Connection) -> str:
+    async with connection.execute("SELECT * FROM epochs") as cursor:
+        return (await fetch_one(cursor))[0]
+
+
+async def update(connection: Connection) -> None:
+    await connection.execute("UPDATE epochs SET epoch = ?", (str(datetime.now()),))

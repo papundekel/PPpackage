@@ -1,5 +1,6 @@
-from collections.abc import AsyncIterable, Iterable, MutableSequence
-from typing import cast as type_cast
+from collections.abc import AsyncIterable, MutableSequence
+
+from aiosqlite import Connection
 
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
@@ -8,39 +9,69 @@ from PPpackage.repository_driver.interface.schemes import (
     SimpleRequirement,
     XORRequirement,
 )
-from sqlitedict import SqliteDict
+from PPpackage.utils.utils import Result
 
-from .schemes import AURPackage, DriverParameters, RepositoryParameters
-from .utils import package_provides
+from .schemes import DriverParameters, RepositoryParameters
+from .state import State
+from .utils import transaction
+
+
+async def query_runtime_dependencies(
+    connection: Connection,
+) -> AsyncIterable[tuple[str, str, str]]:
+    async with connection.execute(
+        """
+        SELECT packages.name, version, dependency
+        FROM packages JOIN runtime_dependencies
+        """
+    ) as cursor:
+        async for row in cursor:
+            yield row[0], row[1], row[2]
+
+
+async def query_provides(connection: Connection) -> AsyncIterable[tuple[str, str, str]]:
+    async with connection.execute(
+        """
+        SELECT packages.name, version, provide
+        FROM packages JOIN provides
+        """
+    ) as cursor:
+        async for row in cursor:
+            yield row[0], row[1], row[2]
+
+
+def make_full_name(package_name: str, package_version: str) -> str:
+    return f"pacman-real-{package_name}-{package_version}"
 
 
 async def get_formula(
+    state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
-    epoch: str,
     translated_options: None,
+    epoch_result: Result[str],
 ) -> AsyncIterable[Requirement]:
     provides = dict[str | tuple[str, str], MutableSequence[str]]()
 
-    with SqliteDict(
-        repository_parameters.database_path / "database.sqlite",
-        tablename="packages",
-    ) as database:
-        for package in type_cast(Iterable[AURPackage], database.values()):
-            full_name = f"pacman-real-{package.Name}-{package.Version}"
-            if len(package.Depends) != 0:
-                yield ImplicationRequirement(
-                    SimpleRequirement("noop", full_name),
-                    ANDRequirement(
-                        [
-                            SimpleRequirement("pacman", dependency)
-                            for dependency in package.Depends
-                        ]
-                    ),
-                )
+    connection = state.connection
 
-            for provide in package_provides(package.Provides):
-                provides.setdefault(provide, []).append(full_name)
+    async with transaction(connection):
+        async for (
+            package_name,
+            package_version,
+            dependency,
+        ) in query_runtime_dependencies(connection):
+            yield ImplicationRequirement(
+                SimpleRequirement(
+                    "noop", make_full_name(package_name, package_version)
+                ),
+                SimpleRequirement("pacman", dependency),
+            )
+
+        async for package_name, package_version, provide in query_provides(connection):
+            provides.setdefault(provide, []).append(
+                make_full_name(package_name, package_version)
+            )
 
     for provide, packages in provides.items():
         variable_string = (

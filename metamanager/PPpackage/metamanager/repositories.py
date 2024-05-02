@@ -16,14 +16,14 @@ from .schemes import (
 
 
 async def create_repository(
-    client_stack: AsyncExitStack,
+    context_stack: AsyncExitStack,
     client: HTTPClient | None,
     repository_config: LocalRepositoryConfig | RemoteRepositoryConfig,
     drivers: Mapping[str, RepositoryDriverConfig],
 ) -> RepositoryInterface:
     if isinstance(repository_config, RemoteRepositoryConfig):
         if client is None:
-            client = await client_stack.enter_async_context(
+            client = await context_stack.enter_async_context(
                 HTTPClient(
                     http2=True,
                     storage=AsyncSQLiteStorage(
@@ -36,7 +36,9 @@ async def create_repository(
 
         return RemoteRepository(repository_config, client)
     else:
-        return LocalRepository(repository_config, drivers)
+        return await context_stack.enter_async_context(
+            LocalRepository.create(repository_config, drivers)
+        )
 
 
 @asynccontextmanager
@@ -45,11 +47,11 @@ async def Repositories(
     repository_configs: Iterable[RemoteRepositoryConfig | LocalRepositoryConfig],
 ) -> AsyncGenerator[Iterable[Repository], None]:
     client: HTTPClient | None = None
-    async with AsyncExitStack() as client_stack:
+    async with AsyncExitStack() as context_stack:
         yield [
             await Repository.create(
                 config,
-                await create_repository(client_stack, client, config, drivers),
+                await create_repository(context_stack, client, config, drivers),
             )
             for config in repository_configs
         ]
