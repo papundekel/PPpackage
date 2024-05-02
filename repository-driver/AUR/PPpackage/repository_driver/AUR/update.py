@@ -34,7 +34,7 @@ async def create_database_packages(
         """
     )
 
-    await connection.execute("DROP FROM packages")
+    await connection.execute("DELETE FROM packages")
 
     await connection.executemany("INSERT INTO packages VALUES (?, ?)", insert_packages)
 
@@ -52,7 +52,7 @@ async def create_database_provides(
         """
     )
 
-    await connection.execute("DROP FROM provides")
+    await connection.execute("DELETE FROM provides")
 
     await connection.executemany(
         "INSERT INTO provides VALUES (?, ?)", insert_package_provides
@@ -72,7 +72,7 @@ async def create_database_conflicts(
         """
     )
 
-    await connection.execute("DROP FROM conflicts")
+    await connection.execute("DELETE FROM conflicts")
 
     await connection.executemany(
         "INSERT INTO conflicts VALUES (?, ?)", insert_package_conflicts
@@ -92,7 +92,7 @@ async def create_database_runtime_dependencies(
         """
     )
 
-    await connection.execute("DROP FROM runtime_dependencies")
+    await connection.execute("DELETE FROM runtime_dependencies")
 
     await connection.executemany(
         "INSERT INTO runtime_dependencies VALUES (?, ?)",
@@ -113,7 +113,7 @@ async def create_database_build_dependencies(
         """
     )
 
-    await connection.execute("DROP FROM build_dependencies")
+    await connection.execute("DELETE FROM build_dependencies")
 
     await connection.executemany(
         "INSERT INTO build_dependencies VALUES (?, ?)",
