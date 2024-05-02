@@ -20,20 +20,11 @@ class Translator:
 
         self.interface = interface
         self.parameters = validate_python(interface.Parameters, config.parameters)
-        self.count = 0
 
     async def translate_requirement(
         self, data: Mapping[str, Iterable[dict[str, str]]], requirement_unparsed: Any
     ) -> Formula:
         requirement = validate_python(self.interface.Requirement, requirement_unparsed)
-
-        if self.count % 10000 == 0:
-            print(
-                f"Translating requirement number {self.count}: {requirement}",
-                file=stderr,
-            )
-
-        self.count += 1
 
         return await self.interface.translate_requirement(
             self.parameters, data, requirement

@@ -73,14 +73,10 @@ async def get_formula(
                 SimpleRequirement("pacman", dependency),
             )
 
-        print("done with runtime dependencies", file=stderr)
-
         async for package_name, package_version, provide in query_provides(connection):
             provides.setdefault(provide, []).append(
                 make_full_name(package_name, package_version)
             )
-
-    print("done with provides db", file=stderr)
 
     for provide, packages in provides.items():
         variable_string = (
@@ -97,5 +93,3 @@ async def get_formula(
                 else SimpleRequirement("noop", packages[0])
             ),
         )
-
-    print("done with provides dict", file=stderr)
