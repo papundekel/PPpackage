@@ -13,6 +13,8 @@ async def lifespan(
 ) -> AsyncIterator[State]:
     database_path = repository_parameters.database_path
 
+    database_path.mkdir(parents=True, exist_ok=True)
+
     async with sqlite_connect(
         database_path / "database.sqlite", autocommit=False
     ) as connection:
