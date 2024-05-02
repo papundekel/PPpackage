@@ -14,6 +14,15 @@ from .state import State
 from .utils import transaction
 
 
+async def create_database_epoch(connection: Connection):
+    await connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS epochs
+            (epoch TEXT PRIMARY KEY)
+        """
+    )
+
+
 async def create_database_packages(
     connection: Connection, insert_packages: list[tuple[str, str]]
 ):
@@ -163,6 +172,8 @@ async def update(
     connection = state.connection
 
     async with transaction(connection):
+        await create_database_epoch(connection)
+
         await update_epoch(connection)
 
         await create_database_packages(connection, insert_packages)
