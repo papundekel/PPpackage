@@ -179,7 +179,7 @@ async def main(
             config.repository_drivers, config.repositories
         ) as repositories:
             model = await resolve(
-                repositories, translators, input.requirements, input.options
+                repositories, translators, input.requirement, input.options
             )
 
             graph = await get_package_details(repositories, model)

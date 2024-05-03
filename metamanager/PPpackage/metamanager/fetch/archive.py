@@ -4,7 +4,7 @@ from pathlib import Path
 from shutil import move
 
 from httpx import AsyncClient as HTTPClient
-from PPpackage.repository_driver.interface.schemes import ArchiveProductDetail
+from PPpackage.repository_driver.interface.schemes import ArchiveBuildContextDetail
 from pydantic import AnyUrl
 
 from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
@@ -67,7 +67,7 @@ async def _(
 
 @fetch_package.register
 async def _(
-    product_detail: ArchiveProductDetail,
+    product_detail: ArchiveBuildContextDetail,
     client: HTTPClient,
     package: str,
     repository: Repository,

@@ -1,16 +1,17 @@
 from collections.abc import AsyncIterable
 from typing import Any, Protocol
 
-from pydantic import AnyUrl
-from sqlitedict import SqliteDict
-
 from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
+    BuildContextDetail,
     PackageDetail,
     ProductInfo,
+    ProductInfos,
     Requirement,
     TranslatorInfo,
 )
+from pydantic import AnyUrl
+from sqlitedict import SqliteDict
+
 from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json
 
@@ -39,11 +40,19 @@ class RepositoryInterface(Protocol):
         self, translated_options: Any, package: str
     ) -> PackageDetail | None: ...
 
+    async def get_build_context(
+        self,
+        translated_options: Any,
+        package: str,
+        runtime_product_infos: ProductInfos,
+    ) -> BuildContextDetail: ...
+
     async def compute_product_info(
         self,
         translated_options: Any,
         package: str,
-        dependency_product_infos: DependencyProductInfos,
+        build_product_infos: ProductInfos,
+        runtime_product_infos: ProductInfos,
     ) -> ProductInfo: ...
 
 
@@ -134,9 +143,21 @@ class Repository:
     async def get_package_detail(self, package: str) -> PackageDetail | None:
         return await self.interface.get_package_detail(self.translated_options, package)
 
+    async def get_build_context(
+        self,
+        package: str,
+        runtime_product_infos: ProductInfos,
+    ) -> BuildContextDetail:
+        return await self.interface.get_build_context(
+            self.translated_options, package, runtime_product_infos
+        )
+
     async def compute_product_info(
-        self, package: str, dependency_product_infos: DependencyProductInfos
+        self,
+        package: str,
+        build_product_infos: ProductInfos,
+        runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         return await self.interface.compute_product_info(
-            self.translated_options, package, dependency_product_infos
+            self.translated_options, package, build_product_infos, runtime_product_infos
         )

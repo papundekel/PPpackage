@@ -83,37 +83,33 @@ class RepositoryConfig:
 
 
 @pydantic_dataclass(frozen=True)
-class TagProductDetail:
+class TagBuildContextDetail:
     tag: str
 
 
 @pydantic_dataclass(frozen=True)
-class ContainerfileProductDetail:
+class ContainerfileBuildContextDetail:
     containerfile: bytes
 
 
 @pydantic_dataclass(frozen=True)
-class MetaProductDetail:
-    meta: Requirement
+class MetaBuildContextDetail:
+    requirement: Requirement
+    options: Any
+    on_top: bool
 
 
 @pydantic_dataclass(frozen=True)
-class MetaOnTopProductDetail:
-    meta_on_top: Requirement
-
-
-@pydantic_dataclass(frozen=True)
-class ArchiveProductDetail:
+class ArchiveBuildContextDetail:
     archive: HttpUrl | Path
     installer: str
 
 
-type ProductDetail = (
-    TagProductDetail
-    | ContainerfileProductDetail
-    | MetaProductDetail
-    | MetaOnTopProductDetail
-    | ArchiveProductDetail
+type BuildContextDetail = (
+    TagBuildContextDetail
+    | ContainerfileBuildContextDetail
+    | MetaBuildContextDetail
+    | ArchiveBuildContextDetail
 )
 
 
@@ -121,8 +117,7 @@ type ProductDetail = (
 class PackageDetail:
     interfaces: frozenset[str]
     dependencies: frozenset[str]
-    product: ProductDetail
 
 
 type ProductInfo = Mapping[str, Any]
-type DependencyProductInfos = Mapping[str, Mapping[str, Any]]
+type ProductInfos = Mapping[str, Mapping[str, Any]]

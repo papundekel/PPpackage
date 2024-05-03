@@ -3,13 +3,7 @@ from collections.abc import AsyncIterable
 from aiosqlite import Connection
 from asyncstdlib import chain as async_chain
 from asyncstdlib import list as async_list
-
-from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
-    MetaOnTopProductDetail,
-    PackageDetail,
-    SimpleRequirement,
-)
+from PPpackage.repository_driver.interface.schemes import PackageDetail
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
@@ -41,16 +35,6 @@ async def query_runtime_dependencies(
 ) -> AsyncIterable[str]:
     async with connection.execute(
         "SELECT dependency FROM runtime_dependencies WHERE name = ?", (name,)
-    ) as cursor:
-        async for row in cursor:
-            yield row[0]
-
-
-async def query_build_dependencies(
-    connection: Connection, name: str
-) -> AsyncIterable[str]:
-    async with connection.execute(
-        "SELECT dependency FROM build_dependencies WHERE name = ?", (name,)
     ) as cursor:
         async for row in cursor:
             yield row[0]
@@ -96,15 +80,5 @@ async def get_package_detail(
                     f"pacman-{strip_version(dependency)}"
                     async for dependency in query_runtime_dependencies(connection, name)
                 ]
-            ),
-            MetaOnTopProductDetail(
-                ANDRequirement(
-                    [
-                        SimpleRequirement("pacman", dependency)
-                        async for dependency in query_build_dependencies(
-                            connection, name
-                        )
-                    ]
-                )
             ),
         )

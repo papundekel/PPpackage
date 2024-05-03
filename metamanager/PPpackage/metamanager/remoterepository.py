@@ -1,18 +1,16 @@
 from logging import getLogger
-from pathlib import Path
-from tempfile import mkdtemp
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
-
 from PPpackage.repository_driver.interface.schemes import (
-    ArchiveProductDetail,
-    DependencyProductInfos,
+    BuildContextDetail,
     PackageDetail,
     ProductInfo,
+    ProductInfos,
     Requirement,
     TranslatorInfo,
 )
+
 from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json, validate_json
 
@@ -122,41 +120,43 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        reader = HTTPResponseReader(response)
+        return validate_json(PackageDetail, memoryview(response.read()))
 
-        package_detail = await reader.load_one(PackageDetail)
+    async def get_build_context(
+        self,
+        translated_options: Any,
+        package: str,
+        runtime_product_infos: ProductInfos,
+    ) -> BuildContextDetail:
+        response = await self.client.get(
+            f"{self.url}/packages/{package}/product-info",
+            params={
+                "translated_options": dump_json(translated_options),
+                "runtime_product_infos": dump_json(runtime_product_infos),
+            },
+        )
 
-        if (
-            package_detail is not None
-            and isinstance(package_detail.product, ArchiveProductDetail)
-            and isinstance(package_detail.product.archive, Path)
-        ):
-            archive_bytes = await reader.load_bytes_chunked()
-
-            archive_directory_path = Path(mkdtemp())
-            archive_path = archive_directory_path / "archive"
-            with archive_path.open("wb") as file:
-                file.write(archive_bytes)
-
-            return PackageDetail(
-                package_detail.interfaces,
-                package_detail.dependencies,
-                ArchiveProductDetail(archive_path, package_detail.product.installer),
+        if not response.is_success:
+            raise SubmanagerCommandFailure(
+                "remote repository.compute_product_info failed "
+                f"{(await response.aread()).decode()}"
             )
 
-        return package_detail
+        return validate_json(BuildContextDetail, memoryview(response.read()))  # type: ignore
 
     async def compute_product_info(
         self,
         translated_options: Any,
         package: str,
-        dependency_product_infos: DependencyProductInfos,
+        build_product_infos: ProductInfos,
+        runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         response = await self.client.get(
             f"{self.url}/packages/{package}/product-info",
             params={
                 "translated_options": dump_json(translated_options),
-                "dependency_product_infos": dump_json(dependency_product_infos),
+                "build_product_infos": dump_json(build_product_infos),
+                "runtime_product_infos": dump_json(runtime_product_infos),
             },
         )
 

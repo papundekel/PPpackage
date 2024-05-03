@@ -1,9 +1,6 @@
 from itertools import chain
 
-from PPpackage.repository_driver.interface.schemes import (
-    ArchiveProductDetail,
-    PackageDetail,
-)
+from PPpackage.repository_driver.interface.schemes import PackageDetail
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
@@ -30,26 +27,6 @@ async def get_package_detail(
     if package.version != version:
         return None
 
-    transaction = state.handle.init_transaction(
-        downloadonly=True, nodeps=True, nodepversion=True
-    )
-
-    try:
-        transaction.add_pkg(package)
-        transaction.prepare()
-        transaction.commit()
-    finally:
-        transaction.release()
-
-    archive_path = (
-        state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.zst"
-    )
-
-    if not archive_path.exists():
-        archive_path = (
-            state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.xz"
-        )
-
     return PackageDetail(
         frozenset(
             chain(
@@ -60,5 +37,4 @@ async def get_package_detail(
         frozenset(
             f"pacman-{strip_version(dependency)}" for dependency in package.depends
         ),
-        ArchiveProductDetail(archive_path, "pacman"),
     )

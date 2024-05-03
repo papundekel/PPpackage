@@ -7,16 +7,16 @@ from typing import Annotated, Any
 
 from asyncstdlib import chain as async_chain
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from PPpackage.repository_driver.interface.interface import Interface
+from PPpackage.repository_driver.interface.schemes import (
+    ArchiveBuildContextDetail,
+    ProductInfos,
+    RepositoryConfig,
+)
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
 
-from PPpackage.repository_driver.interface.interface import Interface
-from PPpackage.repository_driver.interface.schemes import (
-    ArchiveProductDetail,
-    DependencyProductInfos,
-    RepositoryConfig,
-)
 from PPpackage.utils.stream import dump_bytes_chunked, dump_many, dump_one
 from PPpackage.utils.utils import iterable_with_result, load_interface_module
 from PPpackage.utils.validation import validate_json, validate_python
@@ -172,24 +172,36 @@ async def get_package_detail(
 
     logger.info(f"Package detail for {package} ready.")
 
-    if (
-        package_detail is not None
-        and isinstance(package_detail.product, ArchiveProductDetail)
-        and isinstance(package_detail.product.archive, Path)
-    ):
-        # TODO: iterate file chunks
-        with package_detail.product.archive.open("rb") as file:
-            archive_bytes = memoryview(file.read())
-
-            return StreamingResponse(
-                HTTP_200_OK,
-                response.headers,
-                async_chain(
-                    dump_one(package_detail), dump_bytes_chunked(archive_bytes)
-                ),
-            )
-
     return package_detail
+
+
+async def get_build_context(
+    state: Annotated[Any, Depends(get_state)],
+    translated_options: Annotated[
+        Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
+    ],
+    package: str,
+    runtime_product_infos: Annotated[
+        ProductInfos,
+        Depends(
+            load_model_from_query(ProductInfos, "runtime_product_infos")  # type: ignore
+        ),
+    ],
+):
+    logger.info(f"Fetching build context for {package}...")
+
+    build_context = await interface.get_build_context(
+        state,
+        driver_parameters,
+        repository_parameters,
+        translated_options,
+        package,
+        runtime_product_infos,
+    )
+
+    logger.info(f"Build context for {package} ready.")
+
+    return build_context
 
 
 async def compute_product_info(
@@ -198,10 +210,16 @@ async def compute_product_info(
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
     package: str,
-    dependency_product_infos: Annotated[
-        DependencyProductInfos,
+    build_product_infos: Annotated[
+        ProductInfos,
         Depends(
-            load_model_from_query(DependencyProductInfos, "dependency_product_infos")  # type: ignore
+            load_model_from_query(ProductInfos, "build_product_infos")  # type: ignore
+        ),
+    ],
+    runtime_product_infos: Annotated[
+        ProductInfos,
+        Depends(
+            load_model_from_query(ProductInfos, "runtime_product_infos")  # type: ignore
         ),
     ],
 ):
@@ -213,7 +231,8 @@ async def compute_product_info(
         repository_parameters,
         translated_options,
         package,
-        dependency_product_infos,
+        build_product_infos,
+        runtime_product_infos,
     )
 
     logger.info(f"Product info for {package} ready.")
@@ -238,6 +257,10 @@ class SubmanagerServer(FastAPI):
         super().get(
             "/packages/{package}", dependencies=[Depends(enable_permanent_cache)]
         )(get_package_detail)
+        super().get(
+            "/packages/{package}/build-context",
+            dependencies=[Depends(enable_permanent_cache)],
+        )(get_build_context)
         super().get(
             "/packages/{package}/product-info",
             dependencies=[Depends(enable_permanent_cache)],

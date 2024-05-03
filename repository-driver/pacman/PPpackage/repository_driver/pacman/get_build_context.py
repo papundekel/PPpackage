@@ -1,21 +1,22 @@
-from itertools import chain
-
-from PPpackage.repository_driver.interface.schemes import ProductInfo, ProductInfos
+from PPpackage.repository_driver.interface.schemes import (
+    ArchiveBuildContextDetail,
+    BuildContextDetail,
+    ProductInfos,
+)
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
-from .utils import PREFIX, parse_package_name, strip_version
+from .utils import PREFIX, parse_package_name
 
 
-async def compute_product_info(
+async def get_build_context(
     state: State,
     driver_parameters: DriverParameters,
     repository_parameters: RepositoryParameters,
     translated_options: None,
     full_package_name: str,
-    build_product_infos: ProductInfos,
     runtime_product_infos: ProductInfos,
-) -> ProductInfo:
+) -> BuildContextDetail:
     if not full_package_name.startswith(PREFIX):
         raise Exception(f"Invalid package: {full_package_name}")
 
@@ -29,7 +30,15 @@ async def compute_product_info(
     if package.version != version:
         raise Exception(f"Invalid package: {full_package_name}")
 
-    return {
-        f"pacman-{strip_version(provide)}": {"version": f"{version}"}
-        for provide in chain([name], package.provides)
-    }
+    # TODO!!!
+
+    archive_path = (
+        state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.zst"
+    )
+
+    if not archive_path.exists():
+        archive_path = (
+            state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.xz"
+        )
+
+    return ArchiveBuildContextDetail(archive_path, "pacman")

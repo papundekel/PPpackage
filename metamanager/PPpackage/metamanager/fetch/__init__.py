@@ -1,5 +1,5 @@
 from asyncio import create_task
-from collections.abc import Iterable, MutableMapping, Set
+from collections.abc import Awaitable, Iterable, MutableMapping, Set
 from functools import singledispatch
 from hashlib import sha1
 from itertools import islice
@@ -11,9 +11,9 @@ from typing import Any
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
-    ProductDetail,
+    BuildContextDetail,
     ProductInfo,
+    ProductInfos,
 )
 from sqlitedict import SqliteDict
 
@@ -24,7 +24,7 @@ from PPpackage.utils.validation import dump_json
 
 @singledispatch
 async def fetch_package(
-    product_detail: ProductDetail,
+    build_context_detail: BuildContextDetail,
     client: HTTPClient,
     package: str,
     repository: Repository,
@@ -35,12 +35,12 @@ async def fetch_package(
 
 
 from .archive import _
-from .meta_on_top import _
+from .meta import _
 
 
 async def create_dependency_product_infos(
     interface_dependencies: Set[str], dependencies: Iterable[tuple[str, NodeData]]
-) -> DependencyProductInfos:
+) -> ProductInfos:
     dependency_product_infos = dict[str, MutableMapping[str, Any]]()
 
     for dependency, node_data in dependencies:
@@ -52,21 +52,34 @@ async def create_dependency_product_infos(
     return dependency_product_infos
 
 
+async def get_build_context(
+    package: str,
+    runtime_product_infos_task: Awaitable[ProductInfos],
+    repository: Repository,
+    dependencies: Iterable[tuple[str, NodeData]],
+) -> BuildContextDetail:
+    runtime_product_infos = await runtime_product_infos_task
+
+    build_context = await repository.get_build_context(package, runtime_product_infos)
+
+    return build_context
+
+
 async def compute_product_info(
     package: str,
-    interface_dependencies: Set[str],
+    build_context_task: Awaitable[BuildContextDetail],
+    runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> ProductInfo:
-    dependency_product_infos = await create_dependency_product_infos(
-        interface_dependencies, dependencies
+    build_context = await build_context_task
+    runtime_product_infos = await runtime_product_infos_task
+
+    product_detail = await repository.compute_product_info(
+        package, {}, runtime_product_infos
     )
 
-    product_info = await repository.compute_product_info(
-        package, dependency_product_infos
-    )
-
-    return product_info
+    return product_detail
 
 
 def hash_product_info(package: str, product_info: ProductInfo) -> str:
@@ -80,6 +93,7 @@ async def fetch_package_or_cache(
     cache_mapping: SqliteDict,
     cache_path: Path,
     client: HTTPClient,
+    build_context_task: Awaitable[BuildContextDetail],
     package: str,
     node_data: NodeData,
     dependencies: Iterable[tuple[str, NodeData]],
@@ -93,7 +107,7 @@ async def fetch_package_or_cache(
             Path(mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))) / "product"
         )
         installer = await fetch_package(
-            node_data["detail"].product,
+            await build_context_task,
             client,
             package,
             node_data["repository"],
@@ -127,10 +141,26 @@ def fetch(
 
             dependencies = graph_successors(graph, package)
 
+            runtime_product_infos_task = create_task(
+                create_dependency_product_infos(
+                    node_data["detail"].dependencies, dependencies
+                )
+            )
+
+            build_context_task = create_task(
+                get_build_context(
+                    package,
+                    runtime_product_infos_task,
+                    node_data["repository"],
+                    dependencies,
+                )
+            )
+
             node_data["product_info"] = create_task(
                 compute_product_info(
                     package,
-                    node_data["detail"].dependencies,
+                    build_context_task,
+                    runtime_product_infos_task,
                     node_data["repository"],
                     dependencies,
                 )
@@ -141,6 +171,7 @@ def fetch(
                     cache_mapping,
                     cache_path,
                     client,
+                    build_context_task,
                     package,
                     node_data,
                     dependencies,

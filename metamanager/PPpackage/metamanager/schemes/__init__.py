@@ -16,7 +16,7 @@ from PPpackage.utils.validation import WithVariables
 
 @pydantic_dataclass(frozen=True)
 class Input:
-    requirements: Requirement
+    requirement: Requirement
     options: Any = None
     locks: Mapping[str, Mapping[str, str]] = frozendict()
     generators: frozenset[str] | None = None

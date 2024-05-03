@@ -1,11 +1,7 @@
 from collections.abc import AsyncIterable
 
 from aiosqlite import Connection
-
-from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
-    ProductInfo,
-)
+from PPpackage.repository_driver.interface.schemes import ProductInfo, ProductInfos
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
@@ -27,16 +23,19 @@ async def compute_product_info(
     repository_parameters: RepositoryParameters,
     translated_options: None,
     full_package_name: str,
-    dependency_product_infos: DependencyProductInfos,
+    build_product_infos: ProductInfos,
+    runtime_product_infos: ProductInfos,
 ) -> ProductInfo:
     if not full_package_name.startswith(PREFIX):
         raise Exception(f"Invalid package name: {full_package_name}")
 
     name, version = parse_package_name(full_package_name)
 
+    connection = state.connection
+
     return {
         f"pacman-{strip_version(provide)}": {"version": f"{version}"}
-        async for provide in query_provides(state.connection, full_package_name)
+        async for provide in query_provides(connection, full_package_name)
     } | {
         f"pacman-{name}": {
             "version": f"{version}",
@@ -44,7 +43,7 @@ async def compute_product_info(
                 dependency[len("pacman-") :]: next(iter(product_infos.values()))[
                     "version"
                 ]
-                for dependency, product_infos in dependency_product_infos.items()
+                for dependency, product_infos in runtime_product_infos.items()
             },
         }
     }

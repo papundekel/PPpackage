@@ -1,9 +1,9 @@
--e ./utils/
--e ./container-utils/
+-e ./utils/ --config-settings editable_mode=compat
+-e ./container-utils/ --config-settings editable_mode=compat
 
 
 
--e ./repository-driver/interface/
+-e ./repository-driver/interface/ --config-settings editable_mode=compat
 
 -e ./repository-driver/server/
 
@@ -16,7 +16,7 @@
 
 
 
--e ./installer/interface/
+-e ./installer/interface/ --config-settings editable_mode=compat
 
 -e ./installer/pacman/
 -e ./installer/conan/
@@ -24,7 +24,7 @@
 
 
 
--e ./translator/interface/
+-e ./translator/interface/ --config-settings editable_mode=compat
 
 -e ./translator/pacman/
 -e ./translator/conan/

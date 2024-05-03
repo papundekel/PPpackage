@@ -1,5 +1,5 @@
 {
-    "requirements": {
+    "requirement": {
         "and_": [
             {
                 "translator": "noop",

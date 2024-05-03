@@ -6,7 +6,14 @@ from pydantic import BaseModel
 
 from PPpackage.utils.utils import Result
 
-from .schemes import PackageDetail, ProductInfo, Requirement, TranslatorInfo
+from .schemes import (
+    BuildContextDetail,
+    PackageDetail,
+    ProductInfo,
+    ProductInfos,
+    Requirement,
+    TranslatorInfo,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -64,6 +71,18 @@ class Interface[
         Awaitable[PackageDetail | None],
     ]
 
+    get_build_context: Callable[
+        [
+            StateType,
+            DriverParametersType,
+            RepositoryParametersType,
+            TranslatedOptionsType,
+            str,
+            ProductInfos,
+        ],
+        Awaitable[BuildContextDetail],
+    ]
+
     compute_product_info: Callable[
         [
             StateType,
@@ -71,7 +90,8 @@ class Interface[
             RepositoryParametersType,
             TranslatedOptionsType,
             str,
-            Mapping[str, Mapping[str, Any]],
+            ProductInfos,
+            ProductInfos,
         ],
         Awaitable[ProductInfo],
     ]
