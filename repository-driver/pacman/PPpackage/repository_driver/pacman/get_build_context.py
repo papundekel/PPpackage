@@ -3,6 +3,7 @@ from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     ProductInfos,
 )
+from pydantic import AnyUrl
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
@@ -30,15 +31,14 @@ async def get_build_context(
     if package.version != version:
         raise Exception(f"Invalid package: {full_package_name}")
 
-    # TODO!!!
+    name_with_arch = f"{name}-{version}-{package.arch}"
 
-    archive_path = (
-        state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.zst"
-    )
+    for suffix in ["pkg.tar.zst", "pkg.tar.xz"]:
+        url = f"https://archive.archlinux.org/packages/{name[0]}/{name}/{name_with_arch}.{suffix}"
 
-    if not archive_path.exists():
-        archive_path = (
-            state.cache_directory_path / f"{name}-{version}-{package.arch}.pkg.tar.xz"
-        )
+        response = await state.http_client.head(url)
 
-    return ArchiveBuildContextDetail(archive_path, "pacman")
+        if response.status_code == 200:
+            return ArchiveBuildContextDetail(AnyUrl(url), "pacman")
+
+    raise Exception(f"Invalid package: {full_package_name}")

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
+from httpx import AsyncClient as HTTPClient
 from pyalpm import Handle
 
 from PPpackage.utils.utils import TemporaryDirectory
@@ -22,18 +23,26 @@ async def lifespan(
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")
 
-    with (
-        TemporaryDirectory() as root_directory_path,
-        TemporaryDirectory() as cache_directory_path,
-    ):
-        handle = Handle(str(root_directory_path), str(database_path))
+    async with HTTPClient(http2=True) as http_client:
+        with (
+            TemporaryDirectory() as root_directory_path,
+            TemporaryDirectory() as cache_directory_path,
+        ):
+            handle = Handle(str(root_directory_path), str(database_path))
 
-        handle.add_cachedir(str(cache_directory_path))
+            handle.add_cachedir(str(cache_directory_path))
 
-        repository = repository_parameters.repository
-        database = handle.register_syncdb(
-            repository if repository is not None else "database", 0
-        )
-        database.servers = repository_parameters.mirrorlist
+            repository = repository_parameters.repository
+            database = handle.register_syncdb(
+                repository if repository is not None else "database", 0
+            )
+            database.servers = repository_parameters.mirrorlist
 
-        yield State(coroutine_lock, file_lock, handle, cache_directory_path, database)
+            yield State(
+                coroutine_lock,
+                file_lock,
+                handle,
+                cache_directory_path,
+                database,
+                http_client,
+            )

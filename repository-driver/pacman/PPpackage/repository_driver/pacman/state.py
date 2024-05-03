@@ -3,6 +3,7 @@ from pathlib import Path
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
+from httpx import AsyncClient as HTTPClient
 from pyalpm import DB, Handle
 
 
@@ -13,3 +14,4 @@ class State:
     handle: Handle
     cache_directory_path: Path
     database: DB
+    http_client: HTTPClient
