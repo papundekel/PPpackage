@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from shutil import move
+from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import (
@@ -35,6 +36,7 @@ async def process_build_context_archive(
     build_context: ArchiveBuildContextDetail,
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
+    build_options: Any,
 ):
     return None
 

@@ -39,6 +39,7 @@ async def get_build_context(
                     [
                         SimpleRequirement("pacman", "conan"),
                         SimpleRequirement("pacman", "bash"),
+                        SimpleRequirement("pacman", "coreutils"),
                         SimpleRequirement("pacman", "jq"),
                     ],
                     (
@@ -56,5 +57,11 @@ async def get_build_context(
             )
         ),
         on_top=True,
-        command=["touch", "/mnt/output/product"],
+        command=[
+            "bash",
+            "-c",
+            f"package_id=(conan install --requires {revision} --build {revision} --format json | "
+            "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2)\n"
+            f'conan cache save {revision}:"$package_id" --file /mnt/output/package',
+        ],
     )

@@ -29,6 +29,7 @@ async def process_build_context(
     build_context_detail: BuildContextDetail,
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
+    build_options: Any,
 ) -> Any:
     raise NotImplementedError
 
@@ -40,7 +41,7 @@ async def fetch_package(
     client: HTTPClient,
     package: str,
     repository: Repository,
-    dependencies: Iterable[str],
+    dependencies: Iterable[tuple[str, NodeData]],
     destination_path: Path,
 ) -> str:
     raise NotImplementedError
@@ -80,34 +81,45 @@ async def create_dependency_product_infos(
 
 
 async def get_build_context(
+    repositories: Iterable[Repository],
+    translators: Mapping[str, Translator],
     package: str,
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
     translated_options: Any,
-    dependencies: Iterable[tuple[str, NodeData]],
-) -> BuildContextDetail:
+    build_options: Any,
+) -> tuple[BuildContextDetail, Any]:
     runtime_product_infos = await runtime_product_infos_task
 
     build_context = await repository.get_build_context(
         translated_options, package, runtime_product_infos
     )
 
-    return build_context
+    build_context_processed_data = await process_build_context(
+        build_context, repositories, translators, build_options
+    )
+
+    return build_context, build_context_processed_data
 
 
 async def compute_product_info(
     package: str,
-    build_context_task: Awaitable[BuildContextDetail],
+    build_context_task: Awaitable[tuple[BuildContextDetail, Any]],
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
     translated_options: Any,
-    dependencies: Iterable[tuple[str, NodeData]],
 ) -> ProductInfo:
-    build_context = await build_context_task
-    runtime_product_infos = await runtime_product_infos_task
+    build_context, build_context_processed_data = await build_context_task
+
+    build_context_info = await get_build_context_info(
+        build_context, build_context_processed_data
+    )
 
     product_detail = await repository.compute_product_info(
-        translated_options, package, {}, runtime_product_infos
+        translated_options,
+        package,
+        build_context_info,
+        await runtime_product_infos_task,
     )
 
     return product_detail
@@ -124,7 +136,7 @@ async def fetch_package_or_cache(
     cache_mapping: SqliteDict,
     cache_path: Path,
     client: HTTPClient,
-    build_context_task: Awaitable[BuildContextDetail],
+    build_context_task: Awaitable[tuple[BuildContextDetail, Any]],
     package: str,
     node_data: NodeData,
     dependencies: Iterable[tuple[str, NodeData]],
@@ -137,8 +149,12 @@ async def fetch_package_or_cache(
         product_path = (
             Path(mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))) / "product"
         )
+
+        build_context, build_context_processed_data = await build_context_task
+
         installer = await fetch_package(
-            await build_context_task,
+            build_context,
+            build_context_processed_data,
             client,
             package,
             node_data["repository"],
@@ -162,7 +178,14 @@ def graph_successors(
 
 
 def fetch(
-    cache_mapping: SqliteDict, client: HTTPClient, cache_path: Path, graph: MultiDiGraph
+    repositories: Iterable[Repository],
+    translators: Mapping[str, Translator],
+    cache_mapping: SqliteDict,
+    client: HTTPClient,
+    cache_path: Path,
+    repository_to_translated_options: Mapping[Repository, Any],
+    build_options: Any,
+    graph: MultiDiGraph,
 ) -> None:
     stderr.write("Fetching package products...\n")
 
@@ -178,13 +201,18 @@ def fetch(
                 )
             )
 
+            repository = node_data["repository"]
+            translated_options = repository_to_translated_options[repository]
+
             build_context_task = create_task(
                 get_build_context(
+                    repositories,
+                    translators,
                     package,
                     runtime_product_infos_task,
-                    node_data["repository"],
-                    None,  # TODO
-                    dependencies,
+                    repository,
+                    translated_options,
+                    build_options,
                 )
             )
 
@@ -193,9 +221,8 @@ def fetch(
                     package,
                     build_context_task,
                     runtime_product_infos_task,
-                    node_data["repository"],
-                    None,  # TODO
-                    dependencies,
+                    repository,
+                    translated_options,
                 )
             )
 

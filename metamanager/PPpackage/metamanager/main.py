@@ -12,10 +12,8 @@ from pydantic import ValidationError
 from pydot import Dot
 from sqlitedict import SqliteDict
 
-from metamanager.PPpackage.metamanager.build_formula import build_formula
 from PPpackage.utils.validation import validate_json
 
-from .build_formula import build_formula
 from .fetch import fetch
 from .install import install
 from .installers import Installers
@@ -23,7 +21,6 @@ from .repository import Repositories, Repository
 from .resolve import resolve
 from .schemes import Config, Input
 from .schemes.node import NodeData
-from .translate_options import translate_options
 from .translators import Translators
 
 logger = getLogger(__name__)
@@ -34,7 +31,7 @@ def log_exception(e: BaseExceptionGroup) -> None:
         if isinstance(e, ExceptionGroup):
             log_exception(e)
         else:
-            stderr.write(f"ERROR: {e.message}\n")
+            stderr.write(str(e))
 
 
 def parse_input(stdin: IO[bytes]) -> Input:
@@ -222,7 +219,14 @@ async def main(
                     config.product_cache_path / "mapping.db"
                 ) as cache_mapping:
                     fetch(
-                        cache_mapping, archive_client, config.product_cache_path, graph
+                        repositories,
+                        await translators_task,
+                        cache_mapping,
+                        archive_client,
+                        config.product_cache_path,
+                        repository_to_translated_options,
+                        input.build_options,
+                        graph,
                     )
 
                     await install(installers, graph, installation_path)
