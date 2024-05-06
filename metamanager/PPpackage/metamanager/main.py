@@ -3,6 +3,7 @@ from collections.abc import Iterable, Mapping, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
+from traceback import print_exc
 from typing import IO, Any
 
 from httpx import AsyncClient as HTTPClient
@@ -31,7 +32,7 @@ def log_exception(e: BaseExceptionGroup) -> None:
         if isinstance(e, ExceptionGroup):
             log_exception(e)
         else:
-            stderr.write(str(e))
+            print_exc(file=stderr)
 
 
 def parse_input(stdin: IO[bytes]) -> Input:
@@ -220,7 +221,7 @@ async def main(
                 ) as cache_mapping:
                     fetch(
                         repositories,
-                        await translators_task,
+                        translators_task,
                         cache_mapping,
                         archive_client,
                         config.product_cache_path,

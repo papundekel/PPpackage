@@ -28,7 +28,7 @@ from PPpackage.utils.validation import dump_json
 async def process_build_context(
     build_context_detail: BuildContextDetail,
     repositories: Iterable[Repository],
-    translators: Mapping[str, Translator],
+    translators_task: Awaitable[Mapping[str, Translator]],
     build_options: Any,
 ) -> Any:
     raise NotImplementedError
@@ -82,7 +82,7 @@ async def create_dependency_product_infos(
 
 async def get_build_context(
     repositories: Iterable[Repository],
-    translators: Mapping[str, Translator],
+    translators_task: Awaitable[Mapping[str, Translator]],
     package: str,
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
@@ -96,7 +96,7 @@ async def get_build_context(
     )
 
     build_context_processed_data = await process_build_context(
-        build_context, repositories, translators, build_options
+        build_context, repositories, translators_task, build_options
     )
 
     return build_context, build_context_processed_data
@@ -179,7 +179,7 @@ def graph_successors(
 
 def fetch(
     repositories: Iterable[Repository],
-    translators: Mapping[str, Translator],
+    translators_task: Awaitable[Mapping[str, Translator]],
     cache_mapping: SqliteDict,
     client: HTTPClient,
     cache_path: Path,
@@ -207,7 +207,7 @@ def fetch(
             build_context_task = create_task(
                 get_build_context(
                     repositories,
-                    translators,
+                    translators_task,
                     package,
                     runtime_product_infos_task,
                     repository,
