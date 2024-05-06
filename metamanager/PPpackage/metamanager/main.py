@@ -78,6 +78,7 @@ async def main(
 
     containerizer = Containerizer(config.containerizer)
     installers = Installers(config.installers)
+    product_cache_path = config.product_cache_path
 
     input = parse_input(stdin.buffer)
 
@@ -95,9 +96,9 @@ async def main(
                 )
 
             async with HTTPClient(http2=True) as archive_client:
-                with SqliteDict(
-                    config.product_cache_path / "mapping.db"
-                ) as cache_mapping:
+                product_cache_path.mkdir(parents=True, exist_ok=True)
+
+                with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
                     await fetch_and_install(
                         containerizer,
                         archive_client,
