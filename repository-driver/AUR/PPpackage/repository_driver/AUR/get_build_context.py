@@ -66,6 +66,7 @@ async def get_build_context(
                 f"git clone https://aur.archlinux.org/{name}.git\n"
                 "cd */\n"
                 "makepkg\n"
-                "mv *.pkg.* /mnt/output/product\n",
+                "mv *.pkg.* /mnt/output/product\n"
+                "echo -n pacman > /mnt/output/installer\n",
             ],
         )

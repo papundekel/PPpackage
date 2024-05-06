@@ -4,15 +4,18 @@ from shutil import move
 from typing import Any
 
 from httpx import AsyncClient as HTTPClient
+from networkx import MultiDiGraph
+from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveBuildContextDetail,
     BuildContextInfo,
 )
 from pydantic import AnyUrl
+from sqlitedict import SqliteDict
 
+from metamanager.PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
 
 from . import fetch_package, get_build_context_info, process_build_context
@@ -37,6 +40,7 @@ async def process_build_context_archive(
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
     build_options: Any,
+    graph: MultiDiGraph,
 ):
     return None
 
@@ -45,17 +49,20 @@ async def process_build_context_archive(
 async def fetch_package_archive(
     build_context: ArchiveBuildContextDetail,
     processed_data: None,
-    client: HTTPClient,
+    containerizer: Containerizer,
+    archive_client: HTTPClient,
+    cache_mapping: SqliteDict,
+    product_cache_path: Path,
+    installers: Mapping[str, Installer],
     package: str,
     repository: Repository,
-    dependencies: Iterable[tuple[str, NodeData]],
     destination_path: Path,
 ) -> str:
     repository_url = repository.get_url()
 
     match build_context.archive, repository_url:
         case AnyUrl() as archive_url, _:
-            await download_file(archive_url, destination_path, client)
+            await download_file(archive_url, destination_path, archive_client)
         case archive_path, AnyUrl():
             await download_file(
                 AnyUrl.build(
@@ -64,7 +71,7 @@ async def fetch_package_archive(
                     path=str(archive_path),
                 ),
                 destination_path,
-                client,
+                archive_client,
             )
         case archive_path, _:
             move(archive_path, destination_path)

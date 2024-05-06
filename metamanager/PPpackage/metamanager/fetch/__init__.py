@@ -10,6 +10,7 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
@@ -18,6 +19,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from sqlitedict import SqliteDict
 
+from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
@@ -30,18 +32,22 @@ async def process_build_context(
     repositories: Iterable[Repository],
     translators_task: Awaitable[Mapping[str, Translator]],
     build_options: Any,
+    graph: MultiDiGraph,
 ) -> Any:
     raise NotImplementedError
 
 
 @singledispatch
 async def fetch_package(
-    build_context_detail: BuildContextDetail,
+    build_context: BuildContextDetail,
     processed_data: Any,
-    client: HTTPClient,
+    containerizer: Containerizer,
+    archive_client: HTTPClient,
+    cache_mapping: SqliteDict,
+    product_cache_path: Path,
+    installers: Mapping[str, Installer],
     package: str,
     repository: Repository,
-    dependencies: Iterable[tuple[str, NodeData]],
     destination_path: Path,
 ) -> str:
     raise NotImplementedError
@@ -88,6 +94,7 @@ async def get_build_context(
     repository: Repository,
     translated_options: Any,
     build_options: Any,
+    graph: MultiDiGraph,
 ) -> tuple[BuildContextDetail, Any]:
     runtime_product_infos = await runtime_product_infos_task
 
@@ -96,7 +103,7 @@ async def get_build_context(
     )
 
     build_context_processed_data = await process_build_context(
-        build_context, repositories, translators_task, build_options
+        build_context, repositories, translators_task, build_options, graph
     )
 
     return build_context, build_context_processed_data
@@ -133,13 +140,14 @@ def hash_product_info(package: str, product_info: ProductInfo) -> str:
 
 
 async def fetch_package_or_cache(
+    containerizer: Containerizer,
     cache_mapping: SqliteDict,
     cache_path: Path,
-    client: HTTPClient,
+    archive_client: HTTPClient,
+    installers: Mapping[str, Installer],
     build_context_task: Awaitable[tuple[BuildContextDetail, Any]],
     package: str,
     node_data: NodeData,
-    dependencies: Iterable[tuple[str, NodeData]],
 ) -> tuple[Path, str]:
     stderr.write(f"\t{package}\n")
 
@@ -155,10 +163,13 @@ async def fetch_package_or_cache(
         installer = await fetch_package(
             build_context,
             build_context_processed_data,
-            client,
+            containerizer,
+            archive_client,
+            cache_mapping,
+            cache_path,
+            installers,
             package,
             node_data["repository"],
-            dependencies,
             product_path,
         )
 
@@ -178,12 +189,14 @@ def graph_successors(
 
 
 def fetch(
+    containerizer: Containerizer,
     repositories: Iterable[Repository],
-    translators_task: Awaitable[Mapping[str, Translator]],
-    cache_mapping: SqliteDict,
-    client: HTTPClient,
-    cache_path: Path,
     repository_to_translated_options: Mapping[Repository, Any],
+    translators_task: Awaitable[Mapping[str, Translator]],
+    installers: Mapping[str, Installer],
+    cache_mapping: SqliteDict,
+    archive_client: HTTPClient,
+    cache_path: Path,
     build_options: Any,
     graph: MultiDiGraph,
 ) -> None:
@@ -213,6 +226,7 @@ def fetch(
                     repository,
                     translated_options,
                     build_options,
+                    graph,
                 )
             )
 
@@ -228,12 +242,13 @@ def fetch(
 
             node_data["product"] = create_task(
                 fetch_package_or_cache(
+                    containerizer,
                     cache_mapping,
                     cache_path,
-                    client,
+                    archive_client,
+                    installers,
                     build_context_task,
                     package,
                     node_data,
-                    dependencies,
                 )
             )

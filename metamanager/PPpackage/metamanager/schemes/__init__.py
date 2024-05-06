@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from frozendict import frozendict
+from PPpackage.container_utils.schemes import ContainerizerConfig
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
     Parameters,
@@ -62,4 +63,5 @@ class Config:
     installers: Mapping[str, InstallerConfig]
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
     product_cache_path: Annotated[Path, WithVariables]
+    containerizer: ContainerizerConfig
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()

@@ -62,6 +62,7 @@ async def get_build_context(
             "-c",
             f"package_id=(conan install --requires {revision} --build {revision} --format json | "
             "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2)\n"
-            f'conan cache save {revision}:"$package_id" --file /mnt/output/package',
+            f'conan cache save {revision}:"$package_id" --file /mnt/output/product'
+            "echo -n conan > /mnt/output/installer\n",
         ],
     )

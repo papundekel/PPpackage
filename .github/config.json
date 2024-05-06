@@ -1,5 +1,14 @@
 {
     "product_cache_path": "/mnt/cache/product/",
+    "containerizer": {
+        "url": "unix:///run/podman/podman.sock",
+        "path_translations": [
+            {
+                "containerizer": "$CONTAINERIZER_ROOT",
+                "container": "/mnt/root"
+            }
+        ]
+    },
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"
