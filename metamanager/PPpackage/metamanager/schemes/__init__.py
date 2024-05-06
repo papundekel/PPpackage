@@ -18,6 +18,7 @@ from PPpackage.utils.validation import WithVariables
 class Input:
     requirement: Requirement
     options: Any = None
+    build_options: Any = None
     locks: Mapping[str, Mapping[str, str]] = frozendict()
     generators: frozenset[str] | None = None
 

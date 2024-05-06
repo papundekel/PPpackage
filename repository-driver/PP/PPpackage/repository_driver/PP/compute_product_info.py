@@ -1,4 +1,8 @@
-from PPpackage.repository_driver.interface.schemes import ProductInfo, ProductInfos
+from PPpackage.repository_driver.interface.schemes import (
+    BuildContextInfo,
+    ProductInfo,
+    ProductInfos,
+)
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
@@ -10,7 +14,7 @@ async def compute_product_info(
     repository_parameters: RepositoryParameters,
     translated_options: None,
     package: str,
-    build_product_infos: ProductInfos,
+    build_context_info: BuildContextInfo,
     runtime_product_infos: ProductInfos,
 ) -> ProductInfo:
     return {}

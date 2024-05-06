@@ -1,9 +1,9 @@
 from asyncio import TaskGroup
-from collections.abc import Iterable, Set
+from collections.abc import Iterable, Mapping, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
-from typing import IO
+from typing import IO, Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
@@ -12,17 +12,18 @@ from pydantic import ValidationError
 from pydot import Dot
 from sqlitedict import SqliteDict
 
+from metamanager.PPpackage.metamanager.build_formula import build_formula
 from PPpackage.utils.validation import validate_json
 
-from .exceptions import SubmanagerCommandFailure
+from .build_formula import build_formula
 from .fetch import fetch
 from .install import install
 from .installers import Installers
-from .repositories import Repositories
-from .repository import Repository
+from .repository import Repositories, Repository
 from .resolve import resolve
 from .schemes import Config, Input
 from .schemes.node import NodeData
+from .translate_options import translate_options
 from .translators import Translators
 
 logger = getLogger(__name__)
@@ -70,11 +71,18 @@ def get_graph_items(graph: MultiDiGraph) -> Iterable[tuple[str, NodeData]]:
 
 
 async def get_package_detail(
-    repositories: Iterable[Repository], graph: MultiDiGraph, variable: str
+    repositories: Iterable[Repository],
+    repository_to_translated_options: Mapping[Repository, Any],
+    graph: MultiDiGraph,
+    variable: str,
 ) -> None:
     async with TaskGroup() as group:
         tasks = [
-            group.create_task(repository.get_package_detail(variable))
+            group.create_task(
+                repository.get_package_detail(
+                    repository_to_translated_options[repository], variable
+                )
+            )
             for repository in repositories
         ]
 
@@ -87,7 +95,9 @@ async def get_package_detail(
 
 
 async def get_package_details(
-    repositories: Iterable[Repository], model: Set[str]
+    repositories: Iterable[Repository],
+    repository_to_translated_options: Mapping[Repository, Any],
+    model: Set[str],
 ) -> MultiDiGraph:
     stderr.write("Fetching package details...\n")
 
@@ -95,7 +105,11 @@ async def get_package_details(
 
     async with TaskGroup() as group:
         for variable in model:
-            group.create_task(get_package_detail(repositories, graph, variable))
+            group.create_task(
+                get_package_detail(
+                    repositories, repository_to_translated_options, graph, variable
+                )
+            )
 
     return graph
 
@@ -169,7 +183,6 @@ async def main(
 ) -> None:
     config = parse_config(config_path)
 
-    translators = Translators(config.requirement_translators)
     installers = Installers(config.installers)
 
     input = parse_input(stdin.buffer)
@@ -178,11 +191,18 @@ async def main(
         async with Repositories(
             config.repository_drivers, config.repositories
         ) as repositories:
-            model = await resolve(
-                repositories, translators, input.requirement, input.options
-            )
+            async with TaskGroup() as task_group:
+                translators_task = task_group.create_task(
+                    Translators(repositories, config.requirement_translators)
+                )
 
-            graph = await get_package_details(repositories, model)
+                repository_to_translated_options, model = await resolve(
+                    repositories, translators_task, input.options, input.requirement
+                )
+
+            graph = await get_package_details(
+                repositories, repository_to_translated_options, model
+            )
 
             for package in sorted(graph.nodes):
                 stderr.write(f"\t{package}\n")
@@ -212,6 +232,6 @@ async def main(
 
             stderr.write("Done.\n")
 
-    except* SubmanagerCommandFailure as e_group:
+    except* Exception as e_group:
         log_exception(e_group)
         stderr.write("Aborting.\n")

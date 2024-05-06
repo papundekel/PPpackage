@@ -5,6 +5,7 @@ from typing import Any, AsyncIterable
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
+    BuildContextInfo,
     PackageDetail,
     ProductInfo,
     ProductInfos,
@@ -12,11 +13,11 @@ from PPpackage.repository_driver.interface.schemes import (
     TranslatorInfo,
 )
 
+from PPpackage.metamanager.schemes import LocalRepositoryConfig, RepositoryDriverConfig
 from PPpackage.utils.utils import Result, load_interface_module
 from PPpackage.utils.validation import validate_python
 
-from .repository import RepositoryInterface
-from .schemes import LocalRepositoryConfig, RepositoryDriverConfig
+from .interface import RepositoryInterface
 
 
 class LocalRepository(RepositoryInterface):
@@ -131,7 +132,7 @@ class LocalRepository(RepositoryInterface):
         self,
         translated_options: Any,
         package: str,
-        build_product_infos: ProductInfos,
+        build_context_info: BuildContextInfo,
         runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         return await self.interface.compute_product_info(
@@ -140,6 +141,6 @@ class LocalRepository(RepositoryInterface):
             self.repository_parameters,
             translated_options,
             package,
-            build_product_infos,
+            build_context_info,
             runtime_product_infos,
         )

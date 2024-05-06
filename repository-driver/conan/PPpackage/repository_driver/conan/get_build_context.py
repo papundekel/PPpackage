@@ -36,7 +36,11 @@ async def get_build_context(
         ANDRequirement(
             list(
                 chain(
-                    [SimpleRequirement("pacman", "conan")],
+                    [
+                        SimpleRequirement("pacman", "conan"),
+                        SimpleRequirement("pacman", "bash"),
+                        SimpleRequirement("pacman", "jq"),
+                    ],
                     (
                         SimpleRequirement(
                             "conan",
@@ -51,6 +55,6 @@ async def get_build_context(
                 )
             )
         ),
-        options=None,
         on_top=True,
+        command=["touch", "/mnt/output/product"],
     )

@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveBuildContextDetail,
+    BuildContextInfo,
     ProductInfos,
     RepositoryConfig,
 )
@@ -210,10 +211,10 @@ async def compute_product_info(
         Any, Depends(load_model_from_query(Any, "translated_options"))  # type: ignore
     ],
     package: str,
-    build_product_infos: Annotated[
-        ProductInfos,
+    build_context_info: Annotated[
+        BuildContextInfo,
         Depends(
-            load_model_from_query(ProductInfos, "build_product_infos")  # type: ignore
+            load_model_from_query(BuildContextInfo, "build_context_info")  # type: ignore
         ),
     ],
     runtime_product_infos: Annotated[
@@ -231,7 +232,7 @@ async def compute_product_info(
         repository_parameters,
         translated_options,
         package,
-        build_product_infos,
+        build_context_info,
         runtime_product_infos,
     )
 

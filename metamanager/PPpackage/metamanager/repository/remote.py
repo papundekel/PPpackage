@@ -4,6 +4,7 @@ from typing import Any, AsyncIterable
 from hishel import AsyncCacheClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
+    BuildContextInfo,
     PackageDetail,
     ProductInfo,
     ProductInfos,
@@ -11,13 +12,13 @@ from PPpackage.repository_driver.interface.schemes import (
     TranslatorInfo,
 )
 
+from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
+from PPpackage.metamanager.schemes import RemoteRepositoryConfig
+from PPpackage.metamanager.utils import HTTPResponseReader
 from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json, validate_json
 
-from .exceptions import SubmanagerCommandFailure
-from .repository import RepositoryInterface
-from .schemes import RemoteRepositoryConfig
-from .utils import HTTPResponseReader
+from .interface import RepositoryInterface
 
 logger = getLogger(__name__)
 
@@ -148,14 +149,14 @@ class RemoteRepository(RepositoryInterface):
         self,
         translated_options: Any,
         package: str,
-        build_product_infos: ProductInfos,
+        build_context_info: BuildContextInfo,
         runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         response = await self.client.get(
             f"{self.url}/packages/{package}/product-info",
             params={
                 "translated_options": dump_json(translated_options),
-                "build_product_infos": dump_json(build_product_infos),
+                "build_context_info": dump_json(build_context_info),
                 "runtime_product_infos": dump_json(runtime_product_infos),
             },
         )

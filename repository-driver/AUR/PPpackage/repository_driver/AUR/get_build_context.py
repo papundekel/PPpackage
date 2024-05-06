@@ -1,6 +1,8 @@
 from collections.abc import AsyncIterable
 
 from aiosqlite import Connection
+from asyncstdlib import chain as async_chain
+from asyncstdlib import list as async_list
 from PPpackage.repository_driver.interface.schemes import (
     ANDRequirement,
     BuildContextDetail,
@@ -42,11 +44,28 @@ async def get_build_context(
     async with transaction(connection):
         return MetaBuildContextDetail(
             ANDRequirement(
-                [
-                    SimpleRequirement("pacman", dependency)
-                    async for dependency in query_build_dependencies(connection, name)
-                ]
+                await async_list(
+                    async_chain(
+                        [
+                            SimpleRequirement("pacman", "base-devel"),
+                            SimpleRequirement("pacman", "git"),
+                        ],
+                        (
+                            SimpleRequirement("pacman", dependency)
+                            async for dependency in query_build_dependencies(
+                                connection, name
+                            )
+                        ),
+                    )
+                )
             ),
-            options=None,
             on_top=True,
+            command=[
+                "bash",
+                "-c",
+                f"git clone https://aur.archlinux.org/{name}.git\n"
+                "cd */\n"
+                "makepkg\n"
+                "mv *.pkg.* /mnt/output/product\n",
+            ],
         )

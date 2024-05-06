@@ -1,5 +1,5 @@
 from asyncio import create_task
-from collections.abc import Awaitable, Iterable, MutableMapping, Set
+from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
 from functools import singledispatch
 from hashlib import sha1
 from itertools import islice
@@ -12,6 +12,7 @@ from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
+    BuildContextInfo,
     ProductInfo,
     ProductInfos,
 )
@@ -19,12 +20,23 @@ from sqlitedict import SqliteDict
 
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
+from PPpackage.metamanager.translators import Translator
 from PPpackage.utils.validation import dump_json
+
+
+@singledispatch
+async def process_build_context(
+    repositories: Iterable[Repository],
+    translators: Mapping[str, Translator],
+    build_context_detail: BuildContextDetail,
+) -> Any:
+    raise NotImplementedError
 
 
 @singledispatch
 async def fetch_package(
     build_context_detail: BuildContextDetail,
+    processed_data: Any,
     client: HTTPClient,
     package: str,
     repository: Repository,
@@ -34,8 +46,23 @@ async def fetch_package(
     raise NotImplementedError
 
 
-from .archive import _
-from .meta import _
+@singledispatch
+async def get_build_context_info(
+    build_context_detail: BuildContextDetail, processed_data: Any
+) -> BuildContextInfo:
+    raise NotImplementedError
+
+
+from .archive import (
+    fetch_package_archive,
+    get_build_context_info_archive,
+    process_build_context_archive,
+)
+from .meta import (
+    fetch_package_meta,
+    get_build_context_info_meta,
+    process_build_context_meta,
+)
 
 
 async def create_dependency_product_infos(
@@ -56,11 +83,14 @@ async def get_build_context(
     package: str,
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
+    translated_options: Any,
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> BuildContextDetail:
     runtime_product_infos = await runtime_product_infos_task
 
-    build_context = await repository.get_build_context(package, runtime_product_infos)
+    build_context = await repository.get_build_context(
+        translated_options, package, runtime_product_infos
+    )
 
     return build_context
 
@@ -70,13 +100,14 @@ async def compute_product_info(
     build_context_task: Awaitable[BuildContextDetail],
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
+    translated_options: Any,
     dependencies: Iterable[tuple[str, NodeData]],
 ) -> ProductInfo:
     build_context = await build_context_task
     runtime_product_infos = await runtime_product_infos_task
 
     product_detail = await repository.compute_product_info(
-        package, {}, runtime_product_infos
+        translated_options, package, {}, runtime_product_infos
     )
 
     return product_detail
@@ -152,6 +183,7 @@ def fetch(
                     package,
                     runtime_product_infos_task,
                     node_data["repository"],
+                    None,  # TODO
                     dependencies,
                 )
             )
@@ -162,6 +194,7 @@ def fetch(
                     build_context_task,
                     runtime_product_infos_task,
                     node_data["repository"],
+                    None,  # TODO
                     dependencies,
                 )
             )

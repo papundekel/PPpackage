@@ -1,8 +1,13 @@
-from collections.abc import AsyncIterable
-from typing import Any, Protocol
+from collections.abc import AsyncGenerator, AsyncIterable, Iterable, Mapping
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Any
 
+from anysqlite import connect as sqlite_connect
+from hishel import AsyncCacheClient as HTTPClient
+from hishel import AsyncSQLiteStorage
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
+    BuildContextInfo,
     PackageDetail,
     ProductInfo,
     ProductInfos,
@@ -12,48 +17,19 @@ from PPpackage.repository_driver.interface.schemes import (
 from pydantic import AnyUrl
 from sqlitedict import SqliteDict
 
+from PPpackage.metamanager.exceptions import EpochException
+from PPpackage.metamanager.schemes import (
+    LocalRepositoryConfig,
+    RemoteRepositoryConfig,
+    RepositoryConfig,
+    RepositoryDriverConfig,
+)
 from PPpackage.utils.utils import Result
 from PPpackage.utils.validation import dump_json
 
-from .exceptions import EpochException
-from .schemes import RepositoryConfig
-
-
-class RepositoryInterface(Protocol):
-    def get_identifier(self) -> str: ...
-
-    def get_url(self) -> AnyUrl | None: ...
-
-    async def get_epoch(self) -> str: ...
-
-    def fetch_translator_data(
-        self, epoch_result: Result[str]
-    ) -> AsyncIterable[TranslatorInfo]: ...
-
-    async def translate_options(self, options: Any) -> tuple[str, Any]: ...
-
-    def get_formula(
-        self, translated_options: Any, epoch_result: Result[str]
-    ) -> AsyncIterable[Requirement]: ...
-
-    async def get_package_detail(
-        self, translated_options: Any, package: str
-    ) -> PackageDetail | None: ...
-
-    async def get_build_context(
-        self,
-        translated_options: Any,
-        package: str,
-        runtime_product_infos: ProductInfos,
-    ) -> BuildContextDetail: ...
-
-    async def compute_product_info(
-        self,
-        translated_options: Any,
-        package: str,
-        build_product_infos: ProductInfos,
-        runtime_product_infos: ProductInfos,
-    ) -> ProductInfo: ...
+from .interface import RepositoryInterface
+from .local import LocalRepository
+from .remote import RemoteRepository
 
 
 class Repository:
@@ -103,19 +79,19 @@ class Repository:
                 for requirement in translator_data:
                     yield requirement
 
-    async def translate_options(self, options: Any) -> None:
+    async def translate_options(self, options: Any) -> Any:
         epoch, translated_options = await self.interface.translate_options(options)
 
         if epoch != self.epoch:
             raise EpochException()
 
-        self.translated_options = translated_options
+        return translated_options
 
-    async def get_formula(self) -> AsyncIterable[Requirement]:
+    async def get_formula(self, translated_options: Any) -> AsyncIterable[Requirement]:
         self.config.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         with SqliteDict(self.config.formula_cache_path) as formula_cache:
-            serialized_translated_options = dump_json(self.translated_options)
+            serialized_translated_options = dump_json(translated_options)
             cache_key = f"{self.epoch}-{serialized_translated_options}"
 
             try:
@@ -126,7 +102,7 @@ class Repository:
                 epoch_result = Result[str]()
 
                 async for requirement in self.interface.get_formula(
-                    self.translated_options, epoch_result
+                    translated_options, epoch_result
                 ):
                     yield requirement
                     formula.append(requirement)
@@ -140,24 +116,70 @@ class Repository:
                 for requirement in formula:
                     yield requirement
 
-    async def get_package_detail(self, package: str) -> PackageDetail | None:
-        return await self.interface.get_package_detail(self.translated_options, package)
+    async def get_package_detail(
+        self, translated_options: Any, package: str
+    ) -> PackageDetail | None:
+        return await self.interface.get_package_detail(translated_options, package)
 
     async def get_build_context(
         self,
+        translated_options: Any,
         package: str,
         runtime_product_infos: ProductInfos,
     ) -> BuildContextDetail:
         return await self.interface.get_build_context(
-            self.translated_options, package, runtime_product_infos
+            translated_options, package, runtime_product_infos
         )
 
     async def compute_product_info(
         self,
+        translated_options: Any,
         package: str,
-        build_product_infos: ProductInfos,
+        build_context_info: BuildContextInfo,
         runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         return await self.interface.compute_product_info(
-            self.translated_options, package, build_product_infos, runtime_product_infos
+            translated_options, package, build_context_info, runtime_product_infos
         )
+
+
+async def create_repository(
+    context_stack: AsyncExitStack,
+    client: HTTPClient | None,
+    repository_config: LocalRepositoryConfig | RemoteRepositoryConfig,
+    drivers: Mapping[str, RepositoryDriverConfig],
+) -> RepositoryInterface:
+    if isinstance(repository_config, RemoteRepositoryConfig):
+        if client is None:
+            client = await context_stack.enter_async_context(
+                HTTPClient(
+                    http2=True,
+                    storage=AsyncSQLiteStorage(
+                        connection=await sqlite_connect(
+                            repository_config.cache_path / "db.sqlite"
+                        )
+                    ),
+                )
+            )
+
+        return RemoteRepository(repository_config, client)
+    else:
+        return await context_stack.enter_async_context(
+            LocalRepository.create(repository_config, drivers)
+        )
+
+
+@asynccontextmanager
+async def Repositories(
+    drivers: Mapping[str, RepositoryDriverConfig],
+    repository_configs: Iterable[RemoteRepositoryConfig | LocalRepositoryConfig],
+) -> AsyncGenerator[Iterable[Repository], None]:
+    client: HTTPClient | None = None
+    async with AsyncExitStack() as context_stack:
+        yield [
+            await Repository.create(
+                config,
+                await create_repository(context_stack, client, config, drivers),
+            )
+            for config in repository_configs
+        ]

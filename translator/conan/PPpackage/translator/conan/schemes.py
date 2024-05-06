@@ -6,7 +6,7 @@ class Parameters(BaseModel):
     pass
 
 
-@pydantic_dataclass
+@pydantic_dataclass(frozen=True)
 class Requirement:
     package: str
     version: str

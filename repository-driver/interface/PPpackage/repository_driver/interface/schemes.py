@@ -95,8 +95,8 @@ class ContainerfileBuildContextDetail:
 @pydantic_dataclass(frozen=True)
 class MetaBuildContextDetail:
     requirement: Requirement
-    options: Any
     on_top: bool
+    command: list[str]
 
 
 @pydantic_dataclass(frozen=True)
@@ -120,4 +120,5 @@ class PackageDetail:
 
 
 type ProductInfo = Mapping[str, Any]
+type BuildContextInfo = Mapping[str, Any]
 type ProductInfos = Mapping[str, Mapping[str, Any]]

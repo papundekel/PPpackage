@@ -2,11 +2,7 @@ from collections.abc import Awaitable
 from pathlib import Path
 from typing import TypedDict
 
-from PPpackage.repository_driver.interface.schemes import (
-    BuildContextDetail,
-    PackageDetail,
-    ProductInfo,
-)
+from PPpackage.repository_driver.interface.schemes import PackageDetail, ProductInfo
 
 from PPpackage.metamanager.repository import Repository
 

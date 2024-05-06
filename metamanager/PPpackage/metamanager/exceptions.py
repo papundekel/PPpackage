@@ -7,3 +7,7 @@ class SubmanagerCommandFailure(Exception):
 
 class EpochException(Exception):
     pass
+
+
+class NoModelException(Exception):
+    pass
