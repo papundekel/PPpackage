@@ -78,10 +78,12 @@ async def create_dependency_product_infos(
     dependency_product_infos = dict[str, MutableMapping[str, Any]]()
 
     for dependency, node_data in dependencies:
+        product_info = await node_data["product_info"]
+
         for interface in node_data["detail"].interfaces & interface_dependencies:
             dependency_product_infos.setdefault(interface, {})[dependency] = (
-                await node_data["product_info"]
-            ).get(interface)
+                product_info.get(interface)
+            )
 
     return dependency_product_infos
 

@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Iterable, Mapping, Set
 from itertools import chain
 from pathlib import Path
 from shutil import move
+from sys import stderr
 from typing import Any
 
 from httpx import AsyncClient as HTTPClient
@@ -115,6 +116,10 @@ async def fetch_package_meta(
             model,
         )
 
+        print(
+            f"Building package {package} with {build_context.command}...", file=stderr
+        )
+
         return_code = containerizer.run(
             build_context.command,
             stdin=None,
@@ -137,8 +142,8 @@ async def fetch_package_meta(
 @get_build_context_info.register
 async def get_build_context_info_meta(
     build_context: MetaBuildContextDetail,
-    processed_data: tuple[Mapping[Repository, Any], Set[str]],
+    processed_data: tuple[Any, Any, Any, Any, Set[str]],
 ) -> BuildContextInfo:
-    _, model = processed_data
+    _, _, _, _, model = processed_data
 
     return {"packages": model}

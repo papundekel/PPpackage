@@ -1,17 +1,13 @@
 from asyncio import TaskGroup
-from collections.abc import Iterable, Mapping, Set
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
 from traceback import print_exc
-from typing import IO, Any
+from typing import IO
 
 from httpx import AsyncClient as HTTPClient
-from networkx import MultiDiGraph, convert_node_labels_to_integers
-from networkx.drawing.nx_pydot import to_pydot
 from PPpackage.container_utils import Containerizer
 from pydantic import ValidationError
-from pydot import Dot
 from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import validate_json
@@ -82,43 +78,38 @@ async def main(
 
     input = parse_input(stdin.buffer)
 
-    try:
-        async with Repositories(
-            config.repository_drivers, config.repositories
-        ) as repositories:
-            async with TaskGroup() as task_group:
-                translators_task = task_group.create_task(
-                    Translators(repositories, config.requirement_translators)
+    async with Repositories(
+        config.repository_drivers, config.repositories
+    ) as repositories:
+        async with TaskGroup() as task_group:
+            translators_task = task_group.create_task(
+                Translators(repositories, config.requirement_translators)
+            )
+
+            repository_to_translated_options, model = await resolve(
+                repositories, translators_task, input.options, input.requirement
+            )
+
+        async with HTTPClient(http2=True) as archive_client:
+            product_cache_path.mkdir(parents=True, exist_ok=True)
+
+            with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
+                await fetch_and_install(
+                    containerizer,
+                    archive_client,
+                    cache_mapping,
+                    config.product_cache_path,
+                    repositories,
+                    repository_to_translated_options,
+                    translators_task,
+                    installers,
+                    installation_path,
+                    graph_path,
+                    input.build_options,
+                    model,
                 )
 
-                repository_to_translated_options, model = await resolve(
-                    repositories, translators_task, input.options, input.requirement
-                )
+    if generators_path is not None:
+        await generators(generators_path)
 
-            async with HTTPClient(http2=True) as archive_client:
-                product_cache_path.mkdir(parents=True, exist_ok=True)
-
-                with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
-                    await fetch_and_install(
-                        containerizer,
-                        archive_client,
-                        cache_mapping,
-                        config.product_cache_path,
-                        repositories,
-                        repository_to_translated_options,
-                        translators_task,
-                        installers,
-                        installation_path,
-                        graph_path,
-                        input.build_options,
-                        model,
-                    )
-
-        if generators_path is not None:
-            await generators(generators_path)
-
-            stderr.write("Done.\n")
-
-    except* Exception as e_group:
-        log_exception(e_group)
-        stderr.write("Aborting.\n")
+        stderr.write("Done.\n")

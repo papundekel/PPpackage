@@ -1,3 +1,6 @@
+from sys import stderr
+
+from httpx import ConnectTimeout
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveBuildContextDetail,
     BuildContextDetail,
@@ -36,9 +39,14 @@ async def get_build_context(
     for suffix in ["pkg.tar.zst", "pkg.tar.xz"]:
         url = f"https://archive.archlinux.org/packages/{name[0]}/{name}/{name_with_arch}.{suffix}"
 
-        response = await state.http_client.head(url)
-
-        if response.status_code == 200:
-            return ArchiveBuildContextDetail(AnyUrl(url), "pacman")
+        try:
+            response = await state.http_client.head(url, timeout=30)
+        except ConnectTimeout:
+            print(f"Timeout {url}", file=stderr)
+            pass
+        else:
+            print(response.status_code, file=stderr)
+            if response.status_code == 200:
+                return ArchiveBuildContextDetail(AnyUrl(url), "pacman")
 
     raise Exception(f"Invalid package: {full_package_name}")

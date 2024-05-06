@@ -41,7 +41,7 @@ async def process_build_context_archive(
     translators: Mapping[str, Translator],
     build_options: Any,
     graph: MultiDiGraph,
-):
+) -> None:
     return None
 
 
