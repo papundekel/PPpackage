@@ -26,9 +26,9 @@ from PPpackage.utils.validation import dump_json
 
 @singledispatch
 async def process_build_context(
+    build_context_detail: BuildContextDetail,
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
-    build_context_detail: BuildContextDetail,
 ) -> Any:
     raise NotImplementedError
 

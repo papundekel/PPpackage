@@ -32,9 +32,9 @@ async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTP
 
 @process_build_context.register
 async def process_build_context_archive(
+    build_context: ArchiveBuildContextDetail,
     repositories: Iterable[Repository],
     translators: Mapping[str, Translator],
-    build_context: ArchiveBuildContextDetail,
 ):
     return None
 

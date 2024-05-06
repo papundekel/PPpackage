@@ -17,9 +17,9 @@ from . import fetch_package, get_build_context_info, process_build_context
 
 @process_build_context.register
 async def process_build_context_meta(
+    build_context: MetaBuildContextDetail,
     repositories: Iterable[Repository],
     translators_task: Awaitable[Mapping[str, Translator]],
-    build_context: MetaBuildContextDetail,
     build_options: Any,
 ) -> tuple[Mapping[Repository, Any], Set[str]]:
     from PPpackage.metamanager.resolve import resolve
