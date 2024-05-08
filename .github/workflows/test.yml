@@ -26,6 +26,26 @@ jobs:
               with:
                   name: image-metamanager
                   path: /tmp/image-metamanager.tar
+    build-solver:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Set up buildx
+              uses: docker/setup-buildx-action@v3.0.0
+
+            - name: Build image
+              uses: docker/build-push-action@v5.1.0
+              with:
+                  target: solver
+                  tags: docker.io/fackop/pppackage-solver:latest
+                  outputs: type=docker,dest=/tmp/image-solver.tar
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Upload image artifact
+              uses: actions/upload-artifact@v4.3.3
+              with:
+                  name: image-solver
+                  path: /tmp/image-solver.tar
     build-updater:
         runs-on: ubuntu-latest
         steps:
@@ -137,6 +157,7 @@ jobs:
               run: |
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
+                  docker load --input /tmp/image-solver.tar
 
             - name: Create directories
               run: |
