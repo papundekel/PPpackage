@@ -16,7 +16,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: metamanager
                   push: true
@@ -33,7 +33,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: solver
                   push: true
@@ -50,7 +50,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: updater
                   push: true
@@ -67,7 +67,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pacman
                   push: true
@@ -84,7 +84,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-aur
                   push: true
@@ -101,7 +101,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-conan
                   push: true
@@ -118,7 +118,7 @@ jobs:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pp
                   push: true

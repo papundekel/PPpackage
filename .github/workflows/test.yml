@@ -11,7 +11,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: metamanager
                   tags: docker.io/fackop/pppackage-metamanager:latest
@@ -28,7 +28,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: solver
                   tags: docker.io/fackop/pppackage-solver:latest
@@ -45,7 +45,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: updater
                   tags: docker.io/fackop/pppackage-updater:latest
@@ -62,7 +62,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pacman
                   tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
@@ -73,7 +73,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-aur
                   tags: docker.io/fackop/pppackage-repository-driver-aur:latest
@@ -84,7 +84,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-conan
                   tags: docker.io/fackop/pppackage-repository-driver-conan:latest
@@ -95,7 +95,7 @@ jobs:
         steps:
             - uses: docker/setup-buildx-action@v3.0.0
 
-            - uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pp
                   tags: docker.io/fackop/pppackage-repository-driver-pp:latest
@@ -141,7 +141,7 @@ jobs:
               run: |
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
-                  docker load --input /tmp/image-solver.tar
+                  podman load --input /tmp/image-solver.tar
 
             - name: Create directories
               run: |
