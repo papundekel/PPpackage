@@ -123,6 +123,7 @@ jobs:
         needs:
             - build-metamanager
             - build-updater
+            - build-solver
         steps:
             - uses: actions/checkout@v4.1.1
 
