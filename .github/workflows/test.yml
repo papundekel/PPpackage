@@ -32,7 +32,7 @@ jobs:
               with:
                   target: solver
                   tags: docker.io/fackop/pppackage-solver:latest
-                  outputs: type=oci,dest=/tmp/image-solver.tar
+                  outputs: type=docker,dest=/tmp/image-solver.tar
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -142,6 +142,7 @@ jobs:
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
                   podman load --input /tmp/image-solver.tar
+                  podman tag localhost/latest:latest docker.io/fackop/pppackage-solver:latest
 
             - name: Create directories
               run: |
