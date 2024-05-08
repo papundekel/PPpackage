@@ -141,7 +141,7 @@ jobs:
               run: |
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
-                  podman load --input /tmp/image-solver.tar
+                  podman load --input /tmp/image-solver.tar docker.io/fackop/pppackage-solver:latest
 
             - name: Create directories
               run: |
