@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from multiprocessing import cpu_count
+from sys import stderr
 
 from conan.api.conan_api import ConanAPI
 from conan.api.model import Remote
@@ -20,7 +21,13 @@ def fetch_revisions(
 ) -> Sequence[RecipeReference]:
     # takes too long
     # return api.list.recipe_revisions(recipe, remote)
-    return [api.list.latest_recipe_revision(recipe, remote)]
+    try:
+        revision = api.list.latest_recipe_revision(recipe, remote)
+    except ConanException:
+        print(f"Failed to fetch revisions for {recipe}", file=stderr)
+        return []
+    else:
+        return [revision]
 
 
 def download_recipes(
