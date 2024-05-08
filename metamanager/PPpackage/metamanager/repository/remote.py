@@ -84,7 +84,7 @@ class RemoteRepository(RepositoryInterface):
 
     async def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
-    ) -> AsyncIterable[Requirement]:
+    ) -> AsyncIterable[list[Requirement]]:
         async with self.client.stream(
             "GET",
             f"{self.url}/formula",
@@ -101,7 +101,7 @@ class RemoteRepository(RepositoryInterface):
 
             reader = HTTPResponseReader(response)
 
-            async for requirement in reader.load_many(Requirement):  # type: ignore
+            async for requirement in reader.load_many(list[Requirement]):
                 yield requirement
 
     async def get_package_detail(

@@ -7,20 +7,19 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph
-from PPpackage.container_utils import Containerizer
-from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
-    BuildContextInfo,
-    MetaBuildContextDetail,
-    SimpleRequirement,
-)
 from sqlitedict import SqliteDict
 
 from metamanager.PPpackage.metamanager.installer import Installer
+from PPpackage.container_utils import Containerizer
 from PPpackage.metamanager.graph import get_graph_items
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
+from PPpackage.repository_driver.interface.schemes import (
+    BuildContextInfo,
+    MetaBuildContextDetail,
+    Requirement,
+)
 from PPpackage.utils.utils import TemporaryDirectory
 
 from . import fetch_package, get_build_context_info, process_build_context
@@ -29,6 +28,8 @@ from . import fetch_package, get_build_context_info, process_build_context
 @process_build_context.register
 async def process_build_context_meta(
     build_context: MetaBuildContextDetail,
+    containerizer: Containerizer,
+    containerizer_workdir: Path,
     repositories: Iterable[Repository],
     translators_task: Awaitable[Mapping[str, Translator]],
     build_options: Any,
@@ -42,24 +43,22 @@ async def process_build_context_meta(
 ]:
     from PPpackage.metamanager.resolve import resolve
 
-    requirement = (
-        build_context.requirement
+    requirements = (
+        build_context.requirements
         if not build_context.on_top
-        else ANDRequirement(
-            list(
-                chain(
-                    [build_context.requirement],
-                    (
-                        SimpleRequirement("noop", package)
-                        for package, _ in get_graph_items(graph)
-                    ),
-                )
-            )
+        else chain(
+            build_context.requirements,
+            (Requirement("noop", package) for package, _ in get_graph_items(graph)),
         )
     )
 
     repository_to_translated_options, model = await resolve(
-        repositories, translators_task, build_options, requirement
+        containerizer,
+        containerizer_workdir,
+        repositories,
+        translators_task,
+        build_options,
+        requirements,
     )
 
     return (
@@ -82,6 +81,7 @@ async def fetch_package_meta(
         Set[str],
     ],
     containerizer: Containerizer,
+    containerizer_workdir: Path,
     archive_client: HTTPClient,
     cache_mapping: SqliteDict,
     product_cache_path: Path,
@@ -100,9 +100,10 @@ async def fetch_package_meta(
         model,
     ) = processed_data
 
-    with TemporaryDirectory() as build_context_root_path:
+    with TemporaryDirectory(containerizer_workdir) as build_context_root_path:
         await fetch_and_install(
             containerizer,
+            containerizer_workdir,
             archive_client,
             cache_mapping,
             product_cache_path,

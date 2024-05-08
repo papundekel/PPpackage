@@ -1,11 +1,6 @@
 from collections.abc import AsyncIterable
 
-from PPpackage.repository_driver.interface.schemes import (
-    ImplicationRequirement,
-    Requirement,
-    SimpleRequirement,
-)
-
+from PPpackage.repository_driver.interface.schemes import Requirement
 from PPpackage.utils.utils import Result
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -18,15 +13,15 @@ async def get_formula(
     repository_parameters: RepositoryParameters,
     translated_options: None,
     epoch_result: Result[str],
-) -> AsyncIterable[Requirement]:
+) -> AsyncIterable[list[Requirement]]:
     epoch_result.set("0")
 
-    yield ImplicationRequirement(
-        SimpleRequirement("noop", "PP-p2-1.0.0"),
-        SimpleRequirement("noop", "PP-p1-1.0.0"),
-    )
+    yield [
+        Requirement("noop", "PP-p2-1.0.0", False),
+        Requirement("noop", "PP-p1-1.0.0"),
+    ]
 
-    yield ImplicationRequirement(
-        SimpleRequirement("noop", "PP-p3-1.0.0"),
-        SimpleRequirement("noop", "PP-p2-1.0.0"),
-    )
+    yield [
+        Requirement("noop", "PP-p3-1.0.0", False),
+        Requirement("noop", "PP-p2-1.0.0"),
+    ]

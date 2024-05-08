@@ -1,43 +1,41 @@
 {
-    "requirement": {
-        "and_": [
-            {
-                "translator": "pacman",
-                "value": "sh"
-            },
-            {
-                "translator": "pacman",
-                "value": "coreutils"
-            },
-            {
-                "translator": "pacman",
-                "value": "sh"
-            },
-            {
-                "translator": "pacman",
-                "value": "conan"
-            },
-            {
-                "translator": "conan",
-                "value": {
-                    "package": "openssl",
-                    "version": "[>=3.1.0]"
-                }
-            },
-            {
-                "translator": "conan",
-                "value": {
-                    "package": "nameof",
-                    "version": "0.10.1"
-                }
-            },
-            {
-                "translator": "conan",
-                "value": {
-                    "package": "openssl",
-                    "version": "[>=3.1.1]"
-                }
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "conan"
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "openssl",
+                "version": "[>=3.1.0]"
             }
-        ]
-    }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "nameof",
+                "version": "0.10.1"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "openssl",
+                "version": "[>=3.1.1]"
+            }
+        }
+    ]
 }

@@ -58,9 +58,13 @@ async def get_package_detail(
         package_version = await query_version(connection, name)
 
         if package_version is None:
+            # if full_package_name.find("ruby-json") != -1:
+            #     print(f"ERROR: {full_package_name} not found in the database.")
             return None
 
         if package_version != version:
+            # if full_package_name.find("ruby-json") != -1:
+            #     print(f"ERROR: {full_package_name} version mismatch.")
             return None
 
         return PackageDetail(

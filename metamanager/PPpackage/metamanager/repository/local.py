@@ -93,7 +93,7 @@ class LocalRepository(RepositoryInterface):
 
     def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
-    ) -> AsyncIterable[Requirement]:
+    ) -> AsyncIterable[list[Requirement]]:
         return self.interface.get_formula(
             self.state,
             self.driver_parameters,

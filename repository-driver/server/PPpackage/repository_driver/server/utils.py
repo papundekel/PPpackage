@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 from typing import Any, Optional
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
 from jinja2 import Template as Jinja2Template
 from starlette.exceptions import HTTPException
@@ -13,8 +13,6 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
-
-from PPpackage.utils.http_stream import AsyncChunkReader
 
 
 def HTTP401Exception():

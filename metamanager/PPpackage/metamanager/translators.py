@@ -1,8 +1,15 @@
 from asyncio import TaskGroup
-from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
+from collections.abc import (
+    AsyncIterable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+)
 from typing import Any
 
-from pysat.formula import Formula
+from asyncstdlib import list as async_list
+from sympy.logic.boolalg import BooleanFunction
 
 from PPpackage.translator.interface.interface import Interface
 from PPpackage.utils.utils import load_interface_module
@@ -44,7 +51,7 @@ class Translator:
         self.interface = interface
         self.parameters = parameters
         self.data = data
-        self.cache = dict[Any, Formula]()
+        self.cache = dict[Any, list[str]]()
 
     @staticmethod
     async def create(
@@ -57,18 +64,21 @@ class Translator:
 
         return Translator(interface, parameters, data)
 
-    async def translate_requirement(self, requirement_unparsed: Any) -> Formula:
+    def translate_requirement(self, requirement_unparsed: Any) -> Iterable[str]:
         requirement = validate_python(self.interface.Requirement, requirement_unparsed)
 
         translated_requirement = self.cache.get(requirement)
 
         if translated_requirement is None:
-            translated_requirement = await self.interface.translate_requirement(
+            translated_requirement = self.interface.translate_requirement(
                 self.parameters, self.data, requirement
             )
+
+            translated_requirement = list(translated_requirement)
             self.cache[requirement] = translated_requirement
 
-        return translated_requirement
+        for symbol in translated_requirement:
+            yield symbol
 
 
 async def Translators(

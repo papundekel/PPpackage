@@ -30,7 +30,7 @@ class RepositoryInterface(Protocol):
 
     def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
-    ) -> AsyncIterable[Requirement]: ...
+    ) -> AsyncIterable[list[Requirement]]: ...
 
     async def get_package_detail(
         self, translated_options: Any, package: str

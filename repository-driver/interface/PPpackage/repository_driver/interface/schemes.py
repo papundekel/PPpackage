@@ -1,59 +1,17 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
-from annotated_types import Len
 from frozendict import frozendict
 from pydantic import HttpUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 
 @pydantic_dataclass(frozen=True)
-class SimpleRequirement:
+class Requirement:
     translator: str
     value: Any
-
-
-@pydantic_dataclass(frozen=True)
-class NegatedRequirement:
-    negated: "Requirement"
-
-
-@pydantic_dataclass(frozen=True)
-class ANDRequirement:
-    and_: list["Requirement"]
-
-
-@pydantic_dataclass(frozen=True)
-class ORRequirement:
-    or_: list["Requirement"]
-
-
-@pydantic_dataclass(frozen=True)
-class XORRequirement:
-    xor: Annotated[list["Requirement"], Len(1)]
-
-
-@pydantic_dataclass(frozen=True)
-class EquivalenceRequirement:
-    equivalent: Annotated[list["Requirement"], Len(1)]
-
-
-@pydantic_dataclass(frozen=True)
-class ImplicationRequirement:
-    if_: "Requirement"
-    implies: "Requirement"
-
-
-Requirement = (
-    SimpleRequirement
-    | NegatedRequirement
-    | ANDRequirement
-    | ORRequirement
-    | XORRequirement
-    | ImplicationRequirement
-    | EquivalenceRequirement
-)
+    polarity: bool = True
 
 
 @pydantic_dataclass(frozen=True)
@@ -94,7 +52,7 @@ class ContainerfileBuildContextDetail:
 
 @pydantic_dataclass(frozen=True)
 class MetaBuildContextDetail:
-    requirement: Requirement
+    requirements: list[Requirement]
     on_top: bool
     command: list[str]
 

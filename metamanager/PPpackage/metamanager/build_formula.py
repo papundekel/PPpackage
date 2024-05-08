@@ -1,20 +1,17 @@
-from asyncio import TaskGroup, as_completed
+from asyncio import as_completed
 from collections.abc import AsyncIterable, Awaitable, Iterable, Mapping
+from itertools import chain, product
+from re import L
 from sys import stderr
 from typing import Any
 
 from asyncstdlib import chain as async_chain
-from asyncstdlib import sync as make_async
-from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
-from PPpackage.repository_driver.interface.utils import (
-    RequirementVisitor,
-    visit_requirements,
-)
-from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
 
+from PPpackage.repository_driver.interface.schemes import Requirement
 from PPpackage.utils.utils import Result
 
 from .repository import Repository
+from .schemes import Literal
 from .translators import Translator
 
 
@@ -23,7 +20,7 @@ async def get_formula(
         Awaitable[tuple[Repository, Any]]
     ],
     repositories_to_translated_options_result: Result[Mapping[Repository, Any]],
-) -> AsyncIterable[Requirement]:
+) -> AsyncIterable[list[Requirement]]:
     repositories_to_translated_options = dict[Repository, Any]()
 
     for translated_options_task in as_completed(
@@ -38,37 +35,48 @@ async def get_formula(
     repositories_to_translated_options_result.set(repositories_to_translated_options)
 
 
+def translate_requirement(
+    translators: Mapping[str, Translator], requirement: Requirement
+) -> Iterable[str]:
+    translator_name = requirement.translator
+
+    if translator_name == "noop":
+        return [requirement.value]
+
+    translator = translators[translator_name]
+
+    translated_requirement = translator.translate_requirement(requirement.value)
+
+    return translated_requirement
+
+
 async def translate_requirements(
-    translators: Mapping[str, Translator], formula: AsyncIterable[Requirement]
-) -> Formula:
-    async def simple_visitor(r: SimpleRequirement):
-        if r.translator == "noop":
-            return Atom(r.value)
+    translators: Mapping[str, Translator],
+    formula: AsyncIterable[list[Requirement]],
+) -> AsyncIterable[list[Literal]]:
+    async for clause in formula:
+        positive_buffer = list[Literal]()
+        negative_buffer = list[list[str]]()
 
-        return await translators[r.translator].translate_requirement(r.value)
+        for literal in clause:
+            translated_requirement = translate_requirement(translators, literal)
 
-    async with TaskGroup() as group:
-        tasks = [
-            group.create_task(
-                visit_requirements(
-                    requirement,
-                    RequirementVisitor(
-                        simple_visitor=simple_visitor,
-                        negated_visitor=make_async(Neg),
-                        and_visitor=make_async(lambda x: And(*x, merge=True)),
-                        or_visitor=make_async(lambda x: Or(*x, merge=True)),
-                        xor_visitor=make_async(lambda x: XOr(*x, merge=True)),
-                        implication_visitor=make_async(Implies),
-                        equivalence_visitor=make_async(
-                            lambda x: Equals(*x, merge=True)
-                        ),
-                    ),
+            if literal.polarity:
+                positive_buffer.extend(
+                    Literal(symbol, True) for symbol in translated_requirement
+                )
+            else:
+                negative_buffer.append(list(translated_requirement))
+
+        for combination in product(*negative_buffer):
+            translated_clause = list(
+                chain(
+                    positive_buffer,
+                    (Literal(symbol, False) for symbol in combination),
                 )
             )
-            async for requirement in formula
-        ]
 
-    return And(*(task.result() for task in tasks), merge=True)
+            yield translated_clause
 
 
 async def build_formula(
@@ -76,11 +84,10 @@ async def build_formula(
         Awaitable[tuple[Repository, Any]]
     ],
     translators_task: Awaitable[Mapping[str, Translator]],
-    requirement: Requirement,
-) -> tuple[Mapping[Repository, Any], Formula]:
+    requirements: Iterable[Requirement],
+    repository_to_translated_options_result: Result[Mapping[Repository, Any]],
+) -> AsyncIterable[list[Literal]]:
     stderr.write("Fetching translator data and translating options...\n")
-
-    repository_to_translated_options_result = Result[Mapping[Repository, Any]]()
 
     formula = get_formula(
         repository_with_translated_options_tasks,
@@ -89,10 +96,8 @@ async def build_formula(
 
     stderr.write("Fetching formula and translating requirements...\n")
 
-    translated_formula = await translate_requirements(
-        await translators_task, async_chain([requirement], formula)
-    )
-
-    repository_to_translated_options = repository_to_translated_options_result.get()
-
-    return repository_to_translated_options, translated_formula
+    async for clause in translate_requirements(
+        await translators_task,
+        async_chain(([requirement] for requirement in requirements), formula),
+    ):
+        yield clause

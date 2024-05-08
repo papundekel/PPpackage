@@ -10,25 +10,27 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from sqlitedict import SqliteDict
+
 from PPpackage.container_utils import Containerizer
+from PPpackage.metamanager.installer import Installer
+from PPpackage.metamanager.repository import Repository
+from PPpackage.metamanager.schemes.node import NodeData
+from PPpackage.metamanager.translators import Translator
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
     ProductInfo,
     ProductInfos,
 )
-from sqlitedict import SqliteDict
-
-from PPpackage.metamanager.installer import Installer
-from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes.node import NodeData
-from PPpackage.metamanager.translators import Translator
 from PPpackage.utils.validation import dump_json
 
 
 @singledispatch
 async def process_build_context(
     build_context_detail: BuildContextDetail,
+    containerizer: Containerizer,
+    containerizer_workdir: Path,
     repositories: Iterable[Repository],
     translators_task: Awaitable[Mapping[str, Translator]],
     build_options: Any,
@@ -42,6 +44,7 @@ async def fetch_package(
     build_context: BuildContextDetail,
     processed_data: Any,
     containerizer: Containerizer,
+    containerizer_workdir: Path,
     archive_client: HTTPClient,
     cache_mapping: SqliteDict,
     product_cache_path: Path,
@@ -89,6 +92,8 @@ async def create_dependency_product_infos(
 
 
 async def get_build_context(
+    containerizer: Containerizer,
+    containerizer_workdir: Path,
     repositories: Iterable[Repository],
     translators_task: Awaitable[Mapping[str, Translator]],
     package: str,
@@ -105,7 +110,13 @@ async def get_build_context(
     )
 
     build_context_processed_data = await process_build_context(
-        build_context, repositories, translators_task, build_options, graph
+        containerizer,
+        containerizer_workdir,
+        build_context,
+        repositories,
+        translators_task,
+        build_options,
+        graph,
     )
 
     return build_context, build_context_processed_data
@@ -143,6 +154,7 @@ def hash_product_info(package: str, product_info: ProductInfo) -> str:
 
 async def fetch_package_or_cache(
     containerizer: Containerizer,
+    containerizer_workdir: Path,
     cache_mapping: SqliteDict,
     cache_path: Path,
     archive_client: HTTPClient,
@@ -166,6 +178,7 @@ async def fetch_package_or_cache(
             build_context,
             build_context_processed_data,
             containerizer,
+            containerizer_workdir,
             archive_client,
             cache_mapping,
             cache_path,
@@ -192,6 +205,7 @@ def graph_successors(
 
 def fetch(
     containerizer: Containerizer,
+    containerizer_workdir: Path,
     repositories: Iterable[Repository],
     repository_to_translated_options: Mapping[Repository, Any],
     translators_task: Awaitable[Mapping[str, Translator]],
@@ -221,6 +235,8 @@ def fetch(
 
             build_context_task = create_task(
                 get_build_context(
+                    containerizer,
+                    containerizer_workdir,
                     repositories,
                     translators_task,
                     package,
@@ -245,6 +261,7 @@ def fetch(
             node_data["product"] = create_task(
                 fetch_package_or_cache(
                     containerizer,
+                    containerizer_workdir,
                     cache_mapping,
                     cache_path,
                     archive_client,

@@ -7,9 +7,10 @@ from typing import Any
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
-from PPpackage.container_utils import Containerizer
 from pydot import Dot
 from sqlitedict import SqliteDict
+
+from PPpackage.container_utils import Containerizer
 
 from .fetch import fetch
 from .graph import get_graph_items
@@ -34,13 +35,17 @@ async def get_package_detail(
             )
             for repository in repositories
         ]
-
+    found = False
     for repository, task in zip(repositories, tasks):
         package_detail = task.result()
 
         if package_detail is not None:
             graph.add_node(variable, repository=repository, detail=package_detail)
+            found = True
             break
+
+    if not found:
+        print(f"Package {variable} not found in any repository")
 
 
 async def get_package_details(
@@ -128,6 +133,7 @@ def write_graph_to_file(graph: MultiDiGraph, path: Path) -> None:
 
 async def fetch_and_install(
     containerizer: Containerizer,
+    containerizer_workdir: Path,
     archive_client: HTTPClient,
     cache_mapping: SqliteDict,
     product_cache_path: Path,
@@ -152,8 +158,10 @@ async def fetch_and_install(
     if graph_path is not None:
         write_graph_to_file(graph, graph_path)
 
+    return
     fetch(
         containerizer,
+        containerizer_workdir,
         repositories,
         repository_to_translated_options,
         translators_task,

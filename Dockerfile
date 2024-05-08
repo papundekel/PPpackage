@@ -1,4 +1,4 @@
-ARG AUR_TAG=paru-20240407.0.316
+ARG AUR_TAG=paru-20240505.0.320
 # -----------------------------------------------------------------------------
 
 FROM docker.io/greyltc/archlinux-aur:$AUR_TAG AS base
@@ -135,6 +135,28 @@ RUN pip install repository-driver/PP/
 
 
 ENTRYPOINT [ "python", "-m", "PPpackage.repository_driver.update" ]
+
+# -----------------------------------------------------------------------------
+
+FROM base AS solver
+
+RUN pacman --noconfirm -S jdk-openjdk
+RUN pacman --noconfirm -S curl
+RUN pacman --noconfirm -S unzip
+
+
+
+COPY solver/ /workdir/solver
+
+RUN curl https://release.ow2.org/sat4j/sat4j-core-v20201214.zip -o /workdir/sat4j.zip
+
+RUN unzip /workdir/sat4j.zip -d /workdir/sat4j
+
+RUN javac -classpath /workdir/sat4j/org.sat4j.core.jar /workdir/solver/Solver.java
+
+
+
+ENTRYPOINT java -classpath /workdir/sat4j/org.sat4j.core.jar /workdir/solver/Solver.java /mnt/input > /mnt/output
 
 # -----------------------------------------------------------------------------
 

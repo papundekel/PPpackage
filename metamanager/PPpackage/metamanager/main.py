@@ -6,10 +6,10 @@ from traceback import print_exc
 from typing import IO
 
 from httpx import AsyncClient as HTTPClient
-from PPpackage.container_utils import Containerizer
 from pydantic import ValidationError
 from sqlitedict import SqliteDict
 
+from PPpackage.container_utils import Containerizer
 from PPpackage.utils.validation import validate_json
 
 from .fetch_and_install import fetch_and_install
@@ -87,7 +87,12 @@ async def main(
             )
 
             repository_to_translated_options, model = await resolve(
-                repositories, translators_task, input.options, input.requirement
+                containerizer,
+                config.containerizer_workdir,
+                repositories,
+                translators_task,
+                input.options,
+                input.requirements,
             )
 
         async with HTTPClient(http2=True) as archive_client:
@@ -96,6 +101,7 @@ async def main(
             with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
                 await fetch_and_install(
                     containerizer,
+                    config.containerizer_workdir,
                     archive_client,
                     cache_mapping,
                     config.product_cache_path,
@@ -112,4 +118,4 @@ async def main(
     if generators_path is not None:
         await generators(generators_path)
 
-        stderr.write("Done.\n")
+    stderr.write("Done.\n")

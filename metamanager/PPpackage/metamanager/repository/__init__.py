@@ -87,7 +87,9 @@ class Repository:
 
         return translated_options
 
-    async def get_formula(self, translated_options: Any) -> AsyncIterable[Requirement]:
+    async def get_formula(
+        self, translated_options: Any
+    ) -> AsyncIterable[list[Requirement]]:
         self.config.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         with SqliteDict(self.config.formula_cache_path) as formula_cache:

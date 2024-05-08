@@ -1,18 +1,20 @@
 {
-    "requirement": {
-        "and_": [
-            {
-                "translator": "pacman",
-                "value": "sh"
-            },
-            {
-                "translator": "pacman",
-                "value": "coreutils"
-            },
-            {
-                "translator": "pacman",
-                "value": "sh"
-            }
-        ]
-    }
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "curl"
+        }
+    ]
 }

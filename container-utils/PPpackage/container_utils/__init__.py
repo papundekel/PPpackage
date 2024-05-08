@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 from typing import cast as type_cast
 
 from podman import PodmanClient
@@ -16,6 +17,7 @@ class Containerizer:
         command: list[str],
         image: str | None = None,
         stdin: bytes | None = None,
+        mounts: list[Any] | None = None,
         **kwargs,
     ) -> int:
         with PodmanClient(base_url=str(self.config.url)) as client:
@@ -23,6 +25,7 @@ class Containerizer:
                 image if image is not None else "",
                 command,
                 **kwargs,
+                mounts=mounts,
                 stdin_open=stdin is not None,
             )
 

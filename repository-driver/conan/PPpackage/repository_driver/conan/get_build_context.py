@@ -2,11 +2,10 @@ from itertools import chain
 
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
     BuildContextDetail,
     MetaBuildContextDetail,
     ProductInfos,
-    SimpleRequirement,
+    Requirement,
 )
 
 from .schemes import DriverParameters, Options, RepositoryParameters
@@ -33,27 +32,25 @@ async def get_build_context(
         raise Exception(f"Recipe not found: {revision}")
 
     return MetaBuildContextDetail(
-        ANDRequirement(
-            list(
-                chain(
-                    [
-                        SimpleRequirement("pacman", "conan"),
-                        SimpleRequirement("pacman", "bash"),
-                        SimpleRequirement("pacman", "coreutils"),
-                        SimpleRequirement("pacman", "jq"),
-                    ],
-                    (
-                        SimpleRequirement(
-                            "conan",
-                            {
-                                "package": str(requirement.ref.name),
-                                "version": str(requirement.ref.version),
-                            },
-                        )
-                        for requirement in requirements
-                        if requirement.build
-                    ),
-                )
+        list(
+            chain(
+                [
+                    Requirement("pacman", "conan"),
+                    Requirement("pacman", "bash"),
+                    Requirement("pacman", "coreutils"),
+                    Requirement("pacman", "jq"),
+                ],
+                (
+                    Requirement(
+                        "conan",
+                        {
+                            "package": str(requirement.ref.name),
+                            "version": str(requirement.ref.version),
+                        },
+                    )
+                    for requirement in requirements
+                    if requirement.build
+                ),
             )
         ),
         on_top=True,

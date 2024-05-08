@@ -4,11 +4,10 @@ from aiosqlite import Connection
 from asyncstdlib import chain as async_chain
 from asyncstdlib import list as async_list
 from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
     BuildContextDetail,
     MetaBuildContextDetail,
     ProductInfos,
-    SimpleRequirement,
+    Requirement,
 )
 
 from .schemes import DriverParameters, RepositoryParameters
@@ -43,20 +42,18 @@ async def get_build_context(
 
     async with transaction(connection):
         return MetaBuildContextDetail(
-            ANDRequirement(
-                await async_list(
-                    async_chain(
-                        [
-                            SimpleRequirement("pacman", "base-devel"),
-                            SimpleRequirement("pacman", "git"),
-                        ],
-                        (
-                            SimpleRequirement("pacman", dependency)
-                            async for dependency in query_build_dependencies(
-                                connection, name
-                            )
-                        ),
-                    )
+            await async_list(
+                async_chain(
+                    [
+                        Requirement("pacman", "base-devel"),
+                        Requirement("pacman", "git"),
+                    ],
+                    (
+                        Requirement("pacman", dependency)
+                        async for dependency in query_build_dependencies(
+                            connection, name
+                        )
+                    ),
                 )
             ),
             on_top=True,

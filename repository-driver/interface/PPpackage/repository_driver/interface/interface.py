@@ -57,7 +57,7 @@ class Interface[
             TranslatedOptionsType,
             Result[str],
         ],
-        AsyncIterable[Requirement],
+        AsyncIterable[list[Requirement]],
     ]
 
     get_package_detail: Callable[

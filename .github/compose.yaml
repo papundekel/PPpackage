@@ -30,6 +30,10 @@ services:
               target: /mnt/cache/
 
             - type: bind
+              source: /tmp/
+              target: /mnt/workdir/
+
+            - type: bind
               source: $PWD/database/archlinux-core/
               target: /mnt/repositories/database/archlinux-core/
             - type: bind

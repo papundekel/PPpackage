@@ -5,10 +5,15 @@
         "path_translations": [
             {
                 "containerizer": "$CONTAINERIZER_ROOT",
-                "container": "/mnt/root"
+                "container": "/mnt/root/"
+            },
+            {
+                "containerizer": "/tmp/",
+                "container": "/mnt/workdir/"
             }
         ]
     },
+    "containerizer_workdir": "/mnt/workdir/",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"

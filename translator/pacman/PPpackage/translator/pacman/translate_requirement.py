@@ -1,11 +1,9 @@
-from collections.abc import Callable, Iterable, Mapping
-from itertools import chain
+from collections.abc import AsyncIterable, Callable, Iterable, Mapping
 from operator import eq, ge, gt, le, lt
 
 from pyalpm import vercmp as alpm_vercmp
-from pysat.formula import Atom, Formula, Or
 
-from .schemes import Parameters
+from .schemes import ExcludeRequirement, Parameters
 
 
 def parse_requirement(
@@ -39,41 +37,44 @@ def version_compare(
 
 
 def create_atoms(
-    package: str,
-    prefix: str,
+    name: str,
     symbols: Iterable[dict[str, str]],
-    requirement_expression: tuple[Callable[[int, int], bool], str] | None,
-) -> Iterable[Formula]:
+    version_expression: tuple[Callable[[int, int], bool], str] | None,
+    exclude: str | None,
+) -> Iterable[str]:
     for symbol in symbols:
-        if requirement_expression is None or version_compare(
-            symbol.get("version"),
-            requirement_expression[0],
-            requirement_expression[1],
+        provider = symbol.get("provider")
+        version = symbol.get("version")
+
+        package_suffix = provider if provider is not None else f"{name}-{version}"
+
+        if package_suffix == exclude:
+            continue
+
+        if version_expression is None or version_compare(
+            version,
+            version_expression[0],
+            version_expression[1],
         ):
-            yield Atom(
-                f"pacman-{prefix}-{package}-{symbol['version']}"
-                if "version" in symbol
-                else f"pacman-{prefix}-{package}"
-            )
+            yield f"pacman-{package_suffix}"
 
 
-async def translate_requirement(
+def translate_requirement(
     parameters: Parameters,
     data: Mapping[str, Iterable[dict[str, str]]],
-    requirement: str,
-) -> Formula:
-    package, requirement_expression = parse_requirement(requirement)
-
-    real_symbols = data.get(f"pacman-real-{package}", [])
-    virtual_symbols = data.get(f"pacman-virtual-{package}", [])
-
-    return Or(
-        *(
-            chain(
-                create_atoms(package, "real", real_symbols, requirement_expression),
-                create_atoms(
-                    package, "virtual", virtual_symbols, requirement_expression
-                ),
-            )
-        )
+    requirement: str | ExcludeRequirement,
+) -> Iterable[str]:
+    requirement_name = (
+        requirement if isinstance(requirement, str) else requirement.package
     )
+
+    exclude = (
+        requirement.exclude if isinstance(requirement, ExcludeRequirement) else None
+    )
+
+    name, version_expression = parse_requirement(requirement_name)
+
+    symbols = data.get(f"pacman-{name}", [])
+
+    for literal in create_atoms(name, symbols, version_expression, exclude):
+        yield literal
