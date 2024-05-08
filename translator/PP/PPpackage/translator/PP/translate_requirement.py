@@ -1,6 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, Mapping
-
-from pysat.formula import Formula, Or
+from collections.abc import Iterable, Mapping
 
 from .schemes import Parameters
 
