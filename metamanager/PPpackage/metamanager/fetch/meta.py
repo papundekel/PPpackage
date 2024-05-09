@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Iterable, Mapping, Set
 from itertools import chain
+from os import chmod
 from pathlib import Path
 from shutil import move
 from sys import stderr
@@ -106,6 +107,8 @@ async def fetch_package_meta(
 
     with TemporaryDirectory(containerizer_workdir) as build_context_root_path:
         stderr.write(f"Fetching and installing build context for {package}...\n")
+
+        chmod(build_context_root_path, 0o755)
 
         await fetch_and_install(
             containerizer,

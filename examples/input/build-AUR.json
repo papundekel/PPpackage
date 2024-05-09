@@ -17,7 +17,15 @@
         },
         {
             "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
             "value": "sudo"
+        },
+        {
+            "translator": "pacman",
+            "value": "python-setuptools"
         }
     ]
 }

@@ -42,7 +42,7 @@ class Containerizer:
 
             return_code = container.wait()
 
-            # container.remove()
+            container.remove()
 
             return return_code
 

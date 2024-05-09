@@ -3,6 +3,7 @@ from collections.abc import AsyncIterable
 from aiosqlite import Connection
 from asyncstdlib import chain as async_chain
 from asyncstdlib import list as async_list
+
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     MetaBuildContextDetail,
@@ -66,10 +67,12 @@ async def get_build_context(
                 "bash",
                 "-c",
                 "useradd builder\n"
-                f"sudo --user builder git clone https://aur.archlinux.org/{name}.git /tmp/workdir || exit 10\n"
+                f"git clone https://aur.archlinux.org/{name}.git /tmp/workdir || exit 10\n"
+                "chown -R builder:builder /tmp/workdir\n"
                 "cd /tmp/workdir\n"
                 "sudo --user builder makepkg || exit 20\n"
                 "chown root:root /tmp/workdir\n"
+                "mkdir /mnt/output\n"
                 "mv /tmp/workdir/*.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"
                 "echo -n pacman > /mnt/output/installer\n",
