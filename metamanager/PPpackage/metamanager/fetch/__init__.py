@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from functools import singledispatch
 from hashlib import sha1
 from pathlib import Path
-from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
