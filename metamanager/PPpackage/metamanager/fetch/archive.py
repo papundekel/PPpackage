@@ -46,6 +46,7 @@ async def process_build_context_archive(
     translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
+    package: str,
 ) -> None:
     return None
 

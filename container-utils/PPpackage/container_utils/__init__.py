@@ -25,7 +25,7 @@ class Containerizer:
                 image if image is not None else "",
                 command,
                 **kwargs,
-                mounts=mounts,
+                mounts=mounts if mounts is not None else [],
                 stdin_open=stdin is not None,
             )
 

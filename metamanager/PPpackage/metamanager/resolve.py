@@ -152,8 +152,6 @@ async def resolve(
             repository_to_translated_options_result,
         )
 
-        stderr.write("Resolving...\n")
-
         model = await solve(
             containerizer, containerizer_workdir, translators_task, formula
         )

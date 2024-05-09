@@ -10,3 +10,9 @@ class Parameters(BaseModel):
 class ExcludeRequirement:
     package: str
     exclude: str
+
+
+@pydantic_dataclass(frozen=True)
+class NoProvideRequirement:
+    package: str
+    no_provide: None

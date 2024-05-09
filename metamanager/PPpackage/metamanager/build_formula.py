@@ -87,14 +87,10 @@ async def build_formula(
     requirements: Iterable[Requirement],
     repository_to_translated_options_result: Result[Mapping[Repository, Any]],
 ) -> AsyncIterable[list[Literal]]:
-    stderr.write("Fetching translator data and translating options...\n")
-
     formula = get_formula(
         repository_with_translated_options_tasks,
         repository_to_translated_options_result,
     )
-
-    stderr.write("Fetching formula and translating requirements...\n")
 
     translators, _ = await translators_task
 

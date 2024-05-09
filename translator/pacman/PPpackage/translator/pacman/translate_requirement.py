@@ -5,7 +5,7 @@ from pyalpm import vercmp as alpm_vercmp
 
 from PPpackage.translator.interface.schemes import Data
 
-from .schemes import ExcludeRequirement, Parameters
+from .schemes import ExcludeRequirement, NoProvideRequirement, Parameters
 from .utils import process_symbol
 
 
@@ -59,9 +59,29 @@ def create_atoms(
             yield f"pacman-{package_suffix}"
 
 
+def handle_no_provide(data: Data, requirement: NoProvideRequirement) -> str | None:
+    symbols = data.get(f"pacman-{requirement.package}", [])
+
+    for symbol in symbols:
+        if "provider" not in symbol:
+            return f"pacman-{requirement.package}-{symbol['version']}"
+
+    return None
+
+
 def translate_requirement(
-    parameters: Parameters, data: Data, requirement: str | ExcludeRequirement
+    parameters: Parameters,
+    data: Data,
+    requirement: str | ExcludeRequirement | NoProvideRequirement,
 ) -> Iterable[str]:
+    if isinstance(requirement, NoProvideRequirement):
+        literal = handle_no_provide(data, requirement)
+
+        if literal is not None:
+            yield literal
+
+        return
+
     requirement_name = (
         requirement if isinstance(requirement, str) else requirement.package
     )

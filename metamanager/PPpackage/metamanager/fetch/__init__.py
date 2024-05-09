@@ -1,16 +1,15 @@
-from asyncio import Lock, create_task, sleep
+from asyncio import create_task, sleep
 from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager
 from functools import singledispatch
 from hashlib import sha1
-from itertools import islice
 from pathlib import Path
 from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
 from httpx import AsyncClient as HTTPClient
-from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
+from networkx import MultiDiGraph, topological_generations
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
@@ -20,6 +19,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from sqlitedict import SqliteDict
 
+from PPpackage.metamanager.graph import successors as graph_successors
 from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
@@ -37,6 +37,7 @@ async def process_build_context(
     translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
+    package: str,
 ) -> Any:
     raise NotImplementedError
 
@@ -119,6 +120,7 @@ async def get_build_context(
         translators_task,
         build_options,
         graph,
+        package,
     )
 
     return build_context, build_context_processed_data
@@ -182,8 +184,6 @@ async def fetch_package_or_cache(
     package: str,
     node_data: NodeData,
 ) -> tuple[Path, str]:
-    stderr.write(f"\t{package}\n")
-
     product_info_hash = hash_product_info(package, await node_data["product_info"])
 
     async with product_cache_lock(product_info_hash):
@@ -217,13 +217,6 @@ async def fetch_package_or_cache(
             return cache_mapping[product_info_hash]
 
 
-def graph_successors(
-    graph: MultiDiGraph, package: str
-) -> Iterable[tuple[str, NodeData]]:
-    for successor in islice(dfs_preorder_nodes(graph, source=package), 1, None):
-        yield successor, graph.nodes[successor]
-
-
 def fetch(
     containerizer: Containerizer,
     containerizer_workdir: Path,
@@ -237,8 +230,6 @@ def fetch(
     build_options: Any,
     graph: MultiDiGraph,
 ) -> None:
-    stderr.write("Fetching package products...\n")
-
     for generation in topological_generations(graph.reverse(copy=False)):
         for package in generation:
             node_data: NodeData = graph.nodes[package]

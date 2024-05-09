@@ -54,8 +54,6 @@ async def get_package_details(
     repository_to_translated_options: Mapping[Repository, Any],
     model: Set[str],
 ) -> MultiDiGraph:
-    stderr.write("Fetching package details...\n")
-
     graph = MultiDiGraph()
 
     async with TaskGroup() as group:
@@ -150,9 +148,6 @@ async def fetch_and_install(
     graph = await get_package_details(
         repositories, repository_to_translated_options, model
     )
-
-    for package in sorted(graph.nodes):
-        stderr.write(f"\t{package}\n")
 
     create_dependencies(graph)
 

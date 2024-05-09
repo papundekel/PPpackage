@@ -20,7 +20,6 @@ class Installer:
         self.parameters = validate_python(interface.Parameters, config.parameters)
 
     async def install(self, product_path: Path, installation_path: Path) -> None:
-        stderr.write(f"Installing {product_path}...\n")
         await self.interface.install(self.parameters, product_path, installation_path)
 
 

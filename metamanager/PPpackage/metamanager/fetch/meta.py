@@ -16,7 +16,7 @@ from PPpackage.repository_driver.interface.schemes import (
 from sqlitedict import SqliteDict
 
 from metamanager.PPpackage.metamanager.installer import Installer
-from PPpackage.metamanager.graph import get_graph_items
+from PPpackage.metamanager.graph import successors as graph_successors
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
@@ -34,6 +34,7 @@ async def process_build_context_meta(
     translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
+    package: str,
 ) -> tuple[
     Mapping[Repository, Any],
     Iterable[Repository],
@@ -48,7 +49,10 @@ async def process_build_context_meta(
         if not build_context.on_top
         else chain(
             build_context.requirements,
-            (Requirement("noop", package) for package, _ in get_graph_items(graph)),
+            (
+                Requirement("noop", package)
+                for package, _ in graph_successors(graph, package)
+            ),
         )
     )
 
@@ -90,8 +94,6 @@ async def fetch_package_meta(
     repository: Repository,
     destination_path: Path,
 ) -> str:
-    print(f"Building package {package}...", file=stderr)
-
     from PPpackage.metamanager.fetch_and_install import fetch_and_install
 
     (
@@ -103,6 +105,8 @@ async def fetch_package_meta(
     ) = processed_data
 
     with TemporaryDirectory(containerizer_workdir) as build_context_root_path:
+        stderr.write(f"Fetching and installing build context for {package}...\n")
+
         await fetch_and_install(
             containerizer,
             containerizer_workdir,
@@ -119,9 +123,7 @@ async def fetch_package_meta(
             model,
         )
 
-        print(
-            f"Building package {package} with {build_context.command}...", file=stderr
-        )
+        stderr.write(f"Building package {package}...\n")
 
         return_code = containerizer.run(
             build_context.command,
@@ -130,7 +132,9 @@ async def fetch_package_meta(
         )
 
         if return_code != 0:
-            raise Exception("Failed to build package")
+            raise Exception(
+                f"Failed to build package {package}, return code: {return_code}"
+            )
 
         move(build_context_root_path / "mnt" / "output" / "product", destination_path)
 
@@ -138,8 +142,6 @@ async def fetch_package_meta(
             "r"
         ) as file:
             installer = file.read()
-
-    print(f"Built package {package}", file=stderr)
 
     return installer
 

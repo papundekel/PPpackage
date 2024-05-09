@@ -47,6 +47,10 @@ async def get_build_context(
                     [
                         Requirement("pacman", "base-devel"),
                         Requirement("pacman", "git"),
+                        Requirement(
+                            "pacman", {"package": "ca-certificates", "no_provide": None}
+                        ),
+                        Requirement("pacman", "sudo"),
                     ],
                     (
                         Requirement("pacman", dependency)
@@ -60,10 +64,15 @@ async def get_build_context(
             command=[
                 "bash",
                 "-c",
-                f"git clone https://aur.archlinux.org/{name}.git\n"
+                "cd /root\n"
+                f"git clone https://aur.archlinux.org/{name}.git || exit 1\n"
                 "cd */\n"
-                "makepkg\n"
+                "useradd builder\n"
+                "chown builder ./\n"
+                "sudo --user builder makepkg || exit 2\n"
+                "chown -R root ./\n"
                 "mv *.pkg.* /mnt/output/product\n"
+                "chown root:root /mnt/output/product\n"
                 "echo -n pacman > /mnt/output/installer\n",
             ],
         )

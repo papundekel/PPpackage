@@ -6,10 +6,10 @@ from traceback import print_exc
 from typing import IO
 
 from httpx import AsyncClient as HTTPClient
+from PPpackage.container_utils import Containerizer
 from pydantic import ValidationError
 from sqlitedict import SqliteDict
 
-from PPpackage.container_utils import Containerizer
 from PPpackage.utils.validation import validate_json
 
 from .fetch_and_install import fetch_and_install
@@ -86,6 +86,8 @@ async def main(
                 Translators(repositories, config.requirement_translators)
             )
 
+            stderr.write("Resolving...\n")
+
             repository_to_translated_options, model = await resolve(
                 containerizer,
                 config.containerizer_workdir,
@@ -99,6 +101,8 @@ async def main(
             product_cache_path.mkdir(parents=True, exist_ok=True)
 
             with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
+                stderr.write("Fetching and installing...\n")
+
                 await fetch_and_install(
                     containerizer,
                     config.containerizer_workdir,
