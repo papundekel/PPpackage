@@ -65,13 +65,14 @@ async def get_build_context(
             command=[
                 "bash",
                 "-c",
-                "cd /tmp\n"
+                "mkdir /mnt/output/workdir\n"
+                "cd /mnt/output/workdir\n"
                 f"git clone https://aur.archlinux.org/{name}.git || exit 1\n"
                 "cd */\n"
                 "useradd -U builder\n"
                 "chown builder:builder ./\n"
                 "sudo --user builder makepkg || exit 2\n"
-                "chown root:root ./\n"
+                "chown -R root:root ./\n"
                 "mv *.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"
                 "echo -n pacman > /mnt/output/installer\n",
