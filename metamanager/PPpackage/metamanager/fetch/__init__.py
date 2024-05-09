@@ -10,19 +10,20 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, dfs_preorder_nodes, topological_generations
-from sqlitedict import SqliteDict
-
 from PPpackage.container_utils import Containerizer
-from PPpackage.metamanager.installer import Installer
-from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes.node import NodeData
-from PPpackage.metamanager.translators import Translator
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
     ProductInfo,
     ProductInfos,
 )
+from sqlitedict import SqliteDict
+
+from PPpackage.metamanager.installer import Installer
+from PPpackage.metamanager.repository import Repository
+from PPpackage.metamanager.schemes.node import NodeData
+from PPpackage.metamanager.translators import Translator
+from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.validation import dump_json
 
 
@@ -32,7 +33,7 @@ async def process_build_context(
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
 ) -> Any:
@@ -95,7 +96,7 @@ async def get_build_context(
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     package: str,
     runtime_product_infos_task: Awaitable[ProductInfos],
     repository: Repository,
@@ -208,7 +209,7 @@ def fetch(
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
     repository_to_translated_options: Mapping[Repository, Any],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     installers: Mapping[str, Installer],
     cache_mapping: SqliteDict,
     archive_client: HTTPClient,

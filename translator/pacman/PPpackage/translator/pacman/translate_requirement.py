@@ -1,9 +1,12 @@
-from collections.abc import AsyncIterable, Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from operator import eq, ge, gt, le, lt
 
 from pyalpm import vercmp as alpm_vercmp
 
+from PPpackage.translator.interface.schemes import Data
+
 from .schemes import ExcludeRequirement, Parameters
+from .utils import process_symbol
 
 
 def parse_requirement(
@@ -38,15 +41,12 @@ def version_compare(
 
 def create_atoms(
     name: str,
-    symbols: Iterable[dict[str, str]],
+    symbols: Iterable[Mapping[str, str]],
     version_expression: tuple[Callable[[int, int], bool], str] | None,
     exclude: str | None,
 ) -> Iterable[str]:
     for symbol in symbols:
-        provider = symbol.get("provider")
-        version = symbol.get("version")
-
-        package_suffix = provider if provider is not None else f"{name}-{version}"
+        package_suffix, version = process_symbol(name, symbol)
 
         if package_suffix == exclude:
             continue
@@ -60,9 +60,7 @@ def create_atoms(
 
 
 def translate_requirement(
-    parameters: Parameters,
-    data: Mapping[str, Iterable[dict[str, str]]],
-    requirement: str | ExcludeRequirement,
+    parameters: Parameters, data: Data, requirement: str | ExcludeRequirement
 ) -> Iterable[str]:
     requirement_name = (
         requirement if isinstance(requirement, str) else requirement.package

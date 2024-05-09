@@ -6,12 +6,12 @@ from sys import stderr
 from typing import Any
 
 from asyncstdlib import chain as async_chain
-
 from PPpackage.repository_driver.interface.schemes import Requirement
+
+from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.utils import Result
 
 from .repository import Repository
-from .schemes import Literal
 from .translators import Translator
 
 
@@ -83,7 +83,7 @@ async def build_formula(
     repository_with_translated_options_tasks: Iterable[
         Awaitable[tuple[Repository, Any]]
     ],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     requirements: Iterable[Requirement],
     repository_to_translated_options_result: Result[Mapping[Repository, Any]],
 ) -> AsyncIterable[list[Literal]]:
@@ -96,8 +96,10 @@ async def build_formula(
 
     stderr.write("Fetching formula and translating requirements...\n")
 
+    translators, _ = await translators_task
+
     async for clause in translate_requirements(
-        await translators_task,
+        translators,
         async_chain(([requirement] for requirement in requirements), formula),
     ):
         yield clause

@@ -1,14 +1,10 @@
 from asyncio import TaskGroup
-from collections.abc import (
-    AsyncIterable,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
-)
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
+from itertools import chain
 from typing import Any
 
 from PPpackage.translator.interface.interface import Interface
+from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import validate_python
 
@@ -41,25 +37,16 @@ async def fetch_translator_data(
 class Translator:
     def __init__(
         self,
-        interface: Interface,
-        parameters: Any,
+        config: RequirementTranslatorConfig,
         data: Mapping[str, Iterable[dict[str, str]]],
-    ):
-        self.interface = interface
-        self.parameters = parameters
-        self.data = data
-        self.cache = dict[Any, list[str]]()
-
-    @staticmethod
-    async def create(
-        repositories: Iterable[Repository], config: RequirementTranslatorConfig
     ):
         interface = load_interface_module(Interface, config.package)
         parameters = validate_python(interface.Parameters, config.parameters)
 
-        data = await fetch_translator_data(repositories)
-
-        return Translator(interface, parameters, data)
+        self.interface = interface
+        self.parameters = parameters
+        self.data = data
+        self.cache = dict[Any, list[str]]()
 
     def translate_requirement(self, requirement_unparsed: Any) -> Iterable[str]:
         requirement = validate_python(self.interface.Requirement, requirement_unparsed)
@@ -77,15 +64,24 @@ class Translator:
         for symbol in translated_requirement:
             yield symbol
 
+    def get_assumptions(self) -> Iterable[Literal]:
+        return self.interface.get_assumptions(self.parameters, self.data)
+
 
 async def Translators(
     repositories: Iterable[Repository],
     translators_config: Mapping[str, RequirementTranslatorConfig],
-) -> Mapping[str, Translator]:
-    async with TaskGroup() as group:
-        translators_tasks = {
-            name: group.create_task(Translator.create(repositories, config))
-            for name, config in translators_config.items()
-        }
+) -> tuple[Mapping[str, Translator], Iterable[Literal]]:
+    data = await fetch_translator_data(repositories)
 
-    return {name: task.result() for name, task in translators_tasks.items()}
+    translators = {
+        name: Translator(config, data) for name, config in translators_config.items()
+    }
+
+    assumptions = set(
+        chain.from_iterable(
+            translator.get_assumptions() for translator in translators.values()
+        )
+    )
+
+    return translators, assumptions

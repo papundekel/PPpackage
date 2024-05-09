@@ -156,7 +156,7 @@ RUN javac -classpath /workdir/sat4j/org.sat4j.core.jar /workdir/solver/Solver.ja
 
 
 
-ENTRYPOINT java -classpath /workdir/sat4j/org.sat4j.core.jar /workdir/solver/Solver.java /mnt/input > /mnt/output
+ENTRYPOINT java -classpath /workdir/sat4j/org.sat4j.core.jar /workdir/solver/Solver.java /mnt/formula /mnt/assumptions > /mnt/output
 
 # -----------------------------------------------------------------------------
 

@@ -7,10 +7,11 @@ from typing import Any
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph, convert_node_labels_to_integers
 from networkx.drawing.nx_pydot import to_pydot
+from PPpackage.container_utils import Containerizer
 from pydot import Dot
 from sqlitedict import SqliteDict
 
-from PPpackage.container_utils import Containerizer
+from PPpackage.translator.interface.schemes import Literal
 
 from .fetch import fetch
 from .graph import get_graph_items
@@ -139,7 +140,7 @@ async def fetch_and_install(
     product_cache_path: Path,
     repositories: Iterable[Repository],
     repository_to_translated_options: Mapping[Repository, Any],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     installers: Mapping[str, Installer],
     installation_path: Path,
     graph_path: Path | None,

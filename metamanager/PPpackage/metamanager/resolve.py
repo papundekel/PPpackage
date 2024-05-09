@@ -6,20 +6,22 @@ from collections.abc import (
     Mapping,
     MutableMapping,
     MutableSequence,
+    Sequence,
     Set,
 )
 from pathlib import Path
 from sys import stderr
 from typing import Any
 
-from metamanager.PPpackage.metamanager.exceptions import NoModelException
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import Requirement
+
+from metamanager.PPpackage.metamanager.exceptions import NoModelException
+from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.utils import Result, TemporaryDirectory
 
 from .build_formula import build_formula
 from .repository import Repository
-from .schemes import Literal
 from .translate_options import translate_options
 from .translators import Translator
 
@@ -41,7 +43,7 @@ def get_variable_int(
 
 async def save_to_dimacs(
     formula: AsyncIterable[list[Literal]], path: Path
-) -> list[str]:
+) -> tuple[Mapping[str, int], Sequence[str]]:
     mapping_to_int = dict[str, int]()
     mapping_to_string = list[str]()
     clause_count = 0
@@ -72,19 +74,38 @@ async def save_to_dimacs(
                 file.write(f"{literal} ")
             file.write("0\n")
 
-    return mapping_to_string
+    return mapping_to_int, mapping_to_string
+
+
+def save_assumptions(
+    mapping_to_int: Mapping[str, int], assumptions: Iterable[Literal], path: Path
+):
+    with path.open("w") as file:
+        for assumption in assumptions:
+            assumption_integer = mapping_to_int.get(assumption.symbol)
+
+            if assumption_integer is not None:
+                file.write(
+                    f"{'' if assumption.polarity else '-'}{assumption_integer}\n"
+                )
 
 
 async def solve(
     containerizer: Containerizer,
     containerizer_workdir: Path,
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     formula: AsyncIterable[list[Literal]],
 ) -> Set[str]:
     with TemporaryDirectory(containerizer_workdir) as mount_dir_path:
-        formula_path = mount_dir_path / "input"
+        formula_path = mount_dir_path / "formula"
+        assumptions_path = mount_dir_path / "assumptions"
         output_path = mount_dir_path / "output"
 
-        mapping_to_string = await save_to_dimacs(formula, formula_path)
+        mapping_to_int, mapping_to_string = await save_to_dimacs(formula, formula_path)
+
+        _, assumptions = await translators_task
+
+        save_assumptions(mapping_to_int, assumptions, assumptions_path)
 
         return_code = containerizer.run(
             [],
@@ -112,7 +133,7 @@ async def resolve(
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     options: Any,
     requirements: Iterable[Requirement],
 ) -> tuple[Mapping[Repository, Any], Set[str]]:
@@ -133,6 +154,8 @@ async def resolve(
 
         stderr.write("Resolving...\n")
 
-        model = await solve(containerizer, containerizer_workdir, formula)
+        model = await solve(
+            containerizer, containerizer_workdir, translators_task, formula
+        )
 
     return repository_to_translated_options_result.get(), model

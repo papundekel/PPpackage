@@ -4,15 +4,15 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from frozendict import frozendict
-from pydantic import AnyUrl
-from pydantic.dataclasses import dataclass as pydantic_dataclass
-
 from PPpackage.container_utils.schemes import ContainerizerConfig
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
     Parameters,
     Requirement,
 )
+from pydantic import AnyUrl
+from pydantic.dataclasses import dataclass as pydantic_dataclass
+
 from PPpackage.utils.validation import WithVariables
 
 
@@ -67,9 +67,3 @@ class Config:
     containerizer: ContainerizerConfig
     containerizer_workdir: Annotated[Path, WithVariables]
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
-
-
-@dataclass(frozen=True)
-class Literal:
-    symbol: str
-    polarity: bool

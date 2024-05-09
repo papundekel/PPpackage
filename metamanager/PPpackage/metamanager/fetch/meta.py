@@ -7,19 +7,19 @@ from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph
-from sqlitedict import SqliteDict
-
-from metamanager.PPpackage.metamanager.installer import Installer
 from PPpackage.container_utils import Containerizer
-from PPpackage.metamanager.graph import get_graph_items
-from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.schemes.node import NodeData
-from PPpackage.metamanager.translators import Translator
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextInfo,
     MetaBuildContextDetail,
     Requirement,
 )
+from sqlitedict import SqliteDict
+
+from metamanager.PPpackage.metamanager.installer import Installer
+from PPpackage.metamanager.graph import get_graph_items
+from PPpackage.metamanager.repository import Repository
+from PPpackage.metamanager.translators import Translator
+from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.utils import TemporaryDirectory
 
 from . import fetch_package, get_build_context_info, process_build_context
@@ -31,13 +31,13 @@ async def process_build_context_meta(
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators_task: Awaitable[Mapping[str, Translator]],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
 ) -> tuple[
     Mapping[Repository, Any],
     Iterable[Repository],
-    Awaitable[Mapping[str, Translator]],
+    Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     Any,
     Set[str],
 ]:
@@ -76,7 +76,7 @@ async def fetch_package_meta(
     processed_data: tuple[
         Mapping[Repository, Any],
         Iterable[Repository],
-        Awaitable[Mapping[str, Translator]],
+        Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
         Any,
         Set[str],
     ],

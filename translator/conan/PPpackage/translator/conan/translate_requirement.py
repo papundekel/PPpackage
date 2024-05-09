@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 from conans.model.version import Version
 from conans.model.version_range import VersionRange

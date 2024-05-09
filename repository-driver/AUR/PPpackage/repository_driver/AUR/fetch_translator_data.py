@@ -41,7 +41,7 @@ async def fetch_translator_data(
         epoch_result.set(await get_epoch(connection))
 
         async for name, version in query_packages(connection):
-            yield TranslatorInfo(f"pacman-{name}", {"version": version})
+            yield TranslatorInfo(f"pacman-{name}", {"version": version, "AUR": ""})
 
         async for name, version, provide in query_provides(connection):
             provider = f"{name}-{version}"
@@ -50,9 +50,9 @@ async def fetch_translator_data(
                 case provide_name, provide_version:
                     yield TranslatorInfo(
                         f"pacman-{provide_name}",
-                        {"provider": provider, "version": provide_version},
+                        {"provider": provider, "version": provide_version, "AUR": ""},
                     )
                 case provide_name:
                     yield TranslatorInfo(
-                        f"pacman-{provide_name}", {"provider": provider}
+                        f"pacman-{provide_name}", {"provider": provider, "AUR": ""}
                     )
