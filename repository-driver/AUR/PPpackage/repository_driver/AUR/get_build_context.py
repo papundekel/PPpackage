@@ -3,7 +3,6 @@ from collections.abc import AsyncIterable
 from aiosqlite import Connection
 from asyncstdlib import chain as async_chain
 from asyncstdlib import list as async_list
-
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     MetaBuildContextDetail,
@@ -71,7 +70,7 @@ async def get_build_context(
                 "chown -R builder:builder /tmp/workdir\n"
                 "cd /tmp/workdir\n"
                 "sudo --user builder makepkg || exit 20\n"
-                "chown root:root /tmp/workdir\n"
+                "chown -R root:root /tmp/workdir\n"
                 "mkdir /mnt/output\n"
                 "mv /tmp/workdir/*.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"
