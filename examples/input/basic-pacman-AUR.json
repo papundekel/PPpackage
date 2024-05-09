@@ -11,6 +11,10 @@
         {
             "translator": "pacman",
             "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "conan"
         }
     ]
 }

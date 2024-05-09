@@ -1,29 +1,30 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Iterable, Mapping
 from pathlib import Path
 from shutil import move
 from typing import Any
 
 from httpx import AsyncClient as HTTPClient
 from networkx import MultiDiGraph
-from pydantic import AnyUrl
-from sqlitedict import SqliteDict
-
-from metamanager.PPpackage.metamanager.installer import Installer
 from PPpackage.container_utils import Containerizer
-from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
-from PPpackage.metamanager.repository import Repository
-from PPpackage.metamanager.translators import Translator
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveBuildContextDetail,
     BuildContextInfo,
 )
+from pydantic import AnyUrl
+from sqlitedict import SqliteDict
+
+from metamanager.PPpackage.metamanager.installer import Installer
+from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
+from PPpackage.metamanager.repository import Repository
+from PPpackage.metamanager.translators import Translator
+from PPpackage.translator.interface.schemes import Literal
 
 from . import fetch_package, get_build_context_info, process_build_context
 
 
 async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTPClient):
     async with client.stream(
-        "GET", str(source_url), follow_redirects=True, timeout=60
+        "GET", str(source_url), follow_redirects=True, timeout=None
     ) as response:
         if not response.is_success:
             raise SubmanagerCommandFailure(
@@ -42,7 +43,7 @@ async def process_build_context_archive(
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators: Mapping[str, Translator],
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     build_options: Any,
     graph: MultiDiGraph,
 ) -> None:

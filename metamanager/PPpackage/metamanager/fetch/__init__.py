@@ -1,5 +1,6 @@
-from asyncio import create_task
+from asyncio import Lock, create_task, sleep
 from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
+from contextlib import asynccontextmanager
 from functools import singledispatch
 from hashlib import sha1
 from itertools import islice
@@ -29,7 +30,7 @@ from PPpackage.utils.validation import dump_json
 
 @singledispatch
 async def process_build_context(
-    build_context_detail: BuildContextDetail,
+    build_context: BuildContextDetail,
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
@@ -111,9 +112,9 @@ async def get_build_context(
     )
 
     build_context_processed_data = await process_build_context(
+        build_context,
         containerizer,
         containerizer_workdir,
-        build_context,
         repositories,
         translators_task,
         build_options,
@@ -147,10 +148,27 @@ async def compute_product_info(
 
 
 def hash_product_info(package: str, product_info: ProductInfo) -> str:
+    product_info_json = dump_json(product_info)
+
     hasher = sha1()
     hasher.update(package.encode())
-    hasher.update(dump_json(product_info).encode())
+    hasher.update(product_info_json.encode())
     return hasher.hexdigest()
+
+
+product_cache_register = set[str]()
+
+
+@asynccontextmanager
+async def product_cache_lock(hash: str):
+    while hash in product_cache_register:
+        await sleep(0)
+
+    product_cache_register.add(hash)
+
+    yield
+
+    product_cache_register.remove(hash)
 
 
 async def fetch_package_or_cache(
@@ -168,33 +186,35 @@ async def fetch_package_or_cache(
 
     product_info_hash = hash_product_info(package, await node_data["product_info"])
 
-    if product_info_hash not in cache_mapping:
-        product_path = (
-            Path(mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))) / "product"
-        )
+    async with product_cache_lock(product_info_hash):
+        if product_info_hash not in cache_mapping:
+            product_path = (
+                Path(mkdtemp(dir=cache_path, prefix=package.replace("/", "\\")))
+                / "product"
+            )
 
-        build_context, build_context_processed_data = await build_context_task
+            build_context, build_context_processed_data = await build_context_task
 
-        installer = await fetch_package(
-            build_context,
-            build_context_processed_data,
-            containerizer,
-            containerizer_workdir,
-            archive_client,
-            cache_mapping,
-            cache_path,
-            installers,
-            package,
-            node_data["repository"],
-            product_path,
-        )
+            installer = await fetch_package(
+                build_context,
+                build_context_processed_data,
+                containerizer,
+                containerizer_workdir,
+                archive_client,
+                cache_mapping,
+                cache_path,
+                installers,
+                package,
+                node_data["repository"],
+                product_path,
+            )
 
-        cache_mapping[product_info_hash] = product_path, installer
-        cache_mapping.commit()
+            cache_mapping[product_info_hash] = product_path, installer
+            cache_mapping.commit()
 
-        return product_path, installer
-    else:
-        return cache_mapping[product_info_hash]
+            return product_path, installer
+        else:
+            return cache_mapping[product_info_hash]
 
 
 def graph_successors(

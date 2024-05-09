@@ -159,7 +159,6 @@ async def fetch_and_install(
     if graph_path is not None:
         write_graph_to_file(graph, graph_path)
 
-    return
     fetch(
         containerizer,
         containerizer_workdir,

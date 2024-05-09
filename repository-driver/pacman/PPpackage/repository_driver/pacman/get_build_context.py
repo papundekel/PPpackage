@@ -43,9 +43,8 @@ async def get_build_context(
             response = await state.http_client.head(url, timeout=30)
         except ConnectTimeout:
             print(f"Timeout {url}", file=stderr)
-            pass
+            raise
         else:
-            print(response.status_code, file=stderr)
             if response.status_code == 200:
                 return ArchiveBuildContextDetail(AnyUrl(url), "pacman")
 

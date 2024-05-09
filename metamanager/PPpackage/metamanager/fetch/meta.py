@@ -90,6 +90,8 @@ async def fetch_package_meta(
     repository: Repository,
     destination_path: Path,
 ) -> str:
+    print(f"Building package {package}...", file=stderr)
+
     from PPpackage.metamanager.fetch_and_install import fetch_and_install
 
     (
@@ -136,6 +138,8 @@ async def fetch_package_meta(
             "r"
         ) as file:
             installer = file.read()
+
+    print(f"Built package {package}", file=stderr)
 
     return installer
 
