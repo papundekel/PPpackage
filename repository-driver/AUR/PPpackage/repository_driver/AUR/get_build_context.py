@@ -65,12 +65,12 @@ async def get_build_context(
             command=[
                 "bash",
                 "-c",
-                "groupadd users\n"
                 "useradd builder\n"
-                f"sudo --user builder git clone https://aur.archlinux.org/{name}.git /mnt/output/workdir || exit 10\n"
-                "cd /mnt/output/workdir\n"
+                f"sudo --user builder git clone https://aur.archlinux.org/{name}.git /tmp/workdir || exit 10\n"
+                "cd /tmp/workdir\n"
                 "sudo --user builder makepkg || exit 20\n"
-                "mv /mnt/output/workdir/*.pkg.* /mnt/output/product\n"
+                "chown root:root /tmp/workdir\n"
+                "mv /tmp/workdir/*.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"
                 "echo -n pacman > /mnt/output/installer\n",
             ],
