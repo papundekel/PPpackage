@@ -1,4 +1,5 @@
 from pathlib import Path
+from sys import stderr
 from typing import Any
 from typing import cast as type_cast
 
@@ -41,6 +42,11 @@ class Containerizer:
                 )
 
             return_code = container.wait()
+
+            x = container.logs(stdout=False, stderr=True)
+
+            print("logs:", file=stderr)
+            print(x, file=stderr)
 
             container.remove()
 
