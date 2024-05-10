@@ -65,6 +65,7 @@ async def get_build_context(
             command=[
                 "bash",
                 "-c",
+                "ls -l / 1>&2\n"
                 "ls -l /etc 1>&2\n"
                 "ls -l /etc/ssl 1>&2\n"
                 "ls -l /etc/ssl/certs 1>&2\n"
