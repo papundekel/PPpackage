@@ -43,10 +43,11 @@ class Containerizer:
 
             return_code = container.wait()
 
-            x = container.logs(stdout=False, stderr=True)
+            logs = container.logs(stdout=False, stderr=True, stream=True)
 
             print("logs:", file=stderr)
-            print(x, file=stderr)
+            for chunk in logs:
+                stderr.write(type_cast(bytes, chunk).decode("utf-8"))
 
             container.remove()
 
