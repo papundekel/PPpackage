@@ -126,7 +126,7 @@ async def fetch_package_meta(
             model,
         )
 
-        stderr.write(f"Building package {package}...\n")
+        stderr.write(f"Building package {package} in {build_context_root_path}...\n")
 
         return_code = containerizer.run(
             build_context.command,
