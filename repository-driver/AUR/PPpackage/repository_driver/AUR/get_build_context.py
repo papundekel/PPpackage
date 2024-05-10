@@ -65,6 +65,7 @@ async def get_build_context(
             command=[
                 "bash",
                 "-c",
+                "ls -l /etc/ssl/certs/ca-certificates.crt 1>&2\n"
                 "useradd builder\n"
                 f"git clone https://aur.archlinux.org/{name}.git /tmp/workdir || exit 10\n"
                 "chown -R builder:builder /tmp/workdir\n"
