@@ -1,4 +1,4 @@
-from asyncio import create_task, sleep
+from asyncio import Lock, create_task, sleep
 from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager
 from functools import singledispatch
@@ -159,20 +159,15 @@ def hash_product_info(package: str, product_info: ProductInfo) -> str:
     return hasher.hexdigest()
 
 
-product_cache_register = set[str]()
+product_cache_register = dict[str, Lock]()
 
 
 @asynccontextmanager
 async def product_cache_lock(hash: str):
-    while hash in product_cache_register:
-        stderr.write(f"Waiting for product {hash} to be cached...\n")
-        await sleep(0)
+    lock = product_cache_register.setdefault(hash, Lock())
 
-    product_cache_register.add(hash)
-
-    yield
-
-    product_cache_register.remove(hash)
+    async with lock:
+        yield
 
 
 async def fetch_package_or_cache(
