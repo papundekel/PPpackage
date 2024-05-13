@@ -31,11 +31,16 @@ async def get_build_context(
     if requirements is None:
         raise Exception(f"Recipe not found: {revision}")
 
+    full_revision = f"{revision}#{revision.revision}"
+
     return MetaBuildContextDetail(
         list(
             chain(
                 [
                     Requirement("pacman", {"package": "conan", "no_provide": None}),
+                    Requirement(
+                        "pacman", {"package": "ca-certificates", "no_provide": None}
+                    ),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),
@@ -59,10 +64,10 @@ async def get_build_context(
             "-c",
             "set -o pipefail\n"
             "conan profile detect\n"
-            f"if ! package_id=$(conan install --requires {revision} --build {revision} --format json | "
+            f"if ! package_id=$(conan install --requires {full_revision} --build {full_revision} --format json | "
             "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 10; fi\n"
             "mkdir /mnt/output\n"
-            f'conan cache save {revision}:"$package_id" --file /mnt/output/product || exit 20'
+            f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 20'
             "echo -n conan > /mnt/output/installer\n",
         ],
     )
