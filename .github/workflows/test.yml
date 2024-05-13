@@ -146,7 +146,7 @@ jobs:
 
             - name: Create directories
               run: |
-                  mkdir -p root/ output/ cache/
+                  mkdir -p root/ output/ cache/ workdir/
                   mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
 
             - name: Update archlinux core database
@@ -218,7 +218,7 @@ jobs:
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
                   run --rm
-                  -T metamanager < examples/input/basic-pacman-AUR.json
+                  -T metamanager < examples/input/basic-pacman.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache

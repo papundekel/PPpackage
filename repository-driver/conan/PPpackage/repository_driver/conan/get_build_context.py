@@ -35,7 +35,7 @@ async def get_build_context(
         list(
             chain(
                 [
-                    Requirement("pacman", "conan"),
+                    Requirement("pacman", {"package": "conan", "no_provide": None}),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),

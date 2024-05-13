@@ -106,7 +106,9 @@ async def fetch_package_meta(
     ) = processed_data
 
     with TemporaryDirectory(containerizer_workdir) as build_context_root_path:
-        stderr.write(f"Fetching and installing build context for {package}...\n")
+        stderr.write(
+            f"Fetching and installing build context for {package} to {build_context_root_path}...\n"
+        )
 
         chmod(build_context_root_path, 0o755)
 
@@ -132,12 +134,15 @@ async def fetch_package_meta(
             build_context.command,
             stdin=None,
             rootfs=str(containerizer.translate(build_context_root_path)),
+            remove=False,
         )
 
         if return_code != 0:
             raise Exception(
                 f"Failed to build package {package}, return code: {return_code}"
             )
+
+        stderr.write(f"Built package {package}.\n")
 
         move(build_context_root_path / "mnt" / "output" / "product", destination_path)
 

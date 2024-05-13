@@ -30,7 +30,7 @@ services:
               target: /mnt/cache/
 
             - type: bind
-              source: /tmp/
+              source: $PWD/workdir/
               target: /mnt/workdir/
 
             - type: bind

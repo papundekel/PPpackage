@@ -19,6 +19,7 @@ class Containerizer:
         image: str | None = None,
         stdin: bytes | None = None,
         mounts: list[Any] | None = None,
+        remove: bool = True,
         **kwargs,
     ) -> int:
         with PodmanClient(base_url=str(self.config.url)) as client:
@@ -43,13 +44,14 @@ class Containerizer:
 
             return_code = container.wait()
 
-            logs = container.logs(stdout=False, stderr=True, stream=True)
+            # logs = container.logs(stdout=False, stderr=True, stream=True)
 
-            print("logs:", file=stderr)
-            for chunk in logs:
-                stderr.write(type_cast(bytes, chunk).decode("utf-8"))
+            # print("logs:", file=stderr)
+            # for chunk in logs:
+            #     stderr.write(type_cast(bytes, chunk).decode("utf-8"))
 
-            container.remove()
+            if remove:
+                container.remove()
 
             return return_code
 

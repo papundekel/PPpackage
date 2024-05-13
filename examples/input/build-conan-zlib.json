@@ -2,7 +2,14 @@
     "requirements": [
         {
             "translator": "pacman",
-            "value": "sh"
+            "value": {
+                "package": "conan",
+                "no_provide": null
+            }
+        },
+        {
+            "translator": "pacman",
+            "value": "bash"
         },
         {
             "translator": "pacman",
@@ -10,14 +17,7 @@
         },
         {
             "translator": "pacman",
-            "value": "sh"
-        },
-        {
-            "translator": "pacman",
-            "value": {
-                "package": "conan",
-                "no_provide": null
-            }
+            "value": "jq"
         }
     ]
 }

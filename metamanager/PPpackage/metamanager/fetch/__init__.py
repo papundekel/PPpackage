@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from functools import singledispatch
 from hashlib import sha1
 from pathlib import Path
+from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
@@ -24,6 +25,7 @@ from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
+from PPpackage.utils.utils import rmtree
 from PPpackage.utils.validation import dump_json
 
 
@@ -163,6 +165,7 @@ product_cache_register = set[str]()
 @asynccontextmanager
 async def product_cache_lock(hash: str):
     while hash in product_cache_register:
+        stderr.write(f"Waiting for product {hash} to be cached...\n")
         await sleep(0)
 
     product_cache_register.add(hash)
@@ -187,29 +190,37 @@ async def fetch_package_or_cache(
 
     async with product_cache_lock(product_info_hash):
         if product_info_hash not in cache_mapping:
-            product_path = (
-                Path(mkdtemp(dir=cache_path, prefix=package.replace("/", "\\")))
-                / "product"
-            )
+            stderr.write(f"Fetching package {package}...\n")
 
-            build_context, build_context_processed_data = await build_context_task
-
-            installer = await fetch_package(
-                build_context,
-                build_context_processed_data,
-                containerizer,
-                containerizer_workdir,
-                archive_client,
-                cache_mapping,
-                cache_path,
-                installers,
-                package,
-                node_data["repository"],
-                product_path,
+            product_directory_path = Path(
+                mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))
             )
+            product_path = product_directory_path / "product"
+
+            try:
+                build_context, build_context_processed_data = await build_context_task
+
+                installer = await fetch_package(
+                    build_context,
+                    build_context_processed_data,
+                    containerizer,
+                    containerizer_workdir,
+                    archive_client,
+                    cache_mapping,
+                    cache_path,
+                    installers,
+                    package,
+                    node_data["repository"],
+                    product_path,
+                )
+            except:
+                rmtree(product_directory_path)
+                raise
 
             cache_mapping[product_info_hash] = product_path, installer
             cache_mapping.commit()
+
+            stderr.write(f"Fetched package {package}.\n")
 
             return product_path, installer
         else:

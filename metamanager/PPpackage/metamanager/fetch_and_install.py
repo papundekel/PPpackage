@@ -149,9 +149,9 @@ async def fetch_and_install(
         repositories, repository_to_translated_options, model
     )
 
-    stderr.write("Resolved packages:\n")
-    for package in sorted(graph.nodes):
-        stderr.write(f"\t{package}\n")
+    # stderr.write("Resolved packages:\n")
+    # for package in sorted(graph.nodes):
+    #     stderr.write(f"\t{package}\n")
 
     create_dependencies(graph)
 

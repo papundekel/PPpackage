@@ -96,6 +96,8 @@ async def solve(
     translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     formula: AsyncIterable[list[Literal]],
 ) -> Set[str]:
+    containerizer_workdir.mkdir(parents=True, exist_ok=True)
+
     with TemporaryDirectory(containerizer_workdir) as mount_dir_path:
         formula_path = mount_dir_path / "formula"
         assumptions_path = mount_dir_path / "assumptions"

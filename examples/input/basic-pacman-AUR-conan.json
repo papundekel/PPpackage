@@ -14,7 +14,10 @@
         },
         {
             "translator": "pacman",
-            "value": "conan"
+            "value": {
+                "package": "conan",
+                "no_provide": null
+            }
         },
         {
             "translator": "conan",
