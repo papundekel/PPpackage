@@ -41,6 +41,7 @@ async def get_build_context(
                     Requirement(
                         "pacman", {"package": "ca-certificates", "no_provide": None}
                     ),
+                    Requirement("pacman", "gcc"),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),
