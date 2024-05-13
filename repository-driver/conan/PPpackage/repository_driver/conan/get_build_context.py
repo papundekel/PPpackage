@@ -74,6 +74,6 @@ async def get_build_context(
             f"if ! package_id=$(conan install --requires {full_revision} --build {full_revision} --format json | "
             "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 20; fi\n"
             f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 30'
-            "chmod -R root:root ~/.conan2",
+            "chown -R root:root ~/.conan2",
         ],
     )
