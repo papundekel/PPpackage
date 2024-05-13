@@ -42,9 +42,12 @@ async def get_build_context(
                         "pacman", {"package": "ca-certificates", "no_provide": None}
                     ),
                     Requirement("pacman", "gcc"),
+                    Requirement("pacman", "cmake"),
+                    Requirement("pacman", "make"),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),
+                    Requirement("pacman", "yq"),
                 ],
                 (
                     Requirement(
@@ -63,12 +66,14 @@ async def get_build_context(
         command=[
             "bash",
             "-c",
+            "mkdir /mnt/output\n"
+            "echo -n conan > /mnt/output/installer || exit 40\n"
             "set -o pipefail\n"
             "conan profile detect\n"
+            'yq --yaml-roundtrip --in-place \'.compiler.gcc.version += ["14", "14.1"]\' ~/.conan2/settings.yml || exit 10\n'
             f"if ! package_id=$(conan install --requires {full_revision} --build {full_revision} --format json | "
-            "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 10; fi\n"
-            "mkdir /mnt/output\n"
-            f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 20'
-            "echo -n conan > /mnt/output/installer\n",
+            "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 20; fi\n"
+            f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 30'
+            "chmod -R root:root ~/.conan2",
         ],
     )
