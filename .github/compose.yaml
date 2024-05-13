@@ -7,7 +7,7 @@ services:
             - --config
             - /mnt/config.json
         environment:
-            CONTAINERIZER_ROOT: $PWD/root/
+            WORKING_DIRECTORY: $PWD
         volumes:
             - type: bind
               source: $PWD/root/
