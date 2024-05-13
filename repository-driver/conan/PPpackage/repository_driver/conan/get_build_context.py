@@ -58,6 +58,7 @@ async def get_build_context(
             "bash",
             "-c",
             "set -o pipefail\n"
+            "conan profile detect\n"
             f"if ! package_id=$(conan install --requires {revision} --build {revision} --format json | "
             "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 10; fi\n"
             "mkdir /mnt/output\n"
