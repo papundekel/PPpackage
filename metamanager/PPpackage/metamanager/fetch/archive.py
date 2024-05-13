@@ -1,3 +1,4 @@
+from asyncio import Lock
 from collections.abc import Awaitable, Iterable, Mapping
 from pathlib import Path
 from shutil import move
@@ -21,20 +22,23 @@ from PPpackage.translator.interface.schemes import Literal
 
 from . import fetch_package, get_build_context_info, process_build_context
 
+lock = Lock()
+
 
 async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTPClient):
-    async with client.stream(
-        "GET", str(source_url), follow_redirects=True, timeout=None
-    ) as response:
-        if not response.is_success:
-            raise SubmanagerCommandFailure(
-                f"Failed to fetch archive {source_url}.\n"
-                f"{(await response.aread()).decode()}"
-            )
+    async with lock:
+        async with client.stream(
+            "GET", str(source_url), follow_redirects=True, timeout=None
+        ) as response:
+            if not response.is_success:
+                raise SubmanagerCommandFailure(
+                    f"Failed to fetch archive {source_url}.\n"
+                    f"{(await response.aread()).decode()}"
+                )
 
-        with destination_path.open("wb") as file:
-            async for chunk in response.aiter_raw():
-                file.write(chunk)
+            with destination_path.open("wb") as file:
+                async for chunk in response.aiter_raw():
+                    file.write(chunk)
 
 
 @process_build_context.register
