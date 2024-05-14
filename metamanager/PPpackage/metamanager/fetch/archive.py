@@ -1,4 +1,4 @@
-from asyncio import Lock, Semaphore
+from asyncio import Semaphore
 from collections.abc import Awaitable, Iterable, Mapping
 from pathlib import Path
 from shutil import move
@@ -22,7 +22,7 @@ from PPpackage.translator.interface.schemes import Literal
 
 from . import fetch_package, get_build_context_info, process_build_context
 
-semaphore = Lock()
+semaphore = Semaphore(1)
 
 
 async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTPClient):
