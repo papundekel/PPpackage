@@ -65,26 +65,6 @@ services:
             - type: volume
               source: cache-conancenter
               target: /mnt/cache/
-    pp:
-        image: docker.io/fackop/pppackage-repository-driver-pp:latest
-        healthcheck:
-            test: ["CMD", "curl", "http://localhost:8888"]
-        command:
-            - 0.0.0.0:8888
-        environment:
-            CONFIG_PATH: /mnt/config.json
-        ports:
-            - 8888
-        volumes:
-            - type: bind
-              source: $CONFIG_PP
-              target: /mnt/config.json
-            - type: volume
-              source: database-pp
-              target: /mnt/database/
-            - type: volume
-              source: cache-pp
-              target: /mnt/cache/
     metamanager:
         image: docker.io/fackop/pppackage-metamanager:latest
         depends_on:
@@ -95,8 +75,6 @@ services:
             aur:
                 condition: service_healthy
             conancenter:
-                condition: service_healthy
-            pp:
                 condition: service_healthy
         command:
             - /mnt/root/
@@ -122,7 +100,5 @@ services:
 volumes:
     database-archlinux-core:
     database-archlinux-extra:
-    database-pp:
 
-    cache-conan:
-    cache-pp:
+    cache-conancenter:

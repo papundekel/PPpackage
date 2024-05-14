@@ -5,9 +5,6 @@
         },
         "conan": {
             "package": "PPpackage.translator.conan"
-        },
-        "PP": {
-            "package": "PPpackage.translator.PP"
         }
     },
     "installers": {
@@ -24,9 +21,6 @@
                     ]
                 }
             }
-        },
-        "simple": {
-            "package": "PPpackage.installer.simple"
         }
     },
     "repositories": [
@@ -45,10 +39,6 @@
         {
             "name": "conancenter",
             "url": "http://conancenter:8888"
-        },
-        {
-            "name": "PP",
-            "url": "http://pp:8888"
         }
     ]
 }

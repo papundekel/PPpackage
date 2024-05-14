@@ -44,12 +44,6 @@ class Containerizer:
 
             return_code = container.wait()
 
-            # logs = container.logs(stdout=False, stderr=True, stream=True)
-
-            # print("logs:", file=stderr)
-            # for chunk in logs:
-            #     stderr.write(type_cast(bytes, chunk).decode("utf-8"))
-
             if remove:
                 container.remove()
 

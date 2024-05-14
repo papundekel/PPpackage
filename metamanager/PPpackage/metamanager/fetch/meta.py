@@ -95,6 +95,7 @@ async def fetch_package_meta(
     repository: Repository,
     destination_path: Path,
 ) -> str:
+    from PPpackage.metamanager.create_graph import create_graph
     from PPpackage.metamanager.fetch_and_install import fetch_and_install
 
     (
@@ -106,29 +107,30 @@ async def fetch_package_meta(
     ) = processed_data
 
     with TemporaryDirectory(containerizer_workdir) as build_context_root_path:
-        stderr.write(
-            f"Fetching and installing build context for {package} to {build_context_root_path}...\n"
-        )
+        stderr.write(f"Creating build context for {package}...\n")
 
         chmod(build_context_root_path, 0o755)
+
+        graph = await create_graph(
+            repositories, repository_to_translated_options, model
+        )
 
         await fetch_and_install(
             containerizer,
             containerizer_workdir,
-            archive_client,
-            cache_mapping,
-            product_cache_path,
             repositories,
             repository_to_translated_options,
             translators_task,
             installers,
-            build_context_root_path,
-            None,
+            cache_mapping,
+            archive_client,
+            product_cache_path,
             build_options,
-            model,
+            build_context_root_path,
+            graph,
         )
 
-        stderr.write(f"Building package {package} in {build_context_root_path}...\n")
+        stderr.write(f"Building package {package}...\n")
 
         return_code = containerizer.run(
             build_context.command,
@@ -141,8 +143,6 @@ async def fetch_package_meta(
             raise Exception(
                 f"Failed to build package {package}, return code: {return_code}"
             )
-
-        stderr.write(f"Built package {package}.\n")
 
         move(build_context_root_path / "mnt" / "output" / "product", destination_path)
 

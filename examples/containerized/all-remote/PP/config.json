@@ -1,9 +1,0 @@
-{
-    "driver": {
-        "package": "PPpackage.PP"
-    },
-    "parameters": {
-        "database_path": "/mnt/database/",
-        "cache_path": "/mnt/cache/"
-    }
-}

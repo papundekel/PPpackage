@@ -1,14 +1,6 @@
 {
     "requirements": [
         {
-            "translator": "PP",
-            "value": "p1"
-        },
-        {
-            "translator": "PP",
-            "value": "p2"
-        },
-        {
             "translator": "pacman",
             "value": "sh"
         },

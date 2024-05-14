@@ -1,4 +1,4 @@
-from asyncio import Lock, create_task, sleep
+from asyncio import Lock, TaskGroup
 from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
 from contextlib import asynccontextmanager
 from functools import singledispatch
@@ -185,8 +185,6 @@ async def fetch_package_or_cache(
 
     async with product_cache_lock(product_info_hash):
         if product_info_hash not in cache_mapping:
-            stderr.write(f"Fetching package {package}...\n")
-
             product_directory_path = Path(
                 mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))
             )
@@ -215,14 +213,13 @@ async def fetch_package_or_cache(
             cache_mapping[product_info_hash] = product_path, installer
             cache_mapping.commit()
 
-            stderr.write(f"Fetched package {package}.\n")
-
             return product_path, installer
         else:
             return cache_mapping[product_info_hash]
 
 
 def fetch(
+    task_group: TaskGroup,
     containerizer: Containerizer,
     containerizer_workdir: Path,
     repositories: Iterable[Repository],
@@ -241,7 +238,7 @@ def fetch(
 
             dependencies = graph_successors(graph, package)
 
-            runtime_product_infos_task = create_task(
+            runtime_product_infos_task = task_group.create_task(
                 create_dependency_product_infos(
                     node_data["detail"].dependencies, dependencies
                 )
@@ -250,7 +247,7 @@ def fetch(
             repository = node_data["repository"]
             translated_options = repository_to_translated_options[repository]
 
-            build_context_task = create_task(
+            build_context_task = task_group.create_task(
                 get_build_context(
                     containerizer,
                     containerizer_workdir,
@@ -265,7 +262,7 @@ def fetch(
                 )
             )
 
-            node_data["product_info"] = create_task(
+            node_data["product_info"] = task_group.create_task(
                 compute_product_info(
                     package,
                     build_context_task,
@@ -275,7 +272,7 @@ def fetch(
                 )
             )
 
-            node_data["product"] = create_task(
+            node_data["product"] = task_group.create_task(
                 fetch_package_or_cache(
                     containerizer,
                     containerizer_workdir,
