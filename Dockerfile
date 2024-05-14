@@ -111,9 +111,6 @@ RUN pip install repository-driver/AUR/
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
 
-COPY repository-driver/PP/ /workdir/repository-driver/PP
-RUN pip install repository-driver/PP/
-
 
 
 ENTRYPOINT [ "python", "-m", "PPpackage.repository_driver.update" ]
