@@ -44,6 +44,7 @@ async def get_build_context(
                     Requirement("pacman", "gcc"),
                     Requirement("pacman", "cmake"),
                     Requirement("pacman", "make"),
+                    Requirement("pacman", "perl"),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),
