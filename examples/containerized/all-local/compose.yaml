@@ -33,20 +33,12 @@ services:
             - type: volume
               source: database-archlinux-extra
               target: /mnt/repositories/database/archlinux-extra/
-            - type: volume
-              source: database-pp
-              target: /mnt/repositories/database/PP/
 
             - type: volume
-              source: cache-conan
+              source: cache-conancenter
               target: /mnt/repositories/cache/conan/
-            - type: volume
-              source: cache-pp
-              target: /mnt/repositories/cache/PP/
 volumes:
     database-archlinux-core:
     database-archlinux-extra:
-    database-pp:
 
-    cache-conan:
-    cache-pp:
+    cache-conancenter:

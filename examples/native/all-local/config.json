@@ -13,9 +13,6 @@
         },
         "conan": {
             "package": "PPpackage.repository_driver.conan"
-        },
-        "PP": {
-            "package": "PPpackage.repository_driver.PP"
         }
     },
     "requirement_translators": {
@@ -24,9 +21,6 @@
         },
         "conan": {
             "package": "PPpackage.translator.conan"
-        },
-        "PP": {
-            "package": "PPpackage.translator.PP"
         }
     },
     "installers": {
@@ -40,9 +34,6 @@
         },
         "conan": {
             "package": "PPpackage.installer.conan"
-        },
-        "simple": {
-            "package": "PPpackage.installer.simple"
         }
     },
     "repositories": [
@@ -85,15 +76,6 @@
             },
             "formula_cache_path": "tmp/cache/formula/conancenter.db",
             "translator_data_cache_path": "tmp/cache/translator-data/conancenter.db"
-        },
-        {
-            "driver": "PP",
-            "parameters": {
-                "database_path": "tmp/database/PP",
-                "cache_path": "tmp/cache/repository/PP"
-            },
-            "formula_cache_path": "tmp/cache/formula/PP.db",
-            "translator_data_cache_path": "tmp/cache/translator-data/PP.db"
         }
     ]
 }

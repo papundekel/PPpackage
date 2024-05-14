@@ -89,24 +89,6 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 # -----------------------------------------------------------------------------
 
-FROM base-python AS repository-driver-pp
-
-COPY utils/ /workdir/utils
-RUN pip install utils/
-
-COPY repository-driver/interface/ /workdir/repository-driver/interface
-RUN pip install repository-driver/interface/
-
-COPY repository-driver/server/ /workdir/repository-driver/server
-RUN pip install repository-driver/server/
-
-COPY repository-driver/PP/ /workdir/repository-driver/PP
-RUN pip install repository-driver/PP/
-
-ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "--bind"]
-
-# -----------------------------------------------------------------------------
-
 FROM base-python AS updater
 
 COPY utils/ /workdir/utils
@@ -128,9 +110,6 @@ RUN pip install repository-driver/AUR/
 
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
-
-COPY repository-driver/PP/ /workdir/repository-driver/PP
-RUN pip install repository-driver/PP/
 
 
 
@@ -189,9 +168,6 @@ RUN pip install repository-driver/AUR/
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
 
-COPY repository-driver/PP/ /workdir/repository-driver/PP
-RUN pip install repository-driver/PP/
-
 
 
 COPY translator/interface/ /workdir/translator/interface
@@ -203,9 +179,6 @@ RUN pip install translator/pacman/
 COPY translator/conan/ /workdir/translator/conan
 RUN pip install translator/conan/
 
-COPY translator/PP/ /workdir/translator/PP
-RUN pip install translator/PP/
-
 
 
 COPY installer/interface/ /workdir/installer/interface
@@ -216,9 +189,6 @@ RUN pip install installer/pacman/
 
 COPY installer/conan/ /workdir/installer/conan
 RUN pip install installer/conan/
-
-COPY installer/simple/ /workdir/installer/simple
-RUN pip install installer/simple/
 
 
 

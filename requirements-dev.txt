@@ -11,7 +11,6 @@
 
 -e ./repository-driver/conan/
 -e ./repository-driver/pacman/
--e ./repository-driver/PP/
 -e ./repository-driver/AUR/
 
 
@@ -20,7 +19,6 @@
 
 -e ./installer/pacman/
 -e ./installer/conan/
--e ./installer/simple/
 
 
 
@@ -28,7 +26,6 @@
 
 -e ./translator/pacman/
 -e ./translator/conan/
--e ./translator/PP/
 
 
 -e ./metamanager/

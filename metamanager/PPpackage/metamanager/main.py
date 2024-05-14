@@ -12,6 +12,7 @@ from sqlitedict import SqliteDict
 
 from PPpackage.utils.validation import validate_json
 
+from .create_graph import create_graph, write_graph_to_file
 from .fetch_and_install import fetch_and_install
 from .installer import Installers
 from .repository import Repositories
@@ -101,22 +102,35 @@ async def main(
             product_cache_path.mkdir(parents=True, exist_ok=True)
 
             with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
+                stderr.write("Creating graph...\n")
+
+                graph = await create_graph(
+                    repositories, repository_to_translated_options, model
+                )
+
+                stderr.write("Resolved packages:\n")
+                for package in sorted(graph.nodes):
+                    stderr.write(f"\t{package}\n")
+
+                if graph_path is not None:
+                    write_graph_to_file(graph, graph_path)
+                    stderr.write(f"Graph written to {graph_path}.\n")
+
                 stderr.write("Fetching and installing...\n")
 
                 await fetch_and_install(
                     containerizer,
                     config.containerizer_workdir,
-                    archive_client,
-                    cache_mapping,
-                    config.product_cache_path,
                     repositories,
                     repository_to_translated_options,
                     translators_task,
                     installers,
-                    installation_path,
-                    graph_path,
+                    cache_mapping,
+                    archive_client,
+                    config.product_cache_path,
                     input.build_options,
-                    model,
+                    installation_path,
+                    graph,
                 )
 
     if generators_path is not None:
