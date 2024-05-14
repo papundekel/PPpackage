@@ -22,7 +22,7 @@ from PPpackage.translator.interface.schemes import Literal
 
 from . import fetch_package, get_build_context_info, process_build_context
 
-semaphore = Semaphore(10)
+semaphore = Semaphore(5)
 
 
 async def download_file(source_url: AnyUrl, destination_path: Path, client: HTTPClient):
