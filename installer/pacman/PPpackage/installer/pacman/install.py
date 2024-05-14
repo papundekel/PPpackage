@@ -4,8 +4,7 @@ from pathlib import Path
 from sys import stderr
 
 from asyncstdlib import list as async_list
-from PPpackage.container_utils.run import run as container_run
-from PPpackage.container_utils.translate import translate
+from PPpackage.container_utils import Containerizer
 
 from PPpackage.installer.interface.exceptions import InstallerException
 from PPpackage.utils.asyncio_stream import start_unix_server
@@ -35,7 +34,7 @@ def create_necessary_container_files(root_path: Path):
 
 
 async def install_manager_command(
-    containerizer_config: ContainerizerConfig,
+    containerizer: Containerizer,
     installation_path: Path,
     reader: Reader,
     writer: Writer,
@@ -52,13 +51,10 @@ async def install_manager_command(
             pipe_hook_path.open("rb") as pipe_hook,
             create_necessary_container_files(installation_path),
         ):
-            return_code = container_run(
-                containerizer_config.url,
+            return_code = containerizer.run(
                 [command, *args],
                 stdin=pipe_hook.read(),
-                rootfs=str(
-                    translate(containerizer_config.path_translations, installation_path)
-                ),
+                rootfs=str(containerizer.translate(installation_path)),
             )
 
     await writer.write(dump_one(return_code))
@@ -75,12 +71,14 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
 
     database_path.mkdir(parents=True, exist_ok=True)
 
+    containerizer = Containerizer(parameters.containerizer)
+
     with TemporaryDirectory() as server_socket_directory_path:
         server_socket_path = server_socket_directory_path / "server.sock"
 
         server = await start_unix_server(
             lambda reader, writer: install_manager_command(
-                parameters.containerizer, installation_path, reader, writer
+                containerizer, installation_path, reader, writer
             ),
             server_socket_path,
         )

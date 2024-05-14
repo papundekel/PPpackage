@@ -17,10 +17,16 @@ async def query_packages(connection: Connection) -> AsyncIterable[tuple[str, str
             yield row[0], row[1]
 
 
-async def query_provides(connection: Connection) -> AsyncIterable[str]:
-    async with connection.execute("SELECT provide FROM provides") as cursor:
+async def query_provides(connection: Connection) -> AsyncIterable[tuple[str, str, str]]:
+    async with connection.execute(
+        """
+        SELECT packages.name, version, provide
+        FROM packages JOIN provides
+        ON packages.name = provides.name
+        """
+    ) as cursor:
         async for row in cursor:
-            yield row[0]
+            yield row[0], row[1], row[2]
 
 
 async def fetch_translator_data(
@@ -34,17 +40,19 @@ async def fetch_translator_data(
     async with transaction(connection):
         epoch_result.set(await get_epoch(connection))
 
-        async for package_name, package_version in query_packages(connection):
-            yield TranslatorInfo(
-                f"pacman-real-{package_name}",
-                {"version": package_version},
-            )
+        async for name, version in query_packages(connection):
+            yield TranslatorInfo(f"pacman-{name}", {"version": version, "AUR": ""})
 
-        async for provide in query_provides(connection):
+        async for name, version, provide in query_provides(connection):
+            provider = f"{name}-{version}"
+
             match parse_provide(provide):
-                case library, version:
+                case provide_name, provide_version:
                     yield TranslatorInfo(
-                        f"pacman-virtual-{library}", {"version": version}
+                        f"pacman-{provide_name}",
+                        {"provider": provider, "version": provide_version, "AUR": ""},
                     )
-                case str():
-                    yield TranslatorInfo(f"pacman-virtual-{provide}", {})
+                case provide_name:
+                    yield TranslatorInfo(
+                        f"pacman-{provide_name}", {"provider": provider, "AUR": ""}
+                    )

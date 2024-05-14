@@ -7,7 +7,7 @@ services:
             - --config
             - /mnt/config.json
         environment:
-            CONTAINERIZER_ROOT: $PWD/root/
+            WORKING_DIRECTORY: $PWD
         volumes:
             - type: bind
               source: $PWD/root/
@@ -28,6 +28,10 @@ services:
             - type: bind
               source: $PWD/cache/
               target: /mnt/cache/
+
+            - type: bind
+              source: $PWD/workdir/
+              target: /mnt/workdir/
 
             - type: bind
               source: $PWD/database/archlinux-core/

@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from collections.abc import (
     AsyncIterable,
+    Awaitable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -8,198 +9,153 @@ from collections.abc import (
     Sequence,
     Set,
 )
-from itertools import chain
+from pathlib import Path
 from sys import stderr
 from typing import Any
-from typing import cast as type_cast
 
-from asyncstdlib import chain as async_chain
-from asyncstdlib import islice as async_islice
-from asyncstdlib import min as async_min
-from asyncstdlib import sync as make_async
-from networkx import MultiDiGraph
-from pysat.formula import And, Atom, Equals, Formula, Implies, Neg, Or, XOr
-from pysat.solvers import Solver
+from PPpackage.container_utils import Containerizer
+from PPpackage.repository_driver.interface.schemes import Requirement
 
-from PPpackage.repository_driver.interface.schemes import Requirement, SimpleRequirement
-from PPpackage.repository_driver.interface.utils import (
-    RequirementVisitor,
-    visit_requirements,
-)
+from metamanager.PPpackage.metamanager.exceptions import NoModelException
+from PPpackage.translator.interface.schemes import Literal
+from PPpackage.utils.utils import Result, TemporaryDirectory
 
-from .exceptions import SubmanagerCommandFailure
+from .build_formula import build_formula
 from .repository import Repository
+from .translate_options import translate_options
 from .translators import Translator
 
 
-async def repository_fetch_translator_data(
-    repository: Repository,
-    translator_info: MutableMapping[str, MutableSequence[dict[str, str]]],
+def get_variable_int(
+    mapping_to_int: MutableMapping[str, int],
+    mapping_to_string: MutableSequence[str],
+    variable: str,
+) -> int:
+    value = mapping_to_int.get(variable)
+
+    if value is None:
+        value = len(mapping_to_string) + 1
+        mapping_to_int[variable] = value
+        mapping_to_string.append(variable)
+
+    return value
+
+
+async def save_to_dimacs(
+    formula: AsyncIterable[list[Literal]], path: Path
+) -> tuple[Mapping[str, int], Sequence[str]]:
+    mapping_to_int = dict[str, int]()
+    mapping_to_string = list[str]()
+    clause_count = 0
+
+    formula_mapped = list[list[int]]()
+
+    async for clause in formula:
+        clause_mapped = list[int]()
+
+        for literal in clause:
+            symbol_mapped = get_variable_int(
+                mapping_to_int, mapping_to_string, literal.symbol
+            )
+            clause_mapped.append(symbol_mapped if literal.polarity else -symbol_mapped)
+
+        if len(clause_mapped) == 0:
+            raise NoModelException
+
+        formula_mapped.append(clause_mapped)
+
+        clause_count += 1
+
+    with path.open("w") as file:
+        file.write(f"p cnf {len(mapping_to_string)} {clause_count}\n")
+
+        for clause in formula_mapped:
+            for literal in clause:
+                file.write(f"{literal} ")
+            file.write("0\n")
+
+    return mapping_to_int, mapping_to_string
+
+
+def save_assumptions(
+    mapping_to_int: Mapping[str, int], assumptions: Iterable[Literal], path: Path
 ):
-    async for info in repository.fetch_translator_data():
-        translator_info.setdefault(info.group, []).append(info.symbol)
+    with path.open("w") as file:
+        for assumption in assumptions:
+            assumption_integer = mapping_to_int.get(assumption.symbol)
+
+            if assumption_integer is not None:
+                file.write(
+                    f"{'' if assumption.polarity else '-'}{assumption_integer}\n"
+                )
 
 
-async def fetch_translator_data(
-    repositories: Iterable[Repository],
-) -> Mapping[str, Iterable[dict[str, str]]]:
-    translator_info = dict[str, MutableSequence[dict[str, str]]]()
+async def solve(
+    containerizer: Containerizer,
+    containerizer_workdir: Path,
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
+    formula: AsyncIterable[list[Literal]],
+) -> Set[str]:
+    containerizer_workdir.mkdir(parents=True, exist_ok=True)
 
-    async with TaskGroup() as group:
-        for repository in repositories:
-            group.create_task(
-                repository_fetch_translator_data(repository, translator_info)
-            )
+    with TemporaryDirectory(containerizer_workdir) as mount_dir_path:
+        formula_path = mount_dir_path / "formula"
+        assumptions_path = mount_dir_path / "assumptions"
+        output_path = mount_dir_path / "output"
 
-    return translator_info
+        mapping_to_int, mapping_to_string = await save_to_dimacs(formula, formula_path)
 
+        _, assumptions = await translators_task
 
-async def translate_options(
-    repositories: Iterable[Repository],
-    options: Any,
-) -> None:
-    async with TaskGroup() as group:
-        for repository in repositories:
-            group.create_task(repository.translate_options(options))
+        save_assumptions(mapping_to_int, assumptions, assumptions_path)
 
-
-async def get_formula(repositories: Iterable[Repository]) -> AsyncIterable[Requirement]:
-    for repository in repositories:
-        async for requirement in repository.get_formula():
-            yield requirement
-
-
-async def translate_requirements(
-    translators: Mapping[str, Translator],
-    translator_data: Mapping[str, Iterable[dict[str, str]]],
-    formula: AsyncIterable[Requirement],
-) -> Formula:
-    async def simple_visitor(r: SimpleRequirement):
-        if r.translator == "noop":
-            return Atom(r.value)
-
-        return await translators[r.translator].translate_requirement(
-            translator_data, r.value
+        return_code = containerizer.run(
+            [],
+            image="docker.io/fackop/pppackage-solver:latest",
+            mounts=[
+                {
+                    "type": "bind",
+                    "source": str(containerizer.translate(mount_dir_path)),
+                    "target": "/mnt/",
+                }
+            ],
         )
 
-    async with TaskGroup() as group:
-        tasks = [
-            group.create_task(
-                visit_requirements(
-                    requirement,
-                    RequirementVisitor(
-                        simple_visitor=simple_visitor,
-                        negated_visitor=make_async(Neg),
-                        and_visitor=make_async(lambda x: And(*x, merge=True)),
-                        or_visitor=make_async(lambda x: Or(*x, merge=True)),
-                        xor_visitor=make_async(lambda x: XOr(*x, merge=True)),
-                        implication_visitor=make_async(Implies),
-                        equivalence_visitor=make_async(
-                            lambda x: Equals(*x, merge=True)
-                        ),
-                    ),
-                )
-            )
-            async for requirement in formula
-        ]
+        if return_code != 0:
+            raise Exception("Failed to solve")
 
-    return And(*(task.result() for task in tasks), merge=True)
-
-
-def generate_smaller_models(
-    model: Sequence[Atom | Neg],
-) -> Iterable[Sequence[Atom | Neg]]:
-    for i in range(len(model)):
-        literal = model[i]
-        if isinstance(literal, Atom):
-            yield list(
-                chain(
-                    model[:i],
-                    [type_cast(Neg, Neg(literal))],
-                    model[i + 1 :],
-                )
-            )
-
-
-def minimize_model(
-    formula: Formula, model: Sequence[Atom | Neg]
-) -> Sequence[Atom | Neg]:
-    while True:
-        smaller_model = next(
-            (x for x in generate_smaller_models(model) if formula.satisfied(x)),
-            None,
-        )
-
-        if smaller_model is None:
-            break
-
-        model = smaller_model
-
-    return model
-
-
-async def enumerate_models(formula: Formula):
-    with Solver(bootstrap_with=formula, name="glucose421") as solver:
-        for model_integers in solver.enum_models():  # type: ignore
-            model_atoms = Formula.formulas(model_integers, atoms_only=True)
-
-            # minimized_model_atoms = minimize_model(formula, model_atoms)
-            minimized_model_atoms = model_atoms
-
-            yield {
-                type_cast(str, atom.object)
-                for atom in minimized_model_atoms
-                if isinstance(atom, Atom)
+        with output_path.open("r") as file:
+            return {
+                mapping_to_string[int(variable_int) - 1]
+                for variable_int in file.readlines()
             }
 
 
-async def select_best_model(
-    models: AsyncIterable[Set[str]],
-) -> Set[str]:
-    # from models with the fewest packages
-    # select the lexicographically smallest
-    model_result: list[str] | None = await async_min(
-        (sorted(model) async for model in async_islice(models, None, 1)),  # type: ignore
-        key=lambda x: (len(x), x) if x is not None else None,  # type: ignore
-        default=None,
-    )
-
-    if model_result is None:
-        raise SubmanagerCommandFailure("No model found.")
-
-    return set(model_result)
-
-
-def create_graph(model: Set[str]):
-    graph = MultiDiGraph()
-
-    graph.add_nodes_from(model)
-
-    return graph
-
-
 async def resolve(
+    containerizer: Containerizer,
+    containerizer_workdir: Path,
     repositories: Iterable[Repository],
-    translators: Mapping[str, Translator],
-    requirements: Requirement,
+    translators_task: Awaitable[tuple[Mapping[str, Translator], Iterable[Literal]]],
     options: Any,
-) -> Set[str]:
-    stderr.write("Fetching translator data and translating options...\n")
+    requirements: Iterable[Requirement],
+) -> tuple[Mapping[Repository, Any], Set[str]]:
 
-    async with TaskGroup() as group:
-        translator_data_task = group.create_task(fetch_translator_data(repositories))
-        group.create_task(translate_options(repositories, options))
+    async with TaskGroup() as task_group:
+        repository_with_translated_options_tasks = translate_options(
+            task_group, repositories, options
+        )
 
-    formula = get_formula(repositories)
+        repository_to_translated_options_result = Result[Mapping[Repository, Any]]()
 
-    stderr.write("Fetching formula and translating requirements...\n")
+        formula = build_formula(
+            repository_with_translated_options_tasks,
+            translators_task,
+            requirements,
+            repository_to_translated_options_result,
+        )
 
-    translated_formula = await translate_requirements(
-        translators, translator_data_task.result(), async_chain([requirements], formula)
-    )
+        model = await solve(
+            containerizer, containerizer_workdir, translators_task, formula
+        )
 
-    stderr.write("Resolving...\n")
-
-    models = enumerate_models(translated_formula)
-
-    return await select_best_model(models)
+    return repository_to_translated_options_result.get(), model

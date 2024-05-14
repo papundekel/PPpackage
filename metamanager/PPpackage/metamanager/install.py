@@ -4,7 +4,7 @@ from pathlib import Path
 
 from networkx import MultiDiGraph, topological_generations
 
-from .installers import Installer
+from .installer import Installer
 from .schemes.node import NodeData
 
 

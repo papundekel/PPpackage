@@ -1,0 +1,8 @@
+{
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        }
+    ]
+}

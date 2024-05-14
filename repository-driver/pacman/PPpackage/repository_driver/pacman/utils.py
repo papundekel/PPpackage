@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-PREFIX = "pacman-real-"
+PREFIX = "pacman-"
 
 
 def strip_version(name: str) -> str:

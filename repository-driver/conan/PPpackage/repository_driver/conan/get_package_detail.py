@@ -1,13 +1,5 @@
-from itertools import chain
-
 from conans.model.recipe_ref import RecipeReference
-from conans.model.requires import Requirement
-from PPpackage.repository_driver.interface.schemes import (
-    ANDRequirement,
-    MetaOnTopProductDetail,
-    PackageDetail,
-    SimpleRequirement,
-)
+from PPpackage.repository_driver.interface.schemes import PackageDetail
 
 from .schemes import DriverParameters, Options, RepositoryParameters
 from .state import State
@@ -31,37 +23,11 @@ async def get_package_detail(
     if requirements is None:
         return None
 
-    runtime_requirements = list[Requirement]()
-    build_requirements = list[Requirement]()
-
-    for requirement in requirements:
-        if not requirement.build:
-            runtime_requirements.append(requirement)
-        else:
-            build_requirements.append(requirement)
-
     return PackageDetail(
         frozenset([f"conan-{revision.name}"]),
         frozenset(
-            f"conan-{requirement.ref.name}" for requirement in runtime_requirements
-        ),
-        MetaOnTopProductDetail(
-            ANDRequirement(
-                list(
-                    chain(
-                        [SimpleRequirement("pacman", "conan")],
-                        (
-                            SimpleRequirement(
-                                "conan",
-                                {
-                                    "package": str(requirement.ref.name),
-                                    "version": str(requirement.ref.version),
-                                },
-                            )
-                            for requirement in build_requirements
-                        ),
-                    )
-                )
-            )
+            f"conan-{requirement.ref.name}"
+            for requirement in requirements
+            if not requirement.build
         ),
     )

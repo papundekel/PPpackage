@@ -1,5 +1,19 @@
 {
     "product_cache_path": "/mnt/cache/product/",
+    "containerizer": {
+        "url": "unix:///run/podman/podman.sock",
+        "path_translations": [
+            {
+                "containerizer": "$WORKING_DIRECTORY/root",
+                "container": "/mnt/root/"
+            },
+            {
+                "containerizer": "$WORKING_DIRECTORY/workdir",
+                "container": "/mnt/workdir/"
+            }
+        ]
+    },
+    "containerizer_workdir": "/mnt/workdir/",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"
@@ -33,12 +47,19 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "$CONTAINERIZER_ROOT",
-                            "container": "/mnt/root"
+                            "containerizer": "$WORKING_DIRECTORY/root",
+                            "container": "/mnt/root/"
+                        },
+                        {
+                            "containerizer": "$WORKING_DIRECTORY/workdir",
+                            "container": "/mnt/workdir/"
                         }
                     ]
                 }
             }
+        },
+        "conan": {
+            "package": "PPpackage.installer.conan"
         },
         "simple": {
             "package": "PPpackage.installer.simple"

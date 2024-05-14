@@ -4,18 +4,20 @@ from typing import Any, AsyncIterable
 
 from PPpackage.repository_driver.interface.interface import Interface
 from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
+    BuildContextDetail,
+    BuildContextInfo,
     PackageDetail,
     ProductInfo,
+    ProductInfos,
     Requirement,
     TranslatorInfo,
 )
 
+from PPpackage.metamanager.schemes import LocalRepositoryConfig, RepositoryDriverConfig
 from PPpackage.utils.utils import Result, load_interface_module
 from PPpackage.utils.validation import validate_python
 
-from .repository import RepositoryInterface
-from .schemes import LocalRepositoryConfig, RepositoryDriverConfig
+from .interface import RepositoryInterface
 
 
 class LocalRepository(RepositoryInterface):
@@ -66,24 +68,32 @@ class LocalRepository(RepositoryInterface):
 
     async def get_epoch(self) -> str:
         return await self.interface.get_epoch(
-            self.state, self.driver_parameters, self.repository_parameters
+            self.state,
+            self.driver_parameters,
+            self.repository_parameters,
         )
 
     def fetch_translator_data(
         self, epoch_result: Result[str]
     ) -> AsyncIterable[TranslatorInfo]:
         return self.interface.fetch_translator_data(
-            self.state, self.driver_parameters, self.repository_parameters, epoch_result
+            self.state,
+            self.driver_parameters,
+            self.repository_parameters,
+            epoch_result,
         )
 
     async def translate_options(self, options: Any) -> tuple[str, Any]:
         return await self.interface.translate_options(
-            self.state, self.driver_parameters, self.repository_parameters, options
+            self.state,
+            self.driver_parameters,
+            self.repository_parameters,
+            options,
         )
 
     def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
-    ) -> AsyncIterable[Requirement]:
+    ) -> AsyncIterable[list[Requirement]]:
         return self.interface.get_formula(
             self.state,
             self.driver_parameters,
@@ -103,11 +113,27 @@ class LocalRepository(RepositoryInterface):
             package,
         )
 
+    async def get_build_context(
+        self,
+        translated_options: Any,
+        package: str,
+        runtime_product_infos: ProductInfos,
+    ) -> BuildContextDetail:
+        return await self.interface.get_build_context(
+            self.state,
+            self.driver_parameters,
+            self.repository_parameters,
+            translated_options,
+            package,
+            runtime_product_infos,
+        )
+
     async def compute_product_info(
         self,
         translated_options: Any,
         package: str,
-        dependency_product_infos: DependencyProductInfos,
+        build_context_info: BuildContextInfo,
+        runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         return await self.interface.compute_product_info(
             self.state,
@@ -115,5 +141,6 @@ class LocalRepository(RepositoryInterface):
             self.repository_parameters,
             translated_options,
             package,
-            dependency_product_infos,
+            build_context_info,
+            runtime_product_infos,
         )

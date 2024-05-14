@@ -10,5 +10,5 @@ from PPpackage.metamanager.repository import Repository
 class NodeData(TypedDict):
     repository: Repository
     detail: PackageDetail
-    product: Awaitable[tuple[Path, str]]
     product_info: Awaitable[ProductInfo]
+    product: Awaitable[tuple[Path, str]]

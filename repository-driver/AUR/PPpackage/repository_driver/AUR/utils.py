@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from aiosqlite import Connection, Cursor
 
-PREFIX = "pacman-real-"
+PREFIX = "pacman-"
 
 
 def strip_version(name: str) -> str:

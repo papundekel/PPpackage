@@ -4,8 +4,9 @@ from typing import Any
 
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import (
-    DependencyProductInfos,
+    BuildContextInfo,
     ProductInfo,
+    ProductInfos,
 )
 
 from .schemes import ConanProductInfo, DriverParameters, Options, RepositoryParameters
@@ -31,7 +32,8 @@ async def compute_product_info(
     repository_parameters: RepositoryParameters,
     translated_options: Options,
     package: str,
-    dependency_product_infos: DependencyProductInfos,
+    build_context_info: BuildContextInfo,
+    runtime_product_infos: ProductInfos,
 ) -> ProductInfo:
     if not package.startswith(PREFIX):
         raise Exception(f"Invalid package name: {package}")
@@ -49,7 +51,7 @@ async def compute_product_info(
                 [revision],
                 (
                     create_ref(dependency, product_infos)
-                    for dependency, product_infos in dependency_product_infos.items()
+                    for dependency, product_infos in runtime_product_infos.items()
                 ),
             )
         ),

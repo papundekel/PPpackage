@@ -1,0 +1,23 @@
+{
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
+            "value": "sh"
+        },
+        {
+            "translator": "pacman",
+            "value": {
+                "package": "conan",
+                "no_provide": null
+            }
+        }
+    ]
+}

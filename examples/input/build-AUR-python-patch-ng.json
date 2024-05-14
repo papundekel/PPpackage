@@ -1,0 +1,31 @@
+{
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "base-devel"
+        },
+        {
+            "translator": "pacman",
+            "value": "git"
+        },
+        {
+            "translator": "pacman",
+            "value": {
+                "package": "ca-certificates",
+                "no_provide": null
+            }
+        },
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
+            "value": "sudo"
+        },
+        {
+            "translator": "pacman",
+            "value": "python-setuptools"
+        }
+    ]
+}

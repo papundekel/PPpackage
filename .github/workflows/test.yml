@@ -9,11 +9,9 @@ jobs:
     build-metamanager:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build image
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: metamanager
                   tags: docker.io/fackop/pppackage-metamanager:latest
@@ -21,19 +19,33 @@ jobs:
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
-            - name: Upload image artifact
-              uses: actions/upload-artifact@v4.3.3
+            - uses: actions/upload-artifact@v4.3.3
               with:
                   name: image-metamanager
                   path: /tmp/image-metamanager.tar
+    build-solver:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: docker/setup-buildx-action@v3.0.0
+
+            - uses: docker/build-push-action@v5.3.0
+              with:
+                  target: solver
+                  tags: docker.io/fackop/pppackage-solver:latest
+                  outputs: type=docker,dest=/tmp/image-solver.tar
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - uses: actions/upload-artifact@v4.3.3
+              with:
+                  name: image-solver
+                  path: /tmp/image-solver.tar
     build-updater:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build image
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: updater
                   tags: docker.io/fackop/pppackage-updater:latest
@@ -41,19 +53,16 @@ jobs:
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
-            - name: Upload image artifact
-              uses: actions/upload-artifact@v4.3.3
+            - uses: actions/upload-artifact@v4.3.3
               with:
                   name: image-updater
                   path: /tmp/image-updater.tar
     build-repo-pacman:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build pppackage-repository-driver-pacman
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pacman
                   tags: docker.io/fackop/pppackage-repository-driver-pacman:latest
@@ -62,11 +71,9 @@ jobs:
     build-repo-aur:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build pppackage-repository-driver-aur
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-aur
                   tags: docker.io/fackop/pppackage-repository-driver-aur:latest
@@ -75,11 +82,9 @@ jobs:
     build-repo-conan:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build pppackage-repository-driver-conan
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-conan
                   tags: docker.io/fackop/pppackage-repository-driver-conan:latest
@@ -88,11 +93,9 @@ jobs:
     build-repo-pp:
         runs-on: ubuntu-latest
         steps:
-            - name: Set up buildx
-              uses: docker/setup-buildx-action@v3.0.0
+            - uses: docker/setup-buildx-action@v3.0.0
 
-            - name: Build pppackage-repository-driver-pp
-              uses: docker/build-push-action@v5.1.0
+            - uses: docker/build-push-action@v5.3.0
               with:
                   target: repository-driver-pp
                   tags: docker.io/fackop/pppackage-repository-driver-pp:latest
@@ -103,6 +106,7 @@ jobs:
         needs:
             - build-metamanager
             - build-updater
+            - build-solver
         steps:
             - uses: actions/checkout@v4.1.1
 
@@ -137,10 +141,12 @@ jobs:
               run: |
                   docker load --input /tmp/image-metamanager.tar
                   docker load --input /tmp/image-updater.tar
+                  podman load --input /tmp/image-solver.tar
+                  podman tag localhost/latest:latest docker.io/fackop/pppackage-solver:latest
 
             - name: Create directories
               run: |
-                  mkdir -p root/ output/ cache/
+                  mkdir -p root/ output/ cache/ workdir/
                   mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
 
             - name: Update archlinux core database
@@ -212,7 +218,7 @@ jobs:
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
                   run --rm
-                  -T metamanager < examples/input/basic-pacman-AUR-conan.json
+                  -T metamanager < examples/input/basic-pacman-conan.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache

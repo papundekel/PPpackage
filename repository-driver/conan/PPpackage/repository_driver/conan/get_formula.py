@@ -1,13 +1,10 @@
 from collections.abc import Iterable
+from sys import stderr
 from typing import AsyncIterable
 
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
-from PPpackage.repository_driver.interface.schemes import (
-    ImplicationRequirement,
-    Requirement,
-    SimpleRequirement,
-)
+from PPpackage.repository_driver.interface.schemes import Requirement
 
 from PPpackage.utils.rwlock import read as rwlock_read
 from PPpackage.utils.utils import Result
@@ -32,7 +29,7 @@ async def get_formula(
     repository_parameters: RepositoryParameters,
     translated_options: Options,
     epoch_result: Result[str],
-) -> AsyncIterable[Requirement]:
+) -> AsyncIterable[list[Requirement]]:
     database_path = repository_parameters.database_path
 
     async with rwlock_read(state.coroutine_lock, state.file_lock):
@@ -48,16 +45,17 @@ async def get_formula(
                 assert requirements is not None
 
                 for requirement in requirements:
-                    yield ImplicationRequirement(
-                        SimpleRequirement(
+                    yield [
+                        Requirement(
                             "noop",
                             f"conan-{revision.name}/{revision.version}#{revision.revision}",
+                            False,
                         ),
-                        SimpleRequirement(
+                        Requirement(
                             "conan",
                             {
                                 "package": str(requirement.ref.name),
                                 "version": str(requirement.ref.version),
                             },
                         ),
-                    )
+                    ]

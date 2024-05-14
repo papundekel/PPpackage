@@ -1,14 +1,8 @@
-from collections.abc import AsyncIterable, MutableSequence
-from sys import stderr
+from collections.abc import AsyncIterable
 
 from aiosqlite import Connection
+from PPpackage.repository_driver.interface.schemes import Requirement
 
-from PPpackage.repository_driver.interface.schemes import (
-    ImplicationRequirement,
-    Requirement,
-    SimpleRequirement,
-    XORRequirement,
-)
 from PPpackage.utils.utils import Result
 
 from .epoch import get as get_epoch
@@ -31,20 +25,18 @@ async def query_runtime_dependencies(
             yield row[0], row[1], row[2]
 
 
-async def query_provides(connection: Connection) -> AsyncIterable[tuple[str, str, str]]:
+async def query_conflicts(
+    connection: Connection,
+) -> AsyncIterable[tuple[str, str, str]]:
     async with connection.execute(
         """
-        SELECT packages.name, version, provide
-        FROM packages JOIN provides
-        ON packages.name = provides.name
+        SELECT packages.name, version, conflict
+        FROM packages JOIN conflicts
+        ON packages.name = conflicts.name
         """
     ) as cursor:
         async for row in cursor:
             yield row[0], row[1], row[2]
-
-
-def make_full_name(package_name: str, package_version: str) -> str:
-    return f"pacman-real-{package_name}-{package_version}"
 
 
 async def get_formula(
@@ -53,43 +45,24 @@ async def get_formula(
     repository_parameters: RepositoryParameters,
     translated_options: None,
     epoch_result: Result[str],
-) -> AsyncIterable[Requirement]:
-    provides = dict[str | tuple[str, str], MutableSequence[str]]()
-
+) -> AsyncIterable[list[Requirement]]:
     connection = state.connection
 
     async with transaction(connection):
         epoch_result.set(await get_epoch(connection))
 
-        async for (
-            package_name,
-            package_version,
-            dependency,
-        ) in query_runtime_dependencies(connection):
-            yield ImplicationRequirement(
-                SimpleRequirement(
-                    "noop", make_full_name(package_name, package_version)
+        async for name, version, dependency in query_runtime_dependencies(connection):
+            yield [
+                Requirement("noop", f"pacman-{name}-{version}", False),
+                Requirement("pacman", dependency),
+            ]
+
+        async for name, version, conflict in query_conflicts(connection):
+            yield [
+                Requirement("noop", f"pacman-{name}-{version}", False),
+                Requirement(
+                    "pacman",
+                    {"package": conflict, "exclude": f"{name}-{version}"},
+                    False,
                 ),
-                SimpleRequirement("pacman", dependency),
-            )
-
-        async for package_name, package_version, provide in query_provides(connection):
-            provides.setdefault(provide, []).append(
-                make_full_name(package_name, package_version)
-            )
-
-    for provide, packages in provides.items():
-        variable_string = (
-            provide if isinstance(provide, str) else f"{provide[0]}-{provide[1]}"
-        )
-
-        yield ImplicationRequirement(
-            SimpleRequirement("noop", f"pacman-virtual-{variable_string}"),
-            (
-                XORRequirement(
-                    [SimpleRequirement("noop", package) for package in packages]
-                )
-                if len(packages) > 1
-                else SimpleRequirement("noop", packages[0])
-            ),
-        )
+            ]

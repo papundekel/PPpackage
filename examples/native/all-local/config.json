@@ -1,5 +1,9 @@
 {
     "product_cache_path": "tmp/cache/product",
+    "containerizer": {
+        "url": "unix://$XDG_RUNTIME_DIR/podman/podman.sock"
+    },
+    "containerizer_workdir": "/tmp",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"

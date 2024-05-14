@@ -6,6 +6,7 @@ setup(
         "PPpackage.metamanager",
         "PPpackage.metamanager.fetch",
         "PPpackage.metamanager.schemes",
+        "PPpackage.metamanager.repository",
     ],
     version="0.1.0",
     install_requires=[
@@ -17,10 +18,8 @@ setup(
         "networkx",
         "pydot",
         "httpx[http2]",
-        "python-sat[aiger, approxmc, cryptosat, pblib]",
         "asyncstdlib",
         "sqlitedict",
         "hishel[sqlite]",
-        "pysat",
     ],
 )
