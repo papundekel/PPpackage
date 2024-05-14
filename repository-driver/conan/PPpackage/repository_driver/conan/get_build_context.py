@@ -73,7 +73,7 @@ async def get_build_context(
             'yq --yaml-roundtrip --in-place \'.compiler.gcc.version += ["14", "14.1"]\' ~/.conan2/settings.yml || exit 10\n'
             f"if ! package_id=$(conan install --requires {full_revision} --build {full_revision} --format json | "
             "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 20; fi\n"
-            f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 30'
-            "chown -R root:root ~/.conan2",
+            "chown -R root:root ~/.conan2 || exit 50\n"
+            f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 30',
         ],
     )
