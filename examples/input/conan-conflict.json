@@ -3,8 +3,29 @@
         {
             "translator": "conan",
             "value": {
-                "package": "double-conversion",
-                "version": "3.3.0"
+                "package": "zlib",
+                "version": "[>=1.2.13]"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "freetype",
+                "version": "[>=2.13.2]"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "qt",
+                "version": "6.4.2"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "brotli",
+                "version": "1.1.0"
             }
         }
     ]
