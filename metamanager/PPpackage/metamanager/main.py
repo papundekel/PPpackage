@@ -94,7 +94,7 @@ async def main(
                 input.requirements,
             )
 
-        async with HTTPClient(http2=True) as archive_client:
+        async with HTTPClient() as archive_client:
             product_cache_path.mkdir(parents=True, exist_ok=True)
 
             with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
