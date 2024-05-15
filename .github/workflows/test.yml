@@ -207,7 +207,7 @@ jobs:
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
                   run --rm
-                  -T metamanager < examples/input/basic.json
+                  -T metamanager < examples/input/conan-build.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache
