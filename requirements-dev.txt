@@ -28,6 +28,13 @@
 -e ./translator/conan/
 
 
+
+-e ./generator/interface/ --config-settings editable_mode=compat
+
+-e ./generator/conan/
+
+
+
 -e ./metamanager/
 
 pre-commit

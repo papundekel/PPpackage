@@ -1,0 +1,29 @@
+{
+    "requirements": [
+        {
+            "translator": "conan",
+            "value": {
+                "package": "openssl",
+                "version": "[>=3.1.0]"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "nameof",
+                "version": "0.10.1"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "openssl",
+                "version": "[>=3.1.1]"
+            }
+        }
+    ],
+    "generators": [
+        "conan-CMakeDeps",
+        "conan-CMakeToolchain"
+    ]
+}

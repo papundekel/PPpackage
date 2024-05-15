@@ -1,9 +1,9 @@
 PODMAN_COMPOSE_PROVIDER=podman-compose \
-CONFIG_PATH=$(pwd)/examples/containerized/all-local/config.json \
+CONFIG_PATH=$(pwd)/examples/metamanager/containerized/all-local/config.json \
 ROOT=$(pwd)/tmp/root \
 OUTPUT=$(pwd)/tmp/output \
 podman compose \
-    --file examples/all-local/compose.yaml \
+    --file examples/metamanager/all-local/compose.yaml \
     run \
         --rm \
         -T \

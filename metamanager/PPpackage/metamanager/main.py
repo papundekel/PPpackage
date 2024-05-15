@@ -14,6 +14,7 @@ from PPpackage.utils.validation import validate_json
 
 from .create_graph import create_graph, write_graph_to_file
 from .fetch_and_install import fetch_and_install
+from .generate import generate
 from .installer import Installers
 from .repository import Repositories
 from .resolve import resolve
@@ -58,11 +59,6 @@ def parse_config(config_path: Path) -> Config:
             raise
 
         return config
-
-
-async def generators(generators_path: Path) -> None:
-    # TODO
-    pass
 
 
 async def main(
@@ -116,7 +112,7 @@ async def main(
                     write_graph_to_file(graph, graph_path)
                     stderr.write(f"Graph written to {graph_path}.\n")
 
-                stderr.write("Fetching and installing...\n")
+                stderr.write(f"Fetching and installing to {installation_path}...\n")
 
                 await fetch_and_install(
                     containerizer,
@@ -134,6 +130,7 @@ async def main(
                 )
 
     if generators_path is not None:
-        await generators(generators_path)
+        stderr.write(f"Generating to {generators_path}...\n")
+        await generate(config.generators, graph, input.generators, generators_path)
 
     stderr.write("Done.\n")

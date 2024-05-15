@@ -8,6 +8,6 @@ fi
 python \
     -m PPpackage.metamanager \
     tmp/root/ \
-    --config examples/native/all-local/config.json \
+    --config examples/metamanager/native/all-local/config.json \
     --generators tmp/output/generators \
     --graph tmp/output/graph.dot

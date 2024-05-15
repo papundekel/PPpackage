@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -22,7 +21,7 @@ class Input:
     options: Any = None
     build_options: Any = None
     locks: Mapping[str, Mapping[str, str]] = frozendict()
-    generators: frozenset[str] | None = None
+    generators: frozenset[str] = frozenset()
 
 
 @pydantic_dataclass(frozen=True)
@@ -59,6 +58,11 @@ class InstallerConfig(BaseModuleConfig):
 
 
 @pydantic_dataclass(frozen=True)
+class GeneratorConfig(BaseModuleConfig):
+    pass
+
+
+@pydantic_dataclass(frozen=True)
 class Config:
     requirement_translators: Mapping[str, RequirementTranslatorConfig]
     installers: Mapping[str, InstallerConfig]
@@ -67,3 +71,4 @@ class Config:
     containerizer: ContainerizerConfig
     containerizer_workdir: Annotated[Path, WithVariables]
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
+    generators: Mapping[str, GeneratorConfig] = frozendict()
