@@ -16,8 +16,9 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from sqlitedict import SqliteDict
 
-from metamanager.PPpackage.metamanager.installer import Installer
+from PPpackage.metamanager.exceptions import BuildException, NoModelException
 from PPpackage.metamanager.graph import successors as graph_successors
+from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
@@ -57,14 +58,17 @@ async def process_build_context_meta(
         )
     )
 
-    repository_to_translated_options, model = await resolve(
-        containerizer,
-        containerizer_workdir,
-        repositories,
-        translators_task,
-        build_options,
-        requirements,
-    )
+    try:
+        repository_to_translated_options, model = await resolve(
+            containerizer,
+            containerizer_workdir,
+            repositories,
+            translators_task,
+            build_options,
+            requirements,
+        )
+    except NoModelException:
+        raise BuildException("No model found")
 
     return (
         repository_to_translated_options,

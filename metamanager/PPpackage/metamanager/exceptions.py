@@ -11,3 +11,7 @@ class EpochException(Exception):
 
 class NoModelException(Exception):
     pass
+
+
+class BuildException(Exception):
+    pass

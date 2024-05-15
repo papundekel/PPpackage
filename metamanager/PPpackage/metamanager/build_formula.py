@@ -1,8 +1,6 @@
 from asyncio import as_completed
 from collections.abc import AsyncIterable, Awaitable, Iterable, Mapping
 from itertools import chain, product
-from re import L
-from sys import stderr
 from typing import Any
 
 from asyncstdlib import chain as async_chain

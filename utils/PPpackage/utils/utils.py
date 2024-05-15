@@ -1,5 +1,6 @@
-from collections.abc import AsyncIterable, Callable, Mapping, Set
-from contextlib import contextmanager
+from asyncio import Lock
+from collections.abc import AsyncIterable, Callable, Mapping, MutableMapping, Set
+from contextlib import asynccontextmanager, contextmanager
 from importlib import import_module
 from os import mkfifo
 from pathlib import Path
@@ -108,3 +109,11 @@ async def iterable_with_result[
         return result.get(), async_chain()
     else:
         return result.get(), async_chain([first], i)
+
+
+@asynccontextmanager
+async def lock_by_key[T](locks: MutableMapping[T, Lock], key: T):
+    lock = locks.setdefault(key, Lock())
+
+    async with lock:
+        yield

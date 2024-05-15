@@ -25,7 +25,7 @@ from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import rmtree
+from PPpackage.utils.utils import lock_by_key, rmtree
 from PPpackage.utils.validation import dump_json
 
 
@@ -159,15 +159,7 @@ def hash_product_info(package: str, product_info: ProductInfo) -> str:
     return hasher.hexdigest()
 
 
-product_cache_register = dict[str, Lock]()
-
-
-@asynccontextmanager
-async def product_cache_lock(hash: str):
-    lock = product_cache_register.setdefault(hash, Lock())
-
-    async with lock:
-        yield
+product_cache_locks = dict[str, Lock]()
 
 
 async def fetch_package_or_cache(
@@ -183,7 +175,7 @@ async def fetch_package_or_cache(
 ) -> tuple[Path, str]:
     product_info_hash = hash_product_info(package, await node_data["product_info"])
 
-    async with product_cache_lock(product_info_hash):
+    async with lock_by_key(product_cache_locks, product_info_hash):
         if product_info_hash not in cache_mapping:
             product_directory_path = Path(
                 mkdtemp(dir=cache_path, prefix=package.replace("/", "\\"))

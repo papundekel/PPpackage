@@ -98,7 +98,7 @@ public class Solver {
             var solver = SolverFactory.newDefault();
             var reader = new DimacsReader(solver);
             var problem = reader.parseInstance(args[0]);
-            
+
             var all_assumptions = read_assumptions(args[1]);
             
             var assumptions = new VecInt();
@@ -125,11 +125,9 @@ public class Solver {
                     System.out.println(variable);
                 }
             }
-            
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             System.exit(2);
         }
-
     }
 }

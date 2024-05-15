@@ -1,0 +1,11 @@
+{
+    "requirements": [
+        {
+            "translator": "conan",
+            "value": {
+                "package": "double-conversion",
+                "version": "3.3.0"
+            }
+        }
+    ]
+}

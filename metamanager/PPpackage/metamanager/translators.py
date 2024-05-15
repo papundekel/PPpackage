@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from itertools import chain
+from sys import stderr
 from typing import Any
 
 from PPpackage.translator.interface.interface import Interface
@@ -58,11 +59,15 @@ class Translator:
                 self.parameters, self.data, requirement
             )
 
-            translated_requirement = list(translated_requirement)
-            self.cache[requirement] = translated_requirement
+            translated_requirement_list = list[str]()
 
-        for symbol in translated_requirement:
-            yield symbol
+            for symbol in translated_requirement:
+                translated_requirement_list.append(symbol)
+                yield symbol
+
+            self.cache[requirement] = translated_requirement_list
+        else:
+            return translated_requirement
 
     def get_assumptions(self) -> Iterable[Literal]:
         return self.interface.get_assumptions(self.parameters, self.data)

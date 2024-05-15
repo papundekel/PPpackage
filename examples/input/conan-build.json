@@ -1,0 +1,50 @@
+{
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": {
+                "package": "conan",
+                "no_provide": null
+            }
+        },
+        {
+            "translator": "pacman",
+            "value": {
+                "package": "ca-certificates",
+                "no_provide": null
+            }
+        },
+        {
+            "translator": "pacman",
+            "value": "gcc"
+        },
+        {
+            "translator": "pacman",
+            "value": "cmake"
+        },
+        {
+            "translator": "pacman",
+            "value": "make"
+        },
+        {
+            "translator": "pacman",
+            "value": "perl"
+        },
+        {
+            "translator": "pacman",
+            "value": "bash"
+        },
+        {
+            "translator": "pacman",
+            "value": "coreutils"
+        },
+        {
+            "translator": "pacman",
+            "value": "jq"
+        },
+        {
+            "translator": "pacman",
+            "value": "yq"
+        }
+    ]
+}

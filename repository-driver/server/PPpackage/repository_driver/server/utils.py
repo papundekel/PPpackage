@@ -1,11 +1,7 @@
-from collections.abc import AsyncIterable, Generator, Iterable, Mapping
-from contextlib import contextmanager
-from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
-from typing import Any, Optional
+from collections.abc import AsyncIterable, Iterable, Mapping
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse as BaseStreamingResponse
-from jinja2 import Template as Jinja2Template
 from starlette.exceptions import HTTPException
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
@@ -47,17 +43,3 @@ def StreamingResponse(
         headers=headers,
         media_type="application/octet-stream",
     )
-
-
-@contextmanager
-def jinja_render_temp_file(
-    template: Jinja2Template,
-    template_context: Mapping[str, Any],
-    suffix: Optional[str] = None,
-) -> Generator[_TemporaryFileWrapper, Any, Any]:
-    with NamedTemporaryFile(mode="w", suffix=suffix) as file:
-        template.stream(**template_context).dump(file)
-
-        file.flush()
-
-        yield file
