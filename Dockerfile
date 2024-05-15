@@ -193,7 +193,7 @@ RUN pip install installer/conan/
 
 
 COPY generator/interface/ /workdir/generator/interface
-RUN pip install installer/interface/
+RUN pip install generator/interface/
 
 COPY generator/conan/ /workdir/generator/conan
 RUN pip install generator/conan/
