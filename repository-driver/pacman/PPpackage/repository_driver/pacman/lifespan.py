@@ -23,7 +23,7 @@ async def lifespan(
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")
 
-    async with HTTPClient(http2=True) as http_client:
+    async with HTTPClient() as http_client:
         with (
             TemporaryDirectory() as root_directory_path,
             TemporaryDirectory() as cache_directory_path,
