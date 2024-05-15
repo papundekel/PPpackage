@@ -1,4 +1,3 @@
-from asyncio import Lock
 from collections.abc import Awaitable, Iterable, Mapping
 from pathlib import Path
 from shutil import move

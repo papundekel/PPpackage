@@ -122,7 +122,6 @@ class Repository:
     async def get_package_detail(
         self, translated_options: Any, package: str
     ) -> PackageDetail | None:
-        stderr.write(f"Getting package detail for {package}...\n")
         return await self.interface.get_package_detail(translated_options, package)
 
     async def get_build_context(
