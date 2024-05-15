@@ -67,7 +67,7 @@ class Translator:
 
             self.cache[requirement] = translated_requirement_list
         else:
-            return translated_requirement
+            yield from translated_requirement
 
     def get_assumptions(self) -> Iterable[Literal]:
         return self.interface.get_assumptions(self.parameters, self.data)
