@@ -1,8 +1,8 @@
 from setuptools import setup
 
 setup(
-    name="PPpackage-installer-interface",
-    packages=["PPpackage.installer.interface"],
+    name="PPpackage-generator-interface",
+    packages=["PPpackage.generator.interface"],
     version="0.1.0",
     install_requires=["pydantic"],
 )

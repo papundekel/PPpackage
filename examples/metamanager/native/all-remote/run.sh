@@ -7,28 +7,28 @@ address_conancenter="localhost:8883"
 
 
 
-CONFIG_PATH="$PWD/examples/native/all-remote/archlinux-core/config.json" \
+CONFIG_PATH="$PWD/examples/metamanager/native/all-remote/archlinux-core/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \
     --bind "$address_archlinux_core" \
     &
 pid_archlinux_core=$!
 
-CONFIG_PATH="$PWD/examples/native/all-remote/archlinux-extra/config.json" \
+CONFIG_PATH="$PWD/examples/metamanager/native/all-remote/archlinux-extra/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \
     --bind "$address_archlinux_extra" \
     &
 pid_archlinux_extra=$!
 
-CONFIG_PATH="$PWD/examples/native/all-remote/AUR/config.json" \
+CONFIG_PATH="$PWD/examples/metamanager/native/all-remote/AUR/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \
     --bind "$address_AUR" \
     &
 pid_AUR=$!
 
-CONFIG_PATH="$PWD/examples/native/all-remote/conancenter/config.json" \
+CONFIG_PATH="$PWD/examples/metamanager/native/all-remote/conancenter/config.json" \
 hypercorn \
     PPpackage.repository_driver.server.server:server \
     --bind "$address_conancenter" \
@@ -58,7 +58,7 @@ done
 python \
     -m PPpackage.metamanager \
     tmp/root/ \
-    --config examples/native/all-remote/config.json \
+    --config examples/metamanager/native/all-remote/config.json \
     --generators tmp/output/generators \
     --graph tmp/output/graph.dot
 

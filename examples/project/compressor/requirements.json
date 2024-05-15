@@ -1,0 +1,27 @@
+{
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "gcc"
+        },
+        {
+            "translator": "pacman",
+            "value": "cmake"
+        },
+        {
+            "translator": "pacman",
+            "value": "make"
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "zlib",
+                "version": "1.2.11"
+            }
+        }
+    ],
+    "generators": [
+        "conan-CMakeDeps",
+        "conan-CMakeToolchain"
+    ]
+}

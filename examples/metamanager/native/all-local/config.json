@@ -36,6 +36,11 @@
             "package": "PPpackage.installer.conan"
         }
     },
+    "generators": {
+        "conan-*": {
+            "package": "PPpackage.generator.conan"
+        }
+    },
     "repositories": [
         {
             "driver": "pacman",
