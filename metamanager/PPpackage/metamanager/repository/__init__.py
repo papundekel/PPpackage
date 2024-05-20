@@ -1,6 +1,5 @@
 from collections.abc import AsyncGenerator, AsyncIterable, Iterable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
-from sys import stderr
 from typing import Any
 
 from anysqlite import connect as sqlite_connect

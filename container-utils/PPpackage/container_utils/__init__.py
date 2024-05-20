@@ -1,5 +1,4 @@
 from pathlib import Path
-from sys import stderr
 from typing import Any
 from typing import cast as type_cast
 

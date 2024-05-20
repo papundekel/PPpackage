@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from sys import stderr
 from typing import AsyncIterable
 
 from conan.api.conan_api import ConanAPI

@@ -1,7 +1,6 @@
 from asyncio import TaskGroup
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from itertools import chain
-from sys import stderr
 from typing import Any
 
 from PPpackage.translator.interface.interface import Interface
