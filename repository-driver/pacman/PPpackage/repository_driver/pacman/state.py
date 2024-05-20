@@ -3,7 +3,7 @@ from pathlib import Path
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
-from httpx import AsyncClient as HTTPClient
+from httpx import Client as HTTPClient
 from pyalpm import DB, Handle
 
 

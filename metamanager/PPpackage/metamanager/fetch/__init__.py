@@ -1,6 +1,5 @@
 from asyncio import Lock, TaskGroup
 from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
-from contextlib import asynccontextmanager
 from functools import singledispatch
 from hashlib import sha1
 from pathlib import Path
@@ -8,7 +7,7 @@ from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
-from httpx import AsyncClient as HTTPClient
+from httpx import Client as HTTPClient
 from networkx import MultiDiGraph, topological_generations
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (

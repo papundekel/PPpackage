@@ -99,7 +99,8 @@ public:
     Transaction(const Handle& handle)
         : handle(handle)
     {
-        const auto return_code = alpm_trans_init(handle, 0);
+        const auto return_code =
+            alpm_trans_init(handle, ALPM_TRANS_FLAG_NODEPS);
 
         if (return_code == -1)
         {

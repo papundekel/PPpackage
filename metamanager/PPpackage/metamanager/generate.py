@@ -4,9 +4,8 @@ from pathlib import Path
 
 from networkx import MultiDiGraph
 
-from metamanager.PPpackage.metamanager.graph import get_graph_items
-
 from .generator import Generators
+from .graph import get_graph_items
 from .schemes import GeneratorConfig
 
 

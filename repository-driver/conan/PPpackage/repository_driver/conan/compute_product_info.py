@@ -8,19 +8,24 @@ from PPpackage.repository_driver.interface.schemes import (
     ProductInfo,
     ProductInfos,
 )
+from pydantic import ValidationError
 
 from .schemes import ConanProductInfo, DriverParameters, Options, RepositoryParameters
 from .state import State
-from .utils import PREFIX
 
 
-def create_ref(dependency: str, product_infos: Mapping[str, Any]):
-    conan_product_info = ConanProductInfo.model_validate(
-        next(iter(product_infos.values()))
-    )
+def create_ref(
+    dependency: str, product_infos: Mapping[str, Any]
+) -> RecipeReference | None:
+    try:
+        conan_product_info = ConanProductInfo.model_validate(
+            next(iter(product_infos.values()))
+        )
+    except ValidationError:
+        return None
 
     return RecipeReference(
-        name=dependency[len(PREFIX) :],
+        name=dependency[len("conan-") :],
         version=conan_product_info.version,
         revision=conan_product_info.revision,
     )
@@ -35,10 +40,10 @@ async def compute_product_info(
     build_context_info: BuildContextInfo,
     runtime_product_infos: ProductInfos,
 ) -> ProductInfo:
-    if not package.startswith(PREFIX):
+    if not package.startswith("conan-"):
         raise Exception(f"Invalid package name: {package}")
 
-    revision = RecipeReference.loads(package[len(PREFIX) :])
+    revision = RecipeReference.loads(package[len("conan-") :])
 
     api = state.api
 
@@ -50,8 +55,9 @@ async def compute_product_info(
             chain(
                 [revision],
                 (
-                    create_ref(dependency, product_infos)
+                    ref
                     for dependency, product_infos in runtime_product_infos.items()
+                    if (ref := create_ref(dependency, product_infos)) is not None
                 ),
             )
         ),

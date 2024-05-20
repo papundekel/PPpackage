@@ -38,24 +38,32 @@ async def get_formula(
         for recipe in get_recipes(state.api):
             for revision in get_revisions(state.api, recipe):
                 try:
-                    requirements = get_requirements(state.api, state.app, revision)
+                    requirements, system_requirements = get_requirements(
+                        state.api, state.app, revision, system=True
+                    )
                 except:
                     continue
 
                 assert requirements is not None
 
+                revision_requirement = Requirement(
+                    "noop",
+                    f"conan-{revision.name}/{revision.version}#{revision.revision}",
+                    False,
+                )
+
                 for requirement in requirements:
-                    yield [
-                        Requirement(
-                            "noop",
-                            f"conan-{revision.name}/{revision.version}#{revision.revision}",
-                            False,
-                        ),
-                        Requirement(
-                            "conan",
-                            {
-                                "package": str(requirement.ref.name),
-                                "version": str(requirement.ref.version),
-                            },
-                        ),
-                    ]
+                    if not requirement.build:
+                        yield [
+                            revision_requirement,
+                            Requirement(
+                                "conan",
+                                {
+                                    "package": str(requirement.ref.name),
+                                    "version": str(requirement.ref.version),
+                                },
+                            ),
+                        ]
+
+                for requirement in system_requirements:
+                    yield [revision_requirement, Requirement("pacman", requirement)]

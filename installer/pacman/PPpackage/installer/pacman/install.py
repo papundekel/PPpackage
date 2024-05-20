@@ -59,7 +59,7 @@ async def install_manager_command(
     await writer.write(dump_one(return_code))
 
 
-DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
+DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
 
 
 locks = dict[Path, Lock]()

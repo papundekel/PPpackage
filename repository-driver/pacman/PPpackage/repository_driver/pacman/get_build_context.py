@@ -40,7 +40,7 @@ async def get_build_context(
         url = f"https://archive.archlinux.org/packages/{name[0]}/{name}/{name_with_arch}.{suffix}"
 
         try:
-            response = await state.http_client.head(url, timeout=300)
+            response = state.http_client.head(url, timeout=None)
         except ConnectTimeout:
             print(f"Timeout {url}", file=stderr)
             raise

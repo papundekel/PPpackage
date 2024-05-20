@@ -149,6 +149,8 @@ async def resolve(
 
         repository_to_translated_options_result = Result[Mapping[Repository, Any]]()
 
+        requirements = list(requirements)
+
         formula = build_formula(
             repository_with_translated_options_tasks,
             translators_task,
@@ -156,8 +158,11 @@ async def resolve(
             repository_to_translated_options_result,
         )
 
-        model = await solve(
-            containerizer, containerizer_workdir, translators_task, formula
-        )
+        try:
+            model = await solve(
+                containerizer, containerizer_workdir, translators_task, formula
+            )
+        except NoModelException:
+            raise NoModelException(requirements)
 
     return repository_to_translated_options_result.get(), model

@@ -6,7 +6,7 @@ from shutil import move
 from sys import stderr
 from typing import Any
 
-from httpx import AsyncClient as HTTPClient
+from httpx import Client as HTTPClient
 from networkx import MultiDiGraph
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
@@ -16,7 +16,6 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from sqlitedict import SqliteDict
 
-from PPpackage.metamanager.exceptions import BuildException, NoModelException
 from PPpackage.metamanager.graph import successors as graph_successors
 from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
@@ -58,17 +57,14 @@ async def process_build_context_meta(
         )
     )
 
-    try:
-        repository_to_translated_options, model = await resolve(
-            containerizer,
-            containerizer_workdir,
-            repositories,
-            translators_task,
-            build_options,
-            requirements,
-        )
-    except NoModelException:
-        raise BuildException("No model found")
+    repository_to_translated_options, model = await resolve(
+        containerizer,
+        containerizer_workdir,
+        repositories,
+        translators_task,
+        build_options,
+        requirements,
+    )
 
     return (
         repository_to_translated_options,

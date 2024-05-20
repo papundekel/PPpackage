@@ -1,0 +1,5 @@
+[requires]
+zlib/[>=1.2.13]
+freetype/[>=2.13.2]
+qt/6.4.2
+brotli/1.1.0

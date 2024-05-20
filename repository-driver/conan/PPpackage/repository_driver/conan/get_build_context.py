@@ -10,7 +10,7 @@ from PPpackage.repository_driver.interface.schemes import (
 
 from .schemes import DriverParameters, Options, RepositoryParameters
 from .state import State
-from .utils import PREFIX, get_requirements
+from .utils import get_requirements
 
 
 async def get_build_context(
@@ -21,12 +21,12 @@ async def get_build_context(
     package: str,
     runtime_product_infos: ProductInfos,
 ) -> BuildContextDetail:
-    if not package.startswith(PREFIX):
+    if not package.startswith("conan-"):
         raise Exception(f"Invalid package name: {package}")
 
-    revision = RecipeReference.loads(package[len(PREFIX) :])
+    revision = RecipeReference.loads(package[len("conan-") :])
 
-    requirements = get_requirements(state.api, state.app, revision)
+    requirements, _ = get_requirements(state.api, state.app, revision)
 
     if requirements is None:
         raise Exception(f"Recipe not found: {revision}")
@@ -45,21 +45,29 @@ async def get_build_context(
                     Requirement("pacman", "cmake"),
                     Requirement("pacman", "make"),
                     Requirement("pacman", "perl"),
+                    Requirement("pacman", "grep"),
+                    Requirement("pacman", "sed"),
+                    Requirement("pacman", "awk"),
+                    Requirement("pacman", "diffutils"),
                     Requirement("pacman", "bash"),
                     Requirement("pacman", "coreutils"),
                     Requirement("pacman", "jq"),
                     Requirement("pacman", "yq"),
+                    Requirement("pacman", "pacman"),
+                    Requirement("pacman", "pkg-config"),
+                    Requirement("pacman", "python-setuptools"),
                 ],
                 (
                     Requirement(
                         "conan",
                         {
                             "package": str(requirement.ref.name),
-                            "version": str(requirement.ref.version),
+                            "version": version,
                         },
                     )
                     for requirement in requirements
                     if requirement.build
+                    and (version := str(requirement.ref.version)) != "<host_version>"
                 ),
             )
         ),
@@ -73,7 +81,7 @@ async def get_build_context(
             "conan profile detect\n"
             'yq --yaml-roundtrip --in-place \'.compiler.gcc.version += ["14", "14.1"]\' ~/.conan2/settings.yml || exit 10\n'
             f"if ! package_id=$(conan install --requires {full_revision} --build {full_revision} --format json | "
-            "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then exit 20; fi\n"
+            "jq '.graph.nodes.\"1\".package_id' | head -c -2 | tail -c +2); then chown -R root:root ~/.conan2; exit 20; fi\n"
             "chown -R root:root ~/.conan2 || exit 50\n"
             f'conan cache save {full_revision}:"$package_id" --file /mnt/output/product || exit 30',
         ],
