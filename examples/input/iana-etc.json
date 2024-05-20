@@ -2,7 +2,7 @@
     "requirements": [
         {
             "translator": "pacman",
-            "value": "sh"
+            "value": "iana-etc"
         }
     ]
 }

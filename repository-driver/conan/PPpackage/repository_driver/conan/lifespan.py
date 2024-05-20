@@ -18,7 +18,14 @@ async def lifespan(
 
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")
-    api = ConanAPI(str(database_path.absolute() / "cache"))
+
+    conan_home_path = database_path / "conan-home"
+    conan_home_path.mkdir(exist_ok=True, parents=True)
+
+    with (conan_home_path / "global.conf").open("w") as file:
+        file.write("tools.system.package_manager:mode = report\n")
+
+    api = ConanAPI(str(conan_home_path.absolute()))
     app = ConanApp(api)
 
     yield State(coroutine_lock, file_lock, api, app)

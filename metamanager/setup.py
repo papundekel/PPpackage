@@ -21,5 +21,6 @@ setup(
         "asyncstdlib",
         "sqlitedict",
         "hishel[sqlite]",
+        "aiohttp",
     ],
 )

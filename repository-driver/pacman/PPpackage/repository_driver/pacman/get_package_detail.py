@@ -35,6 +35,11 @@ async def get_package_detail(
             )
         ),
         frozenset(
-            f"pacman-{strip_version(dependency)}" for dependency in package.depends
+            f"pacman-{strip_version(dependency)}"
+            for dependency in package.depends
+            if not (
+                name == "libglvnd"
+                and (dependency == "mesa" or dependency == "opengl-driver")
+            )
         ),
     )

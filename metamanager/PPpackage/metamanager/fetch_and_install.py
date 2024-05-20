@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from httpx import AsyncClient as HTTPClient
+from httpx import Client as HTTPClient
 from networkx import MultiDiGraph
 from PPpackage.container_utils import Containerizer
 from sqlitedict import SqliteDict

@@ -1,7 +1,6 @@
 from asyncio import Lock, create_subprocess_exec
 from contextlib import contextmanager
 from pathlib import Path
-from sys import stderr
 
 from asyncstdlib import list as async_list
 from PPpackage.container_utils import Containerizer
@@ -9,9 +8,9 @@ from PPpackage.container_utils import Containerizer
 from PPpackage.installer.interface.exceptions import InstallerException
 from PPpackage.utils.asyncio_stream import start_unix_server
 from PPpackage.utils.stream import Reader, Writer, dump_one
-from PPpackage.utils.utils import TemporaryDirectory, TemporaryPipe
+from PPpackage.utils.utils import TemporaryDirectory, TemporaryPipe, lock_by_key
 
-from .schemes import ContainerizerConfig, Parameters
+from .schemes import Parameters
 
 
 @contextmanager
@@ -60,10 +59,10 @@ async def install_manager_command(
     await writer.write(dump_one(return_code))
 
 
-DATABASE_PATH_RELATIVE = Path("var") / Path("lib") / Path("pacman")
+DATABASE_PATH_RELATIVE = Path("var") / "lib" / "pacman"
 
 
-lock = Lock()
+locks = dict[Path, Lock]()
 
 
 async def install(parameters: Parameters, product_path: Path, installation_path: Path):
@@ -85,7 +84,7 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
 
         await server.start_serving()
 
-        async with lock:
+        async with lock_by_key(locks, installation_path):
             process = await create_subprocess_exec(
                 "/usr/local/bin/fakealpm",
                 "/usr/local/bin/fakealpm-executable",

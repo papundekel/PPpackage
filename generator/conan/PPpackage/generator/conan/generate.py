@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from pathlib import Path
-from sys import stderr
 
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
@@ -65,8 +64,8 @@ async def generate(
 
         set_deploy_folders(api, cache_directory_path, graph)
 
-        graph.root.conanfile.virtualrunenv = False
-        graph.root.conanfile.virtualbuildenv = False
+        graph.root.conanfile.virtualrunenv = False  # type: ignore
+        graph.root.conanfile.virtualbuildenv = False  # type: ignore
 
         generator = generator_full[len("conan-") :]
 

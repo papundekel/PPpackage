@@ -10,17 +10,16 @@ from collections.abc import (
     Set,
 )
 from pathlib import Path
-from sys import stderr
 from typing import Any
 
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import Requirement
 
-from metamanager.PPpackage.metamanager.exceptions import NoModelException
 from PPpackage.translator.interface.schemes import Literal
 from PPpackage.utils.utils import Result, TemporaryDirectory
 
 from .build_formula import build_formula
+from .exceptions import NoModelException
 from .repository import Repository
 from .translate_options import translate_options
 from .translators import Translator
@@ -122,7 +121,10 @@ async def solve(
         )
 
         if return_code != 0:
-            raise Exception("Failed to solve")
+            if return_code == 1:
+                raise NoModelException
+            else:
+                raise Exception("Error in solver.")
 
         with output_path.open("r") as file:
             return {
@@ -147,6 +149,8 @@ async def resolve(
 
         repository_to_translated_options_result = Result[Mapping[Repository, Any]]()
 
+        requirements = list(requirements)
+
         formula = build_formula(
             repository_with_translated_options_tasks,
             translators_task,
@@ -154,8 +158,11 @@ async def resolve(
             repository_to_translated_options_result,
         )
 
-        model = await solve(
-            containerizer, containerizer_workdir, translators_task, formula
-        )
+        try:
+            model = await solve(
+                containerizer, containerizer_workdir, translators_task, formula
+            )
+        except NoModelException:
+            raise NoModelException(requirements)
 
     return repository_to_translated_options_result.get(), model

@@ -134,7 +134,6 @@ async def update(
     database_path.mkdir(parents=True, exist_ok=True)
 
     async with HTTPClient(
-        http2=True,
         storage=AsyncSQLiteStorage(
             connection=await sqlite_connect(database_path / "http-cache.sqlite")
         ),

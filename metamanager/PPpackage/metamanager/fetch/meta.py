@@ -6,7 +6,7 @@ from shutil import move
 from sys import stderr
 from typing import Any
 
-from httpx import AsyncClient as HTTPClient
+from httpx import Client as HTTPClient
 from networkx import MultiDiGraph
 from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
@@ -16,8 +16,8 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from sqlitedict import SqliteDict
 
-from metamanager.PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.graph import successors as graph_successors
+from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal

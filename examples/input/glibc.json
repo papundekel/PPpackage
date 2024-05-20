@@ -2,7 +2,7 @@
     "requirements": [
         {
             "translator": "pacman",
-            "value": "coreutils"
+            "value": "glibc"
         }
     ]
 }

@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from collections.abc import Mapping
 from pathlib import Path
+from sys import stderr
 
 from networkx import MultiDiGraph, topological_generations
 
@@ -20,4 +21,7 @@ async def install(
 
                 installer = installers[installer_identifier]
 
-                group.create_task(installer.install(product_path, installation_path))
+                stderr.write(f"Installing {product_path}.\n")
+                await group.create_task(
+                    installer.install(product_path, installation_path)
+                )

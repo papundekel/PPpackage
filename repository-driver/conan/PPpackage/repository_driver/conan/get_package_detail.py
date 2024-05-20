@@ -1,9 +1,11 @@
+from itertools import chain
+
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import PackageDetail
 
 from .schemes import DriverParameters, Options, RepositoryParameters
 from .state import State
-from .utils import PREFIX, get_requirements
+from .utils import get_requirements
 
 
 async def get_package_detail(
@@ -13,12 +15,14 @@ async def get_package_detail(
     translated_options: Options,
     full_package_name: str,
 ) -> PackageDetail | None:
-    if not full_package_name.startswith(PREFIX):
+    if not full_package_name.startswith("conan-"):
         return None
 
-    revision = RecipeReference.loads(full_package_name[len(PREFIX) :])
+    revision = RecipeReference.loads(full_package_name[len("conan-") :])
 
-    requirements = get_requirements(state.api, state.app, revision)
+    requirements, system_requirements = get_requirements(
+        state.api, state.app, revision, system=True
+    )
 
     if requirements is None:
         return None
@@ -26,8 +30,13 @@ async def get_package_detail(
     return PackageDetail(
         frozenset([f"conan-{revision.name}"]),
         frozenset(
-            f"conan-{requirement.ref.name}"
-            for requirement in requirements
-            if not requirement.build
+            chain(
+                (
+                    f"conan-{requirement.ref.name}"
+                    for requirement in requirements
+                    if not requirement.build
+                ),
+                (f"pacman-{requirement}" for requirement in system_requirements),
+            )
         ),
     )
