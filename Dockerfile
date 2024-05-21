@@ -37,14 +37,33 @@ RUN pip install --upgrade pip
 
 FROM base-python AS repository-driver-pacman
 
-COPY utils/ /workdir/utils
-RUN pip install utils/
+COPY utils/async/ /workdir/utils/async
+RUN pip install utils/async
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+
+
+COPY utils/json/ /workdir/utils/json
+RUN pip install utils/json
+
+COPY utils/python/ /workdir/utils/python
+RUN pip install utils/python
+
+COPY utils/serialization/ /workdir/utils/serialization
+RUN pip install utils/serialization
+
 COPY repository-driver/server/ /workdir/repository-driver/server
 RUN pip install repository-driver/server/
+
+
+
+COPY utils/file/ /workdir/utils/file
+RUN pip install utils/file
+
+COPY utils/lock/ /workdir/utils/lock
+RUN pip install utils/lock
 
 COPY repository-driver/pacman/ /workdir/repository-driver/pacman
 RUN pip install repository-driver/pacman/
@@ -55,14 +74,30 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 FROM base-python AS repository-driver-aur
 
-COPY utils/ /workdir/utils
-RUN pip install utils/
+COPY utils/async/ /workdir/utils/async
+RUN pip install utils/async
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+
+
+COPY utils/json/ /workdir/utils/json
+RUN pip install utils/json
+
+COPY utils/python/ /workdir/utils/python
+RUN pip install utils/python
+
+COPY utils/serialization/ /workdir/utils/serialization
+RUN pip install utils/serialization
+
 COPY repository-driver/server/ /workdir/repository-driver/server
 RUN pip install repository-driver/server/
+
+
+
+COPY utils/file/ /workdir/utils/file
+RUN pip install utils/file
 
 COPY repository-driver/AUR/ /workdir/repository-driver/AUR
 RUN pip install repository-driver/AUR/
@@ -73,14 +108,30 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 FROM base-python AS repository-driver-conan
 
-COPY utils/ /workdir/utils
-RUN pip install utils/
+COPY utils/async/ /workdir/utils/async
+RUN pip install utils/async
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
 
+
+
+COPY utils/json/ /workdir/utils/json
+RUN pip install utils/json
+
+COPY utils/python/ /workdir/utils/python
+RUN pip install utils/python
+
+COPY utils/serialization/ /workdir/utils/serialization
+RUN pip install utils/serialization
+
 COPY repository-driver/server/ /workdir/repository-driver/server
 RUN pip install repository-driver/server/
+
+
+
+COPY utils/lock/ /workdir/utils/lock
+RUN pip install utils/lock
 
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
@@ -91,22 +142,43 @@ ENTRYPOINT [ "hypercorn", "PPpackage.repository_driver.server.server:server", "-
 
 FROM base-python AS updater
 
-COPY utils/ /workdir/utils
-RUN pip install utils/
+COPY utils/async/ /workdir/utils/async
+RUN pip install utils/async
 
 COPY repository-driver/interface/ /workdir/repository-driver/interface
 RUN pip install repository-driver/interface/
+
+
+
+COPY utils/json /workdir/utils/json
+RUN pip install utils/json
+
+COPY utils/cli /workdir/utils/cli
+RUN pip install utils/cli
+
+COPY utils/python /workdir/utils/python
+RUN pip install utils/python
 
 COPY repository-driver/update/ /workdir/repository-driver/update
 RUN pip install repository-driver/update/
 
 
 
+COPY utils/file/ /workdir/utils/file
+RUN pip install utils/file
+
+COPY utils/lock/ /workdir/utils/lock
+RUN pip install utils/lock
+
 COPY repository-driver/pacman/ /workdir/repository-driver/pacman
 RUN pip install repository-driver/pacman/
 
+
+
 COPY repository-driver/AUR/ /workdir/repository-driver/AUR
 RUN pip install repository-driver/AUR/
+
+
 
 COPY repository-driver/conan/ /workdir/repository-driver/conan
 RUN pip install repository-driver/conan/
@@ -148,11 +220,29 @@ ARG USER=root
 COPY --from=fakealpm /usr/local/bin/fakealpm /usr/local/bin/fakealpm
 COPY --from=fakealpm /usr/local/bin/fakealpm-executable /usr/local/bin/fakealpm-executable
 
-COPY utils/ /workdir/utils
-RUN pip install utils/
+COPY utils/json /workdir/utils/json
+RUN pip install utils/json
 
-COPY container-utils/ /workdir/container-utils
-RUN pip install container-utils/
+COPY utils/async /workdir/utils/async
+RUN pip install utils/async
+
+COPY utils/cli /workdir/utils/cli
+RUN pip install utils/cli
+
+COPY utils/container /workdir/utils/container
+RUN pip install utils/container
+
+COPY utils/file /workdir/utils/file
+RUN pip install utils/file
+
+COPY utils/lock /workdir/utils/lock
+RUN pip install utils/lock
+
+COPY utils/python /workdir/utils/python
+RUN pip install utils/python
+
+COPY utils/serialization /workdir/utils/serialization
+RUN pip install utils/serialization
 
 
 
