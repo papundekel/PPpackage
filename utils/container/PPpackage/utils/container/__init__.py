@@ -1,5 +1,4 @@
 from pathlib import Path
-from sys import stderr
 from typing import Any
 from typing import cast as type_cast
 
@@ -59,4 +58,6 @@ class Containerizer:
                     )
                 ).absolute()
 
-        raise ValueError(f"Path {container_path} is not in any of the translations")
+        raise Exception(
+            f"Path {container_path} cannot be translated by the containerizer."
+        )

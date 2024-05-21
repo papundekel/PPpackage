@@ -15,7 +15,7 @@
             "package": "PPpackage.repository_driver.conan"
         }
     },
-    "requirement_translators": {
+    "translators": {
         "pacman": {
             "package": "PPpackage.translator.pacman"
         },

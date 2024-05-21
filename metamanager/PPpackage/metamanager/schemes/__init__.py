@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from frozendict import frozendict
-from PPpackage.container_utils.schemes import ContainerizerConfig
 from PPpackage.repository_driver.interface.schemes import (
     BaseModuleConfig,
     Parameters,
@@ -12,7 +11,8 @@ from PPpackage.repository_driver.interface.schemes import (
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from PPpackage.utils.validation import WithVariables
+from PPpackage.utils.container.schemes import ContainerizerConfig
+from PPpackage.utils.json.validator import WithVariables
 
 
 @pydantic_dataclass(frozen=True)
@@ -48,7 +48,7 @@ class RepositoryDriverConfig(BaseModuleConfig):
 
 
 @pydantic_dataclass(frozen=True)
-class RequirementTranslatorConfig(BaseModuleConfig):
+class TranslatorConfig(BaseModuleConfig):
     pass
 
 
@@ -64,7 +64,7 @@ class GeneratorConfig(BaseModuleConfig):
 
 @pydantic_dataclass(frozen=True)
 class Config:
-    requirement_translators: Mapping[str, RequirementTranslatorConfig]
+    translators: Mapping[str, TranslatorConfig]
     installers: Mapping[str, InstallerConfig]
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
     product_cache_path: Annotated[Path, WithVariables]

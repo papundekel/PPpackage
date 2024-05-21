@@ -12,13 +12,14 @@ from PPpackage.repository_driver.interface.schemes import (
     ProductInfos,
     RepositoryConfig,
 )
+from PPpackage.utils.async_ import get_async_iterable_result
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.status import HTTP_200_OK, HTTP_304_NOT_MODIFIED
 
-from PPpackage.utils.stream import dump_many
-from PPpackage.utils.utils import iterable_with_result, load_interface_module
-from PPpackage.utils.validation import validate_json, validate_python
+from PPpackage.utils.json.validate import validate_json, validate_python
+from PPpackage.utils.python import load_interface_module
+from PPpackage.utils.serialization.writer import dump_many
 
 from .utils import StreamingResponse
 
@@ -93,7 +94,7 @@ async def fetch_translator_data(
 ):
     logger.info("Preparing translator data...")
 
-    epoch, translator_data = await iterable_with_result(
+    epoch, translator_data = await get_async_iterable_result(
         partial(
             interface.fetch_translator_data,
             state,
@@ -138,7 +139,7 @@ async def get_formula(
 ):
     logger.info("Preparing formula...")
 
-    epoch, formula = await iterable_with_result(
+    epoch, formula = await get_async_iterable_result(
         partial(
             interface.get_formula,
             state,

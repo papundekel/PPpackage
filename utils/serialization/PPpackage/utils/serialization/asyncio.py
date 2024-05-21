@@ -1,10 +1,8 @@
 from asyncio import StreamReader, StreamWriter
-from asyncio import start_unix_server as base_start_unix_server
-from collections.abc import Awaitable, Callable
-from pathlib import Path
 from typing import AsyncIterable
 
-from .stream import Reader, Writer
+from .reader import Reader
+from .writer import Writer
 
 
 class AsyncioReader(Reader):
@@ -35,12 +33,3 @@ class AsyncioWriter(Writer):
         async for chunk in data:
             self._writer.write(chunk)
         await self._writer.drain()
-
-
-async def start_unix_server(
-    client_connected_cb: Callable[[Reader, Writer], Awaitable[None]], socket_path: Path
-):
-    async def cb(reader: StreamReader, writer: StreamWriter) -> None:
-        await client_connected_cb(AsyncioReader(reader), AsyncioWriter(writer))
-
-    return await base_start_unix_server(cb, socket_path)

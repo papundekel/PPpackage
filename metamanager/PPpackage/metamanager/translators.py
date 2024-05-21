@@ -1,16 +1,15 @@
 from asyncio import TaskGroup
 from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence
 from itertools import chain
-from sys import stderr
 from typing import Any
 
 from PPpackage.translator.interface.interface import Interface
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import validate_python
+from PPpackage.utils.json.validate import validate_python
+from PPpackage.utils.python import load_interface_module
 
 from .repository import Repository
-from .schemes import RequirementTranslatorConfig
+from .schemes import TranslatorConfig
 
 
 async def repository_fetch_translator_data(
@@ -38,7 +37,7 @@ async def fetch_translator_data(
 class Translator:
     def __init__(
         self,
-        config: RequirementTranslatorConfig,
+        config: TranslatorConfig,
         data: Mapping[str, Iterable[dict[str, str]]],
     ):
         interface = load_interface_module(Interface, config.package)
@@ -75,7 +74,7 @@ class Translator:
 
 async def Translators(
     repositories: Iterable[Repository],
-    translators_config: Mapping[str, RequirementTranslatorConfig],
+    translators_config: Mapping[str, TranslatorConfig],
 ) -> tuple[Mapping[str, Translator], Iterable[Literal]]:
     data = await fetch_translator_data(repositories)
 

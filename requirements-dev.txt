@@ -1,5 +1,11 @@
--e ./utils/ --config-settings editable_mode=compat
--e ./container-utils/ --config-settings editable_mode=compat
+-e ./utils/json --config-settings editable_mode=compat
+-e ./utils/async --config-settings editable_mode=compat
+-e ./utils/cli --config-settings editable_mode=compat
+-e ./utils/container --config-settings editable_mode=compat
+-e ./utils/file --config-settings editable_mode=compat
+-e ./utils/lock --config-settings editable_mode=compat
+-e ./utils/python --config-settings editable_mode=compat
+-e ./utils/serialization --config-settings editable_mode=compat
 
 
 

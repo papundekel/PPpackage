@@ -1,5 +1,6 @@
-from PPpackage.container_utils.schemes import ContainerizerConfig
 from pydantic import BaseModel
+
+from PPpackage.utils.container.schemes import ContainerizerConfig
 
 
 class Parameters(BaseModel):

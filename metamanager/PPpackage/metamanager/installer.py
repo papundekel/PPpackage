@@ -2,8 +2,8 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from PPpackage.installer.interface.interface import Interface
-from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import validate_python
+from PPpackage.utils.json.validate import validate_python
+from PPpackage.utils.python import load_interface_module
 
 from .schemes import InstallerConfig
 

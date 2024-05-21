@@ -6,5 +6,8 @@ setup(
     version="0.1.0",
     install_requires=[
         "PPpackage-repository-driver-interface",
+        "PPpackage-utils-cli",
+        "PPpackage-utils-json",
+        "PPpackage-utils-python",
     ],
 )

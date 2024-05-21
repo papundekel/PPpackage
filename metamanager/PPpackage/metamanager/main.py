@@ -2,18 +2,15 @@ from asyncio import TaskGroup
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
-from traceback import print_exc
-from typing import IO
 
 from httpx import Client as HTTPClient
-from PPpackage.container_utils import Containerizer
-from pydantic import ValidationError
 from sqlitedict import SqliteDict
 
-from PPpackage.utils.validation import validate_json
+from PPpackage.utils.container import Containerizer
+from PPpackage.utils.json.validate import validate_json_io, validate_json_io_path
 
 from .create_graph import create_graph, write_graph_to_file
-from .exceptions import NoModelException, print_exception_group
+from .exceptions import HandledException, handle_exception_group
 from .fetch_and_install import fetch_and_install
 from .generate import generate
 from .installer import Installers
@@ -25,35 +22,6 @@ from .translators import Translators
 logger = getLogger(__name__)
 
 
-def parse_input(stdin: IO[bytes]) -> Input:
-    input_json_bytes = stdin.read()
-
-    try:
-        input = validate_json(Input, input_json_bytes)
-    except ValidationError as e:
-        stderr.write("ERROR: Invalid input.\n")
-        stderr.write(e.json(indent=4))
-
-        raise
-
-    return input
-
-
-def parse_config(config_path: Path) -> Config:
-    with config_path.open("rb") as f:
-        config_json_bytes = f.read()
-
-        try:
-            config = validate_json(Config, config_json_bytes)
-        except ValidationError as e:
-            stderr.write("ERROR: Invalid config.\n")
-            stderr.write(e.json(indent=4))
-
-            raise
-
-        return config
-
-
 async def main(
     config_path: Path,
     installation_path: Path,
@@ -61,21 +29,18 @@ async def main(
     graph_path: Path | None,
 ) -> None:
     try:
-        config = parse_config(config_path)
-
-        containerizer = Containerizer(config.containerizer)
-        installers = Installers(config.installers)
-        product_cache_path = config.product_cache_path
-
-        input = parse_input(stdin.buffer)
+        config = validate_json_io_path(Config, config_path)
 
         async with Repositories(
             config.repository_drivers, config.repositories
         ) as repositories:
             async with TaskGroup() as task_group:
                 translators_task = task_group.create_task(
-                    Translators(repositories, config.requirement_translators)
+                    Translators(repositories, config.translators)
                 )
+
+                containerizer = Containerizer(config.containerizer)
+                input = validate_json_io(Input, stdin.buffer)
 
                 stderr.write("Resolving...\n")
 
@@ -89,9 +54,11 @@ async def main(
                 )
 
             with HTTPClient() as archive_client:
-                product_cache_path.mkdir(parents=True, exist_ok=True)
+                config.product_cache_path.mkdir(parents=True, exist_ok=True)
 
-                with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
+                with SqliteDict(
+                    config.product_cache_path / "mapping.db"
+                ) as cache_mapping:
                     stderr.write("Creating graph...\n")
 
                     graph = await create_graph(
@@ -105,6 +72,8 @@ async def main(
                     if graph_path is not None:
                         write_graph_to_file(graph, graph_path)
                         stderr.write(f"Graph written to {graph_path}.\n")
+
+                    installers = Installers(config.installers)
 
                     stderr.write(f"Fetching and installing to {installation_path}...\n")
 
@@ -128,7 +97,5 @@ async def main(
             await generate(config.generators, graph, input.generators, generators_path)
 
         stderr.write("Done.\n")
-    except* NoModelException as exception_group:
-        print_exception_group(stderr, exception_group)
-    except* Exception:
-        print_exc(file=stderr)
+    except* HandledException as exception_group:
+        handle_exception_group(stderr, exception_group)

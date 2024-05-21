@@ -3,13 +3,11 @@ from collections.abc import Awaitable, Iterable, Mapping, MutableMapping, Set
 from functools import singledispatch
 from hashlib import sha1
 from pathlib import Path
-from sys import stderr
 from tempfile import mkdtemp
 from typing import Any
 
 from httpx import Client as HTTPClient
 from networkx import MultiDiGraph, topological_generations
-from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
@@ -24,8 +22,10 @@ from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.schemes.node import NodeData
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import lock_by_key, rmtree
-from PPpackage.utils.validation import dump_json
+from PPpackage.utils.container import Containerizer
+from PPpackage.utils.file import rmtree
+from PPpackage.utils.json.dump import dump_json
+from PPpackage.utils.lock.by_key import lock_by_key
 
 
 @singledispatch

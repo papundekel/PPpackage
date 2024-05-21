@@ -5,9 +5,9 @@ from typing import Any
 
 from asyncstdlib import chain as async_chain
 from PPpackage.repository_driver.interface.schemes import Requirement
+from PPpackage.utils.async_ import Result
 
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import Result
 
 from .repository import Repository
 from .translators import Translator

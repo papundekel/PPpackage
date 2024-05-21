@@ -1,7 +1,7 @@
 from httpx import Response
 
-from PPpackage.utils.http_stream import AsyncChunkReader
+from PPpackage.utils.serialization.chunk_reader import ChunkReader
 
 
 def HTTPResponseReader(response: Response):
-    return AsyncChunkReader(memoryview(chunk) async for chunk in response.aiter_raw())
+    return ChunkReader(memoryview(chunk) async for chunk in response.aiter_raw())

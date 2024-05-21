@@ -12,11 +12,12 @@ from collections.abc import (
 from pathlib import Path
 from typing import Any
 
-from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import Requirement
+from PPpackage.utils.async_ import Result
 
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import Result, TemporaryDirectory
+from PPpackage.utils.container import Containerizer
+from PPpackage.utils.file import TemporaryDirectory
 
 from .build_formula import build_formula
 from .exceptions import NoModelException
@@ -25,7 +26,7 @@ from .translate_options import translate_options
 from .translators import Translator
 
 
-def get_variable_int(
+def get_variable_mapping(
     mapping_to_int: MutableMapping[str, int],
     mapping_to_string: MutableSequence[str],
     variable: str,
@@ -40,38 +41,47 @@ def get_variable_int(
     return value
 
 
-async def save_to_dimacs(
-    formula: AsyncIterable[list[Literal]], path: Path
-) -> tuple[Mapping[str, int], Sequence[str]]:
+async def map_formula(
+    formula: AsyncIterable[list[Literal]],
+) -> tuple[Sequence[list[int]], Mapping[str, int], Sequence[str]]:
     mapping_to_int = dict[str, int]()
     mapping_to_string = list[str]()
-    clause_count = 0
 
-    formula_mapped = list[list[int]]()
+    mapped_formula = list[list[int]]()
 
     async for clause in formula:
-        clause_mapped = list[int]()
+        mapped_clause = list[int]()
 
         for literal in clause:
-            symbol_mapped = get_variable_int(
+            symbol_mapped = get_variable_mapping(
                 mapping_to_int, mapping_to_string, literal.symbol
             )
-            clause_mapped.append(symbol_mapped if literal.polarity else -symbol_mapped)
+            mapped_clause.append(symbol_mapped if literal.polarity else -symbol_mapped)
 
-        if len(clause_mapped) == 0:
+        if len(mapped_clause) == 0:
             raise NoModelException
 
-        formula_mapped.append(clause_mapped)
+        mapped_formula.append(mapped_clause)
 
-        clause_count += 1
+    return mapped_formula, mapping_to_int, mapping_to_string
 
+
+def write_dimacs(formula: Sequence[list[int]], variable_count: int, path: Path):
     with path.open("w") as file:
-        file.write(f"p cnf {len(mapping_to_string)} {clause_count}\n")
+        file.write(f"p cnf {variable_count} {len(formula)}\n")
 
-        for clause in formula_mapped:
+        for clause in formula:
             for literal in clause:
                 file.write(f"{literal} ")
             file.write("0\n")
+
+
+async def save_dimacs(
+    formula: AsyncIterable[list[Literal]], path: Path
+) -> tuple[Mapping[str, int], Sequence[str]]:
+    mapped_formula, mapping_to_int, mapping_to_string = await map_formula(formula)
+
+    write_dimacs(mapped_formula, len(mapping_to_string), path)
 
     return mapping_to_int, mapping_to_string
 
@@ -102,7 +112,7 @@ async def solve(
         assumptions_path = mount_dir_path / "assumptions"
         output_path = mount_dir_path / "output"
 
-        mapping_to_int, mapping_to_string = await save_to_dimacs(formula, formula_path)
+        mapping_to_int, mapping_to_string = await save_dimacs(formula, formula_path)
 
         _, assumptions = await translators_task
 
@@ -141,7 +151,6 @@ async def resolve(
     options: Any,
     requirements: Iterable[Requirement],
 ) -> tuple[Mapping[Repository, Any], Set[str]]:
-
     async with TaskGroup() as task_group:
         repository_with_translated_options_tasks = translate_options(
             task_group, repositories, options

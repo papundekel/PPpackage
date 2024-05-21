@@ -2,8 +2,7 @@ from collections.abc import AsyncIterable
 
 from aiosqlite import Connection
 from PPpackage.repository_driver.interface.schemes import Requirement
-
-from PPpackage.utils.utils import Result
+from PPpackage.utils.async_ import Result
 
 from .epoch import get as get_epoch
 from .schemes import DriverParameters, RepositoryParameters

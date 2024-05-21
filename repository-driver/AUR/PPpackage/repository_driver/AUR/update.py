@@ -5,8 +5,8 @@ from anysqlite import connect as sqlite_connect
 from hishel import AsyncCacheClient as HTTPClient
 from hishel import AsyncSQLiteStorage
 
-from PPpackage.utils.utils import TemporaryDirectory
-from PPpackage.utils.validation import validate_json
+from PPpackage.utils.file import TemporaryDirectory
+from PPpackage.utils.json.validate import validate_json
 
 from .epoch import update as update_epoch
 from .schemes import AURPackage, DriverParameters, RepositoryParameters
