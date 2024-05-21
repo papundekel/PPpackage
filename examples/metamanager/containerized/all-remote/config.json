@@ -1,5 +1,5 @@
 {
-    "requirement_translators": {
+    "translators": {
         "pacman": {
             "package": "PPpackage.translator.pacman"
         },

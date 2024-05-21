@@ -1,6 +1,6 @@
 {
     "product_cache_path": "tmp/cache/product",
-    "requirement_translators": {
+    "translators": {
         "pacman": {
             "package": "PPpackage.translator.pacman"
         },

@@ -48,7 +48,7 @@ class RepositoryDriverConfig(BaseModuleConfig):
 
 
 @pydantic_dataclass(frozen=True)
-class RequirementTranslatorConfig(BaseModuleConfig):
+class TranslatorConfig(BaseModuleConfig):
     pass
 
 
@@ -64,7 +64,7 @@ class GeneratorConfig(BaseModuleConfig):
 
 @pydantic_dataclass(frozen=True)
 class Config:
-    requirement_translators: Mapping[str, RequirementTranslatorConfig]
+    translators: Mapping[str, TranslatorConfig]
     installers: Mapping[str, InstallerConfig]
     repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
     product_cache_path: Annotated[Path, WithVariables]

@@ -37,7 +37,7 @@ async def main(
         ) as repositories:
             async with TaskGroup() as task_group:
                 translators_task = task_group.create_task(
-                    Translators(repositories, config.requirement_translators)
+                    Translators(repositories, config.translators)
                 )
 
                 containerizer = Containerizer(config.containerizer)
