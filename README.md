@@ -1,130 +1,112 @@
 # PPpackage
 
-An experimental package meta-manager.
+An experimental package meta-manager primarily focused on compiled languages, in particular C++.
 
-Currently supports [`arch`](https://archlinux.org/) and [`conan`](https://conan.io/) sub-managers. Also implements a custom `PP` submanager for testing and demonstration purposes.
+Currently integrates [pacman](https://pacman.archlinux.page/) (both official and unofficial repositories), [AUR](https://aur.archlinux.org/) and [Conan](https://conan.io/).
 
-Takes a set of requirements and creates an installation directory with packages that satisfy the requirements.
+Takes a propositional logic formula and produces a directory with a set of packages that satisfy the formula. The resulting directory is intended to be used as a root directory of a container image.
+
+Promotes building packages from source with binary caching. Provides means to communicate ABI compatibility to take full advantage of caching.
+
+Supports and generalizes Conan generators for package consumption.
+
+## Glossary
+
+- **package** - a string identifying a package source. Corresponds to a package version in most managers.
+- **(package) source** - a set of files from which a package product can be built.
+- **(package) product** - a set of files that are the result of building a package from a package source. Can be installed into a directory. Each package can produce many different products.
+- **product info** - a JSON containing information about a product. May contain useful information about the ABI. (Although not necessary, it is also currently used as a unique product identifier).
 
 ## Architecture
 
-The application consists of two main parts. The meta-manager, with which the user interacts, and submanagers, which are queried by the meta-manager.
+The application is highly modular. It is divided into the meta-manager part and many modules. The meta-manager is a driver which communicates with the modules. The modules implement the actual package managers' behavior.
 
-### Glossary
+The different types of modules are:
 
-- **package** - a string identifying a set of related package versions. Unique to a submanager.
-- **package version** - a string identifying a specific version of a package. Corresponds to one **package source**.
-- **package source** - a set of files from which a package can be built.
-- **package product** or **product** - a set of files that are the result of building a package from a package source. Can be installed into a directory.
-- **product ID** - a string identifying a product.
-- **product info** - a JSON containing information about a product. May contain useful information about ABI. **infos** of dependencies are consumed when building the depending package.
-- **requirement** - a JSON with specific meaning to a submanager. Constrains the resulting installation.
+- repository driver
+- requirement translator
+- installer
+- generator
+
+Each module type handles a certain part of the package management process. There are typicly multiple modules of each type, each implementing a part of some manager's functionality.
+
+All modules can present a Python interface. The repository drivers can also be communicated with using a REST API.
 
 ### Meta-manager
 
-The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the submanagers, and to combine the results and present them to the user.
+The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the modules, and to combine the results and present them to the user.
 
 Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section.
 
 The meta-manager works in these basic phases:
 
-1. **RESOLVE** - forwards the requirements to the submanagers until a set of package versions that satisfy the requirements is found
-2. **FETCH** - when versions are known, the submanagers are requested to fetch the package products (e. g. binaries). This may mean downloading built binaries or building the packages. Outputs of this phase are also the product ID and product info. Fetching is done in the order defined by the dependency graph. Unordered packages are fetched in parallel.
-3. **INSTALL** - when products are known, the submanagers are requested to install them into the installation directory. Output of this phase is the installation directory. Installation is done sequentially in the order defined by the dependency graph.
-4. **GENERATE** - optional. When the installation directory is used to build a package depending on the installed packages, generators can be produced. Output of this phase is the generators directory. It contains necessary files for building against the installed packages.
+1. **RESOLVE** - the formula is resolved into a dependency graph.
+2. **FETCH** - the packages are downloaded/built with respect to the graph.
+3. **INSTALL** - each product is installed into the directory with respect to the graph.
+4. **GENERATE** - optional. Each generator is invoked on the set of all products.
 
-### Submanagers
+### Repository drivers
 
-Submanagers are the actual package managers. They are responsible for resolving requirements, downloading or building binaries and installing them into a directory.
+A repository driver is responsible for providing information about packages and their relationships.
 
-Communication between the meta-manager and submanagers can be done in two ways. The first is by running the submanagers as part of the meta-manager by loading them as Python modules. The second is by making requests to a REST API. The way in which the submanagers are used is defined the meta-manager configuration.
+#### Epoch
 
-The same interface that can be loaded by the meta-manager can also be used by the framework `PPpackage-submanager` to create a HTTP server serving the REST API interface needed by the meta-manager.
+Some repository information is valid indefinitely, such as dependencies of a certain package version. Others can change in time, e. g. the set of all packages, therefore the driver must provide a current epoch identifier. When the epoch changes, all epoch-bound data are invalidated.
 
-## Interfaces
+Repository drivers provide epoch as a separate interface and also in each interface providing epoch-bound data. This way the data can be validated against each other so every piece of information is from the same epoch.
 
-### Python
+#### Formula
 
-```python
-from PPpackage.submanager.schemes import (
-    Dependency,
-    Package,
-    Product,
-    ResolutionGraph,
-)
+The formula is the main piece of data that a repository provides. It describes valid package subsets that can coexist in an installation, i.e. it mainly provides the dependencies. It is a propositional logic formula and its variables are JSON objects that are eventually translated into strings.
 
-async def update_database(
-    settings: Settings,
-    state: State,
-):
-    ...
+The final formula is a conjunction of all repositories' formulas.
 
-async def resolve(
-    settings: Settings,
-    state: State,
-    options: Any,
-    requirements: AsyncIterable[AsyncIterable[Requirement]],
-) -> AsyncIterable[ResolutionGraph]:
-    ...
+#### Translator data
 
-async def fetch(
-    settings: Settings,
-    state: State,
-    options: Any,
-    package: Package,
-    dependencies: AsyncIterable[Dependency],
-    installation_path: Path | None,
-    generators_path: Path | None,
-) -> ProductIDAndInfo | AsyncIterable[str]:
-    ...
+In order for repositories to be able to provide packages that interact with each other, some data from repositories needs to be combined into a single structure. This is achieved by the translator data. It is a mapping of symbols to groups which is created from all repositories' translator data.
 
-async def install(
-    settings: Settings,
-    state: State,
-    options: Any,
-    product: Product,
-    installation_path: Path,
-) -> None:
-    ...
+Its purpose is to provide information about which versions correspond to a single package or a package "provide" in pacman.
 
-async def generate(
-    settings: Settings,
-    state: State,
-    options: Any,
-    products: AsyncIterable[Product],
-    generators: AsyncIterable[str],
-    generators_path: Path,
-):
-    ...
-```
+#### Package detail
 
-`Settings` and `State` are defined by the submanager.
+The model satisfying a formula is a set of strings. From this set the package manager needs to derive a dependency graph. For this purpose, the repository driver provides a package detail for each package. If a string doesn't correspond to a package, the driver returns a null value.
 
-### REST API
+A package's detail also contains its interfaces and interface dependencies. These are used to construct the dependency graph. Note that in a typical package manager a single dependency mechanism handles both the valid package sets and the dependency graph. In this application, these two issues are separated.
 
-<summary><code>POST</code> <code><b>/resolve</b></code></summary>
-<summary><code>POST</code> <code><b>/products</b></code></summary>
-<summary><code>POST</code> <code><b>/installations</b></code></summary>
-<summary><code>PATCH</code> <code><b>/installations/{id}</b></code></summary>
-<summary><code>PUT</code> <code><b>/installations/{id}</b></code></summary>
-<summary><code>GET</code> <code><b>/installations/{id}</b></code></summary>
-<summary><code>DELETE</code> <code><b>/installations/{id}</b></code></summary>
-<summary><code>POST</code> <code><b>/generators</b></code></summary>
+#### Build context
 
-\
-All endpoints behave as their Python counterparts except for installation.
+Information which describes how to fetch a package is here called the build context. It can either be:
 
-The **INSTALL** phase is fragmented in remote submanagers to allow for request interleaving.
+- an archive URL - simplest, the product is directly downloaded
+- meta build context - a regular input to the meta-manager which is used to construct a container in which the package is built
 
-To simulate the same behavior as in the Python interface, these steps are made:
+In the future it would also be possible to support building in a container specified by the image tag or a Dockerfile.
 
-1. a `POST` request is made to `/installations` to upload a directory. `id` is returned.
-2. a series of `PATCH` requests is made to `/installations/{id}` to install products
-3. `GET` request is made to `/installations/{id}` to download the installation directory
-4. other submanagers do work on the directory
-5. a `PUT` request is made to `/installations/{id}` to update the directory after changes made
-6. `GET` request is made to `/installations/{id}` to download the installation directory when all work is done
-7. a `DELETE` request is made to `/installations/{id}` to delete the installation directory
+#### Product info
+
+In order to support good caching, package authors and maintainers can provide information for each product. This "product info" is used to 1) identify the product and 2) provide ABI information to depending packages.
+
+The repository driver is responsible for computing a product's info from just the product infos of its dependencies and some information about the build context *without* building the package. This is essential for caching, as we can determine whether a build would produce an equivalent product without actually building the package.
+
+### Requirement translator
+
+The requirement translators are mainly responsible for implementing version semantics. Their input is the whole translator info and a requirement from the formula. The output is again a formula, but with variables being strings.
+
+#### Assumptions
+
+The translators can also provide assumptions, which are variable polarity assignments that the meta-manager is supposed to try to satisfy. This is useful for preferential model selection i.e. when combing pacman and AUR where the user expects AUR packages to be used only if necessary.
+
+### Installer
+
+Since package installation is quite complex in both pacman and Conan, separate installer modules are used.
+
+Pacman supports running arbitrary hooks while installing a package and also maintains a database of installed packages for updates.
+
+Conan installs all packages into a single cache from which they can be used in builds using generators.
+
+### Generator
+
+Generators are used by Conan to provide a way to consume packages. Generators provide paths to libraries, CMake files and so on.
 
 ## Meta-manager Input
 
@@ -134,233 +116,66 @@ The input is taken by stdin and it is in JSON format.
 
 ```json
 {
-    "requirements": {
-        "manager1": [
-            "req1",
-            {
-                "name": "req2",
-                "version": ">=1.0.0"
-            },
-        ],
-        "manager2": [
-            ["req1a", "req1b"],
-            ["req2a", "req2b", "req2c"]
-        ],
-    },
-    "options": {
-        "manager2": {
-            "settings": {
-                "arch": "x86_64",
-                "build_type": "Release",
-                "os": "Linux"
-            },
+    "requirements": [
+        {
+            "translator": "pacman",
+            "value": "official-package"
+        },
+        {
+            "translator": "pacman",
+            "value": "AUR-package=v1"
+        },
+        {
+            "translator": "pacman",
+            "value": "provide-package>=v2"
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "package1",
+                "version": "1.2.3"
+            }
+        },
+        {
+            "translator": "conan",
+            "value": {
+                "package": "package2",
+                "version": "[>=2.3.4]"
+            }
         }
-    },
+    ],
     "generators": [
-        "generator1",
-        "generator2"
+        "conan-CMakeDeps",
+        "conan-CMakeToolchain"
     ]
 }
 ```
 
 ## Requirements
 
-Each sub-manager can have any number of requirements.
-The format of individual requirements is defined by the sub-manager.
-Requirements are passed as-is by the meta-manager.
+The requirements are currently a conjunction but could be any propositional formula.
 
-### arch
+### `pacman` translator
 
-Just the package name or `provides` string, e.g. `bash` or `sh`.
+Any string valid in pacman depends or conflicts field. This means a (virtual) package name with an optional version specification.
 
-### conan
+### `conan` translator
 
 Dictionary with package name and version requirement.
 
 ```json
 {
-    "package": "openssl",
-    "version": "[>=3.1.0]"
+    "package": "package",
+    "version": "version"
 },
 ```
 
-Corresponds to `openssl/[>=3.1.0]` in Conan.
-
-## Options
-
-Any JSON object for a sub-manager. Modifies the behavior of the respective sub-manager.
-Affects the resulting installation.
-
-Inspired by Conan.
-
-### arch
-
-Ignored.
-
-### conan
-
-Parsed into a Conan [profile](https://docs.conan.io/2/reference/config_files/profiles.html) INI file.
-
-## Generators
-
-A set of strings.
-
-Applies to all sub-managers (each gets the whole set).
-
-Only useful when building. The installation contains the dependencies and generators are used to build againts them.
-
-```bash
-python -m PPpackage --generators <generators_path> ...
-```
-
-### arch
-
-Ignored.
-
-### conan
-
-[generators](https://docs.conan.io/2/reference/conanfile/methods/generate.html?highlight=generator).
-
-## Input example
-
-```json
-{
-    "requirements": {
-        "arch": [
-            "sh",
-            "coreutils",
-        ],
-        "conan": [
-            {
-                "package": "openssl",
-                "version": "[>=3.1.0]"
-            },
-            {
-                "package": "nameof",
-                "version": "0.10.1"
-            },
-            {
-                "package": "openssl",
-                "version": "[>=3.1.1]"
-            }
-        ]
-    },
-    "options": {
-        "conan": {
-            "settings": {
-                "arch": "x86_64",
-                "build_type": "Release",
-                "compiler": "gcc",
-                "compiler.cppstd": "gnu17",
-                "compiler.libcxx": "libstdc++11",
-                "compiler.version": "13",
-                "os": "Linux"
-            },
-            "options": {
-                "zlib*:shared": "True"
-            }
-        }
-    },
-    "generators": [
-        "CMakeDeps",
-        "CMakeToolchain",
-    ]
-}
-```
-
-More input examples can be found in the `input/` directory.
+Corresponds to `package/version` in Conan.
 
 ## Resolution graph
 
 The meta-manager is able to generate a dot file with the resolution graph.
 
 ```bash
-python -m PPpackage --graph <graph_path> ...
-```
-
-## Testing
-
-For all testing scenarios, a clone of the repository is required.
-
-An empty directory where all temporary files and outputs can be stored is also helpful.
-All scripts must be run from the root of the repository and expect the `tmp/` directory to exist.
-
-```bash
-git clone https://github.com/papundekel/PPpackage
-cd PPpackage/
-mkdir tmp/
-```
-
-The installation directory, generators and the resolution graph are located
-in the `tmp/output/` directory in all scenarios.
-
-Leaving the outputs before subsequent runs is possible, but note that in that case
-the installation will be done on top of that content.
-
-Note that all submanagers use caching and the first runs can take a few minutes.
-Do not remove the cache directories/volumes to get the best performance.
-
-All scripts are located in the `test/` directory.
-
-### Native
-
-It is possible to test the application directly on the host machine without any containerization.
-
-As all applications in these scenarios run on the host, we need to install
-the required packages first.
-
-```bash
-python -m venv .venv/
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-```
-
-This script runs all submanagers as part of the meta-manager. Is the fastest
-with the least requirements:
-
-```bash
-./test/all-local.sh < examples/input/basic.json
-```
-
-This script runs all submanagers as separate HTTP servers. It requires `hypercorn`
-and sends the installation directories through the network so is slower than the
-previous option:
-
-```bash
-./test/all-remote.sh < examples/input/basic.json
-```
-
-### Containerized
-
-It is also possible to run the application using the Compose Specification.
-Both Docker and podman are supported.
-
-Docker requires more configuration because of how
-user namespace mappings work, so the compose files are written to work for podman.
-Support for Docker can be added to the compose file by supplying the `USER` environment variable to the composer and Dockerfile and bind mounting the `/etc/passwd`
-and `/etc/group` files. An example of this configuration can be seen in the github workflow in `.github/compose.yaml`.
-
-Submanager caches are configured to be stored in volumes. This means that
-the cache from native runs will not be used. To use the cache from native runs,
-change the compose files and bind mount the cache directories instead.
-
-This script runs the metamanager in a container with all submanagers running
-as its parts:
-
-```bash
-./test/containerized-all-local.sh < examples/input/basic.json
-```
-
-Before running containerized managers as servers, secrets used for authentication
-need to be initialized. This needs to be done only once.
-Run the following script:
-
-```bash
-./test/containerized-all-remote-init.sh
-```
-
-Then its posiible to run this script which runs the metamanager in a container with all submanagers running as HTTP servers in separate containers:
-
-```bash
-./test/containerized-all-remote.sh < examples/input/basic.json
+python -m PPpackage.metamanager --graph <graph_path> ...
 ```
