@@ -2,7 +2,7 @@ from inspect import isclass
 from json import dumps as json_dumps
 from os import environ
 from string import Template
-from typing import Any
+from typing import IO, Any
 
 from pydantic import AfterValidator, BaseModel, RootModel
 
@@ -37,6 +37,14 @@ def validate_json[T](Model: type[T], input_json: str | bytes) -> T:
     input_wrapped = ModelWrapped.model_validate_json(input_json)
 
     input = unwrap_instance(input_wrapped)
+
+    return input
+
+
+def validate_json_io[T](Model: type[T], input_io: IO[bytes]) -> T:
+    input_json = input_io.read()
+
+    input = validate_json(Model, input_json)
 
     return input
 
