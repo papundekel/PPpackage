@@ -7,7 +7,7 @@ from httpx import Client as HTTPClient
 from PPpackage.container_utils import Containerizer
 from sqlitedict import SqliteDict
 
-from PPpackage.utils.validation import validate_json_io
+from PPpackage.utils.validation import validate_json_io, validate_json_io_path
 
 from .create_graph import create_graph, write_graph_to_file
 from .exceptions import HandledException, handle_exception_group
@@ -29,8 +29,7 @@ async def main(
     graph_path: Path | None,
 ) -> None:
     try:
-        with config_path.open("rb") as config_file:
-            config = validate_json_io(Config, config_file)
+        config = validate_json_io_path(Config, config_path)
 
         async with Repositories(
             config.repository_drivers, config.repositories

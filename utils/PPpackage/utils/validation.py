@@ -1,6 +1,7 @@
 from inspect import isclass
 from json import dumps as json_dumps
 from os import environ
+from pathlib import Path
 from string import Template
 from typing import IO, Any
 
@@ -45,6 +46,13 @@ def validate_json_io[T](Model: type[T], input_io: IO[bytes]) -> T:
     input_json = input_io.read()
 
     input = validate_json(Model, input_json)
+
+    return input
+
+
+def validate_json_io_path[T](Model: type[T], input_path: Path) -> T:
+    with input_path.open("rb") as input_io:
+        input = validate_json_io(Model, input_io)
 
     return input
 

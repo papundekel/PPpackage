@@ -80,7 +80,7 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return response.headers["ETag"], validate_json(Any, memoryview(response.read()))  # type: ignore
+        return response.headers["ETag"], validate_json(Any, response.read())  # type: ignore
 
     async def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
@@ -121,7 +121,7 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return validate_json(PackageDetail, memoryview(response.read()))
+        return validate_json(PackageDetail, response.read())
 
     async def get_build_context(
         self,
@@ -143,7 +143,7 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return validate_json(BuildContextDetail, memoryview(response.read()))  # type: ignore
+        return validate_json(BuildContextDetail, response.read())  # type: ignore
 
     async def compute_product_info(
         self,
@@ -167,4 +167,4 @@ class RemoteRepository(RepositoryInterface):
                 f"{(await response.aread()).decode()}"
             )
 
-        return validate_json(ProductInfo, memoryview(response.read()))  # type: ignore
+        return validate_json(ProductInfo, response.read())  # type: ignore
