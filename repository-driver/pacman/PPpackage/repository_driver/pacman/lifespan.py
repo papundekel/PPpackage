@@ -6,7 +6,7 @@ from fasteners import InterProcessReaderWriterLock
 from httpx import Client as HTTPClient
 from pyalpm import Handle
 
-from PPpackage.utils.utils import TemporaryDirectory
+from PPpackage.utils.file import TemporaryDirectory
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State

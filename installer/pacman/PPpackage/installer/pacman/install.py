@@ -1,14 +1,22 @@
-from asyncio import Lock, create_subprocess_exec
+from asyncio import (
+    Lock,
+    StreamReader,
+    StreamWriter,
+    create_subprocess_exec,
+    start_unix_server,
+)
 from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 
 from asyncstdlib import list as async_list
-from PPpackage.container_utils import Containerizer
 
 from PPpackage.installer.interface.exceptions import InstallerException
-from PPpackage.utils.asyncio_stream import start_unix_server
-from PPpackage.utils.stream import Reader, Writer, dump_one
-from PPpackage.utils.utils import TemporaryDirectory, TemporaryPipe, lock_by_key
+from PPpackage.utils.container import Containerizer
+from PPpackage.utils.file import TemporaryDirectory, TemporaryPipe
+from PPpackage.utils.lock.by_key import lock_by_key
+from PPpackage.utils.serialization.asyncio import AsyncioReader, AsyncioWriter
+from PPpackage.utils.serialization.writer import dump_one
 
 from .schemes import Parameters
 
@@ -35,9 +43,12 @@ def create_necessary_container_files(root_path: Path):
 async def install_manager_command(
     containerizer: Containerizer,
     installation_path: Path,
-    reader: Reader,
-    writer: Writer,
+    stream_reader: StreamReader,
+    stream_writer: StreamWriter,
 ):
+    reader = AsyncioReader(stream_reader)
+    writer = AsyncioWriter(stream_writer)
+
     command = await reader.load_one(str)
     args = reader.load_many(str)
 
@@ -76,9 +87,7 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
         server_socket_path = server_socket_directory_path / "server.sock"
 
         server = await start_unix_server(
-            lambda reader, writer: install_manager_command(
-                containerizer, installation_path, reader, writer
-            ),
+            partial(install_manager_command, containerizer, installation_path),
             server_socket_path,
         )
 
@@ -95,6 +104,7 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
             )
 
             return_code = await process.wait()
+
             if return_code != 0:
                 raise InstallerException(
                     f"fakealpm exited with non-zero return code: {return_code}"

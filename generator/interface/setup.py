@@ -4,5 +4,7 @@ setup(
     name="PPpackage-generator-interface",
     packages=["PPpackage.generator.interface"],
     version="0.1.0",
-    install_requires=["pydantic"],
+    install_requires=[
+        "pydantic",
+    ],
 )

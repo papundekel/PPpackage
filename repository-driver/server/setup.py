@@ -6,6 +6,9 @@ setup(
     version="0.1.0",
     install_requires=[
         "PPpackage-repository-driver-interface",
+        "PPpackage-utils-json",
+        "PPpackage-utils-python",
+        "PPpackage-utils-serialization",
         "fastapi",
         "pydantic_settings",
     ],

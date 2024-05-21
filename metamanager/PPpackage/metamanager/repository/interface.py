@@ -10,9 +10,8 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
+from PPpackage.utils.async_ import Result
 from pydantic import AnyUrl
-
-from PPpackage.utils.utils import Result
 
 
 class RepositoryInterface(Protocol):

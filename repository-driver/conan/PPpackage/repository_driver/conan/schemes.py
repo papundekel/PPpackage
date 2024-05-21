@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import AnyUrl, BaseModel
 
-from PPpackage.utils.validation import WithVariables
+from PPpackage.utils.json.validator import WithVariables
 
 
 class DriverParameters(BaseModel):

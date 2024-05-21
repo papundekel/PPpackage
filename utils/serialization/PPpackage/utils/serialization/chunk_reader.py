@@ -1,11 +1,10 @@
 from asyncio import IncompleteReadError
 from collections.abc import AsyncIterable
 
-from .queue import Queue, queue_iterate
-from .stream import Reader, Writer
+from .reader import Reader
 
 
-class AsyncChunkReader(Reader):
+class ChunkReader(Reader):
     def __init__(self, chunks: AsyncIterable[memoryview]):
         self._buffer = bytearray()
         self._iterator = aiter(chunks)
@@ -46,14 +45,3 @@ class AsyncChunkReader(Reader):
 
     def read(self) -> AsyncIterable[memoryview]:
         return self._iterator
-
-
-class HTTPWriter(Writer):
-    def __init__(self):
-        self._queue = Queue[memoryview]()  # type: ignore
-
-    async def write(self, data: memoryview) -> None:
-        await self._queue.put(data)
-
-    def iterate(self):
-        return queue_iterate(self._queue)

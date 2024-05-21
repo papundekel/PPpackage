@@ -7,7 +7,7 @@ from typing import Any
 from typer import Typer
 
 
-class AsyncTyper(Typer):
+class App(Typer):
     @staticmethod
     def maybe_run_async(decorator: Callable[[Any], Any], f: Any) -> Any:
         if iscoroutinefunction(f):

@@ -9,7 +9,7 @@ from conan.internal.conan_app import ConanApp
 from conans.errors import ConanException
 from conans.model.recipe_ref import RecipeReference
 
-from PPpackage.utils.rwlock import write as rwlock_write
+from PPpackage.utils.lock.rw import write as rwlock_write
 
 from .epoch import update as update_epoch
 from .schemes import DriverParameters, RepositoryParameters

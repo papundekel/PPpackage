@@ -5,7 +5,7 @@ from typing import Annotated
 from pydantic import AnyUrl
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from PPpackage.utils.validation import WithVariables
+from PPpackage.utils.json.validator import WithVariables
 
 
 @pydantic_dataclass(frozen=True)

@@ -5,11 +5,14 @@ setup(
     packages=["PPpackage.repository_driver.pacman"],
     version="0.1.0",
     install_requires=[
-        "PPpackage-utils",
         "PPpackage-repository-driver-interface",
-        "pydot",
+        "PPpackage-utils-async",
+        "PPpackage-utils-file",
+        "PPpackage-utils-lock",
+        "PPpackage-utils-json",
+        "httpx[http2]",
         "networkx",
         "pyalpm",
-        "httpx[http2]",
+        "pydot",
     ],
 )

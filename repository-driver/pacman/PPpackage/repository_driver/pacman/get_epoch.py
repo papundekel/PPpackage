@@ -1,4 +1,4 @@
-from PPpackage.utils.rwlock import read as rwlock_read
+from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get
 from .schemes import DriverParameters, RepositoryParameters

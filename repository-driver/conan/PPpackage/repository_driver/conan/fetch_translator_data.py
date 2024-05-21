@@ -3,9 +3,9 @@ from collections.abc import AsyncIterable, Iterable
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import TranslatorInfo
+from PPpackage.utils.async_ import Result
 
-from PPpackage.utils.rwlock import read as rwlock_read
-from PPpackage.utils.utils import Result
+from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get as get_epoch
 from .schemes import DriverParameters, RepositoryParameters

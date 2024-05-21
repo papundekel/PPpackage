@@ -5,7 +5,6 @@ from typing import Any
 
 from httpx import Client as HTTPClient
 from networkx import MultiDiGraph
-from PPpackage.container_utils import Containerizer
 from PPpackage.repository_driver.interface.schemes import (
     ArchiveBuildContextDetail,
     BuildContextInfo,
@@ -18,6 +17,7 @@ from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
+from PPpackage.utils.container import Containerizer
 
 from . import fetch_package, get_build_context_info, process_build_context
 

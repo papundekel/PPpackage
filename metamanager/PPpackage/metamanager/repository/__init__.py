@@ -14,6 +14,7 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
+from PPpackage.utils.async_ import Result
 from pydantic import AnyUrl
 from sqlitedict import SqliteDict
 
@@ -24,8 +25,7 @@ from PPpackage.metamanager.schemes import (
     RepositoryConfig,
     RepositoryDriverConfig,
 )
-from PPpackage.utils.utils import Result
-from PPpackage.utils.validation import dump_json
+from PPpackage.utils.json.dump import dump_json
 
 from .interface import RepositoryInterface
 from .local import LocalRepository

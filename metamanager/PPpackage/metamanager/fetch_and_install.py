@@ -5,13 +5,13 @@ from typing import Any
 
 from httpx import Client as HTTPClient
 from networkx import MultiDiGraph
-from PPpackage.container_utils import Containerizer
 from sqlitedict import SqliteDict
 
 from PPpackage.metamanager.installer import Installer
 from PPpackage.metamanager.repository import Repository
 from PPpackage.metamanager.translators import Translator
 from PPpackage.translator.interface.schemes import Literal
+from PPpackage.utils.container import Containerizer
 
 from .fetch import fetch
 from .install import install

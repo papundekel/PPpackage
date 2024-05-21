@@ -2,9 +2,8 @@ from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, AsyncContextManager
 
+from PPpackage.utils.async_ import Result
 from pydantic import BaseModel
-
-from PPpackage.utils.utils import Result
 
 from .schemes import (
     BuildContextDetail,

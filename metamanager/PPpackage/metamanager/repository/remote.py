@@ -11,12 +11,13 @@ from PPpackage.repository_driver.interface.schemes import (
     Requirement,
     TranslatorInfo,
 )
+from PPpackage.utils.async_ import Result
 
 from PPpackage.metamanager.exceptions import SubmanagerCommandFailure
 from PPpackage.metamanager.schemes import RemoteRepositoryConfig
 from PPpackage.metamanager.utils import HTTPResponseReader
-from PPpackage.utils.utils import Result
-from PPpackage.utils.validation import dump_json, validate_json
+from PPpackage.utils.json.dump import dump_json
+from PPpackage.utils.json.validate import validate_json
 
 from .interface import RepositoryInterface
 

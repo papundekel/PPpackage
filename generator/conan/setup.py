@@ -6,7 +6,7 @@ setup(
     version="0.1.0",
     install_requires=[
         "PPpackage-generator-interface",
+        "PPpackage-utils-file",
         "conan",
-        "PPpackage-utils",
     ],
 )

@@ -5,8 +5,8 @@ from typing import Any
 
 from PPpackage.translator.interface.interface import Interface
 from PPpackage.translator.interface.schemes import Literal
-from PPpackage.utils.utils import load_interface_module
-from PPpackage.utils.validation import validate_python
+from PPpackage.utils.json.validate import validate_python
+from PPpackage.utils.python import load_interface_module
 
 from .repository import Repository
 from .schemes import TranslatorConfig

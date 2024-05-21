@@ -4,7 +4,7 @@ from pathlib import Path
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
 
-from PPpackage.utils.utils import TemporaryDirectory
+from PPpackage.utils.file import TemporaryDirectory
 
 from .schemes import Parameters
 

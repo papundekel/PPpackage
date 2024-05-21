@@ -8,11 +8,11 @@ from typing import Optional
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
-from PPpackage.utils.cli import AsyncTyper
+from PPpackage.utils.cli import App
 
 from .main import main
 
-app = AsyncTyper()
+app = App()
 
 
 class LoggingFilter:
