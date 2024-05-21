@@ -2,7 +2,6 @@ from asyncio import TaskGroup
 from logging import getLogger
 from pathlib import Path
 from sys import stderr, stdin
-from traceback import print_exc
 from typing import IO
 
 from httpx import Client as HTTPClient
@@ -13,7 +12,7 @@ from sqlitedict import SqliteDict
 from PPpackage.utils.validation import validate_json
 
 from .create_graph import create_graph, write_graph_to_file
-from .exceptions import NoModelException, print_exception_group
+from .exceptions import HandledException, NoModelException, handle_exception_group
 from .fetch_and_install import fetch_and_install
 from .generate import generate
 from .installer import Installers
@@ -128,7 +127,5 @@ async def main(
             await generate(config.generators, graph, input.generators, generators_path)
 
         stderr.write("Done.\n")
-    except* NoModelException as exception_group:
-        print_exception_group(stderr, exception_group)
-    except* Exception:
-        print_exc(file=stderr)
+    except* HandledException as exception_group:
+        handle_exception_group(stderr, exception_group)

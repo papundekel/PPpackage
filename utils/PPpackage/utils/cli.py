@@ -2,8 +2,6 @@ from asyncio import iscoroutinefunction
 from asyncio import run as asyncio_run
 from collections.abc import Callable
 from functools import partial, wraps
-from sys import stderr
-from traceback import print_exc
 from typing import Any
 
 from typer import Typer
@@ -30,13 +28,3 @@ class AsyncTyper(Typer):
     def command(self, *args: Any, **kwargs: Any) -> Any:
         decorator = super().command(*args, **kwargs)
         return partial(self.maybe_run_async, decorator)
-
-
-def run(app: AsyncTyper, program_name: str) -> None:
-    try:
-        app()
-    except Exception:
-        stderr.write(f"{program_name}:\n")
-        print_exc()
-
-        exit(1)

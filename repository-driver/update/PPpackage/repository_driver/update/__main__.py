@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import Annotated, Optional
 
+from PPpackage.repository_driver.interface.interface import Interface
 from typer import Option as TyperOption
 
-from PPpackage.repository_driver.interface.interface import Interface
-from PPpackage.utils.cli import AsyncTyper, run
+from PPpackage.utils.cli import AsyncTyper
 from PPpackage.utils.utils import load_interface_module
 from PPpackage.utils.validation import validate_json
 
@@ -41,4 +41,4 @@ async def main(
         await interface.update(state, driver_parameters, repository_parameters)
 
 
-run(app, "PPpackage update")
+app()

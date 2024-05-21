@@ -8,7 +8,7 @@ from typing import Optional
 from typer import Option as TyperOption
 from typing_extensions import Annotated
 
-from PPpackage.utils.cli import AsyncTyper, run
+from PPpackage.utils.cli import AsyncTyper
 
 from .main import main
 
@@ -40,4 +40,4 @@ async def main_command(
     await main(config_path, installation_path, generators_path, graph_path)
 
 
-run(app, "PPpackage")
+app()
