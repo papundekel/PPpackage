@@ -75,7 +75,7 @@ def write_dimacs(formula: Sequence[list[int]], variable_count: int, path: Path):
             file.write("0\n")
 
 
-async def save_to_dimacs(
+async def save_dimacs(
     formula: AsyncIterable[list[Literal]], path: Path
 ) -> tuple[Mapping[str, int], Sequence[str]]:
     mapped_formula, mapping_to_int, mapping_to_string = await map_formula(formula)
@@ -111,7 +111,7 @@ async def solve(
         assumptions_path = mount_dir_path / "assumptions"
         output_path = mount_dir_path / "output"
 
-        mapping_to_int, mapping_to_string = await save_to_dimacs(formula, formula_path)
+        mapping_to_int, mapping_to_string = await save_dimacs(formula, formula_path)
 
         _, assumptions = await translators_task
 
