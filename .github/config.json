@@ -1,5 +1,5 @@
 {
-    "product_cache_path": "/mnt/cache/product/",
+    "data_path": "/home/runner/.PPpackage/",
     "containerizer": {
         "url": "unix:///run/podman/podman.sock",
         "path_translations": [
@@ -9,11 +9,10 @@
             },
             {
                 "containerizer": "/tmp/",
-                "container": "/mnt/workdir/"
+                "container": "/tmp/"
             }
         ]
     },
-    "containerizer_workdir": "/mnt/workdir/",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"
@@ -46,7 +45,7 @@
                         },
                         {
                             "containerizer": "/tmp/",
-                            "container": "/mnt/workdir/"
+                            "container": "/tmp/"
                         }
                     ]
                 }
@@ -60,42 +59,28 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/database/archlinux-core/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/core/os/x86_64"
                 ]
-            },
-            "formula_cache_path": "/mnt/cache/formula/archlinux-core.db",
-            "translator_data_cache_path": "/mnt/cache/translator-data/archlinux-core.db"
+            }
         },
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/database/archlinux-extra/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
                 ]
-            },
-            "formula_cache_path": "/mnt/cache/formula/archlinux-extra.db",
-            "translator_data_cache_path": "/mnt/cache/translator-data/archlinux-extra.db"
+            }
         },
         {
-            "driver": "AUR",
-            "parameters": {
-                "database_path": "/mnt/database/AUR/"
-            },
-            "formula_cache_path": "/mnt/cache/formula/AUR.db",
-            "translator_data_cache_path": "/mnt/cache/translator-data/AUR.db"
+            "driver": "AUR"
         },
         {
             "driver": "conan",
             "parameters": {
-                "database_path": "/mnt/database/conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
-            },
-            "formula_cache_path": "/mnt/cache/formula/conancenter.db",
-            "translator_data_cache_path": "/mnt/cache/translator-data/conancenter.db"
+            }
         }
     ]
 }
