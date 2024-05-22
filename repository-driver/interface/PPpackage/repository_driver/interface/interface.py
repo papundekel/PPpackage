@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterable, Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, AsyncContextManager
 
 from PPpackage.utils.async_ import Result
@@ -27,70 +28,37 @@ class Interface[
     TranslatedOptions: type[TranslatedOptionsType]
 
     lifespan: Callable[
-        [DriverParametersType, RepositoryParametersType], AsyncContextManager[StateType]
+        [DriverParametersType, RepositoryParametersType, Path],
+        AsyncContextManager[StateType],
     ]
 
-    update: Callable[
-        [StateType, DriverParametersType, RepositoryParametersType], Awaitable[None]
-    ]
+    update: Callable[[StateType], Awaitable[None]]
 
-    get_epoch: Callable[
-        [StateType, DriverParametersType, RepositoryParametersType], Awaitable[str]
-    ]
+    get_epoch: Callable[[StateType], Awaitable[str]]
 
     fetch_translator_data: Callable[
-        [StateType, DriverParametersType, RepositoryParametersType, Result[str]],
-        AsyncIterable[TranslatorInfo],
+        [StateType, Result[str]], AsyncIterable[TranslatorInfo]
     ]
 
     translate_options: Callable[
-        [StateType, DriverParametersType, RepositoryParametersType, Any],
-        Awaitable[tuple[str, TranslatedOptionsType]],
+        [StateType, Any], Awaitable[tuple[str, TranslatedOptionsType]]
     ]
 
     get_formula: Callable[
-        [
-            StateType,
-            DriverParametersType,
-            RepositoryParametersType,
-            TranslatedOptionsType,
-            Result[str],
-        ],
+        [StateType, TranslatedOptionsType, Result[str]],
         AsyncIterable[list[Requirement]],
     ]
 
     get_package_detail: Callable[
-        [
-            StateType,
-            DriverParametersType,
-            RepositoryParametersType,
-            TranslatedOptionsType,
-            str,
-        ],
-        Awaitable[PackageDetail | None],
+        [StateType, TranslatedOptionsType, str], Awaitable[PackageDetail | None]
     ]
 
     get_build_context: Callable[
-        [
-            StateType,
-            DriverParametersType,
-            RepositoryParametersType,
-            TranslatedOptionsType,
-            str,
-            ProductInfos,
-        ],
+        [StateType, TranslatedOptionsType, str, ProductInfos],
         Awaitable[BuildContextDetail],
     ]
 
     compute_product_info: Callable[
-        [
-            StateType,
-            DriverParametersType,
-            RepositoryParametersType,
-            TranslatedOptionsType,
-            str,
-            ProductInfos,
-            ProductInfos,
-        ],
+        [StateType, TranslatedOptionsType, str, ProductInfos, ProductInfos],
         Awaitable[ProductInfo],
     ]

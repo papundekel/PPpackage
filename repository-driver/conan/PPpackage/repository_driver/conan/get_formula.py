@@ -9,7 +9,7 @@ from PPpackage.utils.async_ import Result
 from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get as get_epoch
-from .schemes import DriverParameters, Options, RepositoryParameters
+from .schemes import Options
 from .state import State
 from .utils import get_requirements
 
@@ -23,16 +23,10 @@ def get_revisions(api: ConanAPI, recipe: RecipeReference) -> Iterable[RecipeRefe
 
 
 async def get_formula(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    translated_options: Options,
-    epoch_result: Result[str],
+    state: State, translated_options: Options, epoch_result: Result[str]
 ) -> AsyncIterable[list[Requirement]]:
-    database_path = repository_parameters.database_path
-
     async with rwlock_read(state.coroutine_lock, state.file_lock):
-        epoch_result.set(get_epoch(database_path / "epoch"))
+        epoch_result.set(get_epoch(state.database_path / "epoch"))
 
         for recipe in get_recipes(state.api):
             for revision in get_revisions(state.api, recipe):

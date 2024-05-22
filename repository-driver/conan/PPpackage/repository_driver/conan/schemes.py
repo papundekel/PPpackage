@@ -12,7 +12,7 @@ class DriverParameters(BaseModel):
 
 
 class RepositoryParameters(BaseModel):
-    database_path: Annotated[Path, WithVariables]
+    database_path: Annotated[Path, WithVariables] | None = None
     url: AnyUrl
     verify_ssl: bool = True
 

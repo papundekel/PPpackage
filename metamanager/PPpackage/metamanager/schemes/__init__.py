@@ -8,7 +8,7 @@ from PPpackage.repository_driver.interface.schemes import (
     Parameters,
     Requirement,
 )
-from pydantic import AnyUrl
+from pydantic import BaseModel
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from PPpackage.utils.container.schemes import ContainerizerConfig
@@ -24,22 +24,11 @@ class Input:
     generators: frozenset[str] = frozenset()
 
 
-@pydantic_dataclass(frozen=True)
-class RepositoryConfig:
-    formula_cache_path: Annotated[Path, WithVariables]
-    translator_data_cache_path: Annotated[Path, WithVariables]
-
-
-@pydantic_dataclass(frozen=True)
-class LocalRepositoryConfig(RepositoryConfig):
+class RepositoryConfig(BaseModel):
     driver: str
     parameters: Parameters = frozendict()
-
-
-@pydantic_dataclass(frozen=True)
-class RemoteRepositoryConfig(RepositoryConfig):
-    url: AnyUrl
-    cache_path: Annotated[Path, WithVariables]
+    formula_cache_path: Annotated[Path, WithVariables] | None = None
+    translator_data_cache_path: Annotated[Path, WithVariables] | None = None
 
 
 @pydantic_dataclass(frozen=True)
@@ -66,9 +55,10 @@ class GeneratorConfig(BaseModuleConfig):
 class Config:
     translators: Mapping[str, TranslatorConfig]
     installers: Mapping[str, InstallerConfig]
-    repositories: list[RemoteRepositoryConfig | LocalRepositoryConfig]
-    product_cache_path: Annotated[Path, WithVariables]
+    repositories: list[RepositoryConfig]
     containerizer: ContainerizerConfig
-    containerizer_workdir: Annotated[Path, WithVariables]
+    containerizer_workdir: Annotated[Path, WithVariables] = Path("/tmp")
+    data_path: Annotated[Path, WithVariables] = Path.home() / ".PPpackage/"
+    product_cache_path: Annotated[Path, WithVariables] | None = None
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
     generators: Mapping[str, GeneratorConfig] = frozendict()

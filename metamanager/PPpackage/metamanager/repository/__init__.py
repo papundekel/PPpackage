@@ -1,10 +1,9 @@
 from collections.abc import AsyncGenerator, AsyncIterable, Iterable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from anysqlite import connect as sqlite_connect
 from hishel import AsyncCacheClient as HTTPClient
-from hishel import AsyncSQLiteStorage
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
@@ -15,42 +14,54 @@ from PPpackage.repository_driver.interface.schemes import (
     TranslatorInfo,
 )
 from PPpackage.utils.async_ import Result
-from pydantic import AnyUrl
 from sqlitedict import SqliteDict
 
 from PPpackage.metamanager.exceptions import EpochException
-from PPpackage.metamanager.schemes import (
-    LocalRepositoryConfig,
-    RemoteRepositoryConfig,
-    RepositoryConfig,
-    RepositoryDriverConfig,
-)
+from PPpackage.metamanager.schemes import RepositoryConfig, RepositoryDriverConfig
 from PPpackage.utils.json.dump import dump_json
 
 from .interface import RepositoryInterface
 from .local import LocalRepository
-from .remote import RemoteRepository
 
 
 class Repository:
     def __init__(
-        self, config: RepositoryConfig, interface: RepositoryInterface, epoch: str
+        self,
+        config: RepositoryConfig,
+        interface: RepositoryInterface,
+        epoch: str,
+        data_path: Path,
+        index: int,
     ):
-        self.config = config
+        self.translator_data_cache_path = (
+            config.translator_data_cache_path
+            if config.translator_data_cache_path is not None
+            else data_path / "cache" / "translator-data" / str(index)
+        )
+
+        self.formula_cache_path = (
+            config.formula_cache_path
+            if config.formula_cache_path is not None
+            else data_path / "cache" / "formula" / str(index)
+        )
+
         self.interface = interface
         self.epoch = epoch
 
     @staticmethod
-    async def create(config: RepositoryConfig, interface: RepositoryInterface):
+    async def create(
+        config: RepositoryConfig,
+        interface: RepositoryInterface,
+        data_path: Path,
+        index: int,
+    ):
         epoch = await interface.get_epoch()
-        return Repository(config, interface, epoch)
+        return Repository(config, interface, epoch, data_path, index)
 
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
-        self.config.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with SqliteDict(
-            self.config.translator_data_cache_path
-        ) as translator_data_cache:
+        with SqliteDict(self.translator_data_cache_path) as translator_data_cache:
             cache_key = self.epoch
 
             try:
@@ -84,9 +95,9 @@ class Repository:
     async def get_formula(
         self, translated_options: Any
     ) -> AsyncIterable[list[Requirement]]:
-        self.config.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self.formula_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with SqliteDict(self.config.formula_cache_path) as formula_cache:
+        with SqliteDict(self.formula_cache_path) as formula_cache:
             serialized_translated_options = dump_json(translated_options)
             cache_key = f"{self.epoch}-{serialized_translated_options}"
 
@@ -141,43 +152,30 @@ class Repository:
 
 async def create_repository(
     context_stack: AsyncExitStack,
-    client: HTTPClient | None,
-    repository_config: LocalRepositoryConfig | RemoteRepositoryConfig,
+    repository_config: RepositoryConfig,
     drivers: Mapping[str, RepositoryDriverConfig],
+    data_path: Path,
 ) -> RepositoryInterface:
-    if isinstance(repository_config, RemoteRepositoryConfig):
-        if client is None:
-            repository_config.cache_path.mkdir(parents=True, exist_ok=True)
-
-            client = await context_stack.enter_async_context(
-                HTTPClient(
-                    http2=True,
-                    storage=AsyncSQLiteStorage(
-                        connection=await sqlite_connect(
-                            repository_config.cache_path / "db.sqlite"
-                        )
-                    ),
-                )
-            )
-
-        return RemoteRepository(repository_config, client)
-    else:
-        return await context_stack.enter_async_context(
-            LocalRepository.create(repository_config, drivers)
-        )
+    return await context_stack.enter_async_context(
+        LocalRepository.create(repository_config, drivers, data_path)
+    )
 
 
 @asynccontextmanager
 async def Repositories(
     drivers: Mapping[str, RepositoryDriverConfig],
-    repository_configs: Iterable[RemoteRepositoryConfig | LocalRepositoryConfig],
+    repository_configs: Iterable[RepositoryConfig],
+    data_path: Path,
 ) -> AsyncGenerator[Iterable[Repository], None]:
-    client: HTTPClient | None = None
     async with AsyncExitStack() as context_stack:
         yield [
             await Repository.create(
                 config,
-                await create_repository(context_stack, client, config, drivers),
+                await create_repository(
+                    context_stack, config, drivers, data_path / str(index)
+                ),
+                data_path,
+                index,
             )
-            for config in repository_configs
+            for index, config in enumerate(repository_configs)
         ]

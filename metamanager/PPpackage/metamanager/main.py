@@ -32,7 +32,7 @@ async def main(
         config = validate_json_io_path(Config, config_path)
 
         async with Repositories(
-            config.repository_drivers, config.repositories
+            config.repository_drivers, config.repositories, config.data_path
         ) as repositories:
             async with TaskGroup() as task_group:
                 translators_task = task_group.create_task(
@@ -54,11 +54,15 @@ async def main(
                 )
 
             with HTTPClient() as archive_client:
-                config.product_cache_path.mkdir(parents=True, exist_ok=True)
+                product_cache_path = (
+                    config.product_cache_path
+                    if config.product_cache_path is not None
+                    else config.data_path / "cache" / "product"
+                )
 
-                with SqliteDict(
-                    config.product_cache_path / "mapping.db"
-                ) as cache_mapping:
+                product_cache_path.mkdir(parents=True, exist_ok=True)
+
+                with SqliteDict(product_cache_path / "mapping.db") as cache_mapping:
                     stderr.write("Creating graph...\n")
 
                     graph = await create_graph(
@@ -86,7 +90,7 @@ async def main(
                         installers,
                         cache_mapping,
                         archive_client,
-                        config.product_cache_path,
+                        product_cache_path,
                         input.build_options,
                         installation_path,
                         graph,

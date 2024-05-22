@@ -19,7 +19,7 @@ Supports and generalizes Conan generators for package consumption.
 
 ## Architecture
 
-The application is highly modular. It is divided into the meta-manager part and many modules. The meta-manager is a driver which communicates with the modules. The modules implement the actual package managers' behavior.
+The application is highly modular. It is divided into the meta-manager part and multiple different modules. The meta-manager is a driver which communicates with the modules. The modules implement the actual package managers' behavior.
 
 The different types of modules are:
 
@@ -32,11 +32,37 @@ Each module type handles a certain part of the package management process. There
 
 All modules ought to implement a Python interface.
 
+#### Current modules
+
+##### Repository drivers
+
+- pacman
+- AUR
+- conan
+
+##### Requirement translators
+
+- pacman
+- conan
+
+AUR uses the archlinux package utility stack, so except for the logic of the repository, it uses the pacman modules.
+
+##### Installers
+
+- pacman
+- conan
+
+##### Generators
+
+- conan
+
 ### Meta-manager
 
-The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the modules, and to combine the results and present them to the user.
+The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the modules, and to combine and process the results and present them to the user.
 
-Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section.
+Meta-manager also handles the SAT solving part.
+
+Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section. Information about the configuration file is found in [Meta-manager Configuration](#meta-manager-configuration).
 
 The meta-manager works in these basic phases:
 
@@ -151,15 +177,17 @@ The input is taken by stdin and it is in JSON format.
 }
 ```
 
-## Requirements
+### Requirements
 
 The requirements are currently a conjunction but could be any propositional formula.
 
-### `pacman` translator
+The `translator` field specifies the requirement translator to be used for translating that particular requirement. The `value` field is the actual value of the requirement.
+
+#### `pacman` translator
 
 Any string valid in pacman depends or conflicts field. This means a (virtual) package name with an optional version specification.
 
-### `conan` translator
+#### `conan` translator
 
 Dictionary with package name and version requirement.
 
@@ -171,6 +199,98 @@ Dictionary with package name and version requirement.
 ```
 
 Corresponds to `package/version` in Conan.
+
+## Meta-manager Configuration
+
+The configuration is a JSON file and is passed to the meta-manager by the `--config` CLI option.
+
+### Format
+
+```json
+{
+    "cache_path": "/path/to/cache/",
+    "containerizer": {
+        "url": "unix:///path/to/podman/or/docker.sock"
+    },
+    "repository_drivers": {
+        "driver1": {
+            "package": "python.package.driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "driver2": {
+            "package": "python.package.driver2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "translators": {
+        "translator1": {
+            "package": "python.package.translator1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "translator2": {
+            "package": "python.package.translator2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "installers": {
+        "installer1": {
+            "package": "python.package.installer1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "installer2": {
+            "package": "python.package.installer2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "generators": {
+        "exact": {
+            "package": "python.package.generator1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "prefix*": {
+            "package": "python.package.generator2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "repositories": [
+        {
+            "driver": "driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        {
+            "driver": "driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        {
+            "driver": "driver2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    ]
+}
+
+```
 
 ## Resolution graph
 

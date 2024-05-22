@@ -8,7 +8,6 @@ from PPpackage.utils.async_ import Result
 from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get as get_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 
 
@@ -19,15 +18,10 @@ def fetch_revisions(
 
 
 async def fetch_translator_data(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    epoch_result: Result[str],
+    state: State, epoch_result: Result[str]
 ) -> AsyncIterable[TranslatorInfo]:
-    database_path = repository_parameters.database_path
-
     async with rwlock_read(state.coroutine_lock, state.file_lock):
-        epoch_result.set(get_epoch(database_path / "epoch"))
+        epoch_result.set(get_epoch(state.database_path / "epoch"))
 
         recipes = state.api.search.recipes("*")
         for recipe in recipes:

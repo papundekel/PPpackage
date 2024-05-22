@@ -1,9 +1,7 @@
 {
-    "product_cache_path": "tmp/cache/product/",
     "containerizer": {
         "url": "unix://$XDG_RUNTIME_DIR/podman/podman.sock"
     },
-    "containerizer_workdir": "/tmp",
     "repository_drivers": {
         "pacman": {
             "package": "PPpackage.repository_driver.pacman"
@@ -45,42 +43,28 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "tmp/database/archlinux-core/",
                 "mirrorlist": [
                     "http://ftp.sh.cvut.cz/arch/core/os/x86_64"
                 ]
-            },
-            "formula_cache_path": "tmp/cache/formula/archlinux-core.db",
-            "translator_data_cache_path": "tmp/cache/translator-data/archlinux-core.db"
+            }
         },
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "tmp/database/archlinux-extra/",
                 "mirrorlist": [
                     "http://ftp.sh.cvut.cz/arch/extra/os/x86_64"
                 ]
-            },
-            "formula_cache_path": "tmp/cache/formula/archlinux-extra.db",
-            "translator_data_cache_path": "tmp/cache/translator-data/archlinux-extra.db"
+            }
         },
         {
-            "driver": "AUR",
-            "parameters": {
-                "database_path": "tmp/database/AUR/"
-            },
-            "formula_cache_path": "tmp/cache/formula/AUR.db",
-            "translator_data_cache_path": "tmp/cache/translator-data/AUR.db"
+            "driver": "AUR"
         },
         {
             "driver": "conan",
             "parameters": {
-                "database_path": "tmp/database/conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
-            },
-            "formula_cache_path": "tmp/cache/formula/conancenter.db",
-            "translator_data_cache_path": "tmp/cache/translator-data/conancenter.db"
+            }
         }
     ]
 }

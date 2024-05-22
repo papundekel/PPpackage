@@ -12,13 +12,10 @@ from .utils import package_provides
 
 
 async def fetch_translator_data(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    epoch_result: Result[str],
+    state: State, epoch_result: Result[str]
 ) -> AsyncIterable[TranslatorInfo]:
     async with rwlock_read(state.coroutine_lock, state.file_lock):
-        epoch_result.set(get_epoch(repository_parameters.database_path / "epoch"))
+        epoch_result.set(get_epoch(state.database_path / "epoch"))
 
         for package in state.database.pkgcache:
             yield TranslatorInfo(f"pacman-{package.name}", {"version": package.version})

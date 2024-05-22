@@ -2,17 +2,12 @@ from itertools import chain
 
 from PPpackage.repository_driver.interface.schemes import PackageDetail
 
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import PREFIX, parse_package_name, strip_version
 
 
 async def get_package_detail(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    translated_options: None,
-    full_package_name: str,
+    state: State, translated_options: None, full_package_name: str
 ) -> PackageDetail | None:
     if not full_package_name.startswith(PREFIX):
         return None

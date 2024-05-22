@@ -109,10 +109,9 @@ jobs:
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/,target=/root/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=core
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
                   --repository /mnt/repository.json
@@ -121,10 +120,9 @@ jobs:
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/,target=/root/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=extra
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
                   --repository /mnt/repository.json
@@ -133,7 +131,7 @@ jobs:
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/AUR/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/,target=/root/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-AUR.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest

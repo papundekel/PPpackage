@@ -13,7 +13,6 @@ from conans.model.recipe_ref import RecipeReference
 from PPpackage.utils.lock.rw import write as rwlock_write
 
 from .epoch import update as update_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 
 
@@ -52,16 +51,8 @@ def download_recipes(
         app.remote_manager.get_recipe(revision, remote)
 
 
-async def update(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-) -> None:
-    remote = Remote(
-        "",
-        url=str(repository_parameters.url),
-        verify_ssl=repository_parameters.verify_ssl,
-    )
+async def update(state: State) -> None:
+    remote = Remote("", url=str(state.url), verify_ssl=state.verify_ssl)
 
     async with rwlock_write(state.coroutine_lock, state.file_lock):
         detected_profile = state.api.profiles.detect()
@@ -91,4 +82,4 @@ async def update(
             for future in futures:
                 future.result()
 
-        update_epoch(repository_parameters.database_path / "epoch")
+        update_epoch(state.database_path / "epoch")

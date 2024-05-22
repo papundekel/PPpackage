@@ -10,7 +10,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from pydantic import ValidationError
 
-from .schemes import ConanProductInfo, DriverParameters, Options, RepositoryParameters
+from .schemes import ConanProductInfo, Options
 from .state import State
 
 
@@ -33,8 +33,6 @@ def create_ref(
 
 async def compute_product_info(
     state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
     translated_options: Options,
     package: str,
     build_context_info: BuildContextInfo,

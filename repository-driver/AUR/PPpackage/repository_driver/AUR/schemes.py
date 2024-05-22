@@ -11,7 +11,7 @@ class DriverParameters(BaseModel):
 
 
 class RepositoryParameters(BaseModel):
-    database_path: Annotated[Path, WithVariables]
+    database_path: Annotated[Path, WithVariables] | None = None
 
 
 class AURPackage(BaseModel):
