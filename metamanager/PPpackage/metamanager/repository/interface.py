@@ -11,14 +11,9 @@ from PPpackage.repository_driver.interface.schemes import (
     TranslatorInfo,
 )
 from PPpackage.utils.async_ import Result
-from pydantic import AnyUrl
 
 
 class RepositoryInterface(Protocol):
-    def get_identifier(self) -> str: ...
-
-    def get_url(self) -> AnyUrl | None: ...
-
     async def get_epoch(self) -> str: ...
 
     def fetch_translator_data(

@@ -61,25 +61,12 @@ async def fetch_package_archive(
     product_cache_path: Path,
     installers: Mapping[str, Installer],
     package: str,
-    repository: Repository,
     destination_path: Path,
 ) -> str:
-    repository_url = repository.get_url()
-
-    match build_context.archive, repository_url:
-        case AnyUrl() as archive_url, _:
+    match build_context.archive:
+        case AnyUrl() as archive_url:
             await download_file(archive_url, destination_path, archive_client)
-        case archive_path, AnyUrl():
-            await download_file(
-                AnyUrl.build(
-                    scheme=repository_url.scheme,
-                    host=str(repository_url.host),
-                    path=str(archive_path),
-                ),
-                destination_path,
-                archive_client,
-            )
-        case archive_path, _:
+        case archive_path:
             move(archive_path, destination_path)
 
     return build_context.installer

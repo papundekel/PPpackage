@@ -31,12 +31,6 @@ class RemoteRepository(RepositoryInterface):
 
         self.url = str(config.url).rstrip("/")
 
-    def get_identifier(self) -> str:
-        return self.url
-
-    def get_url(self) -> str:
-        return self.url
-
     async def get_epoch(self) -> str:
         response = await self.client.head(f"{self.url}/epoch")
 

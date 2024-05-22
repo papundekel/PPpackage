@@ -45,12 +45,6 @@ class Repository:
         epoch = await interface.get_epoch()
         return Repository(config, interface, epoch)
 
-    def get_identifier(self) -> str:
-        return self.interface.get_identifier()
-
-    def get_url(self) -> AnyUrl | None:
-        return self.interface.get_url()
-
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
         self.config.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
