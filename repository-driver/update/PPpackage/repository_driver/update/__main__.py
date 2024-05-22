@@ -3,7 +3,6 @@ from sys import stderr
 from typing import Annotated, Optional
 
 from PPpackage.repository_driver.interface.interface import Interface
-from pydantic import ValidationError
 from typer import Option as TyperOption
 
 from PPpackage.utils.cli import App
