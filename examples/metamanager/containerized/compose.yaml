@@ -28,7 +28,7 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/cache/
+              source: $PWD/tmp/cache/
               target: /mnt/cache/
 
             - type: bind
