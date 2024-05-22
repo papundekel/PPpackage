@@ -7,7 +7,7 @@ services:
             - --config
             - /mnt/config.json
         environment:
-            PWD: $PWD
+            HOST_PWD: $PWD
         volumes:
             - type: bind
               source: $PWD/root/
@@ -35,16 +35,16 @@ services:
 
             - type: bind
               source: $PWD/database/archlinux-core/
-              target: /mnt/repository/database/archlinux-core/
+              target: /mnt/database/archlinux-core/
             - type: bind
               source: $PWD/database/archlinux-extra/
-              target: /mnt/repository/database/archlinux-extra/
+              target: /mnt/database/archlinux-extra/
             - type: bind
               source: $PWD/database/AUR/
-              target: /mnt/repository/database/AUR/
+              target: /mnt/database/AUR/
             - type: bind
               source: $PWD/database/conancenter/
-              target: /mnt/repository/database/conancenter/
+              target: /mnt/database/conancenter/
 
             - type: bind
               source: /etc/passwd

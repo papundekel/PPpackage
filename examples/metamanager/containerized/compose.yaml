@@ -10,6 +10,8 @@ services:
             - /mnt/output/generators/
             - --graph
             - /mnt/output/graph.dot
+        environment:
+            HOST_PWD: $PWD
         volumes:
             - type: bind
               source: $PWD/tmp/root/
@@ -37,13 +39,13 @@ services:
 
             - type: bind
               source: $PWD/tmp/database/archlinux-core/
-              target: /mnt/repository/database/archlinux-core/
+              target: /mnt/database/archlinux-core/
             - type: bind
               source: $PWD/tmp/database/archlinux-extra/
-              target: /mnt/repository/database/archlinux-extra/
+              target: /mnt/database/archlinux-extra/
             - type: bind
               source: $PWD/tmp/database/AUR/
-              target: /mnt/repository/database/AUR/
+              target: /mnt/database/AUR/
             - type: bind
               source: $PWD/tmp/database/conancenter/
-              target: /mnt/repository/database/conancenter/
+              target: /mnt/database/conancenter/

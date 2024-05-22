@@ -4,7 +4,7 @@
         "url": "unix:///run/podman/podman.sock",
         "path_translations": [
             {
-                "containerizer": "$PWD/root/",
+                "containerizer": "$HOST_PWD/root/",
                 "container": "/mnt/root/"
             },
             {
@@ -41,7 +41,7 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "$PWD/root/",
+                            "containerizer": "$HOST_PWD/root/",
                             "container": "/mnt/root/"
                         },
                         {
@@ -60,7 +60,7 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/repositories/database/archlinux-core/",
+                "database_path": "/mnt/database/archlinux-core/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/core/os/x86_64"
                 ]
@@ -71,7 +71,7 @@
         {
             "driver": "pacman",
             "parameters": {
-                "database_path": "/mnt/repositories/database/archlinux-extra/",
+                "database_path": "/mnt/database/archlinux-extra/",
                 "mirrorlist": [
                     "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
                 ]
@@ -82,7 +82,7 @@
         {
             "driver": "AUR",
             "parameters": {
-                "database_path": "/mnt/repositories/database/AUR/"
+                "database_path": "/mnt/database/AUR/"
             },
             "formula_cache_path": "/mnt/cache/formula/AUR.db",
             "translator_data_cache_path": "/mnt/cache/translator-data/AUR.db"
@@ -90,7 +90,7 @@
         {
             "driver": "conan",
             "parameters": {
-                "database_path": "/mnt/repositories/database/conancenter/",
+                "database_path": "/mnt/database/conancenter/",
                 "url": "https://center.conan.io",
                 "verify_ssl": true
             },
