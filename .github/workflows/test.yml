@@ -135,12 +135,10 @@ jobs:
                   docker run --rm
                   --user $(id -u):$(id -g)
                   --mount type=bind,source=/home/runner/.PPpackage/archlinux-core/,target=/mnt/data/
-                  --mount type=bind,source=${{ github.workspace }}/examples/update/repository-AUR.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.AUR
                   --data-path /mnt/data/
-                  --repository /mnt/repository.json
 
             - name: Check if conancenter database exists
               id: check_conancenter
