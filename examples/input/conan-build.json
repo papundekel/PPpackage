@@ -32,6 +32,22 @@
         },
         {
             "translator": "pacman",
+            "value": "grep"
+        },
+        {
+            "translator": "pacman",
+            "value": "sed"
+        },
+        {
+            "translator": "pacman",
+            "value": "awk"
+        },
+        {
+            "translator": "pacman",
+            "value": "diffutils"
+        },
+        {
+            "translator": "pacman",
             "value": "bash"
         },
         {
@@ -45,6 +61,18 @@
         {
             "translator": "pacman",
             "value": "yq"
+        },
+        {
+            "translator": "pacman",
+            "value": "pacman"
+        },
+        {
+            "translator": "pacman",
+            "value": "pkg-config"
+        },
+        {
+            "translator": "pacman",
+            "value": "python-setuptools"
         }
     ]
 }
