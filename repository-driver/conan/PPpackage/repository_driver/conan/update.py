@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from multiprocessing import cpu_count
+from pathlib import Path
 from sys import stderr
 
 from conan.api.conan_api import ConanAPI
@@ -63,6 +64,18 @@ async def update(
     )
 
     async with rwlock_write(state.coroutine_lock, state.file_lock):
+        detected_profile = state.api.profiles.detect()
+
+        profiles_path = Path(state.api.home_folder) / "profiles"
+
+        profiles_path.mkdir(parents=True, exist_ok=True)
+
+        with (profiles_path / "default").open("w") as profile_file:
+            profile_file.write("[settings]\n")
+
+            for setting, value in detected_profile.settings.items():
+                profile_file.write(f"{setting}={value}\n")
+
         recipes = state.api.search.recipes("*", remote)
 
         with ThreadPoolExecutor(cpu_count() * 16) as executor:
