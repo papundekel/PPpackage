@@ -61,12 +61,6 @@ class LocalRepository(RepositoryInterface):
                 package, interface, state, driver_parameters, repository_parameters
             )
 
-    def get_identifier(self) -> str:
-        return self.package
-
-    def get_url(self) -> None:
-        return None
-
     async def get_epoch(self) -> str:
         return await self.interface.get_epoch(
             self.state,

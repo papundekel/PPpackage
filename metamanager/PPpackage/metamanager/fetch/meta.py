@@ -92,7 +92,6 @@ async def fetch_package_meta(
     product_cache_path: Path,
     installers: Mapping[str, Installer],
     package: str,
-    repository: Repository,
     destination_path: Path,
 ) -> str:
     from PPpackage.metamanager.create_graph import create_graph
@@ -136,7 +135,6 @@ async def fetch_package_meta(
             build_context.command,
             stdin=None,
             rootfs=str(containerizer.translate(build_context_root_path)),
-            remove=False,
         )
 
         if return_code != 0:

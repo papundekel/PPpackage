@@ -1,5 +1,5 @@
 {
-    "product_cache_path": "tmp/cache/product",
+    "product_cache_path": "tmp/cache/product/",
     "containerizer": {
         "url": "unix://$XDG_RUNTIME_DIR/podman/podman.sock"
     },

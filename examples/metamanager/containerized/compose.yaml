@@ -1,24 +1,28 @@
+name: pppackage
 services:
     metamanager:
         image: docker.io/fackop/pppackage-metamanager:latest
-        user: $USER
         command:
             - /mnt/root/
             - --config
             - /mnt/config.json
+            - --generators
+            - /mnt/output/generators/
+            - --graph
+            - /mnt/output/graph.dot
         environment:
             HOST_PWD: $PWD
         volumes:
             - type: bind
-              source: $PWD/root/
+              source: $PWD/tmp/root/
               target: /mnt/root/
 
             - type: bind
-              source: $PWD/output/
-              target: /mnt/output/
+              source: $PWD/tmp/output/
+              target: /mnt/output
 
             - type: bind
-              source: $PWD/.github/config.json
+              source: $PWD/examples/metamanager/containerized/config.json
               target: /mnt/config.json
 
             - type: bind
@@ -26,7 +30,7 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/cache/
+              source: $PWD/tmp/cache/
               target: /mnt/cache/
 
             - type: bind
@@ -34,23 +38,14 @@ services:
               target: /mnt/workdir/
 
             - type: bind
-              source: $PWD/database/archlinux-core/
+              source: $PWD/tmp/database/archlinux-core/
               target: /mnt/database/archlinux-core/
             - type: bind
-              source: $PWD/database/archlinux-extra/
+              source: $PWD/tmp/database/archlinux-extra/
               target: /mnt/database/archlinux-extra/
             - type: bind
-              source: $PWD/database/AUR/
+              source: $PWD/tmp/database/AUR/
               target: /mnt/database/AUR/
             - type: bind
-              source: $PWD/database/conancenter/
+              source: $PWD/tmp/database/conancenter/
               target: /mnt/database/conancenter/
-
-            - type: bind
-              source: /etc/passwd
-              target: /etc/passwd
-              read_only: true
-            - type: bind
-              source: /etc/group
-              target: /etc/group
-              read_only: true

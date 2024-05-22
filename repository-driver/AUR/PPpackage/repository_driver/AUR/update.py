@@ -140,7 +140,9 @@ async def update(
     ) as client:
         with TemporaryDirectory() as download_directory_path:
             async with client.stream(
-                "GET", "https://aur.archlinux.org/packages-meta-ext-v1.json.gz"
+                "GET",
+                "https://aur.archlinux.org/packages-meta-ext-v1.json.gz",
+                timeout=120,
             ) as response:
                 gunzipped_packages = download_directory_path / "packages.json.gz"
 

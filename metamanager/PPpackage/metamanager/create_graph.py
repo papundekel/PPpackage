@@ -86,13 +86,13 @@ async def create_graph(
 
 
 def graph_to_dot(graph: MultiDiGraph) -> Dot:
-    manager_to_color = dict[str, int]()
+    manager_to_color = dict[Repository, int]()
 
     for package, data in get_graph_items(graph):
-        repository_identifier = data["repository"].get_identifier()
+        repository = data["repository"]
 
-        if repository_identifier not in manager_to_color:
-            manager_to_color[repository_identifier] = len(manager_to_color) + 1
+        if repository not in manager_to_color:
+            manager_to_color[repository] = len(manager_to_color) + 1
 
     graph_presentation: MultiDiGraph = convert_node_labels_to_integers(
         graph, label_attribute="package"
@@ -105,7 +105,7 @@ def graph_to_dot(graph: MultiDiGraph) -> Dot:
         data.clear()
 
         data["label"] = f'"{package}"'
-        data["fillcolor"] = manager_to_color[repository.get_identifier()]
+        data["fillcolor"] = manager_to_color[repository]
 
     graph_presentation.graph.update(
         {

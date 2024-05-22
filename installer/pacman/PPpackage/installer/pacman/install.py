@@ -107,7 +107,7 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
 
             if return_code != 0:
                 raise InstallerException(
-                    f"fakealpm exited with non-zero return code: {return_code}"
+                    f"fakealpm for {product_path} exited with non-zero return code: {return_code}"
                 )
 
         server.close()

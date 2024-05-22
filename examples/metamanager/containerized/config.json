@@ -56,13 +56,18 @@
             "package": "PPpackage.installer.conan"
         }
     },
+    "generators": {
+        "conan-*": {
+            "package": "PPpackage.generator.conan"
+        }
+    },
     "repositories": [
         {
             "driver": "pacman",
             "parameters": {
                 "database_path": "/mnt/database/archlinux-core/",
                 "mirrorlist": [
-                    "https://geo.mirror.pkgbuild.com/core/os/x86_64"
+                    "http://ftp.sh.cvut.cz/arch/core/os/x86_64"
                 ]
             },
             "formula_cache_path": "/mnt/cache/formula/archlinux-core.db",
@@ -73,7 +78,7 @@
             "parameters": {
                 "database_path": "/mnt/database/archlinux-extra/",
                 "mirrorlist": [
-                    "https://geo.mirror.pkgbuild.com/extra/os/x86_64"
+                    "http://ftp.sh.cvut.cz/arch/extra/os/x86_64"
                 ]
             },
             "formula_cache_path": "/mnt/cache/formula/archlinux-extra.db",

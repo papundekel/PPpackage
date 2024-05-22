@@ -45,12 +45,6 @@ class Repository:
         epoch = await interface.get_epoch()
         return Repository(config, interface, epoch)
 
-    def get_identifier(self) -> str:
-        return self.interface.get_identifier()
-
-    def get_url(self) -> AnyUrl | None:
-        return self.interface.get_url()
-
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
         self.config.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -153,6 +147,8 @@ async def create_repository(
 ) -> RepositoryInterface:
     if isinstance(repository_config, RemoteRepositoryConfig):
         if client is None:
+            repository_config.cache_path.mkdir(parents=True, exist_ok=True)
+
             client = await context_stack.enter_async_context(
                 HTTPClient(
                     http2=True,

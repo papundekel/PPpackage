@@ -5,6 +5,7 @@ from hashlib import sha1
 from pathlib import Path
 from tempfile import mkdtemp
 from typing import Any
+from typing import cast as type_cast
 
 from httpx import Client as HTTPClient
 from networkx import MultiDiGraph, topological_generations
@@ -53,7 +54,6 @@ async def fetch_package(
     product_cache_path: Path,
     installers: Mapping[str, Installer],
     package: str,
-    repository: Repository,
     destination_path: Path,
 ) -> str:
     raise NotImplementedError
@@ -194,19 +194,24 @@ async def fetch_package_or_cache(
                     cache_path,
                     installers,
                     package,
-                    node_data["repository"],
                     product_path,
                 )
             except:
                 rmtree(product_directory_path)
                 raise
 
-            cache_mapping[product_info_hash] = product_path, installer
-            cache_mapping.commit()
+            relative_product_path = product_path.relative_to(cache_path.absolute())
 
-            return product_path, installer
+            cache_mapping[product_info_hash] = relative_product_path, installer
+            cache_mapping.commit()
         else:
-            return cache_mapping[product_info_hash]
+            relative_product_path, installer = type_cast(
+                tuple[Path, str], cache_mapping[product_info_hash]
+            )
+
+            product_path = cache_path / relative_product_path
+
+    return product_path, installer
 
 
 def fetch(
