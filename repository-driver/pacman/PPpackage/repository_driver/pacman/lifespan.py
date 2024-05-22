@@ -22,7 +22,7 @@ async def lifespan(
     database_path = (
         repository_parameters.database_path
         if repository_parameters.database_path is not None
-        else data_path / "database"
+        else data_path
     )
 
     database_path.mkdir(parents=True, exist_ok=True)
