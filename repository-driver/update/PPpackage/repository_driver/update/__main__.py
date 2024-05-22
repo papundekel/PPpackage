@@ -1,4 +1,5 @@
 from pathlib import Path
+from sys import stderr
 from typing import Annotated, Optional
 
 from PPpackage.repository_driver.interface.interface import Interface
@@ -21,11 +22,19 @@ def load_parameters(Parameters: type, path: Path | None):
 @app.command()
 async def main(
     package: str,
+    data_path: Optional[Path] = None,
+    index: Optional[int] = None,
     driver_parameters_path: Annotated[Optional[Path], TyperOption("--driver")] = None,
     repository_parameters_path: Annotated[
         Optional[Path], TyperOption("--repository")
     ] = None,
 ):
+    if data_path is None and index is None:
+        raise Exception("One of --data-path or --index must be specified.")
+
+    if data_path is None:
+        data_path = Path.home() / ".PPpackage" / "repository" / str(index)
+
     interface = load_interface_module(Interface, package)
 
     driver_parameters = load_parameters(
@@ -36,8 +45,10 @@ async def main(
         interface.RepositoryParameters, repository_parameters_path
     )
 
-    async with interface.lifespan(driver_parameters, repository_parameters) as state:
-        await interface.update(state, driver_parameters, repository_parameters)
+    async with interface.lifespan(
+        driver_parameters, repository_parameters, data_path
+    ) as state:
+        await interface.update(state)
 
 
 app()

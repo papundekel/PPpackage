@@ -3,17 +3,13 @@ from itertools import chain
 from conans.model.recipe_ref import RecipeReference
 from PPpackage.repository_driver.interface.schemes import PackageDetail
 
-from .schemes import DriverParameters, Options, RepositoryParameters
+from .schemes import Options
 from .state import State
 from .utils import get_requirements
 
 
 async def get_package_detail(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    translated_options: Options,
-    full_package_name: str,
+    state: State, translated_options: Options, full_package_name: str
 ) -> PackageDetail | None:
     if not full_package_name.startswith("conan-"):
         return None

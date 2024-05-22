@@ -19,7 +19,7 @@ services:
 
             - type: bind
               source: $PWD/tmp/output/
-              target: /mnt/output
+              target: /mnt/output/
 
             - type: bind
               source: $PWD/examples/metamanager/containerized/config.json
@@ -30,22 +30,9 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/tmp/cache/
-              target: /mnt/cache/
+              source: /tmp/
+              target: /tmp/
 
             - type: bind
-              source: /tmp
-              target: /mnt/workdir/
-
-            - type: bind
-              source: $PWD/tmp/database/archlinux-core/
-              target: /mnt/database/archlinux-core/
-            - type: bind
-              source: $PWD/tmp/database/archlinux-extra/
-              target: /mnt/database/archlinux-extra/
-            - type: bind
-              source: $PWD/tmp/database/AUR/
-              target: /mnt/database/AUR/
-            - type: bind
-              source: $PWD/tmp/database/conancenter/
-              target: /mnt/database/conancenter/
+              source: $HOME
+              target: /root/

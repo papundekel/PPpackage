@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncIterable
 
 from PPpackage.repository_driver.interface.interface import Interface
@@ -14,7 +15,7 @@ from PPpackage.repository_driver.interface.schemes import (
 )
 from PPpackage.utils.async_ import Result
 
-from PPpackage.metamanager.schemes import LocalRepositoryConfig, RepositoryDriverConfig
+from PPpackage.metamanager.schemes import RepositoryConfig, RepositoryDriverConfig
 from PPpackage.utils.json.validate import validate_python
 from PPpackage.utils.python import load_interface_module
 
@@ -39,8 +40,9 @@ class LocalRepository(RepositoryInterface):
     @staticmethod
     @asynccontextmanager
     async def create(
-        repository_config: LocalRepositoryConfig,
+        repository_config: RepositoryConfig,
         drivers: Mapping[str, RepositoryDriverConfig],
+        data_path: Path,
     ):
         driver_config = drivers[repository_config.driver]
 
@@ -55,57 +57,33 @@ class LocalRepository(RepositoryInterface):
         )
 
         async with interface.lifespan(
-            driver_parameters, repository_parameters
+            driver_parameters, repository_parameters, data_path
         ) as state:
             yield LocalRepository(
                 package, interface, state, driver_parameters, repository_parameters
             )
 
     async def get_epoch(self) -> str:
-        return await self.interface.get_epoch(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-        )
+        return await self.interface.get_epoch(self.state)
 
     def fetch_translator_data(
         self, epoch_result: Result[str]
     ) -> AsyncIterable[TranslatorInfo]:
-        return self.interface.fetch_translator_data(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-            epoch_result,
-        )
+        return self.interface.fetch_translator_data(self.state, epoch_result)
 
     async def translate_options(self, options: Any) -> tuple[str, Any]:
-        return await self.interface.translate_options(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-            options,
-        )
+        return await self.interface.translate_options(self.state, options)
 
     def get_formula(
         self, translated_options: Any, epoch_result: Result[str]
     ) -> AsyncIterable[list[Requirement]]:
-        return self.interface.get_formula(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-            translated_options,
-            epoch_result,
-        )
+        return self.interface.get_formula(self.state, translated_options, epoch_result)
 
     async def get_package_detail(
         self, translated_options: Any, package: str
     ) -> PackageDetail | None:
         return await self.interface.get_package_detail(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-            translated_options,
-            package,
+            self.state, translated_options, package
         )
 
     async def get_build_context(
@@ -115,12 +93,7 @@ class LocalRepository(RepositoryInterface):
         runtime_product_infos: ProductInfos,
     ) -> BuildContextDetail:
         return await self.interface.get_build_context(
-            self.state,
-            self.driver_parameters,
-            self.repository_parameters,
-            translated_options,
-            package,
-            runtime_product_infos,
+            self.state, translated_options, package, runtime_product_infos
         )
 
     async def compute_product_info(
@@ -132,8 +105,6 @@ class LocalRepository(RepositoryInterface):
     ) -> ProductInfo:
         return await self.interface.compute_product_info(
             self.state,
-            self.driver_parameters,
-            self.repository_parameters,
             translated_options,
             package,
             build_context_info,

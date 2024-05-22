@@ -74,17 +74,11 @@ jobs:
             - name: Download seccomp.json
               run: sudo wget https://raw.githubusercontent.com/containers/common/main/pkg/seccomp/seccomp.json --output-document /etc/containers/seccomp.json
 
-            - name: Cache caches
+            - name: Cache .PPpackage
               uses: actions/cache@v4.0.2
               with:
-                  path: ${{ github.workspace }}/cache/
+                  path: /home/runner/.PPpackage/
                   key: cache
-
-            - name: Cache databases
-              uses: actions/cache@v4.0.2
-              with:
-                  path: ${{ github.workspace }}/database/
-                  key: database
 
             - name: Download image artifacts
               uses: actions/download-artifact@v4.1.7
@@ -102,43 +96,45 @@ jobs:
 
             - name: Create directories
               run: |
-                  mkdir -p root/ output/ cache/ workdir/
-                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
+                  mkdir -p root/ output/ /home/runner/.PPpackage/ workdir/
+                  cd /home/runner/.PPpackage/
+                  mkdir -p cache/ repository/
+                  cd repository/
+                  mkdir -p 0/ 1/ 2/ 3/
 
             - name: Update archlinux core database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/0/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=core
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
+                  --data-path /mnt/repository/
                   --repository /mnt/repository.json
 
             - name: Update archlinux extra database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/1/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=extra
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
+                  --data-path /mnt/repository/
                   --repository /mnt/repository.json
 
             - name: Update AUR database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/AUR/,target=/mnt/database/
-                  --mount type=bind,source=${{ github.workspace }}/examples/update/repository-AUR.json,target=/mnt/repository.json
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/2/,target=/mnt/repository/
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.AUR
-                  --repository /mnt/repository.json
+                  --data-path /mnt/repository/
 
             - name: Check if conancenter database exists
               id: check_conancenter
@@ -151,23 +147,13 @@ jobs:
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/3/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-conancenter.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.conan
+                  --data-path /mnt/repository/
                   --repository /mnt/repository.json
-
-            - name: Create default conan profile
-              if: steps.check_conancenter.outputs.files_exists == 'false'
-              run: >
-                  docker run --rm
-                  --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
-                  --env CONAN_HOME=/mnt/database/cache/
-                  --entrypoint conan
-                  docker.io/fackop/pppackage-updater:latest
-                  profile detect
 
             - name: Run PPpackage
               run: >

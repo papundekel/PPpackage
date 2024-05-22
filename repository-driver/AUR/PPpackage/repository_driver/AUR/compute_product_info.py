@@ -7,7 +7,6 @@ from PPpackage.repository_driver.interface.schemes import (
     ProductInfos,
 )
 
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import PREFIX, parse_package_name, strip_version, transaction
 
@@ -23,8 +22,6 @@ async def query_provides(connection: Connection, name: str) -> AsyncIterable[str
 
 async def compute_product_info(
     state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
     translated_options: None,
     full_package_name: str,
     build_context_info: BuildContextInfo,

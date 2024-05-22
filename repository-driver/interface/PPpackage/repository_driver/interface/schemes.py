@@ -30,17 +30,6 @@ class BaseModuleConfig:
 
 
 @pydantic_dataclass(frozen=True)
-class RepositoryDriverConfig(BaseModuleConfig):
-    pass
-
-
-@pydantic_dataclass(frozen=True)
-class RepositoryConfig:
-    driver: RepositoryDriverConfig
-    parameters: Parameters = frozendict()
-
-
-@pydantic_dataclass(frozen=True)
 class TagBuildContextDetail:
     tag: str
 

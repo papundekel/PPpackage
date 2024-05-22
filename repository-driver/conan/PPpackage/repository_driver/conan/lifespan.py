@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from aiorwlock import RWLock
 from conan.api.conan_api import ConanAPI
@@ -12,9 +13,15 @@ from .state import State
 
 @asynccontextmanager
 async def lifespan(
-    driver_parameters: DriverParameters, repository_parameters: RepositoryParameters
+    driver_parameters: DriverParameters,
+    repository_parameters: RepositoryParameters,
+    data_path: Path,
 ) -> AsyncIterator[State]:
-    database_path = repository_parameters.database_path
+    database_path = (
+        repository_parameters.database_path
+        if repository_parameters.database_path is not None
+        else data_path
+    )
 
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")
@@ -28,4 +35,12 @@ async def lifespan(
     api = ConanAPI(str(conan_home_path.absolute()))
     app = ConanApp(api)
 
-    yield State(coroutine_lock, file_lock, api, app)
+    yield State(
+        database_path,
+        repository_parameters.url,
+        repository_parameters.verify_ssl,
+        coroutine_lock,
+        file_lock,
+        api,
+        app,
+    )

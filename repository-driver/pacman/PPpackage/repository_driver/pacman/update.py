@@ -3,23 +3,18 @@ from shutil import move
 from PPpackage.utils.lock.rw import write as rwlock_write
 
 from .epoch import update as update_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 
 
-async def update(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-) -> None:
+async def update(state: State) -> None:
     async with rwlock_write(state.coroutine_lock, state.file_lock):
         state.database.update(True)
 
-        sync_database_path = repository_parameters.database_path / "sync"
+        sync_database_path = state.database_path / "sync"
 
         move(
-            sync_database_path / f"{repository_parameters.repository}.db",
+            sync_database_path / f"{state.repository}.db",
             sync_database_path / "database.db",
         )
 
-        update_epoch(repository_parameters.database_path / "epoch")
+        update_epoch(state.database_path / "epoch")

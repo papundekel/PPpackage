@@ -5,7 +5,6 @@ from PPpackage.repository_driver.interface.schemes import Requirement
 from PPpackage.utils.async_ import Result
 
 from .epoch import get as get_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import transaction
 
@@ -39,11 +38,7 @@ async def query_conflicts(
 
 
 async def get_formula(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    translated_options: None,
-    epoch_result: Result[str],
+    state: State, translated_options: None, epoch_result: Result[str]
 ) -> AsyncIterable[list[Requirement]]:
     connection = state.connection
 

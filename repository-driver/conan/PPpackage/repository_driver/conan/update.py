@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from multiprocessing import cpu_count
+from pathlib import Path
 from sys import stderr
 
 from conan.api.conan_api import ConanAPI
@@ -12,7 +13,6 @@ from conans.model.recipe_ref import RecipeReference
 from PPpackage.utils.lock.rw import write as rwlock_write
 
 from .epoch import update as update_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 
 
@@ -51,18 +51,22 @@ def download_recipes(
         app.remote_manager.get_recipe(revision, remote)
 
 
-async def update(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-) -> None:
-    remote = Remote(
-        "",
-        url=str(repository_parameters.url),
-        verify_ssl=repository_parameters.verify_ssl,
-    )
+async def update(state: State) -> None:
+    remote = Remote("", url=str(state.url), verify_ssl=state.verify_ssl)
 
     async with rwlock_write(state.coroutine_lock, state.file_lock):
+        detected_profile = state.api.profiles.detect()
+
+        profiles_path = Path(state.api.home_folder) / "profiles"
+
+        profiles_path.mkdir(parents=True, exist_ok=True)
+
+        with (profiles_path / "default").open("w") as profile_file:
+            profile_file.write("[settings]\n")
+
+            for setting, value in detected_profile.settings.items():
+                profile_file.write(f"{setting}={value}\n")
+
         recipes = state.api.search.recipes("*", remote)
 
         with ThreadPoolExecutor(cpu_count() * 16) as executor:
@@ -78,4 +82,4 @@ async def update(
             for future in futures:
                 future.result()
 
-        update_epoch(repository_parameters.database_path / "epoch")
+        update_epoch(state.database_path / "epoch")

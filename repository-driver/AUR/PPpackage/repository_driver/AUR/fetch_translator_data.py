@@ -5,7 +5,6 @@ from PPpackage.repository_driver.interface.schemes import TranslatorInfo
 from PPpackage.utils.async_ import Result
 
 from .epoch import get as get_epoch
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import parse_provide, transaction
 
@@ -29,10 +28,7 @@ async def query_provides(connection: Connection) -> AsyncIterable[tuple[str, str
 
 
 async def fetch_translator_data(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    epoch_result: Result[str],
+    state: State, epoch_result: Result[str]
 ) -> AsyncIterable[TranslatorInfo]:
     connection = state.connection
 

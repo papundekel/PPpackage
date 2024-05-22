@@ -125,17 +125,10 @@ async def create_database_build_dependencies(
     )
 
 
-async def update(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-) -> None:
-    database_path = repository_parameters.database_path
-    database_path.mkdir(parents=True, exist_ok=True)
-
+async def update(state: State) -> None:
     async with HTTPClient(
         storage=AsyncSQLiteStorage(
-            connection=await sqlite_connect(database_path / "http-cache.sqlite")
+            connection=await sqlite_connect(state.database_path / "http-cache.sqlite")
         ),
     ) as client:
         with TemporaryDirectory() as download_directory_path:

@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from aiorwlock import RWLock
 from fasteners import InterProcessReaderWriterLock
@@ -14,9 +15,15 @@ from .state import State
 
 @asynccontextmanager
 async def lifespan(
-    driver_parameters: DriverParameters, repository_parameters: RepositoryParameters
+    driver_parameters: DriverParameters,
+    repository_parameters: RepositoryParameters,
+    data_path: Path,
 ) -> AsyncIterator[State]:
-    database_path = repository_parameters.database_path
+    database_path = (
+        repository_parameters.database_path
+        if repository_parameters.database_path is not None
+        else data_path
+    )
 
     database_path.mkdir(parents=True, exist_ok=True)
 
@@ -32,13 +39,18 @@ async def lifespan(
 
         handle.add_cachedir(str(cache_directory_path))
 
-        repository = repository_parameters.repository
-        database = handle.register_syncdb(
-            repository if repository is not None else "database", 0
+        repository = (
+            repository_parameters.repository
+            if repository_parameters.repository is not None
+            else "database"
         )
+
+        database = handle.register_syncdb(repository, 0)
         database.servers = repository_parameters.mirrorlist
 
         yield State(
+            database_path,
+            repository,
             coroutine_lock,
             file_lock,
             handle,

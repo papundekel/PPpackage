@@ -26,25 +26,12 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/cache/
-              target: /mnt/cache/
+              source: /home/runner/
+              target: /root/
 
             - type: bind
-              source: /tmp
-              target: /mnt/workdir/
-
-            - type: bind
-              source: $PWD/database/archlinux-core/
-              target: /mnt/database/archlinux-core/
-            - type: bind
-              source: $PWD/database/archlinux-extra/
-              target: /mnt/database/archlinux-extra/
-            - type: bind
-              source: $PWD/database/AUR/
-              target: /mnt/database/AUR/
-            - type: bind
-              source: $PWD/database/conancenter/
-              target: /mnt/database/conancenter/
+              source: /tmp/
+              target: /tmp/
 
             - type: bind
               source: /etc/passwd

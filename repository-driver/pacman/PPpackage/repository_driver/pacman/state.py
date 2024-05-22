@@ -9,6 +9,8 @@ from pyalpm import DB, Handle
 
 @dataclass(frozen=True)
 class State:
+    database_path: Path
+    repository: str
     coroutine_lock: RWLock
     file_lock: InterProcessReaderWriterLock
     handle: Handle

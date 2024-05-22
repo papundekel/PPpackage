@@ -19,7 +19,7 @@ Supports and generalizes Conan generators for package consumption.
 
 ## Architecture
 
-The application is highly modular. It is divided into the meta-manager part and many modules. The meta-manager is a driver which communicates with the modules. The modules implement the actual package managers' behavior.
+The application is highly modular. It is divided into the meta-manager part and multiple different modules. The meta-manager is a driver which communicates with the modules. The modules implement the actual package managers' behavior.
 
 The different types of modules are:
 
@@ -32,11 +32,37 @@ Each module type handles a certain part of the package management process. There
 
 All modules ought to implement a Python interface.
 
+#### Current modules
+
+##### Repository drivers
+
+- pacman
+- AUR
+- conan
+
+##### Requirement translators
+
+- pacman
+- conan
+
+AUR uses the archlinux package utility stack, so except for the logic of the repository, it uses the pacman modules.
+
+##### Installers
+
+- pacman
+- conan
+
+##### Generators
+
+- conan
+
 ### Meta-manager
 
-The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the modules, and to combine the results and present them to the user.
+The task of the meta-manager is to accept input from the user, parse it into requests which can be forwarded and answered by the modules, and to combine and process the results and present them to the user.
 
-Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section.
+Meta-manager also handles the SAT solving part.
+
+Detailed information about the input format can be found in the [Meta-manager Input](#meta-manager-input) section. Information about the configuration file is found in [Meta-manager Configuration](#meta-manager-configuration).
 
 The meta-manager works in these basic phases:
 
@@ -151,15 +177,17 @@ The input is taken by stdin and it is in JSON format.
 }
 ```
 
-## Requirements
+### Requirements
 
 The requirements are currently a conjunction but could be any propositional formula.
 
-### `pacman` translator
+The `translator` field specifies the requirement translator to be used for translating that particular requirement. The `value` field is the actual value of the requirement.
+
+#### `pacman` translator
 
 Any string valid in pacman depends or conflicts field. This means a (virtual) package name with an optional version specification.
 
-### `conan` translator
+#### `conan` translator
 
 Dictionary with package name and version requirement.
 
@@ -172,6 +200,98 @@ Dictionary with package name and version requirement.
 
 Corresponds to `package/version` in Conan.
 
+## Meta-manager Configuration
+
+The configuration is a JSON file and is passed to the meta-manager by the `--config` CLI option.
+
+### Format
+
+```json
+{
+    "cache_path": "/path/to/cache/",
+    "containerizer": {
+        "url": "unix:///path/to/podman/or/docker.sock"
+    },
+    "repository_drivers": {
+        "driver1": {
+            "package": "python.package.driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "driver2": {
+            "package": "python.package.driver2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "translators": {
+        "translator1": {
+            "package": "python.package.translator1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "translator2": {
+            "package": "python.package.translator2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "installers": {
+        "installer1": {
+            "package": "python.package.installer1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "installer2": {
+            "package": "python.package.installer2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "generators": {
+        "exact": {
+            "package": "python.package.generator1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        "prefix*": {
+            "package": "python.package.generator2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    },
+    "repositories": [
+        {
+            "driver": "driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        {
+            "driver": "driver1",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        },
+        {
+            "driver": "driver2",
+            "parameters": {
+                "implementation_defined": ""
+            }
+        }
+    ]
+}
+
+```
+
 ## Resolution graph
 
 The meta-manager is able to generate a dot file with the resolution graph.
@@ -179,3 +299,80 @@ The meta-manager is able to generate a dot file with the resolution graph.
 ```bash
 python -m PPpackage.metamanager --graph <graph_path> ...
 ```
+
+## Examples
+
+For all testing scenarios, a clone of the repository is required.
+
+All scripts expect to be run from the git repository root.
+They create directory `tmp/` to store all files created during the run of the program.
+
+```bash
+git clone https://github.com/papundekel/PPpackage
+cd PPpackage/
+```
+
+The installation directory will be locate in `tmp/root/`. Generators and the resolution graph are located in the `tmp/output/` directory.
+
+Note that the program uses caching and so the first run is very slow compared to subsequent ones.
+
+All scripts are located in the `examples/` directory.
+
+### Native
+
+It is possible to test the application directly on the host machine without any containerization.
+
+As all applications in these scenarios run on the host, we need to install
+the required packages first.
+
+```bash
+python -m venv .venv/
+source .venv/bin/activate
+pip install --requirement requirements-dev.txt
+```
+
+To run:
+
+```bash
+./examples/metamanager/native/run.sh < examples/input/iana-etc.json
+```
+
+There are multiple input examples in the `examples/input/` directory, you can try any of them.
+
+### Containerized
+
+It is also possible to run the application using the Compose Specification.
+Both Docker and podman are supported.
+
+The only requirements are therefore Docker or podman and a composer (docker-compose or podman-compose).
+
+Docker requires more configuration because of how
+user namespace mappings work, so the compose files are written to work for podman.
+Support for Docker can be added to the compose file by supplying the `USER` environment variable to the composer and Dockerfile and bind mounting the `/etc/passwd`
+and `/etc/group` files. An example of this configuration can be seen in the github workflow in `.github/compose.yaml`.
+
+```bash
+./examples/metamanager/containerized/run.sh < examples/input/iana-etc.json
+```
+
+### Project
+
+One example project is also provided. It is the project described in the Conan documentation. It resides in `examples/project/compressor/`.
+
+First, the build context for the project is created with our meta-manager:
+
+```bash
+./examples/metamanager/$method/run.sh < examples/project/compressor/requirements.json
+```
+
+Next we need to move the directories from `tmp/`. `tmp/root` goes to `examples/project/compressor/build/root` and `tmp/output/generators/` into `examples/project/compressor/build/generators/`.
+
+Then we can run the provided script, which uses the `root/` directory as image rootfs and builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation.
+
+```bash
+./examples/project/compressor/build-in-container.sh $containerizer
+
+./examples/project/compressor/build/output/compressor
+```
+
+We can also invoke the meta-manager directly without the `run.sh` scripts and then we would not have to move the directories as we could specify the output directories directly. The only problem with this method is that the containerized meta-manager needs to have path translations for the containerizer set for the root directory and that requires changing the config.json file. The native version doesn't have this problem as it resides in the same mount namespace as the containerizer.

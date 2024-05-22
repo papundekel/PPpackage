@@ -4,11 +4,7 @@ from .state import State
 from .utils import transaction
 
 
-async def get_epoch(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-) -> str:
+async def get_epoch(state: State) -> str:
     connection = state.connection
 
     async with transaction(connection):

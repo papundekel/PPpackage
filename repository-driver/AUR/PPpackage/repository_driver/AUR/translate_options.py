@@ -6,12 +6,7 @@ from .state import State
 from .utils import transaction
 
 
-async def translate_options(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    options: Any,
-) -> tuple[str, None]:
+async def translate_options(state: State, options: Any) -> tuple[str, None]:
     connection = state.connection
 
     async with transaction(connection):

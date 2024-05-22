@@ -5,7 +5,6 @@ from asyncstdlib import chain as async_chain
 from asyncstdlib import list as async_list
 from PPpackage.repository_driver.interface.schemes import PackageDetail
 
-from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import PREFIX, parse_package_name, strip_version, transaction
 
@@ -41,11 +40,7 @@ async def query_runtime_dependencies(
 
 
 async def get_package_detail(
-    state: State,
-    driver_parameters: DriverParameters,
-    repository_parameters: RepositoryParameters,
-    translated_options: None,
-    full_package_name: str,
+    state: State, translated_options: None, full_package_name: str
 ) -> PackageDetail | None:
     if not full_package_name.startswith(PREFIX):
         return None
