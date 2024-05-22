@@ -35,8 +35,6 @@ async def main(
     if data_path is None:
         data_path = Path.home() / ".PPpackage" / str(index)
 
-    print(data_path, file=stderr)
-
     interface = load_interface_module(Interface, package)
 
     driver_parameters = load_parameters(
