@@ -179,3 +179,80 @@ The meta-manager is able to generate a dot file with the resolution graph.
 ```bash
 python -m PPpackage.metamanager --graph <graph_path> ...
 ```
+
+## Examples
+
+For all testing scenarios, a clone of the repository is required.
+
+All scripts expect to be run from the git repository root.
+They create directory `tmp/` to store all files created during the run of the program.
+
+```bash
+git clone https://github.com/papundekel/PPpackage
+cd PPpackage/
+```
+
+The installation directory will be locate in `tmp/root/`. Generators and the resolution graph are located in the `tmp/output/` directory.
+
+Note that the program uses caching and so the first run is very slow compared to subsequent ones.
+
+All scripts are located in the `examples/` directory.
+
+### Native
+
+It is possible to test the application directly on the host machine without any containerization.
+
+As all applications in these scenarios run on the host, we need to install
+the required packages first.
+
+```bash
+python -m venv .venv/
+source .venv/bin/activate
+pip install --requirement requirements-dev.txt
+```
+
+To run:
+
+```bash
+./examples/metamanager/native/run.sh < examples/input/iana-etc.json
+```
+
+There are multiple input examples in the `examples/input/` directory, you can try any of them.
+
+### Containerized
+
+It is also possible to run the application using the Compose Specification.
+Both Docker and podman are supported.
+
+The only requirements are therefore Docker or podman and a composer (docker-compose or podman-compose).
+
+Docker requires more configuration because of how
+user namespace mappings work, so the compose files are written to work for podman.
+Support for Docker can be added to the compose file by supplying the `USER` environment variable to the composer and Dockerfile and bind mounting the `/etc/passwd`
+and `/etc/group` files. An example of this configuration can be seen in the github workflow in `.github/compose.yaml`.
+
+```bash
+./examples/metamanager/containerized/run.sh < examples/input/iana-etc.json
+```
+
+### Project
+
+One example project is also provided. It is the project described in the Conan documentation. It resides in `examples/project/compressor/`.
+
+First, the build context for the project is created with our meta-manager:
+
+```bash
+./examples/metamanager/$method/run.sh < examples/project/compressor/requirements.json
+```
+
+Next we need to move the directories from `tmp/`. `tmp/root` goes to `examples/project/compressor/build/root` and `tmp/output/generators/` into `examples/project/compressor/build/generators/`.
+
+Then we can run the provided script, which uses the `root/` directory as image rootfs and builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation.
+
+```bash
+./examples/project/compressor/build-in-container.sh $containerizer
+
+./examples/project/compressor/build/output/compressor
+```
+
+We can also invoke the meta-manager directly without the `run.sh` scripts and then we would not have to move the directories as we could specify the output directories directly. The only problem with this method is that the containerized meta-manager needs to have path translations for the containerizer set for the root directory and that requires changing the config.json file. The native version doesn't have this problem as it resides in the same mount namespace as the containerizer.
