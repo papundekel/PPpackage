@@ -26,16 +26,12 @@ services:
               target: /run/podman/podman.sock
 
             - type: bind
-              source: $PWD/cache/
-              target: /mnt/cache/
+              source: /home/runner/
+              target: /root/
 
             - type: bind
               source: /tmp/
               target: /tmp/
-
-            - type: bind
-              source: /home/runner/
-              target: /root/
 
             - type: bind
               source: /etc/passwd

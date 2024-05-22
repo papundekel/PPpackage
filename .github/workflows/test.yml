@@ -77,7 +77,7 @@ jobs:
             - name: Cache caches
               uses: actions/cache@v4.0.2
               with:
-                  path: ${{ github.workspace }}/cache/
+                  path: ${{ github.workspace }}/data/cache
                   key: cache
 
             - name: Cache databases
@@ -102,42 +102,45 @@ jobs:
 
             - name: Create directories
               run: |
-                  mkdir -p root/ output/ cache/ workdir/
-                  mkdir -p database/archlinux-core/ database/archlinux-extra/ database/AUR/ database/conancenter/
+                  mkdir -p root/ output/ /home/runner/.PPpackage/cache/ workdir/
+                  cd /home/runner/.PPpackage
+                  mkdir -p archlinux-core/ archlinux-extra/ AUR/ conancenter/
 
             - name: Update archlinux core database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-core/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/archlinux-core/,target=/mnt/data/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=core
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
-                  --data-path /mnt/database/
+                  --data-path /mnt/data/
                   --repository /mnt/repository.json
 
             - name: Update archlinux extra database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/archlinux-extra/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/archlinux-core/,target=/mnt/data/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=extra
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
-                  --data-path /mnt/database/
+                  --data-path /mnt/data/
                   --repository /mnt/repository.json
 
             - name: Update AUR database
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/AUR/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/archlinux-core/,target=/mnt/data/
+                  --mount type=bind,source=${{ github.workspace }}/examples/update/repository-AUR.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.AUR
-                  --data-path /mnt/database/
+                  --data-path /mnt/data/
+                  --repository /mnt/repository.json
 
             - name: Check if conancenter database exists
               id: check_conancenter
@@ -150,24 +153,13 @@ jobs:
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/conancenter/,target=/mnt/data/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-conancenter.json,target=/mnt/repository.json
                   --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.conan
-                  --data-path /mnt/database/
+                  --data-path /mnt/data/
                   --repository /mnt/repository.json
-
-            - name: Create default conan profile
-              if: steps.check_conancenter.outputs.files_exists == 'false'
-              run: >
-                  docker run --rm
-                  --user $(id -u):$(id -g)
-                  --mount type=bind,source=${{ github.workspace }}/database/conancenter/,target=/mnt/database/
-                  --env CONAN_HOME=/mnt/database/cache/
-                  --entrypoint conan
-                  docker.io/fackop/pppackage-updater:latest
-                  profile detect
 
             - name: Run PPpackage
               run: >
