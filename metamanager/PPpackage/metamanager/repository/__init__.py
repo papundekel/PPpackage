@@ -153,6 +153,8 @@ async def create_repository(
 ) -> RepositoryInterface:
     if isinstance(repository_config, RemoteRepositoryConfig):
         if client is None:
+            repository_config.cache_path.mkdir(parents=True, exist_ok=True)
+
             client = await context_stack.enter_async_context(
                 HTTPClient(
                     http2=True,

@@ -1,4 +1,5 @@
 from logging import getLogger
+from sys import stderr
 from typing import Any, AsyncIterable
 
 from hishel import AsyncCacheClient as HTTPClient
@@ -37,13 +38,11 @@ class RemoteRepository(RepositoryInterface):
         return self.url
 
     async def get_epoch(self) -> str:
-        response = await self.client.head(f"{self.url}/translate-options")
+        response = await self.client.head(f"{self.url}/epoch")
 
         if not response.is_success:
-            raise SubmanagerCommandFailure(
-                "remote repository.get_epoch failed "
-                f"{(await response.aread()).decode()}"
-            )
+            stderr.write((await response.aread()).decode())
+            raise Exception("remote repository.get_epoch failed")
 
         return response.headers["ETag"]
 
@@ -109,7 +108,7 @@ class RemoteRepository(RepositoryInterface):
         self, translated_options: Any, package: str
     ) -> PackageDetail | None:
         response = await self.client.get(
-            f"{self.url}/packages/{package}",
+            f"{self.url}/package/{package}",
             params={"translated_options": dump_json(translated_options)},
         )
 
@@ -131,7 +130,7 @@ class RemoteRepository(RepositoryInterface):
         runtime_product_infos: ProductInfos,
     ) -> BuildContextDetail:
         response = await self.client.get(
-            f"{self.url}/packages/{package}/product-info",
+            f"{self.url}/package/{package}/build-context",
             params={
                 "translated_options": dump_json(translated_options),
                 "runtime_product_infos": dump_json(runtime_product_infos),
@@ -154,7 +153,7 @@ class RemoteRepository(RepositoryInterface):
         runtime_product_infos: ProductInfos,
     ) -> ProductInfo:
         response = await self.client.get(
-            f"{self.url}/packages/{package}/product-info",
+            f"{self.url}/package/{package}/product-info",
             params={
                 "translated_options": dump_json(translated_options),
                 "build_context_info": dump_json(build_context_info),

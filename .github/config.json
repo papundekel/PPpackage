@@ -4,11 +4,11 @@
         "url": "unix:///run/podman/podman.sock",
         "path_translations": [
             {
-                "containerizer": "$WORKING_DIRECTORY/root",
+                "containerizer": "$PWD/root/",
                 "container": "/mnt/root/"
             },
             {
-                "containerizer": "$WORKING_DIRECTORY/workdir",
+                "containerizer": "/tmp/",
                 "container": "/mnt/workdir/"
             }
         ]
@@ -41,11 +41,11 @@
                     "url": "unix:///run/podman/podman.sock",
                     "path_translations": [
                         {
-                            "containerizer": "$WORKING_DIRECTORY/root",
+                            "containerizer": "$PWD/root/",
                             "container": "/mnt/root/"
                         },
                         {
-                            "containerizer": "$WORKING_DIRECTORY/workdir",
+                            "containerizer": "/tmp/",
                             "container": "/mnt/workdir/"
                         }
                     ]

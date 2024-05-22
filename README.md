@@ -28,9 +28,9 @@ The different types of modules are:
 - installer
 - generator
 
-Each module type handles a certain part of the package management process. There are typicly multiple modules of each type, each implementing a part of some manager's functionality.
+Each module type handles a certain part of the package management process. There are typically multiple modules of each type, each implementing a part of some manager's functionality.
 
-All modules can present a Python interface. The repository drivers can also be communicated with using a REST API.
+All modules ought to implement a Python interface.
 
 ### Meta-manager
 
