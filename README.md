@@ -318,7 +318,7 @@ Note that the program uses caching and so the first run is very slow compared to
 
 All scripts are located in the `examples/` directory.
 
-### Native
+### Native invocation
 
 It is possible to test the application directly on the host machine without any containerization.
 
@@ -331,29 +331,49 @@ source .venv/bin/activate
 pip install --requirement requirements-dev.txt
 ```
 
-To run:
-
-```bash
-./examples/metamanager/native/run.sh < examples/input/iana-etc.json
-```
-
-There are multiple input examples in the `examples/input/` directory, you can try any of them.
-
-### Containerized
+### Containerized invocation
 
 It is also possible to run the application using the Compose Specification.
 Both Docker and podman are supported.
 
 The only requirements are therefore Docker or podman and a composer (docker-compose or podman-compose).
 
+Also, you need to build the images.
+
+```bash
+./images-build.sh $containerizer
+```
+
 Docker requires more configuration because of how
 user namespace mappings work, so the compose files are written to work for podman.
 Support for Docker can be added to the compose file by supplying the `USER` environment variable to the composer and Dockerfile and bind mounting the `/etc/passwd`
 and `/etc/group` files. An example of this configuration can be seen in the github workflow in `.github/compose.yaml`.
 
+### Updating repositories
+
+Before using the manager, databases of used repositories need to be created. The examples contained in this repository always use the same configuration of five repositories. To create or update their databases, use one of the following methods.
+
 ```bash
-./examples/metamanager/containerized/run.sh < examples/input/iana-etc.json
+./examples/update/native/update.sh
 ```
+
+```bash
+./examples/update/containerized/update.sh $containerizer
+```
+
+These scripts create files in `~/.PPpackage`. It is also the location where run scripts look for the files. All locations are configurable but are left to their simplest defaults for ease of testing.
+
+### Running
+
+```bash
+./examples/metamanager/native/run.sh < examples/input/iana-etc.json
+```
+
+```bash
+./examples/metamanager/containerized/run.sh $containerizer < examples/input/iana-etc.json
+```
+
+There are multiple input examples in the `examples/input/` directory, you can try any of them.
 
 ### Project
 
