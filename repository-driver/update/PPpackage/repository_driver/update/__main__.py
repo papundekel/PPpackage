@@ -33,7 +33,7 @@ async def main(
         raise Exception("One of --data-path or --index must be specified.")
 
     if data_path is None:
-        data_path = Path.home() / ".PPpackage" / str(index)
+        data_path = Path.home() / ".PPpackage" / "repository" / str(index)
 
     interface = load_interface_module(Interface, package)
 

@@ -27,6 +27,7 @@ class Input:
 class RepositoryConfig(BaseModel):
     driver: str
     parameters: Parameters = frozendict()
+    data_path: Path | None = None
     formula_cache_path: Annotated[Path, WithVariables] | None = None
     translator_data_cache_path: Annotated[Path, WithVariables] | None = None
 

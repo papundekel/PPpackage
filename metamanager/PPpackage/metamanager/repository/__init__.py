@@ -3,7 +3,6 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from hishel import AsyncCacheClient as HTTPClient
 from PPpackage.repository_driver.interface.schemes import (
     BuildContextDetail,
     BuildContextInfo,
@@ -172,7 +171,10 @@ async def Repositories(
             await Repository.create(
                 config,
                 await create_repository(
-                    context_stack, config, drivers, data_path / str(index)
+                    context_stack,
+                    config,
+                    drivers,
+                    data_path / "repository" / str(index),
                 ),
                 data_path,
                 index,
