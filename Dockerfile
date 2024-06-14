@@ -1,7 +1,4 @@
-ARG AUR_TAG=paru-20240505.0.320
-# -----------------------------------------------------------------------------
-
-FROM docker.io/greyltc/archlinux-aur:$AUR_TAG AS base
+FROM docker.io/greyltc/archlinux-aur AS base
 
 RUN mkdir -p /workdir
 WORKDIR /workdir
