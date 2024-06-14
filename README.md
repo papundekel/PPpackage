@@ -331,6 +331,20 @@ source .venv/bin/activate
 pip install --requirement requirements-dev.txt
 ```
 
+`pyalpm`, a Python bindings library for `libalpm`, requires `libalpm` to be installed manually.
+
+#### archlinux
+
+```bash
+pacman -Syu libalpm
+```
+
+#### Ubuntu
+
+```bash
+apt install libalpm-dev
+```
+
 ### Containerized invocation
 
 It is also possible to run the application using the Compose Specification.
