@@ -95,8 +95,8 @@ async def install(parameters: Parameters, product_path: Path, installation_path:
 
         async with lock_by_key(locks, installation_path):
             process = await create_subprocess_exec(
-                parameters.fakealpm_install_path / "/bin/fakealpm",
-                parameters.fakealpm_install_path / "/bin/fakealpm-executable",
+                parameters.fakealpm_install_path / "bin" / "fakealpm",
+                parameters.fakealpm_install_path / "bin" / "fakealpm-executable",
                 str(server_socket_path),
                 str(installation_path),
                 str(database_path),
