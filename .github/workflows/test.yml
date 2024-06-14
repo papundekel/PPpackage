@@ -164,3 +164,16 @@ jobs:
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache
+    # wait for Ubuntu 24
+    # fakealpm:
+    #     runs-on: ubuntu-latest
+    #     steps:
+    #         - uses: actions/checkout@v4.1.1
+
+    #         - name: Install fakealpm dependencies
+    #           uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+    #           with:
+    #               packages: libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
+
+    #         - name: Build fakelpm
+    #           run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local

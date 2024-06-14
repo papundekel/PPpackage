@@ -49,6 +49,7 @@ async def get_build_context(
                         ),
                         Requirement("pacman", "sudo"),
                         Requirement("pacman", "coreutils"),
+                        Requirement("pacman", "python-setuptools"),
                     ],
                     (
                         Requirement("pacman", dependency)
@@ -67,8 +68,10 @@ async def get_build_context(
                 f"git clone https://aur.archlinux.org/{name}.git /tmp/workdir || exit 10\n"
                 "chown -R builder:builder /tmp/workdir\n"
                 "cd /tmp/workdir\n"
-                "sudo --user builder makepkg || exit 20\n"
+                "sudo --user builder makepkg\n"
+                "return_code=$?\n"
                 "chown -R root:root /tmp/workdir\n"
+                "if [ $return_code -ne 0 ]; then exit 20; fi\n"
                 "mkdir /mnt/output\n"
                 "mv /tmp/workdir/*.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"

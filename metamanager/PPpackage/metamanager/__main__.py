@@ -3,6 +3,8 @@ from logging import LogRecord
 from logging import StreamHandler as StreamLoggingHandler
 from logging import getLogger
 from pathlib import Path
+from sys import stderr
+from traceback import print_exc
 from typing import Optional
 
 from typer import Option as TyperOption
@@ -37,7 +39,11 @@ async def main_command(
     generators_path: Annotated[Optional[Path], TyperOption("--generators")] = None,
     graph_path: Annotated[Optional[Path], TyperOption("--graph")] = None,
 ) -> None:
-    await main(config_path, installation_path, generators_path, graph_path)
+    try:
+        await main(config_path, installation_path, generators_path, graph_path)
+    except:
+        print_exc(file=stderr)
+        exit(1)
 
 
 app()

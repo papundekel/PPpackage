@@ -11,8 +11,6 @@
 
 -e ./repository-driver/interface/ --config-settings editable_mode=compat
 
--e ./repository-driver/server/
-
 -e ./repository-driver/update/
 
 -e ./repository-driver/conan/
