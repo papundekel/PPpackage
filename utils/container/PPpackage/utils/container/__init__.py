@@ -46,7 +46,8 @@ class Containerizer:
 
             if return_code != 0:
                 logs = container.logs(stream=True, stderr=True)
-                print(logs, file=stderr)
+                for chunk in logs:
+                    stderr.write(chunk.decode())
 
             if remove:
                 container.remove()
