@@ -172,7 +172,7 @@ jobs:
             - name: Install fakealpm dependencies
               uses: awalsh128/cache-apt-pkgs-action@v1.4.2
               with:
-                  packages: gcc cmake ninja boost nlohmann-json3-dev
+                  packages: libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
 
             - name: Build fakelpm
               run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local

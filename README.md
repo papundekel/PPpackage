@@ -331,18 +331,18 @@ source .venv/bin/activate
 pip install --requirement requirements-dev.txt
 ```
 
-`pyalpm`, a Python bindings library for `libalpm`, requires `libalpm` to be installed manually.
+`pyalpm`, a Python bindings library for `libalpm`, requires `libalpm` to be installed manually. The `pacman` installer uses `fakealpm` which has dependencies.
 
 #### archlinux
 
 ```bash
-pacman -Syu libalpm
+pacman -Syu libalpm gcc cmake ninja boost nlohmann-json
 ```
 
 #### Ubuntu
 
 ```bash
-apt install libalpm-dev
+apt install libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
 ```
 
 ### Containerized invocation
