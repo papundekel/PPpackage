@@ -333,17 +333,25 @@ pip install --requirement requirements-dev.txt
 
 `pyalpm`, a Python bindings library for `libalpm`, requires `libalpm` to be installed manually. The `pacman` installer uses `fakealpm` which has dependencies.
 
-#### archlinux
+archlinux:
 
 ```bash
 pacman -Syu libalpm gcc cmake ninja boost nlohmann-json
 ```
 
-#### Ubuntu
+Ubuntu:
 
 ```bash
 apt install libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
 ```
+
+To build `fakealpm`:
+
+```bash
+./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ $fakealpm_install_dir
+```
+
+If `fakealpm_install_dir` is set to something else than `/usr/local/` then you need to configure `fakealpm_install_path` parameter in the `pacman` installer to that path.
 
 ### Containerized invocation
 
