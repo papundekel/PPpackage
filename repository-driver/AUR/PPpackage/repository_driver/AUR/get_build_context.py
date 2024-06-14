@@ -70,7 +70,7 @@ async def get_build_context(
                 "sudo --user builder makepkg\n"
                 "return_code=$?\n"
                 "chown -R root:root /tmp/workdir\n"
-                "if [ $return_code -ne 0 ]; exit 20; fi\n"
+                "if [ $return_code -ne 0 ]; then exit 20; fi\n"
                 "mkdir /mnt/output\n"
                 "mv /tmp/workdir/*.pkg.* /mnt/output/product\n"
                 "chown root:root /mnt/output/product\n"
