@@ -77,6 +77,10 @@ RUN pip install repository-driver/conan/
 
 
 
+COPY examples/ /usr/share/doc/PPpackage/examples/
+
+
+
 ENTRYPOINT [ "python", "-m", "PPpackage.repository_driver.update" ]
 
 # -----------------------------------------------------------------------------
