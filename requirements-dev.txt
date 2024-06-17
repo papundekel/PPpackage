@@ -1,3 +1,7 @@
+pre-commit
+hypercorn
+setuptools
+
 -e ./utils/json --config-settings editable_mode=compat
 -e ./utils/async --config-settings editable_mode=compat
 -e ./utils/cli --config-settings editable_mode=compat
@@ -40,6 +44,3 @@
 
 
 -e ./metamanager/
-
-pre-commit
-hypercorn
