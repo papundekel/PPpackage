@@ -112,7 +112,7 @@ jobs:
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
                   --data-path /mnt/repository/
-                  --repository /mnt/repository.json
+                  --repository-config /mnt/repository.json
 
             - name: Update archlinux extra database
               run: >
@@ -124,7 +124,7 @@ jobs:
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
                   --data-path /mnt/repository/
-                  --repository /mnt/repository.json
+                  --repository-config /mnt/repository.json
 
             - name: Update AUR database
               run: >
@@ -153,7 +153,7 @@ jobs:
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.conan
                   --data-path /mnt/repository/
-                  --repository /mnt/repository.json
+                  --repository-config /mnt/repository.json
 
             - name: Run PPpackage
               run: >
