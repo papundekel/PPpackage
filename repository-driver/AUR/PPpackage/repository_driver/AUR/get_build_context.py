@@ -49,7 +49,6 @@ async def get_build_context(
                         ),
                         Requirement("pacman", "sudo"),
                         Requirement("pacman", "coreutils"),
-                        Requirement("pacman", "python-setuptools"),
                     ],
                     (
                         Requirement("pacman", dependency)
