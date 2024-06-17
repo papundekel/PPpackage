@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from pathlib import Path
 from sys import stderr
 from typing import Any
@@ -45,7 +46,9 @@ class Containerizer:
             return_code = container.wait()
 
             if return_code != 0:
-                logs = container.logs(stream=True, stderr=True)
+                logs = type_cast(
+                    Iterable[bytes], container.logs(stream=True, stderr=True)
+                )
                 for chunk in logs:
                     stderr.write(chunk.decode())
 
