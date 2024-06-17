@@ -3,6 +3,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from multiprocessing import cpu_count
 from pathlib import Path
 from sys import stderr
+from typing import cast as type_cast
 
 from conan.api.conan_api import ConanAPI
 from conan.api.model import Remote
@@ -19,10 +20,13 @@ from .state import State
 def fetch_revisions(
     api: ConanAPI, remote: Remote, recipe: RecipeReference
 ) -> Sequence[RecipeReference]:
-    # takes too long
+    # this takes too long:
     # return api.list.recipe_revisions(recipe, remote)
+
     try:
-        revision = api.list.latest_recipe_revision(recipe, remote)
+        revision = type_cast(
+            RecipeReference, api.list.latest_recipe_revision(recipe, remote)
+        )
     except ConanException:
         print(f"Failed to fetch revisions for {recipe}", file=stderr)
         return []
