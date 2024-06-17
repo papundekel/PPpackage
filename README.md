@@ -318,7 +318,22 @@ Note that the program uses caching and so the first run is very slow compared to
 
 All scripts are located in the `examples/` directory.
 
-### Native invocation
+The manager can be invoked natively or in a container.
+
+### Requirements
+
+#### Common
+
+The meta-manager launches containers and needs access to a containerizer. Currently only Podman is supported, but the design of the project allows to easily support Docker as well.
+All examples use config `unix://$XDG_RUNTIME_DIR/podman/podman.sock` for the containerizer socket url which is the default location for Podman. You can change this value to any location in the `config.json` files according to your setup.
+
+The SAT solver the meta-manager uses is invoked as a container. Therefore the image for the solver needs to be built.
+
+```bash
+./solver/image-build.sh $containerizer
+```
+
+#### Native invocation
 
 It is possible to test the application directly on the host machine without any containerization.
 
@@ -353,7 +368,7 @@ To build `fakealpm`:
 
 If `fakealpm_install_dir` is set to something else than `/usr/local/` then you need to configure `fakealpm_install_path` parameter in the `pacman` installer to that path.
 
-### Containerized invocation
+#### Containerized invocation
 
 It is also possible to run the application using the Compose Specification.
 Both Docker and podman are supported.
