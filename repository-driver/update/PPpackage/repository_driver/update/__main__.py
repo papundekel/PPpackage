@@ -1,5 +1,4 @@
 from pathlib import Path
-from sys import stderr
 from typing import Annotated, Optional
 
 from PPpackage.repository_driver.interface.interface import Interface
@@ -24,9 +23,11 @@ async def main(
     package: str,
     data_path: Optional[Path] = None,
     index: Optional[int] = None,
-    driver_parameters_path: Annotated[Optional[Path], TyperOption("--driver")] = None,
-    repository_parameters_path: Annotated[
-        Optional[Path], TyperOption("--repository")
+    driver_config_path: Annotated[
+        Optional[Path], TyperOption("--driver-config")
+    ] = None,
+    repository_config_path: Annotated[
+        Optional[Path], TyperOption("--repository-config")
     ] = None,
 ):
     if data_path is None and index is None:
@@ -37,12 +38,10 @@ async def main(
 
     interface = load_interface_module(Interface, package)
 
-    driver_parameters = load_parameters(
-        interface.DriverParameters, driver_parameters_path
-    )
+    driver_parameters = load_parameters(interface.DriverParameters, driver_config_path)
 
     repository_parameters = load_parameters(
-        interface.RepositoryParameters, repository_parameters_path
+        interface.RepositoryParameters, repository_config_path
     )
 
     async with interface.lifespan(

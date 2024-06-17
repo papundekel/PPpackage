@@ -30,6 +30,7 @@ class Containerizer:
                 **kwargs,
                 mounts=mounts if mounts is not None else [],
                 stdin_open=stdin is not None,
+                security_opt=["disable"],
             )
 
             container.start()

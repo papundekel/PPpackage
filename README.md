@@ -403,11 +403,11 @@ These scripts create files in `~/.PPpackage`. It is also the location where run 
 ### Running
 
 ```bash
-./examples/metamanager/native/run.sh < examples/input/iana-etc.json
+./examples/metamanager/native/run.sh <examples/input/iana-etc.json
 ```
 
 ```bash
-./examples/metamanager/containerized/run.sh $containerizer < examples/input/iana-etc.json
+./examples/metamanager/containerized/run.sh $containerizer <examples/input/iana-etc.json
 ```
 
 There are multiple input examples in the `examples/input/` directory, you can try any of them.

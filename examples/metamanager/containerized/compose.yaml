@@ -1,6 +1,8 @@
 name: pppackage
 services:
     metamanager:
+        security_opt:
+            - label=disable
         image: docker.io/fackop/pppackage-metamanager:latest
         command:
             - /mnt/root/
