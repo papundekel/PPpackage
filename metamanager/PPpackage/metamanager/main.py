@@ -27,6 +27,7 @@ async def main(
     installation_path: Path,
     generators_path: Path | None,
     graph_path: Path | None,
+    just_resolve: bool,
 ) -> None:
     try:
         config = validate_json_io_path(Config, config_path)
@@ -80,6 +81,10 @@ async def main(
                     if graph_path is not None:
                         write_graph_to_file(graph, graph_path)
                         stderr.write(f"Graph written to {graph_path}.\n")
+
+                    if just_resolve:
+                        stderr.write("Done.\n")
+                        return
 
                     installers = Installers(config.installers)
 

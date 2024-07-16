@@ -38,9 +38,12 @@ async def main_command(
     config_path: Annotated[Path, TyperOption("--config")],
     generators_path: Annotated[Optional[Path], TyperOption("--generators")] = None,
     graph_path: Annotated[Optional[Path], TyperOption("--graph")] = None,
+    just_resolve: bool = False,
 ) -> None:
     try:
-        await main(config_path, installation_path, generators_path, graph_path)
+        await main(
+            config_path, installation_path, generators_path, graph_path, just_resolve
+        )
     except:
         print_exc(file=stderr)
         exit(1)
