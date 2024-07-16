@@ -75,7 +75,7 @@ async def get_formula(
     async with rwlock_read(state.coroutine_lock, state.file_lock):
         epoch_result.set(get_epoch(state.database_path / "epoch"))
 
-        with ProcessPoolExecutor(2 * cpu_count()) as executor:
+        with ProcessPoolExecutor() as executor:
             futures = list[Future[list[list[Requirement]]]]()
 
             for aux_home_path in state.aux_home_paths:
