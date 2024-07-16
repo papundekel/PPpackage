@@ -21,8 +21,8 @@ def load_parameters(Parameters: type, path: Path | None):
 @app.command()
 async def main(
     package: str,
+    name: str,
     data_path: Optional[Path] = None,
-    index: Optional[int] = None,
     driver_config_path: Annotated[
         Optional[Path], TyperOption("--driver-config")
     ] = None,
@@ -30,11 +30,8 @@ async def main(
         Optional[Path], TyperOption("--repository-config")
     ] = None,
 ):
-    if data_path is None and index is None:
-        raise Exception("One of --data-path or --index must be specified.")
-
     if data_path is None:
-        data_path = Path.home() / ".PPpackage" / "repository" / str(index)
+        data_path = Path.home() / ".PPpackage" / "repository" / str(name)
 
     interface = load_interface_module(Interface, package)
 

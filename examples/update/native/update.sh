@@ -1,20 +1,20 @@
 REPOSITORY=core python -m PPpackage.repository_driver.update \
     PPpackage.repository_driver.pacman \
-    --index 0 \
+    archlinux-core \
     --repository-config examples/update/repository-pacman.json &
 
 REPOSITORY=extra python -m PPpackage.repository_driver.update \
     PPpackage.repository_driver.pacman \
-    --index 1 \
+    archlinux-extra \
     --repository-config examples/update/repository-pacman.json &
 
 python -m PPpackage.repository_driver.update \
     PPpackage.repository_driver.AUR \
-    --index 2 &
+    AUR &
 
 python -m PPpackage.repository_driver.update \
     PPpackage.repository_driver.conan \
-    --index 3 \
+    conancenter \
     --repository-config examples/update/repository-conancenter.json &
 
 wait

@@ -8,7 +8,7 @@ from PPpackage.repository_driver.interface.schemes import (
     Parameters,
     Requirement,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from PPpackage.utils.container.schemes import ContainerizerConfig
@@ -25,6 +25,7 @@ class Input:
 
 
 class RepositoryConfig(BaseModel):
+    name: str
     driver: str
     parameters: Parameters = frozendict()
     data_path: Path | None = None
@@ -63,3 +64,18 @@ class Config:
     product_cache_path: Annotated[Path, WithVariables] | None = None
     repository_drivers: Mapping[str, RepositoryDriverConfig] = frozendict()
     generators: Mapping[str, GeneratorConfig] = frozendict()
+
+    @field_validator("repositories")
+    @classmethod
+    def name_must_contain_space(
+        cls, repository_configs: list[RepositoryConfig]
+    ) -> list[RepositoryConfig]:
+        names = set[str]()
+
+        for repository_config in repository_configs:
+            if repository_config.name in names:
+                raise ValueError(f"Duplicate repository name: {repository_config.name}")
+
+            names.add(repository_config.name)
+
+        return repository_configs

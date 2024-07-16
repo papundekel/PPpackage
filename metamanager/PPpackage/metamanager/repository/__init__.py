@@ -30,18 +30,17 @@ class Repository:
         interface: RepositoryInterface,
         epoch: str,
         data_path: Path,
-        index: int,
     ):
         self.translator_data_cache_path = (
             config.translator_data_cache_path
             if config.translator_data_cache_path is not None
-            else data_path / "cache" / "translator-data" / str(index)
+            else data_path / "cache" / "translator-data" / config.name
         )
 
         self.formula_cache_path = (
             config.formula_cache_path
             if config.formula_cache_path is not None
-            else data_path / "cache" / "formula" / str(index)
+            else data_path / "cache" / "formula" / config.name
         )
 
         self.interface = interface
@@ -49,13 +48,10 @@ class Repository:
 
     @staticmethod
     async def create(
-        config: RepositoryConfig,
-        interface: RepositoryInterface,
-        data_path: Path,
-        index: int,
+        config: RepositoryConfig, interface: RepositoryInterface, data_path: Path
     ):
         epoch = await interface.get_epoch()
-        return Repository(config, interface, epoch, data_path, index)
+        return Repository(config, interface, epoch, data_path)
 
     async def fetch_translator_data(self) -> AsyncIterable[TranslatorInfo]:
         self.translator_data_cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,15 +165,14 @@ async def Repositories(
     async with AsyncExitStack() as context_stack:
         yield [
             await Repository.create(
-                config,
+                repository_config,
                 await create_repository(
                     context_stack,
-                    config,
+                    repository_config,
                     drivers,
-                    data_path / "repository" / str(index),
+                    data_path / "repository" / repository_config.name,
                 ),
                 data_path,
-                index,
             )
-            for index, config in enumerate(repository_configs)
+            for repository_config in repository_configs
         ]
