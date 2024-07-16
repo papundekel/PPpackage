@@ -1,5 +1,6 @@
 from collections.abc import Iterable, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from contextlib import ExitStack
 from itertools import cycle
 from multiprocessing import cpu_count
 from pathlib import Path
@@ -59,13 +60,10 @@ def download_recipes(
         app.remote_manager.get_recipe(revision, remote)
 
 
-def save_and_restore(
-    source_api: ConanAPI, package_list: PackagesList, destination_api: ConanAPI
-) -> None:
-    with TemporaryDirectory() as temp:
-        archive_path = temp / "packages"
-        source_api.cache.save(package_list, archive_path)
-        destination_api.cache.restore(archive_path)
+def restore(home_path: Path, archive_path: Path) -> None:
+    api, _ = create_api_and_app(home_path)
+
+    api.cache.restore(archive_path)
 
 
 def create_default_profile(home_path: Path, detected_profile: Profile) -> None:
@@ -86,6 +84,9 @@ async def update(state: State) -> None:
         detected_profile = state.api.profiles.detect()
 
         create_default_profile(Path(state.api.home_folder), detected_profile)
+
+        for aux_home in state.aux_home_paths:
+            create_default_profile(aux_home, detected_profile)
 
         recipes = state.api.search.recipes("*", remote)
 
@@ -111,9 +112,25 @@ async def update(state: State) -> None:
         for revision, package_list in zip(all_revisions, cycle(package_lists)):
             package_list.add_refs([revision])
 
-        for package_list, aux_home in zip(package_lists, state.aux_home_paths):
-            aux_api, _ = create_api_and_app(aux_home)
-            create_default_profile(aux_home, detected_profile)
-            save_and_restore(state.api, package_list, aux_api)
+        with ExitStack() as exit_stack:
+            archive_paths = list[Path]()
+
+            for package_list in package_lists:
+                archive_path = (
+                    exit_stack.enter_context(TemporaryDirectory()) / "packages"
+                )
+
+                state.api.cache.save(package_list, archive_path)
+                archive_paths.append(archive_path)
+
+            with ProcessPoolExecutor() as executor:
+                futures = []
+
+                for archive_path, aux_home in zip(archive_paths, state.aux_home_paths):
+                    future = executor.submit(restore, aux_home, archive_path)
+                    futures.append(future)
+
+                for future in futures:
+                    future.result()
 
         update_epoch(state.database_path / "epoch")
