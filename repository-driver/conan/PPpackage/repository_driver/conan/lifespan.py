@@ -9,7 +9,7 @@ from .schemes import DriverParameters, RepositoryParameters
 from .state import State
 from .utils import create_api_and_app
 
-AUX_HOMES_COUNT = 8
+AUX_HOMES_COUNT = 32
 
 
 def setup_home(home_path: Path):
