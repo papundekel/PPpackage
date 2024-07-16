@@ -163,8 +163,10 @@ jobs:
               run: >
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
-                  run --rm
-                  -T metamanager < examples/input/conan-build.json
+                  run --rm -T
+                  metamanager
+                  /mnt/root --config /mnt/config.json
+                  <examples/input/conan-build.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache
@@ -173,8 +175,9 @@ jobs:
               run: >
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
-                  run --rm
-                  -T metamanager < examples/input/conan-conflict/PP.json
+                  run --rm -T metamanager
+                  /mnt/root --config /mnt/config.json --just-resolve
+                  <examples/input/conan-conflict/PP.json
     # wait for Ubuntu 24
     # fakealpm:
     #     runs-on: ubuntu-latest

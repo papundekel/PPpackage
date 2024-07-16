@@ -2,10 +2,6 @@ services:
     metamanager:
         image: docker.io/fackop/pppackage-metamanager:latest
         user: $USER
-        command:
-            - /mnt/root/
-            - --config
-            - /mnt/config.json
         environment:
             HOST_PWD: $PWD
         volumes:
