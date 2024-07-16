@@ -17,4 +17,4 @@ class State:
     file_lock: InterProcessReaderWriterLock
     api: ConanAPI
     app: ConanApp
-    aux_homes: list[Path]
+    # aux_homes: list[Path]

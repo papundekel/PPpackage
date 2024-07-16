@@ -1,13 +1,13 @@
 from collections.abc import Iterable
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import AsyncIterable
 
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
+
 from PPpackage.repository_driver.interface.schemes import Requirement
 from PPpackage.utils.async_ import Result
-
 from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get as get_epoch
@@ -34,7 +34,7 @@ def get_formula_from_one_cache_impl(home: Path) -> Iterable[list[Requirement]]:
                     api, app, revision, system=True
                 )
             except:
-                return
+                continue
 
             assert requirements is not None
 
@@ -74,14 +74,35 @@ async def get_formula(
     async with rwlock_read(state.coroutine_lock, state.file_lock):
         epoch_result.set(get_epoch(state.database_path / "epoch"))
 
-        with ProcessPoolExecutor() as executor:
-            futures = []
+        for recipe in get_recipes(state.api):
+            for revision in get_revisions(state.api, recipe):
+                try:
+                    requirements, system_requirements = get_requirements(
+                        state.api, state.app, revision, system=True
+                    )
+                except:
+                    continue
 
-            for aux_home in state.aux_homes:
-                future = executor.submit(get_formula_from_one_cache, aux_home)
+                assert requirements is not None
 
-                futures.append(future)
+                revision_requirement = Requirement(
+                    "noop",
+                    f"conan-{revision.name}/{revision.version}#{revision.revision}",
+                    False,
+                )
 
-            for future in as_completed(futures):
-                for clause in future.result():
-                    yield clause
+                for requirement in requirements:
+                    if not requirement.build:
+                        yield [
+                            revision_requirement,
+                            Requirement(
+                                "conan",
+                                {
+                                    "package": str(requirement.ref.name),
+                                    "version": str(requirement.ref.version),
+                                },
+                            ),
+                        ]
+
+                for requirement in system_requirements:
+                    yield [revision_requirement, Requirement("pacman", requirement)]

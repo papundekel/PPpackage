@@ -58,6 +58,15 @@ def download_recipes(
         app.remote_manager.get_recipe(revision, remote)
 
 
+def save_and_restore(
+    source_api: ConanAPI, package_list: PackagesList, destination_api: ConanAPI
+) -> None:
+    with TemporaryDirectory() as temp:
+        archive_path = Path(temp) / "packages"
+        source_api.cache.save(package_list, archive_path)
+        destination_api.cache.restore(archive_path)
+
+
 async def update(state: State) -> None:
     remote = Remote("", url=str(state.url), verify_ssl=state.verify_ssl)
 
@@ -76,8 +85,6 @@ async def update(state: State) -> None:
 
         recipes = state.api.search.recipes("*", remote)
 
-        all_revisions = list[RecipeReference]()
-
         with ThreadPoolExecutor(cpu_count() * 16) as executor:
             futures = list[Future]()
 
@@ -88,24 +95,7 @@ async def update(state: State) -> None:
                     executor.submit(download_recipes, state.app, remote, revisions)
                 )
 
-                all_revisions.extend(revisions)
-
             for future in futures:
                 future.result()
-
-        package_lists = [PackagesList() for _ in state.aux_homes]
-
-        for revision, package_list in zip(all_revisions, cycle(package_lists)):
-            package_list.add_refs([revision])
-
-        for package_list, aux_home in zip(package_lists, state.aux_homes):
-            api, _ = create_api_and_app(aux_home)
-
-            with TemporaryDirectory() as temp:
-                archive_path = temp / "packages"
-
-                state.api.cache.save(package_list, archive_path)
-
-                api.cache.restore(archive_path)
 
         update_epoch(state.database_path / "epoch")
