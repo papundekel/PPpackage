@@ -159,7 +159,7 @@ jobs:
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Run PPpackage
+            - name: Run PPpackage for conan-build
               run: >
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
@@ -168,6 +168,13 @@ jobs:
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache
+
+            - name: Run PPpackage for conan-conflict
+              run: >
+                  USER="$(id -u):$(id -g)" docker compose
+                  --file .github/compose.yaml
+                  run --rm
+                  -T metamanager < examples/input/conan-conflict/PP.json
     # wait for Ubuntu 24
     # fakealpm:
     #     runs-on: ubuntu-latest
