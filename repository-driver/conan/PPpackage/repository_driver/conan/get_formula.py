@@ -1,13 +1,14 @@
 from collections.abc import Iterable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from multiprocessing import cpu_count
 from pathlib import Path
 from typing import AsyncIterable
 
 from conan.api.conan_api import ConanAPI
 from conans.model.recipe_ref import RecipeReference
-
 from PPpackage.repository_driver.interface.schemes import Requirement
 from PPpackage.utils.async_ import Result
+
 from PPpackage.utils.lock.rw import read as rwlock_read
 
 from .epoch import get as get_epoch
@@ -74,7 +75,7 @@ async def get_formula(
     async with rwlock_read(state.coroutine_lock, state.file_lock):
         epoch_result.set(get_epoch(state.database_path / "epoch"))
 
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(2 * cpu_count()) as executor:
             futures = list[Future[list[list[Requirement]]]]()
 
             for aux_home_path in state.aux_home_paths:
