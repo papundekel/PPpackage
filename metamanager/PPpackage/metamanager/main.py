@@ -40,6 +40,8 @@ async def main(
                 )
 
                 containerizer = Containerizer(config.containerizer)
+                containerizer.pull("docker.io/fackop/pppackage-solver", "latest")
+
                 input = validate_json_io(Input, stdin.buffer)
 
                 stderr.write("Resolving...\n")

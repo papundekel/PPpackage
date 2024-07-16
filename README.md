@@ -10,6 +10,23 @@ Promotes building packages from source with binary caching. Provides means to co
 
 Supports and generalizes Conan generators for package consumption.
 
+## Try It out with Podman
+
+This example assumes you have `XDG_RUNTIME_DIR` set and that you have Podman installed.
+It uses the Docker Compose specification and is compatible with both `docker-compose` and `podman-compose`. `podman compose` is able to run both, see the [documentation](https://docs.podman.io/en/latest/markdown/podman-compose.1.html) for more info.
+
+WARNING: `docker-compose` version 1.X is *not* supported. Only version 2.X is.
+
+Note that the update will take a few minutes. Updating fetches newly released packages. Do not update unnecessarily, i. e. when you don't want to synchronize with repositories.
+
+Running for the first time after an update also takes a bit longer. Subsequent runs are much faster.
+
+```bash
+podman system service --time=0 &
+./examples/update/containerized/update.sh podman
+./examples/metamanager/containerized/run.sh podman <examples/input/iana-etc.json
+```
+
 ## Glossary
 
 - **package** - a string identifying a package source. Corresponds to a package version in most managers.
@@ -300,7 +317,7 @@ The meta-manager is able to generate a dot file with the resolution graph.
 python -m PPpackage.metamanager --graph <graph_path> ...
 ```
 
-## Examples
+## More Examples
 
 For all testing scenarios, a clone of the repository is required.
 
@@ -375,7 +392,9 @@ Both Docker and podman are supported.
 
 The only requirements are therefore Docker or podman and a composer (docker-compose or podman-compose).
 
-Also, you need to build the images.
+WARNING: `docker-compose` 1.X is not compatible. Use version 2.X.
+
+It is *optional* to build the images yourself. They are hosted on [dockerhub](https://hub.docker.com/).
 
 ```bash
 ./images-build.sh $containerizer

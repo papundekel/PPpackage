@@ -58,6 +58,10 @@ class Containerizer:
 
             return return_code
 
+    def pull(self, repository: str, tag: str):
+        with PodmanClient(base_url=str(self.config.url)) as client:
+            client.images.pull(repository, tag)
+
     def translate(self, container_path: Path):
         for path_translation in self.config.path_translations:
             if container_path.absolute().is_relative_to(path_translation.container):
