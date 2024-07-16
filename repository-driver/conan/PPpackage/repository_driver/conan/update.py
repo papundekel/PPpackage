@@ -1,20 +1,23 @@
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
+from itertools import cycle
 from multiprocessing import cpu_count
 from pathlib import Path
 from sys import stderr
 from typing import cast as type_cast
 
 from conan.api.conan_api import ConanAPI
-from conan.api.model import Remote
+from conan.api.model import PackagesList, Remote
 from conan.internal.conan_app import ConanApp
 from conans.errors import ConanException
 from conans.model.recipe_ref import RecipeReference
 
+from PPpackage.utils.file import TemporaryDirectory
 from PPpackage.utils.lock.rw import write as rwlock_write
 
 from .epoch import update as update_epoch
 from .state import State
+from .utils import create_api_and_app
 
 
 def fetch_revisions(
@@ -73,6 +76,8 @@ async def update(state: State) -> None:
 
         recipes = state.api.search.recipes("*", remote)
 
+        all_revisions = list[RecipeReference]()
+
         with ThreadPoolExecutor(cpu_count() * 16) as executor:
             futures = list[Future]()
 
@@ -83,7 +88,24 @@ async def update(state: State) -> None:
                     executor.submit(download_recipes, state.app, remote, revisions)
                 )
 
+                all_revisions.extend(revisions)
+
             for future in futures:
                 future.result()
+
+        package_lists = [PackagesList() for _ in state.aux_homes]
+
+        for revision, package_list in zip(all_revisions, cycle(package_lists)):
+            package_list.add_refs([revision])
+
+        for package_list, aux_home in zip(package_lists, state.aux_homes):
+            api, _ = create_api_and_app(aux_home)
+
+            with TemporaryDirectory() as temp:
+                archive_path = temp / "packages"
+
+                state.api.cache.save(package_list, archive_path)
+
+                api.cache.restore(archive_path)
 
         update_epoch(state.database_path / "epoch")

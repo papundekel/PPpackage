@@ -2,6 +2,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated
 
+from conan.api.conan_api import ConanAPI
+from conan.internal.conan_app import ConanApp
 from pydantic import AnyUrl, BaseModel
 
 from PPpackage.utils.json.validator import WithVariables
