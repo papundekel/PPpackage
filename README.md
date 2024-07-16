@@ -10,6 +10,20 @@ Promotes building packages from source with binary caching. Provides means to co
 
 Supports and generalizes Conan generators for package consumption.
 
+## Try It out with Podman
+
+This example assumes you have `XDG_RUNTIME_DIR` set and that you have Podman installed.
+
+Note that the update will take a few minutes. Updating fetches newly released packages. Do not update unnecessarily, i. e. when you don't want to synchronize with repositories.
+
+Running for the first time after an update also takes a bit longer. Subsequent runs are much faster.
+
+```bash
+podman system service --time=0 &
+./examples/update/containerized/update.sh podman
+./examples/metamanager/containerized/run.sh podman <examples/input/iana-etc.json
+```
+
 ## Glossary
 
 - **package** - a string identifying a package source. Corresponds to a package version in most managers.
