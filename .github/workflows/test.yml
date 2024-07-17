@@ -100,80 +100,85 @@ jobs:
                   cd /home/runner/.PPpackage/
                   mkdir -p cache/ repository/
                   cd repository/
-                  mkdir -p 0/ 1/ 2/ 3/
+                  mkdir -p archlinux-core/ archlinux-extra/ AUR/ conancenter/
 
-            - name: Update archlinux core database
+            - name: Update archlinux-core
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=/home/runner/.PPpackage/repository/0/,target=/mnt/repository/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/archlinux-core/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=core
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
+                  archlinux-core
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Update archlinux extra database
+            - name: Update archlinux-extra
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=/home/runner/.PPpackage/repository/1/,target=/mnt/repository/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/archlinux-extra/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-pacman.json,target=/mnt/repository.json
                   --env REPOSITORY=extra
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.pacman
+                  archlinux-extra
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Update AUR database
+            - name: Update AUR
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=/home/runner/.PPpackage/repository/2/,target=/mnt/repository/
-                  --env DATABASE_PATH=/mnt/database/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/AUR/,target=/mnt/repository/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.AUR
+                  AUR
                   --data-path /mnt/repository/
 
-            - name: Check if conancenter database exists
-              id: check_conancenter
-              uses: andstor/file-existence-action@v3.0.0
-              with:
-                  files: database/conancenter/cache/
-
-            - name: Update conancenter database
-              if: steps.check_conancenter.outputs.files_exists == 'false'
+            - name: Update conancenter
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
-                  --mount type=bind,source=/home/runner/.PPpackage/repository/3/,target=/mnt/repository/
+                  --mount type=bind,source=/home/runner/.PPpackage/repository/conancenter/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-conancenter.json,target=/mnt/repository.json
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.conan
+                  conancenter
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Run PPpackage
+            - name: Run PPpackage for conan-build
               run: >
                   USER="$(id -u):$(id -g)" docker compose
                   --file .github/compose.yaml
-                  run --rm
-                  -T metamanager < examples/input/conan-build.json
+                  run --rm -T
+                  metamanager
+                  /mnt/root --config /mnt/config.json
+                  <examples/input/conan-build.json
 
             - name: Test alpm hooks (check if ldconfig ran)
               run: ls -l root/etc/ld.so.cache
-    # wait for Ubuntu 24
-    # fakealpm:
-    #     runs-on: ubuntu-latest
-    #     steps:
-    #         - uses: actions/checkout@v4.1.1
 
-    #         - name: Install fakealpm dependencies
-    #           uses: awalsh128/cache-apt-pkgs-action@v1.4.2
-    #           with:
-    #               packages: libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
+            - name: Run PPpackage for conan-conflict
+              run: >
+                  USER="$(id -u):$(id -g)" docker compose
+                  --file .github/compose.yaml
+                  run --rm -T metamanager
+                  /mnt/root --config /mnt/config.json --just-resolve
+                  <examples/input/conan-conflict/PP.json
+    # wait for Ubuntu 24 becoming ubuntu-latest
+    fakealpm:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-    #         - name: Build fakelpm
-    #           run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local
+            - name: Install fakealpm dependencies
+              uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+              with:
+                  packages: libarchive-dev libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
+
+            - name: Build fakelpm
+              run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local

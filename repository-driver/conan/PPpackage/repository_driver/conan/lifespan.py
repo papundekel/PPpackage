@@ -3,12 +3,22 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from aiorwlock import RWLock
-from conan.api.conan_api import ConanAPI
-from conan.internal.conan_app import ConanApp
 from fasteners import InterProcessReaderWriterLock
 
 from .schemes import DriverParameters, RepositoryParameters
 from .state import State
+from .utils import create_api_and_app
+
+AUX_HOMES_COUNT = 16
+
+
+def setup_home(home_path: Path):
+    home_path.mkdir(parents=True, exist_ok=True)
+
+    with (home_path / "global.conf").open("w") as file:
+        file.write("tools.system.package_manager:mode = report\n")
+
+    return home_path
 
 
 @asynccontextmanager
@@ -26,14 +36,17 @@ async def lifespan(
     coroutine_lock = RWLock()
     file_lock = InterProcessReaderWriterLock(database_path / "lock")
 
-    conan_home_path = database_path / "conan-home"
-    conan_home_path.mkdir(exist_ok=True, parents=True)
+    homes_path = database_path / "homes"
+    homes_path.mkdir(parents=True, exist_ok=True)
 
-    with (conan_home_path / "global.conf").open("w") as file:
-        file.write("tools.system.package_manager:mode = report\n")
+    main_home_path = homes_path / "main"
+    setup_home(main_home_path)
 
-    api = ConanAPI(str(conan_home_path.absolute()))
-    app = ConanApp(api)
+    api, app = create_api_and_app(main_home_path)
+
+    aux_home_paths = [
+        setup_home(homes_path / f"aux-{i}") for i in range(AUX_HOMES_COUNT)
+    ]
 
     yield State(
         database_path,
@@ -43,4 +56,5 @@ async def lifespan(
         file_lock,
         api,
         app,
+        aux_home_paths,
     )

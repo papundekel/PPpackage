@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from pathlib import Path
 
 from conan.api.conan_api import ConanAPI
 from conan.internal.conan_app import ConanApp
@@ -41,3 +42,10 @@ def get_requirements(
         return requirements, system_requirements
 
     return requirements, []
+
+
+def create_api_and_app(home_path: Path):
+    api = ConanAPI(str(home_path.absolute()))
+    app = ConanApp(api)
+
+    return api, app

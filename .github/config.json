@@ -57,6 +57,7 @@
     },
     "repositories": [
         {
+            "name": "archlinux-core",
             "driver": "pacman",
             "parameters": {
                 "mirrorlist": [
@@ -65,6 +66,7 @@
             }
         },
         {
+            "name": "archlinux-extra",
             "driver": "pacman",
             "parameters": {
                 "mirrorlist": [
@@ -73,9 +75,11 @@
             }
         },
         {
+            "name": "AUR",
             "driver": "AUR"
         },
         {
+            "name": "conancenter",
             "driver": "conan",
             "parameters": {
                 "url": "https://center.conan.io",

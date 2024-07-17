@@ -9,7 +9,7 @@ from PPpackage.utils.file import TemporaryDirectory
 from PPpackage.utils.json.validate import validate_json
 
 from .epoch import update as update_epoch
-from .schemes import AURPackage, DriverParameters, RepositoryParameters
+from .schemes import AURPackage
 from .state import State
 from .utils import transaction
 
