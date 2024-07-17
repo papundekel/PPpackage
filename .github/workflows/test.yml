@@ -138,14 +138,7 @@ jobs:
                   AUR
                   --data-path /mnt/repository/
 
-            - name: Check if conancenter exists
-              id: check_conancenter
-              uses: andstor/file-existence-action@v3.0.0
-              with:
-                  files: /home/runner/.PPpackage/repository/conancenter/epoch
-
             - name: Update conancenter
-              if: steps.check_conancenter.outputs.files_exists == 'false'
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
