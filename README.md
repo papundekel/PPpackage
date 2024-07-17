@@ -449,7 +449,7 @@ This creates the image rootfs in the `tmp/root` directory and generators in `tmp
 ```bash
 ./examples/project/compressor/build-in-container.sh $containerizer $PWD/tmp/root $PWD/tmp/output/generators
 
-./examples/project/compressor/build/output/compressor
+./examples/project/compressor/build/compressor
 ```
 
 We can also invoke the meta-manager directly without the `run.sh` scripts and then we would not have to move the directories as we could specify the output directories directly. The only problem with this method is that the containerized meta-manager needs to have path translations for the containerizer set for the root directory and that requires changing the config.json file. The native version doesn't have this problem as it resides in the same mount namespace as the containerizer.

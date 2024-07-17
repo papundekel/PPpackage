@@ -3,6 +3,8 @@ if [ -z "$1" ] || ([ "$1" != "docker" ] && [ "$1" != "podman" ]); then
     exit 1
 fi
 
+project_root="$PWD/examples/project/compressor"
+
 mkdir -p "$project_root/build"
 
 "$1" run --rm \
