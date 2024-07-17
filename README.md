@@ -22,6 +22,8 @@ Note that the update will take a few minutes. Updating fetches newly released pa
 Running for the first time after an update also takes a bit longer. Subsequent runs are much faster.
 
 ```bash
+git clone https://github.com/papundekel/PPpackage
+cd PPpackage/
 podman system service --time=0 &
 ./examples/update/containerized/update.sh podman
 ./examples/metamanager/containerized/run.sh podman <examples/input/iana-etc.json
