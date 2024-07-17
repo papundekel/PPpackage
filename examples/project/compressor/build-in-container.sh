@@ -7,7 +7,7 @@ project_root="$PWD/examples/project/compressor"
 
 mkdir -p "$project_root/build"
 
-"$1" run --rm \
+"$1" run --rm --security-opt label=disable \
     --mount type=bind,source="$3",target=/mnt/generators \
     --mount type=bind,source="$project_root/compressor",target=/mnt/source \
     --mount type=bind,source="$project_root/build",target=/mnt/build \
