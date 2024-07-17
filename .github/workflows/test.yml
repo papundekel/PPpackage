@@ -169,16 +169,16 @@ jobs:
                   run --rm -T metamanager
                   /mnt/root --config /mnt/config.json --just-resolve
                   <examples/input/conan-conflict/PP.json
-    # wait for Ubuntu 24
-    # fakealpm:
-    #     runs-on: ubuntu-latest
-    #     steps:
-    #         - uses: actions/checkout@v4.1.1
+    # wait for Ubuntu 24 becoming ubuntu-latest
+    fakealpm:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4.1.1
 
-    #         - name: Install fakealpm dependencies
-    #           uses: awalsh128/cache-apt-pkgs-action@v1.4.2
-    #           with:
-    #               packages: libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
+            - name: Install fakealpm dependencies
+              uses: awalsh128/cache-apt-pkgs-action@v1.4.2
+              with:
+                  packages: libalpm-dev gcc cmake ninja-build libboost-dev nlohmann-json3-dev
 
-    #         - name: Build fakelpm
-    #           run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local
+            - name: Build fakelpm
+              run: ./installer/pacman/fakealpm/build.sh installer/pacman/fakealpm/ installer/pacman/fakealpm/build/ /usr/local
