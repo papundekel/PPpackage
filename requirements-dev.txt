@@ -2,45 +2,45 @@ pre-commit
 hypercorn
 setuptools
 
--e ./utils/json --config-settings editable_mode=compat
--e ./utils/async --config-settings editable_mode=compat
--e ./utils/cli --config-settings editable_mode=compat
--e ./utils/container --config-settings editable_mode=compat
--e ./utils/file --config-settings editable_mode=compat
--e ./utils/lock --config-settings editable_mode=compat
--e ./utils/python --config-settings editable_mode=compat
--e ./utils/serialization --config-settings editable_mode=compat
+-e ./src/utils/json --config-settings editable_mode=compat
+-e ./src/utils/async --config-settings editable_mode=compat
+-e ./src/utils/cli --config-settings editable_mode=compat
+-e ./src/utils/container --config-settings editable_mode=compat
+-e ./src/utils/file --config-settings editable_mode=compat
+-e ./src/utils/lock --config-settings editable_mode=compat
+-e ./src/utils/python --config-settings editable_mode=compat
+-e ./src/utils/serialization --config-settings editable_mode=compat
 
 
 
--e ./repository-driver/interface/ --config-settings editable_mode=compat
+-e ./src/repository-driver/interface/ --config-settings editable_mode=compat
 
--e ./repository-driver/update/
+-e ./src/repository-driver/update/
 
--e ./repository-driver/conan/
--e ./repository-driver/pacman/
--e ./repository-driver/AUR/
-
-
-
--e ./installer/interface/ --config-settings editable_mode=compat
-
--e ./installer/pacman/
--e ./installer/conan/
+-e ./src/repository-driver/conan/
+-e ./src/repository-driver/pacman/
+-e ./src/repository-driver/AUR/
 
 
 
--e ./translator/interface/ --config-settings editable_mode=compat
+-e ./src/installer/interface/ --config-settings editable_mode=compat
 
--e ./translator/pacman/
--e ./translator/conan/
-
-
-
--e ./generator/interface/ --config-settings editable_mode=compat
-
--e ./generator/conan/
+-e ./src/installer/pacman/
+-e ./src/installer/conan/
 
 
 
--e ./metamanager/
+-e ./src/translator/interface/ --config-settings editable_mode=compat
+
+-e ./src/translator/pacman/
+-e ./src/translator/conan/
+
+
+
+-e ./src/generator/interface/ --config-settings editable_mode=compat
+
+-e ./src/generator/conan/
+
+
+
+-e ./src/metamanager/

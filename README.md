@@ -349,7 +349,7 @@ All examples use config `unix://$XDG_RUNTIME_DIR/podman/podman.sock` for the con
 The SAT solver the meta-manager uses is invoked as a container. Therefore the image for the solver needs to be built.
 
 ```bash
-./solver/image-build.sh $containerizer
+./image-build.sh $containerizer solver
 ```
 
 #### Native invocation
@@ -399,7 +399,8 @@ WARNING: `docker-compose` 1.X is not compatible. Use version 2.X.
 It is *optional* to build the images yourself. They are hosted on [dockerhub](https://hub.docker.com/).
 
 ```bash
-./images-build.sh $containerizer
+./image-build.sh $containerizer metamanager
+./image-build.sh $containerizer updater
 ```
 
 Docker requires more configuration because of how
