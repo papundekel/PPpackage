@@ -444,14 +444,12 @@ First, the build context for the project is created with our meta-manager:
 ./examples/metamanager/$method/run.sh < examples/project/compressor/requirements.json
 ```
 
-Next we need to move the directories from `tmp/`. `tmp/root` goes to `examples/project/compressor/build/root` and `tmp/output/generators/` into `examples/project/compressor/build/generators/`.
-
-Then we can run the provided script, which uses the `root/` directory as image rootfs and builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation.
+This creates the image rootfs in the `tmp/root` directory and generators in `tmp/output/generators`. Then we can run the provided script, which builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation. The paths to the image rootfs and generators need to be absolute.
 
 ```bash
-./examples/project/compressor/build-in-container.sh $containerizer
+./examples/project/compressor/build-in-container.sh $containerizer $PWD/tmp/root $PWD/tmp/output/generators
 
-./examples/project/compressor/build/output/compressor
+./examples/project/compressor/build/compressor
 ```
 
 We can also invoke the meta-manager directly without the `run.sh` scripts and then we would not have to move the directories as we could specify the output directories directly. The only problem with this method is that the containerized meta-manager needs to have path translations for the containerizer set for the root directory and that requires changing the config.json file. The native version doesn't have this problem as it resides in the same mount namespace as the containerizer.

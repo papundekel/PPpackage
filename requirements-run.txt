@@ -1,0 +1,42 @@
+./src/utils/json --config-settings editable_mode=compat
+./src/utils/async --config-settings editable_mode=compat
+./src/utils/cli --config-settings editable_mode=compat
+./src/utils/container --config-settings editable_mode=compat
+./src/utils/file --config-settings editable_mode=compat
+./src/utils/lock --config-settings editable_mode=compat
+./src/utils/python --config-settings editable_mode=compat
+./src/utils/serialization --config-settings editable_mode=compat
+
+
+
+./src/repository-driver/interface/ --config-settings editable_mode=compat
+
+./src/repository-driver/update/
+
+./src/repository-driver/conan/
+./src/repository-driver/pacman/
+./src/repository-driver/AUR/
+
+
+
+./src/installer/interface/ --config-settings editable_mode=compat
+
+./src/installer/pacman/
+./src/installer/conan/
+
+
+
+./src/translator/interface/ --config-settings editable_mode=compat
+
+./src/translator/pacman/
+./src/translator/conan/
+
+
+
+./src/generator/interface/ --config-settings editable_mode=compat
+
+./src/generator/conan/
+
+
+
+./src/metamanager/
