@@ -4,10 +4,9 @@ from pathlib import Path
 from sys import stderr, stdin
 
 from httpx import Client as HTTPClient
-from sqlitedict import SqliteDict
-
 from PPpackage.utils.container import Containerizer
 from PPpackage.utils.json.validate import validate_json_io, validate_json_io_path
+from sqlitedict import SqliteDict
 
 from .create_graph import create_graph, write_graph_to_file
 from .exceptions import HandledException, handle_exception_group
@@ -43,7 +42,9 @@ async def main(
                 containerizer = Containerizer(config.containerizer)
 
                 print("Pulling the solver image...", file=stderr)
-                containerizer.pull("docker.io/fackop/pppackage-solver", "latest")
+                containerizer.pull_if_missing(
+                    "docker.io/fackop/pppackage-solver:latest"
+                )
 
                 input = validate_json_io(Input, stdin.buffer)
 
