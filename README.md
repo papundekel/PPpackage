@@ -444,12 +444,10 @@ First, the build context for the project is created with our meta-manager:
 ./examples/metamanager/$method/run.sh < examples/project/compressor/requirements.json
 ```
 
-Next we need to move the directories from `tmp/`. `tmp/root` goes to `examples/project/compressor/build/root` and `tmp/output/generators/` into `examples/project/compressor/build/generators/`.
-
-Then we can run the provided script, which uses the `root/` directory as image rootfs and builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation.
+This creates the image rootfs in the `tmp/root` directory and generators in `tmp/output/generators`. Then we can run the provided script, which builds the project with build script `examples/project/compressor/build.sh`. The script is just the modified version of commands run in the Conan documentation. The paths to the image rootfs and generators need to be absolute.
 
 ```bash
-./examples/project/compressor/build-in-container.sh $containerizer
+./examples/project/compressor/build-in-container.sh $containerizer $PWD/tmp/root $PWD/tmp/output/generators
 
 ./examples/project/compressor/build/output/compressor
 ```

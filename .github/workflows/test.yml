@@ -169,6 +169,24 @@ jobs:
                   run --rm -T metamanager
                   /mnt/root --config /mnt/config.json --just-resolve
                   <examples/input/conan-conflict/PP.json
+
+            - name: Clean meta-manager outputs
+              run: rm -rf output/ root/
+
+            - name: Run PPpackage for project compressor
+              run: >
+                  USER="$(id -u):$(id -g)" docker compose
+                  --file .github/compose.yaml
+                  run --rm -T
+                  metamanager
+                  /mnt/root --config /mnt/config.json
+                  <examples/project/compressor/requirements.json
+
+            - name: Build project compressor
+              run: ./examples/project/compressor/build-in-container.sh docker ${{ github.workspace }}/root ${{ github.workspace }}/output/generators
+
+            - name: Run project compressor
+              run: ./examples/project/compressor/build/output/compressor
     # wait for Ubuntu 24 becoming ubuntu-latest
     fakealpm:
         runs-on: ubuntu-24.04
