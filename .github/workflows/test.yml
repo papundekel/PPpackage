@@ -102,7 +102,7 @@ jobs:
                   cd repository/
                   mkdir -p archlinux-core/ archlinux-extra/ AUR/ conancenter/
 
-            - name: Update archlinux core database
+            - name: Update archlinux-core
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
@@ -115,7 +115,7 @@ jobs:
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Update archlinux extra database
+            - name: Update archlinux-extra
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
@@ -128,7 +128,7 @@ jobs:
                   --data-path /mnt/repository/
                   --repository-config /mnt/repository.json
 
-            - name: Update AUR database
+            - name: Update AUR
               run: >
                   docker run --rm
                   --user $(id -u):$(id -g)
@@ -138,13 +138,13 @@ jobs:
                   AUR
                   --data-path /mnt/repository/
 
-            - name: Check if conancenter database exists
+            - name: Check if conancenter exists
               id: check_conancenter
               uses: andstor/file-existence-action@v3.0.0
               with:
                   files: /home/runner/.PPpackage/repository/conancenter/epoch
 
-            - name: Update conancenter database
+            - name: Update conancenter
               if: steps.check_conancenter.outputs.files_exists == 'false'
               run: >
                   docker run --rm
