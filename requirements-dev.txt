@@ -1,6 +1,4 @@
 pre-commit
-hypercorn
-setuptools
 
 -e ./src/utils/json --config-settings editable_mode=compat
 -e ./src/utils/async --config-settings editable_mode=compat
