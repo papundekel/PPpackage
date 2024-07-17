@@ -133,7 +133,6 @@ jobs:
                   docker run --rm
                   --user $(id -u):$(id -g)
                   --mount type=bind,source=/home/runner/.PPpackage/repository/AUR/,target=/mnt/repository/
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.AUR
                   AUR
@@ -143,7 +142,7 @@ jobs:
               id: check_conancenter
               uses: andstor/file-existence-action@v3.0.0
               with:
-                  files: database/conancenter/cache/
+                  files: /home/runner/.PPpackage/repository/conancenter/epoch
 
             - name: Update conancenter database
               if: steps.check_conancenter.outputs.files_exists == 'false'
@@ -152,7 +151,6 @@ jobs:
                   --user $(id -u):$(id -g)
                   --mount type=bind,source=/home/runner/.PPpackage/repository/conancenter/,target=/mnt/repository/
                   --mount type=bind,source=${{ github.workspace }}/examples/update/repository-conancenter.json,target=/mnt/repository.json
-                  --env DATABASE_PATH=/mnt/database/
                   docker.io/fackop/pppackage-updater:latest
                   PPpackage.repository_driver.conan
                   conancenter
